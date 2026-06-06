@@ -1,0 +1,1254 @@
+import 'package:image_cropper/image_cropper.dart';
+import 'dart:io';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:account_app/core/models/account_model.dart';
+import 'package:account_app/core/services/theme_service.dart';
+import 'package:account_app/core/services/language_service.dart';
+import 'package:account_app/core/services/database_service.dart';
+import 'package:account_app/core/services/auth_service.dart';
+import 'package:account_app/core/services/auto_sync_service.dart';
+import 'package:account_app/core/services/security_service.dart';
+import 'package:account_app/core/services/backup_service.dart';
+import 'package:account_app/core/services/pdf_service.dart';
+import 'package:account_app/core/services/excel_service.dart';
+import 'package:account_app/core/utils/formatters.dart';
+import 'app_lock_screen.dart';
+import 'package:account_app/features/inventory/seller_items_screen.dart';
+import 'package:account_app/core/theme/app_theme.dart';
+import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/widgets/profile_info_widget.dart';
+
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  _SettingsScreenState createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  bool _isAppLockEnabled = false;
+  bool _isBiometricEnabled = false;
+  bool _isBiometricHardwareAvailable = false;
+  String _appVersion = '1.0.0';
+  String? _address;
+  String? _slogan;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettingsData();
+  }
+
+  Future<void> _loadSettingsData() async {
+    final securityService = Provider.of<SecurityService>(context, listen: false);
+    final isEnabled = await securityService.isAppLockEnabled();
+    final isBioEnabled = await securityService.isBiometricEnabled();
+    final isHardwareAvailable = await securityService.isBiometricsAvailable();
+    final packageInfo = await PackageInfo.fromPlatform();
+    
+    // Fetch user profile extra data from Firestore
+    String? address;
+    String? slogan;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists) {
+        address = doc.data()?['address'];
+        slogan = doc.data()?['slogan'];
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _isAppLockEnabled = isEnabled;
+        _isBiometricEnabled = isBioEnabled;
+        _isBiometricHardwareAvailable = isHardwareAvailable;
+        _appVersion = packageInfo.version;
+        _address = address;
+        _slogan = slogan;
+      });
+    }
+  }
+
+  Widget _buildShimmerLoading() {
+    return const _ShimmerBox(width: 74, height: 74);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final languageService = Provider.of<LanguageService>(context);
+    final isUrdu = languageService.isUrdu;
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
+    final user = FirebaseAuth.instance.currentUser;
+    final photoUrl = user?.photoURL;
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: CustomAppBar(
+        title: isUrdu ? 'ترتیبات' : 'Settings',
+        showBackButton: false,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        children: [
+          // User Profile Card
+          InkWell(
+            onTap: () => _showEditProfileDialog(context, isUrdu, user),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.12), width: 1),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ProfileInfoWidget(
+                      name: user?.displayName ?? (isUrdu ? 'صارف کا نام' : 'User Name'),
+                      phone: user?.phoneNumber ?? (isUrdu ? 'معلومات دستیاب نہیں' : 'Info not available'),
+                      profileImage: photoUrl,
+                      isLarge: true,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Edit Action Icon
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).dividerColor.withOpacity(0.05),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(PhosphorIcons.pencilSimple(PhosphorIconsStyle.bold), color: Theme.of(context).iconTheme.color, size: 14),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // General Settings Section
+          _buildSectionHeader(isUrdu ? 'عمومی ترتیبات' : 'General Settings', fontFamily, isUrdu),
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.12), width: 1),
+            ),
+            child: Column(
+              children: [
+                _buildSettingItem(
+                  icon: PhosphorIcons.translate(),
+                  title: isUrdu ? 'زبان' : 'Language',
+                  onTap: () => _showLanguageDialog(context, languageService),
+                  fontFamily: fontFamily,
+                  isUrdu: isUrdu,
+                  trailing: Text(
+                    isUrdu ? 'اردو' : 'English',
+                    style: TextStyle(
+                      color: AppTheme.themeColor, 
+                      fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal, 
+                      fontFamily: fontFamily,
+                      fontSize: 16, // سائز مزید بڑھا دیا گیا
+                    ),
+                  ),
+                  context: context,
+                ),
+                /* _buildDivider(context),
+                _buildSettingItem(
+                  icon: PhosphorIcons.moon(),
+                  title: isUrdu ? 'ڈارک موڈ' : 'Dark Mode',
+                  onTap: () {},
+                  fontFamily: fontFamily,
+                  isUrdu: isUrdu,
+                  trailing: Consumer<ThemeService>(
+                    builder: (context, themeService, child) {
+                      return Switch(
+                        value: themeService.themeMode == ThemeMode.dark,
+                        activeColor: AppTheme.themeColor,
+                        onChanged: (value) {
+                          themeService.changeTheme(value ? 'dark' : 'light');
+                        },
+                      );
+                    },
+                  ),
+                  context: context,
+                ), */
+                _buildDivider(context),
+                _buildSettingItem(
+                  icon: PhosphorIcons.lock(),
+                  title: isUrdu ? 'ایپ لاک' : 'App Lock',
+                  onTap: () => _toggleAppLock(context, isUrdu),
+                  fontFamily: fontFamily,
+                  isUrdu: isUrdu,
+                  trailing: Switch(
+                    value: _isAppLockEnabled,
+                    activeColor: AppTheme.themeColor,
+                    onChanged: (value) => _toggleAppLock(context, isUrdu),
+                  ),
+                  context: context,
+                ),
+                if (_isAppLockEnabled) ...[
+                  _buildDivider(context),
+                  _buildSettingItem(
+                    icon: PhosphorIcons.key(),
+                    title: isUrdu ? 'پن کوڈ تبدیل کریں' : 'Change PIN',
+                    onTap: () => _changePin(context, isUrdu),
+                    fontFamily: fontFamily,
+                    isUrdu: isUrdu,
+                    context: context,
+                  ),
+                  if (_isBiometricHardwareAvailable) ...[
+                    _buildDivider(context),
+                    _buildSettingItem(
+                      icon: PhosphorIcons.fingerprint(),
+                      title: isUrdu ? 'بائیو میٹرک' : 'Biometric',
+                      onTap: () => _toggleBiometric(context, isUrdu),
+                      fontFamily: fontFamily,
+                      isUrdu: isUrdu,
+                      trailing: Switch(
+                        value: _isBiometricEnabled,
+                        activeColor: AppTheme.themeColor,
+                        onChanged: (value) => _toggleBiometric(context, isUrdu),
+                      ),
+                      context: context,
+                    ),
+                  ],
+                ],
+                _buildDivider(context),
+                _buildSettingItem(
+                  icon: PhosphorIcons.package(),
+                  title: isUrdu ? 'آئٹم مینجمنٹ' : 'Item Management',
+                  onTap: () {
+                    final user = FirebaseAuth.instance.currentUser;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SellerItemsScreen(
+                          sellerUid: user?.uid ?? '',
+                          sellerName: user?.displayName ?? 'My Store',
+                        ),
+                      ),
+                    );
+                  },
+                  fontFamily: fontFamily,
+                  isUrdu: isUrdu,
+                  trailing: Consumer<DatabaseService>(
+                    builder: (context, dbService, child) {
+                      final count = dbService.getInventoryItems().length;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.themeColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '$count',
+                          style: const TextStyle(
+                            color: AppTheme.themeColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            fontFamily: '',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  context: context,
+                ),
+                _buildDivider(context),
+                _buildSettingItem(
+                  icon: PhosphorIcons.cloudArrowUp(),
+                  title: isUrdu ? 'ڈیٹا سینک' : 'Data Sync',
+                  onTap: () => _syncData(context, isUrdu),
+                  fontFamily: fontFamily,
+                  isUrdu: isUrdu,
+                  context: context,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Data Management Section
+          _buildSectionHeader(isUrdu ? 'ڈیٹا مینجمنٹ' : 'Data Management', fontFamily, isUrdu),
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.12), width: 1),
+            ),
+            child: Column(
+              children: [
+                _buildSettingItem(
+                  icon: PhosphorIcons.filePdf(),
+                  title: isUrdu ? 'پی ڈی ایف رپورٹ' : 'PDF Report',
+                  onTap: () => _showExportDialog(context, isUrdu),
+                  fontFamily: fontFamily,
+                  isUrdu: isUrdu,
+                  context: context,
+                ),
+                _buildDivider(context),
+                _buildSettingItem(
+                  icon: PhosphorIcons.database(),
+                  title: isUrdu ? 'بیک اپ اور بحالی' : 'Backup & Restore',
+                  onTap: () => _showBackupDialog(context, isUrdu),
+                  fontFamily: fontFamily,
+                  isUrdu: isUrdu,
+                  context: context,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Application Section
+          _buildSectionHeader(isUrdu ? 'ایپلی کیشن' : 'Application', fontFamily, isUrdu),
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.12), width: 1),
+            ),
+            child: Column(
+              children: [
+                _buildSettingItem(
+                  icon: PhosphorIcons.info(),
+                  title: isUrdu ? 'ایپ کے بارے میں' : 'About App',
+                  onTap: () => _showAboutAppDialog(context, isUrdu, fontFamily),
+                  fontFamily: fontFamily,
+                  isUrdu: isUrdu,
+                  context: context,
+                ),
+                _buildDivider(context),
+                _buildSettingItem(
+                  icon: PhosphorIcons.shareNetwork(),
+                  title: isUrdu ? 'ایپ شیئر کریں' : 'Share App',
+                  onTap: () => _shareApp(context, isUrdu),
+                  fontFamily: fontFamily,
+                  isUrdu: isUrdu,
+                  context: context,
+                ),
+                _buildDivider(context),
+                _buildSettingItem(
+                  icon: PhosphorIcons.star(),
+                  title: isUrdu ? 'ایپ کو ریٹ کریں' : 'Rate App',
+                  onTap: () => _rateApp(context, isUrdu),
+                  fontFamily: fontFamily,
+                  isUrdu: isUrdu,
+                  context: context,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Help Card
+          InkWell(
+            onTap: () => _contactUs(context, isUrdu),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.shade400),
+              ),
+              child: Row(
+                children: [
+                  Icon(PhosphorIcons.headset(), size: 32, color: Colors.green.shade700),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      isUrdu ? 'ہم آپ کی کیسے مدد کر سکتے ہیں؟' : 'How can we help you?',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
+                        color: Colors.green.shade900,
+                        fontFamily: fontFamily,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Logout Button
+          TextButton.icon(
+            onPressed: () => _showLogoutDialog(context, isUrdu),
+            icon: Icon(PhosphorIcons.signOut(), color: Colors.red),
+            label: Text(
+              isUrdu ? 'لاگ آؤٹ' : 'Logout',
+              style: TextStyle(color: Colors.red, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal, fontFamily: fontFamily),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () => _showDeactivateDialog(context, isUrdu),
+            icon: Icon(PhosphorIcons.userMinus(), color: Colors.red.withOpacity(0.7)),
+            label: Text(
+              isUrdu ? 'اکاؤنٹ ختم کریں' : 'Deactivate Account',
+              style: TextStyle(color: Colors.red.withOpacity(0.7), fontSize: 13, fontFamily: fontFamily),
+            ),
+          ),
+          const SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, String fontFamily, bool isUrdu) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
+          color: Theme.of(context).textTheme.bodySmall?.color,
+          fontFamily: fontFamily,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    required String fontFamily,
+    required bool isUrdu,
+    required BuildContext context,
+    Widget? trailing,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: Theme.of(context).iconTheme.color, size: 22),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 16,
+          color: Theme.of(context).textTheme.titleMedium?.color,
+          fontFamily: fontFamily,
+          fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      trailing: trailing ?? Icon(PhosphorIcons.caretRight(), color: Theme.of(context).textTheme.bodySmall?.color, size: 18),
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildDivider(BuildContext context) {
+    return Divider(height: 1, thickness: 0.5, color: Theme.of(context).dividerColor.withOpacity(0.12), indent: 50);
+  }
+
+  void _showEditProfileDialog(BuildContext context, bool isUrdu, User? user) {
+    final nameController = TextEditingController(text: user?.displayName);
+    final addressController = TextEditingController(text: _address);
+    final sloganController = TextEditingController(text: _slogan);
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
+    bool isUpdating = false;
+    File? localImage;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final currentUser = FirebaseAuth.instance.currentUser;
+          return Container(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 20),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isUrdu ? 'پروفائل اپڈیٹ کریں' : 'Update Profile',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal, 
+                    fontFamily: fontFamily,
+                    color: Theme.of(context).textTheme.titleLarge?.color,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                GestureDetector(
+                  onTap: () async {
+                    final picker = ImagePicker();
+                    final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+                    if (image != null) {
+                      final croppedFile = await ImageCropper().cropImage(
+                        sourcePath: image.path,
+                        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+                        compressQuality: 70,
+                        uiSettings: [
+                          AndroidUiSettings(
+                            toolbarTitle: isUrdu ? 'تصویر تراشیں' : 'Crop Image',
+                            toolbarColor: AppTheme.darkColor,
+                            toolbarWidgetColor: Colors.white,
+                            initAspectRatio: CropAspectRatioPreset.square,
+                            lockAspectRatio: true,
+                          ),
+                          IOSUiSettings(
+                            title: isUrdu ? 'تصویر تراشیں' : 'Crop Image',
+                          ),
+                        ],
+                      );
+                      if (croppedFile != null) {
+                        setModalState(() {
+                          localImage = File(croppedFile.path);
+                        });
+                      }
+                    }
+                  },
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.12), width: 1),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            width: 120,
+                            height: 120,
+                            color: Theme.of(context).dividerColor.withOpacity(0.05),
+                            child: localImage != null
+                                ? Image.file(localImage!, fit: BoxFit.cover)
+                                : (currentUser?.photoURL != null && currentUser!.photoURL!.isNotEmpty
+                                    ? CachedNetworkImage(
+                                        imageUrl: currentUser.photoURL!,
+                                        fit: BoxFit.cover,
+                                        placeholder: (context, url) => const _ShimmerBox(width: 120, height: 120),
+                                        errorWidget: (context, url, error) => Icon(PhosphorIcons.user(), size: 60, color: Theme.of(context).iconTheme.color),
+                                      )
+                                    : Icon(PhosphorIcons.user(), size: 60, color: Theme.of(context).iconTheme.color)),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.themeColor,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: Icon(PhosphorIcons.camera(), color: Colors.white, size: 20),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: nameController,
+                  style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
+                  decoration: InputDecoration(
+                    labelText: isUrdu ? 'نام' : 'Name',
+                    labelStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: Icon(PhosphorIcons.user()),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: sloganController,
+                  style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
+                  decoration: InputDecoration(
+                    labelText: isUrdu ? 'سلوگن' : 'Slogan',
+                    labelStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
+                    hintText: isUrdu ? 'بہترین معیار، بہترین قیمت' : 'Best Quality, Best Price',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: Icon(PhosphorIcons.tag()),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: addressController,
+                  style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    labelText: isUrdu ? 'پتہ' : 'Address',
+                    labelStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: Icon(PhosphorIcons.mapPin()),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: isUpdating ? null : () async {
+                      setModalState(() => isUpdating = true);
+                      try {
+                        String? finalPhotoUrl;
+                        if (localImage != null) {
+                          try {
+                            final ref = FirebaseStorage.instance.ref().child('${currentUser!.uid}.jpg');
+                            await ref.putFile(localImage!);
+                            finalPhotoUrl = await ref.getDownloadURL();
+                          } catch (e) {
+                            debugPrint("Storage error: $e");
+                          }
+                        }
+                        await Provider.of<AuthService>(context, listen: false).updateProfile(
+                          displayName: nameController.text.trim(),
+                          photoUrl: finalPhotoUrl,
+                          address: addressController.text.trim(),
+                          slogan: sloganController.text.trim(),
+                        );
+
+                        // Also update local database record for the user if it exists
+                        if (mounted) {
+                          final dbService = Provider.of<DatabaseService>(context, listen: false);
+                          final userPhone = currentUser?.phoneNumber ?? '';
+                          if (userPhone.isNotEmpty) {
+                            final userAccount = dbService.getAccounts().firstWhere(
+                              (a) => a.phone == userPhone,
+                              orElse: () => Account(
+                                id: 'none', 
+                                name: '', 
+                                phone: '', 
+                                category: 'Other', 
+                                initialBalance: 0, 
+                                balanceType: 'Receivable', 
+                                balance: 0, 
+                                createdAt: DateTime.now(), 
+                                updatedAt: DateTime.now()
+                              ),
+                            );
+
+                            if (userAccount.id != 'none') {
+                              final updatedAccount = userAccount.copyWith(
+                                name: nameController.text.trim(),
+                                profileImage: finalPhotoUrl ?? userAccount.profileImage,
+                                updatedAt: DateTime.now(),
+                              );
+                              await dbService.updateAccount(updatedAccount);
+                            }
+                          }
+                        }
+
+                        await currentUser?.reload();
+                        if (mounted) {
+                          _loadSettingsData(); // Refresh address and slogan
+                          Navigator.pop(context);
+                          _showSnackBar(context, isUrdu ? 'پروفائل اپڈیٹ ہوگئی' : 'Profile updated successfully', isUrdu);
+                        }
+                      } catch (e) {
+                        if (mounted) _showSnackBar(context, 'Error: $e', isUrdu, isError: true);
+                      } finally {
+                        if (mounted) setModalState(() => isUpdating = false);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.themeColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: isUpdating 
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : Text(isUrdu ? 'محفوظ کریں' : 'Save Changes', style: TextStyle(fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context, bool isUrdu) {
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          isUrdu ? 'لاگ آؤٹ کریں؟' : 'Logout?',
+          style: TextStyle(fontFamily: fontFamily, color: AppTheme.expenseColor, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
+        ),
+        content: Text(
+          isUrdu ? 'کیا آپ واقعی لاگ آؤٹ کرنا چاہتے ہیں؟' : 'Are you sure you want to logout?',
+          style: TextStyle(fontFamily: fontFamily, color: AppTheme.darkColor, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(isUrdu ? 'منسوخ' : 'Cancel', style: TextStyle(fontFamily: fontFamily, color: AppTheme.textSecondary, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                await Provider.of<AuthService>(context, listen: false).signOut(context);
+              } catch (e) {
+                if (mounted) _showSnackBar(context, '${isUrdu ? 'خرابی:' : 'Error:'} $e', isUrdu, isError: true);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.expenseColor, foregroundColor: Colors.white),
+            child: Text(isUrdu ? 'لاگ آؤٹ' : 'Logout', style: TextStyle(fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeactivateDialog(BuildContext parentContext, bool isUrdu) {
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
+    showDialog(
+      context: parentContext,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          isUrdu ? 'اکاؤنٹ غیر فعال کریں؟' : 'Deactivate Account?',
+          style: TextStyle(fontFamily: fontFamily, color: AppTheme.expenseColor, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
+        ),
+        content: Text(
+          isUrdu 
+            ? 'اس سے آپ کا اکاؤنٹ اور ڈیٹا عارضی طور پر غیر فعال ہو جائے گا۔ آپ دوبارہ لاگ ان کر کے اسے بحال کر سکتے ہیں۔'
+            : 'This will temporarily disable your account and data. You can reactivate it by logging in again.',
+          style: TextStyle(fontFamily: fontFamily, color: AppTheme.darkColor, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(isUrdu ? 'منسوخ' : 'Cancel', style: TextStyle(fontFamily: fontFamily, color: AppTheme.textSecondary, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                  final authService = Provider.of<AuthService>(parentContext, listen: false);
+                  await authService.deactivateAccount(parentContext);
+              } catch (e) {
+                  if (mounted) _showSnackBar(parentContext, '${isUrdu ? 'خرابی:' : 'Error:'} $e', isUrdu, isError: true);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.expenseColor, foregroundColor: Colors.white),
+            child: Text(isUrdu ? 'تصدیق' : 'Confirm', style: TextStyle(fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLanguageDialog(BuildContext context, LanguageService languageService) {
+    final isUrdu = languageService.isUrdu;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          isUrdu ? 'زبان منتخب کریں' : 'Select Language',
+          style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '', color: AppTheme.darkColor, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<String>(
+              title: const Text('اردو', style: TextStyle(fontFamily: 'NooriNastaleeq', fontSize: 18)),
+              value: 'ur',
+              groupValue: languageService.currentLocale.languageCode,
+              activeColor: AppTheme.themeColor,
+              onChanged: (value) {
+                languageService.changeLanguage(value!);
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('English', style: TextStyle(fontSize: 18)),
+              value: 'en',
+              groupValue: languageService.currentLocale.languageCode,
+              activeColor: AppTheme.themeColor,
+              onChanged: (value) {
+                languageService.changeLanguage(value!);
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _toggleAppLock(BuildContext context, bool isUrdu) async {
+    final securityService = Provider.of<SecurityService>(context, listen: false);
+
+    if (_isAppLockEnabled) {
+      await securityService.setAppLockEnabled(false);
+      setState(() => _isAppLockEnabled = false);
+      if (mounted) _showSnackBar(context, isUrdu ? 'ایپ لاک غیر فعال کر دیا گیا' : 'App Lock disabled', isUrdu);
+    } else {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const AppLockScreen(isSettingUp: true),
+        ),
+      );
+
+      if (result == true) {
+        final isEnabled = await securityService.isAppLockEnabled();
+        setState(() => _isAppLockEnabled = isEnabled);
+
+        if (isEnabled && mounted) {
+          _showSnackBar(context, isUrdu ? 'ایپ لاک فعال کر دیا گیا' : 'App Lock enabled', isUrdu);
+        }
+      }
+    }
+  }
+
+  Future<void> _changePin(BuildContext context, bool isUrdu) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AppLockScreen(isChangingPin: true),
+      ),
+    );
+
+    if (result == true && mounted) {
+      _showSnackBar(context, isUrdu ? 'پن کوڈ کامیابی سے تبدیل ہو گیا' : 'PIN changed successfully', isUrdu);
+    }
+  }
+
+  Future<void> _toggleBiometric(BuildContext context, bool isUrdu) async {
+    final securityService = Provider.of<SecurityService>(context, listen: false);
+
+    if (!_isBiometricEnabled) {
+      final available = await securityService.isBiometricsAvailable();
+      if (!available) {
+        if (mounted) {
+          _showSnackBar(
+            context,
+            isUrdu ? 'اس ڈیوائس پر بائیو میٹرک دستیاب نہیں' : 'Biometrics not available',
+            isUrdu,
+            isError: true,
+          );
+        }
+        return;
+      }
+    }
+
+    await securityService.setBiometricEnabled(!_isBiometricEnabled);
+    setState(() {
+      _isBiometricEnabled = !_isBiometricEnabled;
+    });
+  }
+
+  void _syncData(BuildContext context, bool isUrdu) async {
+    final syncService = Provider.of<AutoSyncService>(context, listen: false);
+    try {
+      await syncService.syncAllDataToCloud();
+      if (mounted) {
+        _showSnackBar(context, isUrdu ? 'ڈیٹا سینک ہوگیا' : 'Data synced successfully', isUrdu);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnackBar(context, '${isUrdu ? 'خرابی:' : 'Error:'} $e', isUrdu, isError: true);
+      }
+    }
+  }
+
+  void _showExportDialog(BuildContext context, bool isUrdu) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          isUrdu ? 'ڈیٹا ایکسپورٹ کریں' : 'Export Data',
+          style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '', color: AppTheme.darkColor, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildExportButton(
+              title: 'PDF Report',
+              icon: PhosphorIcons.filePdf(),
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                _showSnackBar(context, isUrdu ? 'پی ڈی ایف بن رہی ہے...' : 'Generating PDF...', isUrdu);
+                final pdfService = Provider.of<PdfService>(context, listen: false);
+                final databaseService = Provider.of<DatabaseService>(context, listen: false);
+                await pdfService.generateAllAccountsReport(databaseService.accounts, databaseService.transactions, isUrdu);
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildExportButton(
+              title: 'Excel / CSV',
+              icon: PhosphorIcons.fileCsv(),
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                _showSnackBar(context, isUrdu ? 'ایکسل فائل بن رہی ہے...' : 'Generating Excel/CSV...', isUrdu);
+                final excelService = Provider.of<ExcelService>(context, listen: false);
+                final databaseService = Provider.of<DatabaseService>(context, listen: false);
+                await excelService.generateAndShareAllAccountsCsv(databaseService.accounts, isUrdu);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExportButton({required String title, required IconData icon, required VoidCallback onPressed}) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(title),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppTheme.darkColor,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    );
+  }
+
+  void _showBackupDialog(BuildContext context, bool isUrdu) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(isUrdu ? 'بیک اپ اور بحالی' : 'Backup & Restore', style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '', fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildExportButton(
+              title: isUrdu ? 'بیک اپ بنائیں' : 'Create Backup',
+              icon: PhosphorIcons.cloudArrowUp(),
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await Provider.of<BackupService>(context, listen: false).createBackup();
+                if (mounted) _showSnackBar(context, isUrdu ? 'بیک اپ مکمل ہو گیا' : 'Backup completed successfully', isUrdu);
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildExportButton(
+              title: isUrdu ? 'بیک اپ بحال کریں' : 'Restore Backup',
+              icon: PhosphorIcons.cloudArrowDown(),
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await Provider.of<BackupService>(context, listen: false).restoreBackup();
+                if (mounted) _showSnackBar(context, isUrdu ? 'ڈیٹا کامیابی سے بحال ہو گیا' : 'Data restored successfully', isUrdu);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAboutAppDialog(BuildContext context, bool isUrdu, String fontFamily) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: EdgeInsets.zero,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header with Logo/Icon
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              decoration: BoxDecoration(
+                color: AppTheme.themeColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              ),
+              child: Center(
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2), // ہلکا تھیم کلر بیک گراؤنڈ کے لیے
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 8,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: Container(
+                          color: AppTheme.darkColor, // سفید لوگو کے لیے گہرا بیک گراؤنڈ
+                          padding: const EdgeInsets.all(8),
+                          child: Image.asset(
+                            'assets/images/icons/zalooq.png',
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => Icon(PhosphorIcons.wallet(PhosphorIconsStyle.fill), color: Colors.white, size: 48),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      isUrdu ? 'کاروباری ساتھی' : 'Karobari Saathi',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: fontFamily,
+                      ),
+                    ),
+                    Text(
+                      'Version $_appVersion',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Info List
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  _buildAboutItem(
+                    icon: PhosphorIcons.shieldCheck(),
+                    title: isUrdu ? 'محفوظ ڈیٹا' : 'Secure Data',
+                    subtitle: isUrdu ? 'آپ کا ڈیٹا مکمل طور پر محفوظ ہے' : 'Your data is completely secure',
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                  ),
+                  const Divider(height: 24),
+                  _buildAboutItem(
+                    icon: PhosphorIcons.cloudArrowUp(),
+                    title: isUrdu ? 'آٹو کلاؤڈ سنک' : 'Auto Cloud Sync',
+                    subtitle: isUrdu ? 'آن لائن بیک اپ کی سہولت' : 'Online backup facility',
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                  ),
+                  const Divider(height: 24),
+                  _buildAboutItem(
+                    icon: PhosphorIcons.code(),
+                    title: isUrdu ? 'تیار کردہ' : 'Developed By',
+                    subtitle: 'Zalooq Tech Solutions',
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                  ),
+                ],
+              ),
+            ),
+            // Close Button
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.themeColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text(isUrdu ? 'بند کریں' : 'Close', style: TextStyle(fontFamily: fontFamily, color: Colors.white)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAboutItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool isUrdu,
+    required String fontFamily,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, color: AppTheme.themeColor, size: 28),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  fontFamily: fontFamily,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 12,
+                  fontFamily: fontFamily,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _contactUs(BuildContext context, bool isUrdu) async {
+    final Uri emailLaunchUri = Uri(
+      scheme: 'mailto',
+      path: 'zalooq.tech@gmail.com',
+      query: 'subject=Support Request&body=Hello Support Team,',
+    );
+    try {
+      if (await canLaunchUrl(emailLaunchUri)) {
+        await launchUrl(emailLaunchUri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          _showSnackBar(
+            context, 
+            isUrdu ? 'ای میل ایپ نہیں ملی' : 'No email app found', 
+            isUrdu, 
+            isError: true
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnackBar(context, 'Error: $e', isUrdu, isError: true);
+      }
+    }
+  }
+
+  void _shareApp(BuildContext context, bool isUrdu) {
+    Share.share(isUrdu
+      ? 'کاروباری ساتھی ایپ استعمال کریں: https://play.google.com/store/apps/details?id=com.accountapp'
+      : 'Use Karobari Saathi app: https://play.google.com/store/apps/details?id=com.accountapp');
+  }
+
+  void _rateApp(BuildContext context, bool isUrdu) async {
+    const url = 'https://play.google.com/store/apps/details?id=com.accountapp';
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    }
+  }
+
+  void _showSnackBar(BuildContext context, String message, bool isUrdu, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '', fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+        backgroundColor: isError ? AppTheme.expenseColor : AppTheme.darkColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+}
+
+class _ShimmerBox extends StatefulWidget {
+  final double width;
+  final double height;
+
+  const _ShimmerBox({required this.width, required this.height});
+
+  @override
+  _ShimmerBoxState createState() => _ShimmerBoxState();
+}
+
+class _ShimmerBoxState extends State<_ShimmerBox> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              stops: [
+                _controller.value - 0.3,
+                _controller.value,
+                _controller.value + 0.3,
+              ],
+              colors: [
+                Colors.grey[300]!,
+                Colors.grey[100]!,
+                Colors.grey[300]!,
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
