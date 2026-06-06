@@ -37,7 +37,7 @@ import 'package:account_app/core/services/chat_service.dart';
 import 'package:account_app/core/services/sharing_service.dart';
 import 'package:account_app/core/services/security_service.dart';
 import 'package:account_app/core/services/price_database_service.dart';
-import 'package:account_app/core/widgets/square_dot_orbit_pro.dart';
+import 'package:account_app/core/widgets/simple_spinning_ring.dart';
 import './helpers/migration_helper.dart';  // ✅ یہ import کریں
 
 
@@ -404,7 +404,7 @@ class _AppWrapperState extends State<AppWrapper> {
                 ),
               ),
               const SizedBox(height: 30),
-              const SquareDotOrbitPro(
+              const SimpleSpinningRing(
                 size: 60,
                 duration: Duration(seconds: 2),
               ),
