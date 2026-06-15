@@ -276,6 +276,18 @@ class _AppWrapperState extends State<AppWrapper> {
   }
 
   Future<void> _initializeApp() async {
+    // Set a maximum timeout for initialization to prevent hanging on loading screen
+    bool isTimedOut = false;
+    Future.delayed(const Duration(seconds: 8), () {
+      if (mounted && _isLoading) {
+        print("Initialization timed out, proceeding anyway...");
+        setState(() {
+          isTimedOut = true;
+          _isLoading = false;
+        });
+      }
+    });
+
     try {
       // Listen to Auth State Changes
       FirebaseAuth.instance.authStateChanges().listen((user) {
@@ -292,31 +304,28 @@ class _AppWrapperState extends State<AppWrapper> {
       // 1. Initialize Database Service fully
       final databaseService = Provider.of<DatabaseService>(context, listen: false);
       if (!databaseService.isInitialized) {
-        await databaseService.init();
+        await databaseService.init().timeout(const Duration(seconds: 15));
       }
 
       // 2. Check Login Status
       final user = FirebaseAuth.instance.currentUser;
 
       if (user != null) {
-        // User is logged in
         _needsLogin = false;
-        
-        // 3. Auto Restore / Fetch Data from Cloud
+        // 3. Auto Restore from Cloud (with timeout)
         try {
-          await databaseService.fetchFromFirebase();
+          await databaseService.fetchFromFirebase().timeout(const Duration(seconds: 10));
         } catch (e) {
-          print("Auto restore failed (maybe no internet): $e");
+          print("Auto restore failed or timed out: $e");
         }
       } else {
-        // User is NOT logged in
         _needsLogin = true;
       }
     } catch (e) {
       print("Initialization Error: $e");
     }
 
-    if (mounted) {
+    if (mounted && !isTimedOut) {
       setState(() {
         _isLoading = false;
       });

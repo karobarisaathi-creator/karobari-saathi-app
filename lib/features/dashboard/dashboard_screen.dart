@@ -27,6 +27,8 @@ import 'package:account_app/core/theme/app_theme.dart';
 
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 
+import 'package:account_app/core/widgets/simple_spinning_ring.dart';
+
 class DashboardScreen extends StatefulWidget {
   @override
   _DashboardScreenState createState() => _DashboardScreenState();
@@ -45,7 +47,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Ensure database is initialized
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final dbService = Provider.of<DatabaseService>(context, listen: false);
-      final langService = Provider.of<LanguageService>(context, listen: false);
       
       // Check for app updates
       _checkVersion();
@@ -57,6 +58,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _loadAlerts(); // Load alerts after init
             setState(() => _isLoading = false);
           }
+        }).catchError((e) {
+          if (mounted) setState(() => _isLoading = false);
         });
       } else {
         _loadAlerts(); // Load alerts if already initialized
@@ -260,7 +263,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.themeColor))
+          ? const Center(
+              child: SimpleSpinningRing(
+                size: 60,
+                duration: Duration(seconds: 2),
+              ),
+            )
           : Consumer<DatabaseService>(
         builder: (context, databaseService, child) {
           final allAccounts = databaseService.getAccounts();

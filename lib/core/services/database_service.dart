@@ -33,6 +33,7 @@ class DatabaseService with ChangeNotifier {
 
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
+  Completer<void>? _initCompleter;
 
   // Getters for lists
   List<Account> get accounts => _accountsBox?.values.toList() ?? [];
@@ -44,57 +45,55 @@ class DatabaseService with ChangeNotifier {
 
   Future<void> init() async {
     if (_isInitialized) return;
+    if (_initCompleter != null) return _initCompleter!.future;
 
-    _accountsBox = await Hive.openBox<Account>('accounts');
-    _transactionsBox = await Hive.openBox<model.Transaction>('transactions');
-    _categoriesBox = await Hive.openBox<Category>('categories');
-    _professionsBox = await Hive.openBox<Profession>('professions');
-    _itemsBox = await Hive.openBox<InventoryItem>('inventory_items');
-    _remoteCachedItemsBox = await Hive.openBox<List>('remote_cached_items');
-    _settingsBox = await Hive.openBox('settings');
+    _initCompleter = Completer<void>();
 
-    _isInitialized = true;
+    try {
+      _accountsBox = await Hive.openBox<Account>('accounts');
+      _transactionsBox = await Hive.openBox<model.Transaction>('transactions');
+      _categoriesBox = await Hive.openBox<Category>('categories');
+      _professionsBox = await Hive.openBox<Profession>('professions');
+      _itemsBox = await Hive.openBox<InventoryItem>('inventory_items');
+      _remoteCachedItemsBox = await Hive.openBox<List>('remote_cached_items');
+      _settingsBox = await Hive.openBox('settings');
 
-    // 🔥 Run migrations using MigrationHelper
-    // بوجھ کم کرنے کے لیے مائیگریشن کو تھوڑی دیر بعد چلایا جائے گا
-    Future.delayed(const Duration(milliseconds: 500), () async {
-      if (_accountsBox != null && _transactionsBox != null && _professionsBox != null) {
-        await MigrationHelper.runAllMigrations(
-          accountsBox: _accountsBox!,
-          transactionsBox: _transactionsBox!,
-          professionsBox: _professionsBox!,
-        );
-      }
-      
+      _isInitialized = true;
+
       // Start Realtime Sync if logged in
       if (_auth.currentUser != null) {
         _startRealtimeSync();
       }
+
+      // Monitor Auth State
+      _auth.authStateChanges().listen((user) {
+        if (user != null) {
+          _startRealtimeSync();
+          _triggerSync();
+        } else {
+          _stopRealtimeSync();
+        }
+      });
+
       _triggerSync();
-    });
 
-    // Monitor Auth State
-    _auth.authStateChanges().listen((user) {
-      if (user != null) {
-        _startRealtimeSync();
-        _triggerSync();
-      } else {
-        _stopRealtimeSync();
-      }
-    });
+      _connectivitySubscription = Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
+        if (results.contains(ConnectivityResult.mobile) ||
+            results.contains(ConnectivityResult.wifi) ||
+            results.contains(ConnectivityResult.ethernet)) {
+          print("Connection restored. Syncing...");
+          _triggerSync();
+        }
+      });
 
-    _triggerSync();
-
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
-      if (results.contains(ConnectivityResult.mobile) ||
-          results.contains(ConnectivityResult.wifi) ||
-          results.contains(ConnectivityResult.ethernet)) {
-        print("Connection restored. Syncing...");
-        _triggerSync();
-      }
-    });
-
-    notifyListeners();
+      _initCompleter!.complete();
+      notifyListeners();
+    } catch (e) {
+      print("Database initialization failed: $e");
+      _initCompleter!.completeError(e);
+      _initCompleter = null; // Allow retry on failure
+      rethrow;
+    }
   }
 
   // --- Migration Method Removed (Moved to MigrationHelper) ---
