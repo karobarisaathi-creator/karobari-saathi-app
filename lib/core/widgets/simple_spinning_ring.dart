@@ -25,7 +25,7 @@ class SimpleSpinningRing extends StatefulWidget {
 }
 
 class _SimpleSpinningRingState extends State<SimpleSpinningRing>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _controller;
   late AnimationController _pulseController;
   bool _isPaused = false;
@@ -36,16 +36,16 @@ class _SimpleSpinningRingState extends State<SimpleSpinningRing>
     _controller = AnimationController(
       vsync: this,
       duration: widget.duration,
-    )..repeat();
+    );
 
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
-    )..repeat();
+    );
 
     if (widget.autoStart) {
-      _controller.forward();
-      _pulseController.forward();
+      _controller.repeat();
+      _pulseController.repeat();
     }
   }
 
@@ -91,13 +91,16 @@ class _SimpleSpinningRingState extends State<SimpleSpinningRing>
                   ),
                   
                   // Spinning ring (Active part)
-                  SizedBox(
-                    width: widget.size,
-                    height: widget.size,
-                    child: CircularProgressIndicator(
-                      value: 0.25, // Only quarter ring
-                      strokeWidth: 3,
-                      valueColor: AlwaysStoppedAnimation<Color>(ringColor),
+                  Transform.rotate(
+                    angle: _controller.value * 2 * math.pi,
+                    child: SizedBox(
+                      width: widget.size,
+                      height: widget.size,
+                      child: CircularProgressIndicator(
+                        value: 0.25, // Only quarter ring
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation<Color>(ringColor),
+                      ),
                     ),
                   ),
                   
