@@ -34,6 +34,9 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
 
 # Symbolication related
 app.*.symbols
@@ -53,3 +56,32 @@ android/wrapper/dists/
 android/app/src/main/res/raw/
 *.keystore
 *.jks
+android/key.properties
+
+# iOS-specific ignores
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/GeneratedPluginRegistrant.h
+ios/Flutter/GeneratedPluginRegistrant.m
+ios/Runner/GeneratedPluginRegistrant.h
+ios/Runner/GeneratedPluginRegistrant.m
+ios/Podfile.lock
+ios/Pods/
+ios/Runner/GeneratedPluginRegistrant.swift
+
+# MacOS-specific ignores
+macos/Flutter/Generated.xcconfig
+macos/Flutter/flutter_export_environment.sh
+macos/Flutter/ephemeral/
+macos/Pods/
+
+# Linux-specific ignores
+linux/flutter/ephemeral/
+
+# Windows-specific ignores
+windows/flutter/ephemeral/
+
+# Web-specific ignores
+web/flutter_service_worker.js

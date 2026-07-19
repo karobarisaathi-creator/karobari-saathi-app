@@ -241,11 +241,11 @@ class VisualResultCard extends StatelessWidget {
   Widget _buildStatItem(String label, String value, {bool highlight = false}) {
     return Expanded(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start, 
+        crossAxisAlignment: isUrdu ? CrossAxisAlignment.end : CrossAxisAlignment.start, 
         children: [
-          Text(label, textAlign: TextAlign.start, style: TextStyle(color: Colors.white38, fontSize: 12, fontFamily: isUrdu ? 'NooriNastaleeq' : null)), 
+          Text(label, textAlign: isUrdu ? TextAlign.right : TextAlign.left, style: TextStyle(color: Colors.white38, fontSize: 12, fontFamily: isUrdu ? 'NooriNastaleeq' : null)), 
           const SizedBox(height: 4), 
-          Text(value, textAlign: TextAlign.start, style: TextStyle(color: highlight ? AppTheme.themeColor : Colors.white, fontWeight: FontWeight.bold, fontSize: 18, fontFamily: getFont(value, isUrdu)))
+          Text(value, textAlign: isUrdu ? TextAlign.right : TextAlign.left, style: TextStyle(color: highlight ? AppTheme.themeColor : Colors.white, fontWeight: FontWeight.bold, fontSize: 18, fontFamily: getFont(value, isUrdu)))
         ] 
       ),
     );
@@ -254,13 +254,20 @@ class VisualResultCard extends StatelessWidget {
   Widget _buildPointList(String title, String points, Color color) {
     final list = points.split(',');
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start, 
+      crossAxisAlignment: isUrdu ? CrossAxisAlignment.end : CrossAxisAlignment.start, 
       children: [
-        Text(title, textAlign: TextAlign.start, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13, fontFamily: isUrdu ? 'NooriNastaleeq' : null)), 
+        Text(title, textAlign: isUrdu ? TextAlign.right : TextAlign.left, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13, fontFamily: isUrdu ? 'NooriNastaleeq' : null)), 
         const SizedBox(height: 6), 
-        ...list.take(2).map((p) => Padding(
+        ...list.take(3).map((p) => Padding(
           padding: const EdgeInsets.only(bottom: 4), 
-          child: Row(children: [Icon(Icons.circle, size: 4, color: color.withValues(alpha: 0.5)), const SizedBox(width: 6), Expanded(child: Text(p.trim(), textAlign: TextAlign.start, style: TextStyle(color: Colors.white70, fontSize: 12, fontFamily: getFont(p, isUrdu)), maxLines: 1, overflow: TextOverflow.ellipsis))])
+          child: Row(
+            textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
+            children: [
+              Icon(Icons.circle, size: 4, color: color.withValues(alpha: 0.5)), 
+              const SizedBox(width: 6), 
+              Expanded(child: Text(p.trim(), textAlign: isUrdu ? TextAlign.right : TextAlign.left, style: TextStyle(color: Colors.white70, fontSize: 12, fontFamily: getFont(p, isUrdu)), maxLines: 1, overflow: TextOverflow.ellipsis))
+            ]
+          )
         )) 
       ] 
     );

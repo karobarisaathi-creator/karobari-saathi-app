@@ -94,6 +94,17 @@ class _SimpleSpinningRingState extends State<SimpleSpinningRing>
                   Transform.rotate(
                     angle: _controller.value * 2 * math.pi,
                     child: SizedBox(
+
+
+
+
+
+
+
+
+
+
+                      
                       width: widget.size,
                       height: widget.size,
                       child: CircularProgressIndicator(

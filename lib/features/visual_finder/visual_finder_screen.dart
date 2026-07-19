@@ -79,6 +79,16 @@ class _VisualFinderScreenState extends State<VisualFinderScreen> with SingleTick
     }
   }
 
+  @override
+  void didUpdateWidget(VisualFinderScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialSearchQuery != null && 
+        widget.initialSearchQuery != oldWidget.initialSearchQuery) {
+      _searchController.text = widget.initialSearchQuery!;
+      _performTextSearch(widget.initialSearchQuery!);
+    }
+  }
+
   Future<void> _loadLimits() async {
     final info = await _limitService.getRemainingLimits();
     if (mounted) setState(() => _limitInfo = info);
@@ -187,7 +197,10 @@ class _VisualFinderScreenState extends State<VisualFinderScreen> with SingleTick
       _searchFailed = false;
     });
 
+    // 1. First search locally and show results immediately
     await _searchLocalAppInventory(query);
+    
+    // 2. Then trigger AI search in background
     final result = await _aiService.searchProductByText(query);
 
     if (mounted) {
@@ -200,21 +213,26 @@ class _VisualFinderScreenState extends State<VisualFinderScreen> with SingleTick
         _saveToHistory(data);
         await _limitService.incrementSearch();
         _loadLimits();
+        
+        // Use AI suggested name for a better local search if needed
         final betterName = data['name']?.split(' ').take(2).join(' ') ?? query;
-        await _searchLocalAppInventory(betterName);
-      } else {
-        String msg = isUrdu ? "سرور مصروف ہے، ہم مقامی نتائج دکھا رہے ہیں۔" : "Server is busy, showing local results.";
-        
-        if (result.error == AIErrorType.timeout) {
-          msg = isUrdu ? "انٹرنیٹ سست ہے، دوبارہ کوشش کریں۔" : "Connection slow, please try again.";
-        } else if (result.error == AIErrorType.payment) {
-          msg = isUrdu ? "اے پی آئی بیلنس ختم ہو گیا ہے" : "API balance exhausted";
-        } else if (result.error == AIErrorType.quota) {
-          msg = isUrdu ? "سروس کی حد ختم ہو گئی ہے" : "Service quota exceeded";
+        if (betterName.toLowerCase() != query.toLowerCase()) {
+          await _searchLocalAppInventory(betterName);
         }
-        
-        _showError(msg);
-        if (_localSellers.isEmpty) _searchFailed = true;
+      } else {
+        // Only show error if we have no local results
+        if (_localSellers.isEmpty) {
+          String msg = isUrdu ? "سرور مصروف ہے، براہ کرم دوبارہ کوشش کریں۔" : "Server is busy, please try again.";
+          
+          if (result.error == AIErrorType.timeout) {
+            msg = isUrdu ? "انٹرنیٹ سست ہے، دوبارہ کوشش کریں۔" : "Connection slow, please try again.";
+          } else if (result.error == AIErrorType.payment) {
+            msg = isUrdu ? "سروس فی الحال دستیاب نہیں ہے" : "Service currently unavailable";
+          }
+          
+          _showError(msg);
+          _searchFailed = true;
+        }
       }
     }
   }
@@ -469,13 +487,13 @@ class _VisualFinderScreenState extends State<VisualFinderScreen> with SingleTick
             const SizedBox(height: 16),
             _buildSearchBar(isUrdu, fontFamily),
             Expanded(
-              child: _isAnalyzing 
-                ? VisualShimmerCard(animation: _shimmerController, isUrdu: isUrdu, fontFamily: fontFamily)
-                : (_result != null || _localSellers.isNotEmpty)
+              child: (_result != null || _localSellers.isNotEmpty)
                     ? _buildResultView(isUrdu, fontFamily)
-                    : _searchFailed
-                        ? _buildErrorView(isUrdu, fontFamily)
-                        : _buildHomeView(isUrdu, fontFamily),
+                    : _isAnalyzing 
+                        ? VisualShimmerCard(animation: _shimmerController, isUrdu: isUrdu, fontFamily: fontFamily)
+                        : _searchFailed
+                            ? _buildErrorView(isUrdu, fontFamily)
+                            : _buildHomeView(isUrdu, fontFamily),
             ),
           ],
         ),
@@ -558,7 +576,22 @@ class _VisualFinderScreenState extends State<VisualFinderScreen> with SingleTick
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 20),
+          if (_isAnalyzing && _result == null) ...[
+            const SizedBox(height: 10),
+            LinearProgressIndicator(
+              backgroundColor: AppTheme.themeColor.withOpacity(0.1),
+              color: AppTheme.themeColor,
+              minHeight: 2,
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                isUrdu ? "AI تلاش کر رہا ہے..." : "AI is searching...",
+                style: TextStyle(fontSize: 10, color: AppTheme.themeColor.withOpacity(0.7), fontFamily: fontFamily),
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
           if (_result != null) ...[ 
             VisualResultCard(
               result: _result!, 

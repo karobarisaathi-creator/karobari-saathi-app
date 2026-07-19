@@ -19,10 +19,20 @@ class PriceDatabaseService {
           .where('defaultRate', isLessThanOrEqualTo: targetPrice)
           .get();
 
-      // سمارٹ میچنگ: نام چیک کریں
+      // سمارٹ میچنگ: نام کے الفاظ چیک کریں تاکہ بہتر نتیجہ ملے
+      final searchWords = productName.toLowerCase().split(' ').where((w) => w.length > 2).toList();
+      
       for (var doc in query.docs) {
         final item = InventoryItem.fromMap({...doc.data(), 'id': doc.id});
-        if (item.name.toLowerCase().contains(productName.toLowerCase().split(' ')[0])) {
+        final itemName = item.name.toLowerCase();
+        
+        // اگر کم از کم دو الفاظ میچ ہو جائیں یا پورا پہلا لفظ میچ ہو
+        int matches = 0;
+        for (var word in searchWords) {
+          if (itemName.contains(word)) matches++;
+        }
+        
+        if (matches >= (searchWords.length > 1 ? 2 : 1)) {
           return item;
         }
       }
