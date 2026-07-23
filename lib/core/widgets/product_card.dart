@@ -4,8 +4,12 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
 import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
+import 'package:account_app/core/services/database_service.dart';
 
 enum ProductCardView { grid, list, horizontal }
 
@@ -17,10 +21,12 @@ class ProductCard extends StatefulWidget {
   final bool isFavorite;
   final bool isMyItem;
   final String? sellerName;
+  final Position? userPosition;
   final VoidCallback onTap;
   final VoidCallback? onFavoriteToggle;
   final VoidCallback? onSellerTap;
   final VoidCallback? onDelete;
+  final VoidCallback? onEdit;
 
   const ProductCard({
     super.key,
@@ -31,10 +37,12 @@ class ProductCard extends StatefulWidget {
     this.isFavorite = false,
     this.isMyItem = false,
     this.sellerName,
+    this.userPosition,
     required this.onTap,
     this.onFavoriteToggle,
     this.onSellerTap,
     this.onDelete,
+    this.onEdit,
   });
 
   @override
@@ -43,11 +51,22 @@ class ProductCard extends StatefulWidget {
 
 class _ProductCardState extends State<ProductCard> {
   Color? _dynamicColor;
+  bool _isSellerVerified = false;
 
   @override
   void initState() {
     super.initState();
     _extractColor();
+    _checkVerification();
+  }
+
+  Future<void> _checkVerification() async {
+    if (widget.item.accountId == null) return;
+    final dbService = Provider.of<DatabaseService>(context, listen: false);
+    final verified = await dbService.isSellerVerified(widget.item.accountId!);
+    if (mounted) {
+      setState(() => _isSellerVerified = verified);
+    }
   }
 
   @override
@@ -86,6 +105,26 @@ class _ProductCardState extends State<ProductCard> {
     }
   }
 
+  String? _calculateDistance() {
+    if (widget.userPosition == null || widget.item.latitude == null || widget.item.longitude == null) {
+      return null;
+    }
+    
+    final double distanceInMeters = Geolocator.distanceBetween(
+      widget.userPosition!.latitude,
+      widget.userPosition!.longitude,
+      widget.item.latitude!,
+      widget.item.longitude!,
+    );
+    
+    if (distanceInMeters < 1000) {
+      return "${distanceInMeters.toStringAsFixed(0)}m";
+    } else {
+      final double distanceInKm = distanceInMeters / 1000;
+      return "${distanceInKm.toStringAsFixed(1)}km";
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     switch (widget.view) {
@@ -102,9 +141,13 @@ class _ProductCardState extends State<ProductCard> {
   Widget _buildGridItem(BuildContext context) {
     final cardColor = AppTheme.goldColor;
     final borderColor = Colors.white.withOpacity(0.15);
+    final String? distance = _calculateDistance();
 
     return GestureDetector(
-      onTap: widget.onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        widget.onTap();
+      },
       child: Container(
         decoration: BoxDecoration(
           color: cardColor,
@@ -141,6 +184,19 @@ class _ProductCardState extends State<ProductCard> {
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(color: Colors.red.withOpacity(0.8), shape: BoxShape.circle),
                         child: Icon(PhosphorIcons.trash(), size: 16, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                if (widget.isMyItem && widget.onEdit != null)
+                  Positioned(
+                    top: 8,
+                    right: widget.onDelete != null ? 40 : 8,
+                    child: GestureDetector(
+                      onTap: widget.onEdit,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(color: AppTheme.themeColor.withOpacity(0.8), shape: BoxShape.circle),
+                        child: Icon(PhosphorIcons.pencilSimple(), size: 16, color: Colors.white),
                       ),
                     ),
                   ),
@@ -190,14 +246,16 @@ class _ProductCardState extends State<ProductCard> {
                       ),
                     ),
                     const Spacer(),
-                    if (widget.item.location != null && widget.item.location!.isNotEmpty)
+                    if (distance != null || (widget.item.location != null && widget.item.location!.isNotEmpty))
                       Row(
                         children: [
                           const Icon(Icons.location_on, size: 10, color: AppTheme.darkColor),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              widget.item.location!,
+                              distance != null 
+                                ? "$distance ${widget.isUrdu ? 'دور' : 'away'}${widget.item.location != null ? ' • ${widget.item.location}' : ''}"
+                                : widget.item.location!,
                               style: TextStyle(
                                 fontSize: 10, 
                                 color: AppTheme.darkColor.withOpacity(0.6), 
@@ -222,16 +280,18 @@ class _ProductCardState extends State<ProductCard> {
                         ),
                         Row(
                           children: [
+                            Icon(PhosphorIcons.eye(), size: 11, color: AppTheme.darkColor.withOpacity(0.6)),
+                            const SizedBox(width: 3),
+                            Text('${widget.item.views}', style: const TextStyle(fontSize: 11, color: AppTheme.darkColor)),
+                          ],
+                        ),
+                        Row(
+                          children: [
                             Icon(PhosphorIcons.heart(PhosphorIconsStyle.fill), size: 11, color: AppTheme.darkColor),
                             const SizedBox(width: 3),
                             Text('${widget.item.likes}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.darkColor)),
                           ],
                         ),
-                        if (widget.item.isNegotiable ?? false)
-                          Text(
-                            widget.isUrdu ? 'کمی بیشی' : 'Neg.',
-                            style: TextStyle(fontSize: 9, color: AppTheme.darkColor.withOpacity(0.7), fontFamily: widget.fontFamily),
-                          ),
                       ],
                     ),
                   ],
@@ -247,9 +307,13 @@ class _ProductCardState extends State<ProductCard> {
   Widget _buildListItem(BuildContext context) {
     final cardColor = AppTheme.goldColor;
     final borderColor = Colors.white.withOpacity(0.15);
+    final String? distance = _calculateDistance();
 
     return GestureDetector(
-      onTap: widget.onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        widget.onTap();
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
@@ -301,8 +365,19 @@ class _ProductCardState extends State<ProductCard> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (widget.isMyItem)
+                        if (widget.isMyItem) ...[
+                          if (widget.onEdit != null)
+                            GestureDetector(
+                              onTap: widget.onEdit,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(color: AppTheme.themeColor.withOpacity(0.1), shape: BoxShape.circle),
+                                child: Icon(PhosphorIcons.pencilSimple(), size: 16, color: AppTheme.themeColor),
+                              ),
+                            ),
+                          const SizedBox(width: 8),
                           _buildBadge(widget.isUrdu ? 'میری' : 'Mine', AppTheme.themeColor.withOpacity(0.8)),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 2),
@@ -322,13 +397,19 @@ class _ProductCardState extends State<ProductCard> {
                             const Icon(Icons.location_on, size: 10, color: AppTheme.darkColor),
                             const SizedBox(width: 4),
                             Text(
-                              widget.item.location ?? '',
+                              distance != null 
+                                ? "$distance ${widget.isUrdu ? 'دور' : 'away'}${widget.item.location != null ? ' • ${widget.item.location}' : ''}"
+                                : (widget.item.location ?? ''),
                               style: TextStyle(fontSize: 10, color: AppTheme.darkColor.withOpacity(0.6), fontFamily: widget.fontFamily),
                             ),
                           ],
                         ),
                         Row(
                           children: [
+                            Icon(PhosphorIcons.eye(), size: 11, color: AppTheme.darkColor.withOpacity(0.6)),
+                            const SizedBox(width: 4),
+                            Text('${widget.item.views}', style: const TextStyle(fontSize: 11, color: AppTheme.darkColor)),
+                            const SizedBox(width: 12),
                             Icon(PhosphorIcons.heart(PhosphorIconsStyle.fill), size: 11, color: AppTheme.darkColor),
                             const SizedBox(width: 4),
                             Text('${widget.item.likes}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.darkColor)),
@@ -373,11 +454,21 @@ class _ProductCardState extends State<ProductCard> {
           Icon(PhosphorIcons.storefront(), size: fontSize, color: color ?? AppTheme.textSecondary),
           const SizedBox(width: 4),
           Expanded(
-            child: Text(
-              widget.sellerName!,
-              style: TextStyle(fontSize: fontSize, color: color ?? AppTheme.textSecondary, fontFamily: widget.fontFamily),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    widget.sellerName!,
+                    style: TextStyle(fontSize: fontSize, color: color ?? AppTheme.textSecondary, fontFamily: widget.fontFamily),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (_isSellerVerified) ...[
+                  const SizedBox(width: 4),
+                  Icon(PhosphorIcons.sealCheck(PhosphorIconsStyle.fill), size: fontSize + 2, color: Colors.blue),
+                ],
+              ],
             ),
           ),
         ],

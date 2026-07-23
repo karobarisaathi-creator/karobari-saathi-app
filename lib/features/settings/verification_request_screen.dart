@@ -1,0 +1,293 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:provider/provider.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/services/language_service.dart';
+import 'package:account_app/core/services/verification_service.dart';
+import 'package:account_app/core/theme/app_theme.dart';
+import 'package:account_app/core/widgets/custom_app_bar.dart';
+
+class VerificationRequestScreen extends StatefulWidget {
+  const VerificationRequestScreen({super.key});
+
+  @override
+  State<VerificationRequestScreen> createState() => _VerificationRequestScreenState();
+}
+
+class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _businessNameController = TextEditingController();
+  final TextEditingController _businessTypeController = TextEditingController();
+  
+  File? _shopImage;
+  File? _idImage;
+  final ImagePicker _picker = ImagePicker();
+
+  @override
+  void dispose() {
+    _businessNameController.dispose();
+    _businessTypeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage(bool isShopImage) async {
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: Text(isUrdu ? 'کیمرہ' : 'Camera'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: Text(isUrdu ? 'گیلری' : 'Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source != null) {
+      final pickedFile = await _picker.pickImage(source: source, imageQuality: 70);
+      if (pickedFile != null) {
+        final croppedFile = await ImageCropper().cropImage(
+          sourcePath: pickedFile.path,
+          aspectRatio: isShopImage ? const CropAspectRatio(ratioX: 16, ratioY: 9) : const CropAspectRatio(ratioX: 3, ratioY: 2),
+          uiSettings: [
+            AndroidUiSettings(
+              toolbarTitle: isUrdu ? 'تصویر تراشیں' : 'Crop Image',
+              toolbarColor: AppTheme.darkColor,
+              toolbarWidgetColor: Colors.white,
+            ),
+          ],
+        );
+
+        if (croppedFile != null) {
+          setState(() {
+            if (isShopImage) {
+              _shopImage = File(croppedFile.path);
+            } else {
+              _idImage = File(croppedFile.path);
+            }
+          });
+        }
+      }
+    }
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_shopImage == null || _idImage == null) {
+      final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(isUrdu ? 'براہ کرم تمام تصویریں اپ لوڈ کریں' : 'Please upload all images')),
+      );
+      return;
+    }
+
+    try {
+      await Provider.of<VerificationService>(context, listen: false).submitRequest(
+        shopImage: _shopImage!,
+        idImage: _idImage!,
+        businessName: _businessNameController.text.trim(),
+        businessType: _businessTypeController.text.trim(),
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isUrdu = Provider.of<LanguageService>(context).isUrdu;
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
+    final service = Provider.of<VerificationService>(context);
+
+    return Scaffold(
+      appBar: CustomAppBar(title: isUrdu ? 'تصدیق کی درخواست' : 'Get Verified'),
+      body: service.isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(isUrdu, fontFamily),
+                  const SizedBox(height: 30),
+                  
+                  // Business Info
+                  _buildTextField(
+                    controller: _businessNameController,
+                    label: isUrdu ? 'کاروبار کا نام' : 'Business Name',
+                    icon: PhosphorIcons.storefront(),
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                  ),
+                  const SizedBox(height: 20),
+                  _buildTextField(
+                    controller: _businessTypeController,
+                    label: isUrdu ? 'کاروبار کی قسم' : 'Business Type',
+                    hint: isUrdu ? 'مثلاً: کریانہ، گارمنٹس' : 'e.g. Grocery, Garments',
+                    icon: PhosphorIcons.tag(),
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                  ),
+                  
+                  const SizedBox(height: 30),
+                  _buildSectionTitle(isUrdu ? 'تصویریں اپ لوڈ کریں' : 'Upload Images', isUrdu, fontFamily),
+                  const SizedBox(height: 15),
+                  
+                  // Shop Image
+                  _buildImagePicker(
+                    image: _shopImage,
+                    label: isUrdu ? 'دکان یا دفتر کی تصویر' : 'Shop or Office Photo',
+                    onTap: () => _pickImage(true),
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // ID Card Image
+                  _buildImagePicker(
+                    image: _idImage,
+                    label: isUrdu ? 'شناختی کارڈ یا بزنس کارڈ' : 'CNIC or Business Card',
+                    onTap: () => _pickImage(false),
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                  ),
+                  
+                  const SizedBox(height: 40),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 55,
+                    child: ElevatedButton(
+                      onPressed: _submit,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.themeColor,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text(
+                        isUrdu ? 'درخواست جمع کروائیں' : 'Submit Request',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: fontFamily, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ),
+    );
+  }
+
+  Widget _buildHeader(bool isUrdu, String fontFamily) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.themeColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.themeColor.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.verified, color: AppTheme.themeColor, size: 40),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isUrdu ? 'نیلا ٹک حاصل کریں' : 'Get Verified Badge',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: fontFamily, color: AppTheme.darkColor),
+                ),
+                Text(
+                  isUrdu ? 'اپنے گاہکوں کا اعتماد بڑھائیں' : 'Increase customer trust with a verified profile.',
+                  style: TextStyle(fontSize: 12, fontFamily: fontFamily, color: AppTheme.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title, bool isUrdu, String fontFamily) {
+    return Text(
+      title,
+      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: fontFamily, color: AppTheme.darkColor),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    String? hint,
+    required IconData icon,
+    required bool isUrdu,
+    required String fontFamily,
+  }) {
+    return TextFormField(
+      controller: controller,
+      style: const TextStyle(fontSize: 16),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        labelStyle: TextStyle(fontFamily: fontFamily),
+        prefixIcon: Icon(icon, color: AppTheme.themeColor),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      ),
+      validator: (value) => (value == null || value.isEmpty) ? (isUrdu ? 'ضروری ہے' : 'Required') : null,
+    );
+  }
+
+  Widget _buildImagePicker({
+    required File? image,
+    required String label,
+    required VoidCallback onTap,
+    required bool isUrdu,
+    required String fontFamily,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        height: 150,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
+        ),
+        child: image != null
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(11),
+                child: Image.file(image, fit: BoxFit.cover, width: double.infinity),
+              )
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_a_photo, size: 40, color: Colors.grey[400]),
+                  const SizedBox(height: 10),
+                  Text(label, style: TextStyle(color: Colors.grey[600], fontFamily: fontFamily)),
+                ],
+              ),
+      ),
+    );
+  }
+}

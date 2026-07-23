@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +13,7 @@ import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/product_card.dart';
+import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/widgets/app_filter_chip.dart';
 import 'item_detail_screen.dart';
 import 'add_inventory_item_screen.dart';
@@ -20,7 +23,7 @@ enum ViewMode { grid, list }
 class SellerItemsScreen extends StatefulWidget {
   final String sellerUid;
   final String sellerName;
-  final Map<String, String>? initialProfile; // New field
+  final Map<String, String>? initialProfile;
 
   const SellerItemsScreen({
     super.key,
@@ -35,9 +38,21 @@ class SellerItemsScreen extends StatefulWidget {
 
 class _SellerItemsScreenState extends State<SellerItemsScreen> {
   List<InventoryItem> _items = [];
+  List<InventoryItem> _filteredItems = [];
+  List<InventoryItem> _bannerItems = [];
   bool _isLoading = true;
   ViewMode _viewMode = ViewMode.grid;
   Map<String, String>? _sellerProfile;
+  String? _storeName;
+  String? _storeImage;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
+  bool _isAscending = true;
+
+  // Banner Slider Controller & Timer
+  final PageController _bannerController = PageController();
+  Timer? _bannerTimer;
+  int _currentBannerPage = 0;
 
   String _getFont(String? text, bool isAppUrdu) {
     if (!isAppUrdu || text == null || text.isEmpty) return '';
@@ -47,120 +62,545 @@ class _SellerItemsScreenState extends State<SellerItemsScreen> {
   @override
   void initState() {
     super.initState();
-    _sellerProfile = widget.initialProfile; // Use passed profile immediately
+    _sellerProfile = widget.initialProfile;
     _loadData();
+    _startBannerTimer();
+  }
+
+  @override
+  void dispose() {
+    _bannerTimer?.cancel();
+    _bannerController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _startBannerTimer() {
+    _bannerTimer?.cancel();
+    _bannerTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (_bannerItems.isNotEmpty && _bannerController.hasClients) {
+        _currentBannerPage = (_currentBannerPage + 1) % _bannerItems.length;
+        _bannerController.animateToPage(
+          _currentBannerPage,
+          duration: const Duration(milliseconds: 800),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
   }
 
   Future<void> _loadData() async {
     final db = Provider.of<DatabaseService>(context, listen: false);
-    
-    // 1. Load from local cache first (Immediate)
     final cachedItems = db.getRemoteCachedItems(widget.sellerUid);
     if (cachedItems.isNotEmpty && mounted) {
       setState(() {
         _items = cachedItems.where((item) => item.accountId == widget.sellerUid).toList();
         _isLoading = false;
+        _applyFilters();
       });
     }
 
-    // 2. Fetch fresh profile in background
     final profile = await db.findPublicProfileByUid(widget.sellerUid);
-
-    // 3. Fetch fresh items from Firestore (Already filtered by sellerUid in the service)
     final fetchedItems = await db.getRemoteInventoryItems(widget.sellerUid);
     
     if (mounted) {
       setState(() {
         _sellerProfile = profile;
+        if (FirebaseAuth.instance.currentUser?.uid == widget.sellerUid) {
+          _storeName = profile?['storeName'];
+          _storeImage = profile?['storeImage'];
+        }
         _items = fetchedItems;
+        _applyFilters();
         _isLoading = false;
       });
     }
   }
 
+  void _applyFilters() {
+    setState(() {
+      final filtered = _items.where((item) {
+        final matchesSearch = item.name.toLowerCase().contains(_searchQuery.toLowerCase());
+        return matchesSearch;
+      }).toList();
+
+      // Apply sorting for the main list
+      filtered.sort((a, b) => _isAscending 
+          ? a.name.toLowerCase().compareTo(b.name.toLowerCase())
+          : b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+
+      _filteredItems = filtered;
+
+      // Logic for Smart Banner (Featured > Most Liked > Latest)
+      final sortedForBanner = List<InventoryItem>.from(_items);
+      sortedForBanner.sort((a, b) {
+        // 1. Featured first
+        if (a.isFeatured && !b.isFeatured) return -1;
+        if (!a.isFeatured && b.isFeatured) return 1;
+        
+        // 2. Most liked
+        if (a.likes != b.likes) return b.likes.compareTo(a.likes);
+        
+        // 3. Latest created
+        return b.createdAt.compareTo(a.createdAt);
+      });
+
+      _bannerItems = sortedForBanner.take(5).toList();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isUrdu = Provider.of<LanguageService>(context).isUrdu;
+    final languageService = Provider.of<LanguageService>(context);
+    final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
     final isOwner = FirebaseAuth.instance.currentUser?.uid == widget.sellerUid;
 
     return Scaffold(
-      backgroundColor: AppTheme.scaffoldBackground,
+      backgroundColor: Colors.white,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                // 1. Centered Profile Header with Theme Background
-                _buildModernHeader(isUrdu, fontFamily),
-
-                // 2. Control Bar (Count & View Mode)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.themeColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
+                Container(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.darkColor,
+                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: SafeArea(
+                    bottom: false,
+                    child: Column(
+                      children: [
+                        _buildTopAppBar(isUrdu, fontFamily),
+                        SearchSortBar(
+                          controller: _searchController,
+                          hintText: isUrdu ? 'آئٹم تلاش کریں...' : 'Search items...',
+                          onSearchChanged: (v) {
+                            _searchQuery = v;
+                            _applyFilters();
+                          },
+                          onSortToggled: () {
+                            setState(() {
+                              _isAscending = !_isAscending;
+                              _applyFilters();
+                            });
+                          },
+                          isAscending: _isAscending,
                         ),
-                        child: Row(
-                          children: [
-                            Icon(PhosphorIcons.shoppingBag(), size: 16, color: AppTheme.themeColor),
-                            const SizedBox(width: 6),
-                            Text(
-                              '${_items.length} ${isUrdu ? 'مصنوعات' : 'Items'}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.themeColor,
-                                fontFamily: fontFamily,
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _loadData,
+                    child: ListView(
+                      padding: EdgeInsets.zero,
+                      children: [
+                        if (_bannerItems.isNotEmpty) _buildFeaturedBanner(isUrdu, fontFamily),
+                        _buildSectionHeader(isUrdu, fontFamily),
+                        _filteredItems.isEmpty
+                            ? _buildEmptyState(isUrdu, fontFamily)
+                            : _buildProductsList(isUrdu, fontFamily, isOwner),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildTopAppBar(bool isUrdu, String fontFamily) {
+    final user = FirebaseAuth.instance.currentUser;
+    final bool isMe = user?.uid == widget.sellerUid;
+    
+    // Identity logic: Priority to Store Info, Fallback to Personal Info
+    final String displayName = isMe 
+        ? (_storeName ?? user?.displayName ?? widget.sellerName)
+        : (_sellerProfile?['storeName']?.isNotEmpty == true ? _sellerProfile!['storeName']! : (_sellerProfile?['name'] ?? widget.sellerName));
+    
+    final String? photoUrl = isMe 
+        ? (_storeImage ?? user?.photoURL)
+        : (_sellerProfile?['storeImage']?.isNotEmpty == true ? _sellerProfile!['storeImage']! : (_sellerProfile?['photoUrl'] ?? ''));
+
+    final bool isVerified = isMe 
+        ? Provider.of<DatabaseService>(context, listen: false).getAccount('me')?.isVerified ?? false
+        : _sellerProfile?['isVerified'] == 'true';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Row(
+        children: [
+          ProfileInfoWidget(
+            name: displayName,
+            phone: '', // No phone needed in header
+            profileImage: photoUrl,
+            isVerified: isVerified,
+            isLarge: false,
+            showText: false, // Only image with ring
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isUrdu ? 'خوش آمدید' : 'Welcome Back 👋',
+                  style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7), fontFamily: fontFamily),
+                ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        displayName,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontFamily: _getFont(displayName, isUrdu),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isVerified) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
+                        size: 16,
+                        color: const Color(0xFF1D9BF0),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (isMe)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: ElevatedButton.icon(
+                onPressed: () => _showCategoryPicker(isUrdu, fontFamily),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.goldColor,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  minimumSize: const Size(0, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: const StadiumBorder(),
+                ),
+                icon: const Icon(Icons.add, size: 14, color: Colors.white),
+                label: Text(
+                  isUrdu ? 'آئٹم شامل کریں' : 'Add Item',
+                  style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 10),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeaturedBanner(bool isUrdu, String fontFamily) {
+    return Column(
+      children: [
+        SizedBox(
+          height: 220,
+          child: PageView.builder(
+            controller: _bannerController,
+            onPageChanged: (index) => setState(() => _currentBannerPage = index),
+            itemCount: _bannerItems.length,
+            itemBuilder: (context, index) {
+              final featured = _bannerItems[index];
+              final String? photoUrl = featured.imagePaths.isNotEmpty ? featured.imagePaths.first : null;
+
+              return GestureDetector(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ItemDetailScreen(item: featured))),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    image: photoUrl != null
+                        ? DecorationImage(image: photoUrl.startsWith('http') ? CachedNetworkImageProvider(photoUrl) : FileImage(File(photoUrl)) as ImageProvider, fit: BoxFit.cover)
+                        : null,
+                    color: Colors.grey[200],
+                  ),
+                  child: Stack(
+                    children: [
+                      // Glass Box at Bottom
+                      Positioned(
+                        bottom: 15,
+                        left: 15,
+                        right: 15,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(15),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(15),
+                                border: Border.all(color: Colors.white.withOpacity(0.2)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          featured.name,
+                                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const Icon(Icons.star, color: Colors.amber, size: 16),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${featured.rating} (${featured.likes})',
+                                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(PhosphorIcons.mapPin(), color: Colors.white70, size: 14),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        featured.location ?? "",
+                                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                      ),
+                                      const Spacer(),
+                                      Text(
+                                        'Rs ${featured.defaultRate.toStringAsFixed(0)}',
+                                        style: const TextStyle(color: AppTheme.goldColor, fontWeight: FontWeight.bold, fontSize: 14),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: () => setState(() => _viewMode = _viewMode == ViewMode.grid ? ViewMode.list : ViewMode.grid),
+                      // Bookmark/Featured Badge
+                      if (featured.isFeatured)
+                        Positioned(
+                          top: 15,
+                          left: 15,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.goldColor,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              isUrdu ? 'خاص' : 'Featured',
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      Positioned(
+                        top: 15,
+                        right: 15,
                         child: Container(
                           padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.grey[200]!),
-                          ),
-                          child: Icon(
-                            _viewMode == ViewMode.grid ? PhosphorIcons.list() : PhosphorIcons.gridFour(),
-                            color: AppTheme.themeColor,
-                            size: 20,
-                          ),
+                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                          child: Icon(PhosphorIcons.bookmarkSimple(), size: 20, color: AppTheme.darkColor),
                         ),
                       ),
                     ],
                   ),
                 ),
+              );
+            },
+          ),
+        ),
+        // Indicator Dots
+        if (_bannerItems.length > 1)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_bannerItems.length, (index) {
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: _currentBannerPage == index ? 20 : 8,
+                height: 8,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  color: _currentBannerPage == index ? AppTheme.themeColor : Colors.grey[300],
+                ),
+              );
+            }),
+          ),
+      ],
+    );
+  }
 
-                // 3. Products List
-                Expanded(
-                  child: _items.isEmpty
-                      ? _buildEmptyState(isUrdu, fontFamily)
-                      : _buildProductsList(isUrdu, fontFamily),
+  Widget _buildSectionHeader(bool isUrdu, String fontFamily) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            isUrdu ? 'تمام مصنوعات' : 'All Products',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.darkColor, fontFamily: fontFamily),
+          ),
+          GestureDetector(
+            onTap: () => setState(() => _viewMode = _viewMode == ViewMode.grid ? ViewMode.list : ViewMode.grid),
+            child: Row(
+              children: [
+                Icon(
+                  _viewMode == ViewMode.grid ? PhosphorIcons.list() : PhosphorIcons.gridFour(),
+                  color: AppTheme.themeColor,
+                  size: 20,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  isUrdu ? (_viewMode == ViewMode.grid ? 'فہرست' : 'گرڈ') : (_viewMode == ViewMode.grid ? 'List' : 'Grid'),
+                  style: TextStyle(fontSize: 13, color: AppTheme.themeColor, fontWeight: FontWeight.bold, fontFamily: fontFamily),
                 ),
               ],
             ),
-      floatingActionButton: isOwner 
-          ? FloatingActionButton.extended(
-              onPressed: () => _showCategoryPicker(isUrdu, fontFamily),
-              backgroundColor: AppTheme.goldColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: Text(
-                isUrdu ? 'آئٹم شامل کریں' : 'Add Item',
-                style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
-              ),
-            )
-          : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductsList(bool isUrdu, String fontFamily, bool isOwner) {
+    if (_viewMode == ViewMode.grid) {
+      return GridView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.72,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+        ),
+        itemCount: _filteredItems.length,
+        itemBuilder: (context, index) {
+          final item = _filteredItems[index];
+          return ProductCard(
+            item: item,
+            isUrdu: isUrdu,
+            fontFamily: fontFamily,
+            view: ProductCardView.grid,
+            isMyItem: isOwner,
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ItemDetailScreen(item: item)),
+              );
+              _loadData();
+            },
+            onEdit: isOwner ? () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AddInventoryItemScreen(itemToEdit: item),
+                ),
+              );
+              if (result == true) _loadData();
+            } : null,
+            onDelete: isOwner ? () => _confirmDelete(item, isUrdu, fontFamily) : null,
+          );
+        },
+      );
+    } else {
+      return ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _filteredItems.length,
+        itemBuilder: (context, index) {
+          final item = _filteredItems[index];
+          return ProductCard(
+            item: item,
+            isUrdu: isUrdu,
+            fontFamily: fontFamily,
+            view: ProductCardView.list,
+            isMyItem: isOwner,
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ItemDetailScreen(item: item)),
+              );
+              _loadData();
+            },
+            onEdit: isOwner ? () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AddInventoryItemScreen(itemToEdit: item),
+                ),
+              );
+              if (result == true) _loadData();
+            } : null,
+            onDelete: isOwner ? () => _confirmDelete(item, isUrdu, fontFamily) : null,
+          );
+        },
+      );
+    }
+  }
+
+  void _confirmDelete(InventoryItem item, bool isUrdu, String fontFamily) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(isUrdu ? 'آئٹم ڈیلیٹ کریں؟' : 'Delete Item?', style: TextStyle(fontFamily: fontFamily)),
+        content: Text(
+          isUrdu ? 'کیا آپ واقعی اس آئٹم کو ختم کرنا چاہتے ہیں؟ یہ عمل واپس نہیں لیا جا سکے گا۔' : 'Are you sure you want to delete this item? This action cannot be undone.',
+          style: TextStyle(fontFamily: fontFamily),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(isUrdu ? 'کینسل' : 'Cancel', style: TextStyle(fontFamily: fontFamily)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final db = Provider.of<DatabaseService>(context, listen: false);
+              await db.deleteInventoryItem(item.id);
+              _loadData();
+            },
+            child: Text(isUrdu ? 'ڈیلیٹ کریں' : 'Delete', style: TextStyle(color: Colors.red, fontFamily: fontFamily, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(bool isUrdu, String fontFamily) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(PhosphorIcons.package(), size: 64, color: Colors.grey[300]!),
+          const SizedBox(height: 16),
+          Text(
+            isUrdu ? 'کوئی مصنوعات نہیں ملی' : 'No products found',
+            style: TextStyle(color: Colors.grey[500], fontFamily: fontFamily, fontSize: 16),
+          ),
+        ],
+      ),
     );
   }
 
@@ -233,317 +673,6 @@ class _SellerItemsScreenState extends State<SellerItemsScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildModernHeader(bool isUrdu, String fontFamily) {
-    final user = FirebaseAuth.instance.currentUser;
-    final bool isMe = user?.uid == widget.sellerUid;
-    final String? photoUrl = isMe ? user?.photoURL : _sellerProfile?['photoUrl'];
-    final String displayName = isMe ? (user?.displayName ?? widget.sellerName) : (_sellerProfile?['name'] ?? widget.sellerName);
-    final bool isUrduName = RegExp(r'[\u0600-\u06FF]').hasMatch(displayName);
-
-    return SizedBox(
-      height: 225, // Compact height for banner + info row
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // 1. Background Cover (Banner)
-          Container(
-            height: 160,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppTheme.darkColor,
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(15)),
-              border: Border(
-                bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05), width: 1),
-              ),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 2)),
-              ],
-            ),
-          ),
-
-          // 2. Back Button (Right Side)
-          Positioned(
-            top: 45,
-            right: 16,
-            child: CircleAvatar(
-              backgroundColor: Colors.white.withValues(alpha: 0.1),
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-          ),
-
-          // 3. Share Button (Left Side)
-          Positioned(
-            top: 45,
-            left: 16,
-            child: CircleAvatar(
-              backgroundColor: Colors.white.withValues(alpha: 0.1),
-              child: IconButton(
-                icon: const Icon(Icons.share, color: Colors.white, size: 18),
-                onPressed: () {},
-              ),
-            ),
-          ),
-
-          // 4. Stats Inside Banner (Left & Right of centered image)
-          Positioned(
-            top: 110,
-            left: 0,
-            right: 0,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 25),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildBannerStat('${_items.length}', isUrdu ? 'اشیاء' : 'Items', PhosphorIcons.package(), fontFamily),
-                  _buildBannerStat(isUrdu ? 'تیز' : 'Fast', isUrdu ? 'رسپانس' : 'Response', PhosphorIcons.lightning(PhosphorIconsStyle.fill), fontFamily, iconColor: Colors.amber),
-                ],
-              ),
-            ),
-          ),
-
-          // 5. Profile Image (Centered & Overlapping)
-          Positioned(
-            top: 90,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: AppTheme.goldColor,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: (photoUrl != null && photoUrl.isNotEmpty)
-                          ? CachedNetworkImage(
-                              imageUrl: photoUrl,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                              errorWidget: (context, url, error) => const Icon(Icons.storefront, size: 40, color: Colors.white70),
-                            )
-                          : const Icon(Icons.storefront, size: 40, color: Colors.white70),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // 6. Name and Tag (Far Left & Far Right, below Banner)
-          Positioned(
-            top: 170,
-            left: 0,
-            right: 0,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                children: [
-                  // Name on the Far Left
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            displayName,
-                            style: TextStyle(
-                              fontSize: isUrduName ? 22 : 18,
-                              fontWeight: FontWeight.bold, 
-                              color: AppTheme.darkColor,
-                              fontFamily: _getFont(displayName, isUrdu)
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 130),
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.themeColor.withValues(alpha: 0.05), // Light theme color background
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppTheme.themeColor.withValues(alpha: 0.1)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.verified, color: AppTheme.themeColor, size: 14),
-                            const SizedBox(width: 6),
-                            Text(
-                              isUrdu ? 'تصدیق شدہ' : 'Verified',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.themeColor, // Darker color
-                                fontFamily: fontFamily,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBannerStat(String value, String label, IconData icon, String fontFamily, {Color? iconColor}) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: iconColor ?? Colors.white),
-        const SizedBox(width: 6),
-        Text(
-          '$value $label',
-          style: TextStyle(
-            fontSize: 12, 
-            fontWeight: FontWeight.bold, 
-            color: Colors.white,
-            fontFamily: fontFamily,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProductsList(bool isUrdu, String fontFamily) {
-    final isOwner = FirebaseAuth.instance.currentUser?.uid == widget.sellerUid;
-    
-    if (_viewMode == ViewMode.grid) {
-      return GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 0.72,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-        ),
-        itemCount: _items.length,
-        itemBuilder: (context, index) {
-          final item = _items[index];
-          return ProductCard(
-            item: item,
-            isUrdu: isUrdu,
-            fontFamily: fontFamily,
-            view: ProductCardView.grid,
-            isMyItem: isOwner,
-            onTap: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ItemDetailScreen(item: item)),
-              );
-              _loadData(); // Sync on return
-            },
-            onDelete: isOwner ? () => _confirmDelete(item, isUrdu, fontFamily) : null,
-          );
-        },
-      );
-    } else {
-      return ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _items.length,
-        itemBuilder: (context, index) {
-          final item = _items[index];
-          return ProductCard(
-            item: item,
-            isUrdu: isUrdu,
-            fontFamily: fontFamily,
-            view: ProductCardView.list,
-            isMyItem: isOwner,
-            onTap: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ItemDetailScreen(item: item)),
-              );
-              _loadData(); // Sync on return
-            },
-            onDelete: isOwner ? () => _confirmDelete(item, isUrdu, fontFamily) : null,
-          );
-        },
-      );
-    }
-  }
-
-  void _confirmDelete(InventoryItem item, bool isUrdu, String fontFamily) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isUrdu ? 'آئٹم ڈیلیٹ کریں؟' : 'Delete Item?', style: TextStyle(fontFamily: fontFamily)),
-        content: Text(
-          isUrdu ? 'کیا آپ واقعی اس آئٹم کو ختم کرنا چاہتے ہیں؟ یہ عمل واپس نہیں لیا جا سکے گا۔' : 'Are you sure you want to delete this item? This action cannot be undone.',
-          style: TextStyle(fontFamily: fontFamily),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(isUrdu ? 'کینسل' : 'Cancel', style: TextStyle(fontFamily: fontFamily)),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              final db = Provider.of<DatabaseService>(context, listen: false);
-              await db.deleteInventoryItem(item.id);
-              _loadData(); // Refresh list
-            },
-            child: Text(isUrdu ? 'ڈیلیٹ کریں' : 'Delete', style: TextStyle(color: Colors.red, fontFamily: fontFamily, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(bool isUrdu, String fontFamily) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(PhosphorIcons.package(), size: 64, color: Colors.grey[300]!),
-          const SizedBox(height: 16),
-          Text(
-            isUrdu ? 'کوئی مصنوعات نہیں ملی' : 'No products found',
-            style: TextStyle(color: Colors.grey[500], fontFamily: fontFamily, fontSize: 16),
-          ),
-        ],
       ),
     );
   }

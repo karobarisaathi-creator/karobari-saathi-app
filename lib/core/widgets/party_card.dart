@@ -133,6 +133,7 @@ class _PartyCardState extends State<PartyCard> {
                             date: widget.party.createdAt,
                             showDate: false,
                             hasUpdate: _hasUpdate,
+                            isVerified: widget.party.isVerified,
                           ),
                           Consumer<NotificationService>(
                             builder: (context, notificationService, _) {

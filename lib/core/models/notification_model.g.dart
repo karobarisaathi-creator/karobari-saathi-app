@@ -83,6 +83,8 @@ class NotificationTypeAdapter extends TypeAdapter<NotificationType> {
         return NotificationType.general;
       case 5:
         return NotificationType.system;
+      case 6:
+        return NotificationType.price_drop;
       default:
         return NotificationType.transaction;
     }
@@ -108,6 +110,9 @@ class NotificationTypeAdapter extends TypeAdapter<NotificationType> {
         break;
       case NotificationType.system:
         writer.writeByte(5);
+        break;
+      case NotificationType.price_drop:
+        writer.writeByte(6);
         break;
     }
   }

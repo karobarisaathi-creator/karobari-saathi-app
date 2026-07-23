@@ -10,6 +10,8 @@ import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/category_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/inventory_item_model.dart';
+import 'package:account_app/core/models/review_model.dart';
+import 'package:account_app/core/models/ad_report_model.dart';
 import 'package:account_app/helpers/migration_helper.dart';
 
 class DatabaseService with ChangeNotifier {
@@ -22,6 +24,7 @@ class DatabaseService with ChangeNotifier {
   Box<Profession>? _professionsBox;
   Box<InventoryItem>? _itemsBox;
   Box<List>? _remoteCachedItemsBox;
+  Box<InventoryItem>? _recentlyViewedBox;
   Box? _settingsBox;
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
@@ -56,6 +59,7 @@ class DatabaseService with ChangeNotifier {
       _professionsBox = await Hive.openBox<Profession>('professions');
       _itemsBox = await Hive.openBox<InventoryItem>('inventory_items');
       _remoteCachedItemsBox = await Hive.openBox<List>('remote_cached_items');
+      _recentlyViewedBox = await Hive.openBox<InventoryItem>('recently_viewed');
       _settingsBox = await Hive.openBox('settings');
 
       _isInitialized = true;
@@ -600,6 +604,38 @@ class DatabaseService with ChangeNotifier {
   }
 
   // --- Global Marketplace ---
+  Future<Map<String, dynamic>> getGlobalMarketplaceItemsPaginated({
+    int limit = 20, 
+    DocumentSnapshot? lastDocument
+  }) async {
+    try {
+      Query query = _firestore
+          .collectionGroup('inventory_items')
+          .orderBy('createdAt', descending: true)
+          .limit(limit);
+
+      if (lastDocument != null) {
+        query = query.startAfterDocument(lastDocument);
+      }
+
+      final querySnapshot = await query.get();
+
+      final items = querySnapshot.docs.map((doc) => InventoryItem.fromMap({
+        ...doc.data() as Map<String, dynamic>,
+        'id': doc.id,
+      })).toList();
+
+      return {
+        'items': items,
+        'lastDocument': querySnapshot.docs.isNotEmpty ? querySnapshot.docs.last : null,
+        'hasMore': items.length == limit,
+      };
+    } catch (e) {
+      debugPrint("Error fetching global marketplace paginated: $e");
+      return {'items': <InventoryItem>[], 'lastDocument': null, 'hasMore': false};
+    }
+  }
+
   Future<List<InventoryItem>> getGlobalMarketplaceItems({int limit = 50}) async {
     try {
       // Using collectionGroup to fetch items from ALL users
@@ -619,6 +655,18 @@ class DatabaseService with ChangeNotifier {
     }
   }
 
+  Future<bool> isSellerVerified(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (doc.exists) {
+        return doc.data()?['isVerified'] ?? false;
+      }
+    } catch (e) {
+      debugPrint("Error checking seller verification: $e");
+    }
+    return false;
+  }
+
   Future<Map<String, String>?> findPublicProfileByUid(String uid) async {
     try {
       final doc = await _firestore.collection('users').doc(uid).get();
@@ -631,6 +679,9 @@ class DatabaseService with ChangeNotifier {
           'phone': data['phoneNumber'] ?? '',
           'slogan': data['slogan'] ?? '',
           'address': data['address'] ?? '',
+          'isVerified': (data['isVerified'] ?? false).toString(),
+          'storeName': data['storeName'] ?? '',
+          'storeImage': data['storeImage'] ?? '',
         };
       }
     } catch (e) {
@@ -1076,9 +1127,95 @@ class DatabaseService with ChangeNotifier {
   }
 
   Future<void> updateInventoryItem(InventoryItem item) async {
+    // Check for price drop before updating
+    final oldItem = _itemsBox?.get(item.id);
+    if (oldItem != null && item.defaultRate < oldItem.defaultRate) {
+      _triggerPriceDropNotification(item);
+    }
+
     await _itemsBox?.put(item.id, item);
     notifyListeners();
     _triggerSync();
+  }
+
+  Future<void> _triggerPriceDropNotification(InventoryItem item) async {
+    try {
+      // Find all users who favorited this item in Firestore
+      final favs = await _firestore.collection('favorites')
+          .where('itemId', isEqualTo: item.id)
+          .get();
+      
+      for (var doc in favs.docs) {
+        final userId = doc.data()['userId'];
+        if (userId == _auth.currentUser?.uid) continue;
+        
+        // Add notification to their collection
+        await _firestore.collection('users').doc(userId).collection('notifications').add({
+          'title': 'قیمت کم ہو گئی! 🔥',
+          'message': 'آپ کی پسندیدہ چیز "${item.name}" اب Rs. ${item.defaultRate} میں دستیاب ہے۔',
+          'timestamp': FieldValue.serverTimestamp(),
+          'type': 'price_drop',
+          'isRead': false,
+          'data': {'itemId': item.id},
+        });
+      }
+    } catch (e) {
+      debugPrint("Price drop notification error: $e");
+    }
+  }
+
+  Future<void> toggleFirestoreFavorite(String itemId, bool isFav) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    
+    final favId = "${user.uid}_$itemId";
+    if (isFav) {
+      await _firestore.collection('favorites').doc(favId).set({
+        'userId': user.uid,
+        'itemId': itemId,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    } else {
+      await _firestore.collection('favorites').doc(favId).delete();
+    }
+  }
+
+  // --- Review Operations ---
+
+  Future<void> addReview(Review review) async {
+    try {
+      await _firestore.collection('reviews').doc(review.id).set(review.toMap());
+      
+      // Update item average rating in Firestore
+      final reviews = await getItemReviews(review.itemId);
+      if (reviews.isNotEmpty) {
+        double totalRating = 0;
+        for (var r in reviews) {
+          totalRating += r.rating;
+        }
+        final double avgRating = totalRating / reviews.length;
+        
+        await _firestore.collection('inventory').doc(review.itemId).update({
+          'rating': avgRating,
+        });
+      }
+    } catch (e) {
+      debugPrint("Add review error: $e");
+    }
+  }
+
+  Future<List<Review>> getItemReviews(String itemId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('reviews')
+          .where('itemId', isEqualTo: itemId)
+          .orderBy('timestamp', descending: true)
+          .get();
+      return snapshot.docs.map((doc) => Review.fromMap(doc.data())).toList();
+    } catch (e) {
+      debugPrint("Get reviews error: $e");
+    }
+    return [];
   }
 
   Future<void> deleteInventoryItem(String id) async {
@@ -1113,6 +1250,74 @@ class DatabaseService with ChangeNotifier {
 
   InventoryItem? getInventoryItem(String id) {
     return _itemsBox?.get(id);
+  }
+
+  // --- Ad Engagement & Reports ---
+
+  Future<void> addRecentlyViewed(InventoryItem item) async {
+    if (_recentlyViewedBox == null) return;
+    
+    // Remove if already exists to move to top
+    await _recentlyViewedBox!.delete(item.id);
+    
+    // Add to box
+    await _recentlyViewedBox!.put(item.id, item);
+    
+    // Maintain limit (e.g., 15 items)
+    if (_recentlyViewedBox!.length > 15) {
+      final keys = _recentlyViewedBox!.keys.toList();
+      await _recentlyViewedBox!.delete(keys.first);
+    }
+    notifyListeners();
+  }
+
+  List<InventoryItem> getRecentlyViewed() {
+    // Return in reverse order (most recent first)
+    return _recentlyViewedBox?.values.toList().reversed.toList() ?? [];
+  }
+
+  Future<void> reportAd(AdReport report) async {
+    try {
+      await _firestore.collection('ad_reports').doc(report.id).set(report.toMap());
+    } catch (e) {
+      debugPrint("Report ad error: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> incrementView(String itemId) async {
+    try {
+      // Find the document across all users using collectionGroup
+      final query = await _firestore.collectionGroup('inventory_items')
+          .where('id', isEqualTo: itemId)
+          .limit(1)
+          .get();
+          
+      if (query.docs.isNotEmpty) {
+        await query.docs.first.reference.update({
+          'views': FieldValue.increment(1),
+        });
+      }
+    } catch (e) {
+      debugPrint("Increment view error: $e");
+    }
+  }
+
+  Future<void> incrementShare(String itemId) async {
+    try {
+      final query = await _firestore.collectionGroup('inventory_items')
+          .where('id', isEqualTo: itemId)
+          .limit(1)
+          .get();
+          
+      if (query.docs.isNotEmpty) {
+        await query.docs.first.reference.update({
+          'shares': FieldValue.increment(1),
+        });
+      }
+    } catch (e) {
+      debugPrint("Increment share error: $e");
+    }
   }
 
   // --- Sync Implementation ---
@@ -1235,6 +1440,7 @@ class DatabaseService with ChangeNotifier {
     if (_categoriesBox?.isOpen ?? false) await _categoriesBox?.clear();
     if (_professionsBox?.isOpen ?? false) await _professionsBox?.clear();
     if (_itemsBox?.isOpen ?? false) await _itemsBox?.clear();
+    if (_recentlyViewedBox?.isOpen ?? false) await _recentlyViewedBox?.clear();
     if (_remoteCachedItemsBox?.isOpen ?? false) await _remoteCachedItemsBox?.clear();
     
     notifyListeners();
@@ -1300,6 +1506,7 @@ class DatabaseService with ChangeNotifier {
     await _categoriesBox?.close();
     await _professionsBox?.close();
     await _itemsBox?.close();
+    await _recentlyViewedBox?.close();
     await _remoteCachedItemsBox?.close();
     await _settingsBox?.close();
     _isInitialized = false;

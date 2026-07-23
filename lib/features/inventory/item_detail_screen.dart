@@ -1,12 +1,18 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:account_app/core/models/inventory_item_model.dart';
+import 'package:account_app/core/models/review_model.dart';
+import 'package:account_app/core/models/ad_report_model.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/widgets/app_filter_chip.dart';
@@ -36,6 +42,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   int _selectedImageIndex = 0;
   Map<String, String>? _sellerInfo;
   bool _isLoadingSeller = false;
+  List<Review> _reviews = [];
+  bool _isLoadingReviews = false;
 
   String _getFont(String? text, bool isAppUrdu, {bool forceUrdu = false}) {
     if (!isAppUrdu) return ''; 
@@ -49,6 +57,105 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     super.initState();
     _isFavorite = widget.item.isFavorite ?? false;
     _loadSellerInfo();
+    _loadReviews();
+    _trackEngagement();
+  }
+
+  void _trackEngagement() {
+    if (widget.isPreview) return;
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final dbService = Provider.of<DatabaseService>(context, listen: false);
+      dbService.incrementView(widget.item.id);
+      dbService.addRecentlyViewed(widget.item);
+    });
+  }
+
+  Future<void> _loadReviews() async {
+    setState(() => _isLoadingReviews = true);
+    final dbService = Provider.of<DatabaseService>(context, listen: false);
+    final reviews = await dbService.getItemReviews(widget.item.id);
+    if (mounted) {
+      setState(() {
+        _reviews = reviews;
+        _isLoadingReviews = false;
+      });
+    }
+  }
+
+  Future<void> _showReviewDialog(bool isUrdu, String fontFamily) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _showErrorSnackBar(isUrdu ? 'ریویو دینے کے لیے لاگ ان کریں' : 'Please login to give a review');
+      return;
+    }
+
+    double rating = 5.0;
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => AlertDialog(
+          backgroundColor: AppTheme.darkColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(isUrdu ? 'ریویو دیں' : 'Give a Review', style: TextStyle(color: Colors.white, fontFamily: fontFamily)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) => IconButton(
+                  icon: Icon(
+                    index < rating ? PhosphorIcons.star(PhosphorIconsStyle.fill) : PhosphorIcons.star(),
+                    color: Colors.amber,
+                  ),
+                  onPressed: () => setModalState(() => rating = index + 1.0),
+                )),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                maxLines: 3,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: isUrdu ? 'اپنا تبصرہ لکھیں...' : 'Write your comment...',
+                  hintStyle: const TextStyle(color: Colors.white54),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white24)),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: Text(isUrdu ? 'کینسل' : 'Cancel', style: TextStyle(color: Colors.white54, fontFamily: fontFamily))),
+            ElevatedButton(
+              onPressed: () async {
+                if (controller.text.trim().isEmpty) return;
+                Navigator.pop(context);
+                
+                final review = Review(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  itemId: widget.item.id,
+                  userId: user.uid,
+                  userName: user.displayName ?? 'User',
+                  rating: rating,
+                  comment: controller.text.trim(),
+                  timestamp: DateTime.now(),
+                );
+
+                final dbService = Provider.of<DatabaseService>(context, listen: false);
+                await dbService.addReview(review);
+                _loadReviews(); // Refresh
+                _loadSellerInfo(); // Refresh rating maybe
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.themeColor),
+              child: Text(isUrdu ? 'شائع کریں' : 'Post', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _openFullScreenImage(int initialIndex) {
@@ -115,6 +222,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   }
 
   Future<void> _toggleFavorite() async {
+    HapticFeedback.mediumImpact();
     final dbService = Provider.of<DatabaseService>(context, listen: false);
     setState(() {
       _isFavorite = !_isFavorite;
@@ -126,6 +234,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     });
     widget.item.isFavorite = _isFavorite;
     await dbService.updateInventoryItem(widget.item);
+    await dbService.toggleFirestoreFavorite(widget.item.id, _isFavorite);
   }
 
   void _whatsappSeller() async {
@@ -158,6 +267,20 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     } else {
       _showErrorSnackBar('Could not launch phone dialer');
     }
+  }
+
+  void _shareItem() {
+    HapticFeedback.lightImpact();
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    final dbService = Provider.of<DatabaseService>(context, listen: false);
+    
+    final String url = 'https://accountapp.page.link/item/${widget.item.id}';
+    final String message = isUrdu 
+        ? "بازار پر یہ اشتہار دیکھیں: ${widget.item.name}\n$url"
+        : "Check out this ad on Bazaar: ${widget.item.name}\n$url";
+    
+    Share.share(message);
+    dbService.incrementShare(widget.item.id);
   }
 
   void _showMissingInfoSnackBar() {
@@ -309,6 +432,24 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                             style: TextStyle(fontSize: isUrdu ? 18 : 15, color: Colors.white70, fontFamily: _getFont(widget.item.description, isUrdu), height: 1.6),
                           ),
                         ),
+                        const SizedBox(height: 32),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildSectionHeader(isUrdu ? 'ریویوز' : 'Reviews', isUrdu, fontFamily),
+                            if (!widget.isPreview)
+                              TextButton.icon(
+                                onPressed: () => _showReviewDialog(isUrdu, fontFamily),
+                                icon: const Icon(Icons.add, size: 16),
+                                label: Text(isUrdu ? 'ریویو دیں' : 'Add Review', style: TextStyle(fontFamily: fontFamily)),
+                                style: TextButton.styleFrom(foregroundColor: AppTheme.themeColor),
+                              ),
+                          ],
+                        ),
+                        _buildReviewsSection(isUrdu, fontFamily),
+                        const SizedBox(height: 32),
+                        if (widget.item.accountId == FirebaseAuth.instance.currentUser?.uid)
+                          _buildSellerInsights(isUrdu, fontFamily),
                         const SizedBox(height: 32),
                         _buildSellerCard(isUrdu, fontFamily),
                         const SizedBox(height: 140),
@@ -470,6 +611,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   }
 
   Widget _buildTopButtons() {
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
+    
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -477,10 +621,94 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             _buildFloatingCircleButton(icon: Icons.arrow_back_ios_new, onTap: () => Navigator.pop(context)),
-            _buildFloatingCircleButton(icon: _isFavorite ? PhosphorIcons.heart(PhosphorIconsStyle.fill) : PhosphorIcons.heart(), iconColor: _isFavorite ? const Color(0xFF128C7E) : Colors.white, onTap: _toggleFavorite),
+            Row(
+              children: [
+                _buildFloatingCircleButton(
+                  icon: PhosphorIcons.shareNetwork(), 
+                  iconColor: Colors.white, 
+                  onTap: _shareItem,
+                ),
+                const SizedBox(width: 8),
+                _buildFloatingCircleButton(
+                  icon: PhosphorIcons.flag(), 
+                  iconColor: Colors.white, 
+                  onTap: () => _showReportDialog(isUrdu, fontFamily),
+                ),
+                const SizedBox(width: 8),
+                _buildFloatingCircleButton(
+                  icon: _isFavorite ? PhosphorIcons.heart(PhosphorIconsStyle.fill) : PhosphorIcons.heart(), 
+                  iconColor: _isFavorite ? const Color(0xFF128C7E) : Colors.white, 
+                  onTap: _toggleFavorite,
+                ),
+              ],
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  void _showReportDialog(bool isUrdu, String fontFamily) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.darkColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          isUrdu ? 'اشتہار رپورٹ کریں' : 'Report Ad',
+          style: TextStyle(color: Colors.white, fontFamily: fontFamily),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildReportOption(isUrdu ? 'غلط قیمت' : 'Incorrect Price', isUrdu, fontFamily),
+            _buildReportOption(isUrdu ? 'دھوکہ دہی / فراڈ' : 'Fraud / Scam', isUrdu, fontFamily),
+            _buildReportOption(isUrdu ? 'غیر اخلاقی مواد' : 'Inappropriate Content', isUrdu, fontFamily),
+            _buildReportOption(isUrdu ? 'چوری شدہ چیز' : 'Stolen Item', isUrdu, fontFamily),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReportOption(String label, bool isUrdu, String fontFamily) {
+    return ListTile(
+      title: Text(label, style: TextStyle(color: Colors.white70, fontSize: 14, fontFamily: fontFamily)),
+      onTap: () async {
+        Navigator.pop(context);
+        
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) return;
+
+        final report = AdReport(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          itemId: widget.item.id,
+          itemOwnerId: widget.item.accountId ?? '',
+          reporterId: user.uid,
+          reason: label,
+          reportedAt: DateTime.now(),
+        );
+
+        try {
+          final dbService = Provider.of<DatabaseService>(context, listen: false);
+          await dbService.reportAd(report);
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(isUrdu ? 'شکریہ! آپ کی رپورٹ موصول ہو گئی ہے۔' : 'Report submitted. Thank you!'),
+                backgroundColor: AppTheme.themeColor,
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+            );
+          }
+        }
+      },
     );
   }
 
@@ -585,6 +813,111 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => SellerItemsScreen(sellerUid: _sellerInfo!['uid']!, sellerName: _sellerInfo!['name']!, initialProfile: _sellerInfo))), child: Text(isUrdu ? 'مصنوعات' : 'Products', style: TextStyle(color: AppTheme.themeColor, fontWeight: FontWeight.bold, fontFamily: fontFamily))),
         ],
       ),
+    );
+  }
+
+  Widget _buildSellerInsights(bool isUrdu, String fontFamily) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppTheme.themeColor.withValues(alpha: 0.1), Colors.white.withValues(alpha: 0.05)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.themeColor.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(PhosphorIcons.chartBar(PhosphorIconsStyle.fill), color: AppTheme.themeColor, size: 24),
+              const SizedBox(width: 12),
+              Text(
+                isUrdu ? 'آپ کے اشتہار کی کارکردگی' : 'Your Ad Performance',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildStatItem(PhosphorIcons.eye(), widget.item.views.toString(), isUrdu ? 'ویوز' : 'Views', fontFamily),
+              _buildStatItem(PhosphorIcons.shareNetwork(), widget.item.shares.toString(), isUrdu ? 'شیئرز' : 'Shares', fontFamily),
+              _buildStatItem(PhosphorIcons.heart(), widget.item.likes.toString(), isUrdu ? 'لائیکس' : 'Likes', fontFamily),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(IconData icon, String value, String label, String fontFamily) {
+    return Column(
+      children: [
+        Icon(icon, color: Colors.white54, size: 20),
+        const SizedBox(height: 8),
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+        Text(label, style: TextStyle(color: Colors.white38, fontSize: 12, fontFamily: fontFamily)),
+      ],
+    );
+  }
+
+  Widget _buildReviewsSection(bool isUrdu, String fontFamily) {
+    if (_isLoadingReviews) return const Center(child: CircularProgressIndicator(color: Colors.white));
+    if (_reviews.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        width: double.infinity,
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.03), borderRadius: BorderRadius.circular(20)),
+        child: Column(
+          children: [
+            Icon(PhosphorIcons.star(), size: 32, color: Colors.white24),
+            const SizedBox(height: 12),
+            Text(isUrdu ? 'کوئی ریویو نہیں ملا' : 'No reviews yet', style: TextStyle(color: Colors.white54, fontFamily: fontFamily)),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _reviews.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final review = _reviews[index];
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(review.userName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                  Row(
+                    children: List.generate(5, (idx) => Icon(
+                      idx < review.rating ? PhosphorIcons.star(PhosphorIconsStyle.fill) : PhosphorIcons.star(),
+                      color: Colors.amber,
+                      size: 14,
+                    )),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(review.comment, style: TextStyle(color: Colors.white70, fontSize: 13, fontFamily: _getFont(review.comment, isUrdu))),
+              const SizedBox(height: 8),
+              Text(
+                DateFormat('MMM dd, yyyy').format(review.timestamp),
+                style: const TextStyle(color: Colors.white24, fontSize: 10),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

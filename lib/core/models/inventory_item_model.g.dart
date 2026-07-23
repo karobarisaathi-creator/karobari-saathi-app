@@ -96,13 +96,17 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
       assetModel: fields[76] as String?,
       serialNumber: fields[77] as String?,
       depreciation: fields[78] as String?,
+      isFeatured: fields[81] == null ? false : fields[81] as bool,
+      views: fields[82] == null ? 0 : fields[82] as int,
+      shares: fields[83] == null ? 0 : fields[83] as int,
+      adExpiryDate: fields[84] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, InventoryItem obj) {
     writer
-      ..writeByte(79)
+      ..writeByte(83)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -260,7 +264,15 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
       ..writeByte(77)
       ..write(obj.serialNumber)
       ..writeByte(78)
-      ..write(obj.depreciation);
+      ..write(obj.depreciation)
+      ..writeByte(81)
+      ..write(obj.isFeatured)
+      ..writeByte(82)
+      ..write(obj.views)
+      ..writeByte(83)
+      ..write(obj.shares)
+      ..writeByte(84)
+      ..write(obj.adExpiryDate);
   }
 
   @override

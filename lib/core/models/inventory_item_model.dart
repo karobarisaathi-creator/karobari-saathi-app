@@ -218,6 +218,24 @@ class InventoryItem extends HiveObject {
   @HiveField(78)
   final String? depreciation;
 
+  @HiveField(79)
+  final double? latitude;
+
+  @HiveField(80)
+  final double? longitude;
+
+  @HiveField(81, defaultValue: false)
+  final bool isFeatured;
+
+  @HiveField(82, defaultValue: 0)
+  int views;
+
+  @HiveField(83, defaultValue: 0)
+  int shares;
+
+  @HiveField(84)
+  final DateTime? adExpiryDate;
+
   InventoryItem({
     required this.id, required this.name, required this.unit, required this.defaultRate,
     required this.createdAt, required this.updatedAt, this.description,
@@ -244,6 +262,11 @@ class InventoryItem extends HiveObject {
     this.capacity, this.routes,
     this.origin, this.specifications,
     this.assetModel, this.serialNumber, this.depreciation,
+    this.latitude, this.longitude,
+    this.isFeatured = false,
+    this.views = 0,
+    this.shares = 0,
+    this.adExpiryDate,
   });
 
   Map<String, dynamic> toMap() {
@@ -275,6 +298,11 @@ class InventoryItem extends HiveObject {
       'capacity': capacity, 'routes': routes,
       'origin': origin, 'specifications': specifications,
       'assetModel': assetModel, 'serialNumber': serialNumber, 'depreciation': depreciation,
+      'latitude': latitude, 'longitude': longitude,
+      'isFeatured': isFeatured,
+      'views': views,
+      'shares': shares,
+      'adExpiryDate': adExpiryDate?.toIso8601String(),
     };
   }
 
@@ -311,6 +339,12 @@ class InventoryItem extends HiveObject {
       capacity: map['capacity'], routes: map['routes'],
       origin: map['origin'], specifications: map['specifications'],
       assetModel: map['assetModel'], serialNumber: map['serialNumber'], depreciation: map['depreciation'],
+      latitude: (map['latitude'] as num?)?.toDouble(),
+      longitude: (map['longitude'] as num?)?.toDouble(),
+      isFeatured: map['isFeatured'] ?? false,
+      views: map['views']?.toInt() ?? 0,
+      shares: map['shares']?.toInt() ?? 0,
+      adExpiryDate: map['adExpiryDate'] != null ? parseDate(map['adExpiryDate']) : null,
     );
   }
 }

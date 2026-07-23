@@ -111,4 +111,7 @@ enum NotificationType {
 
   @HiveField(5)
   system,
+
+  @HiveField(6)
+  price_drop,
 }

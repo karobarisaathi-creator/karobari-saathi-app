@@ -27,6 +27,7 @@ class ProfileInfoWidget extends StatefulWidget {
   final Color? subtitleColor;
   final bool hasUpdate;
   final bool isSynced;
+  final bool isVerified;
 
   const ProfileInfoWidget({
     super.key,
@@ -45,6 +46,7 @@ class ProfileInfoWidget extends StatefulWidget {
     this.subtitleColor,
     this.hasUpdate = false,
     this.isSynced = true,
+    this.isVerified = false,
   });
 
   @override
@@ -96,12 +98,34 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
 
     // Build the Image Widget
     Widget imagePart = SizedBox(
-      width: size,
-      height: size,
+      width: size + 4, // Added space for the ring
+      height: size + 4,
       child: Stack(
         alignment: Alignment.center,
         clipBehavior: Clip.none,
         children: [
+          // Ring/Border for Verified Users
+          if (widget.isVerified)
+            Container(
+              width: size + 4,
+              height: size + 4,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(radius + 2),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFFD700), Color(0xFFFFA500), Color(0xFFFFD700)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.orange.withOpacity(0.3),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+            ),
+          
           // Main Image Container
           Container(
             width: size,
@@ -110,8 +134,8 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(radius),
               border: Border.all(
-                color: AppTheme.darkColor.withOpacity(0.12),
-                width: 1,
+                color: widget.isVerified ? Colors.white : AppTheme.darkColor.withOpacity(0.12),
+                width: widget.isVerified ? 1.5 : 1,
               ),
             ),
             child: ClipRRect(
@@ -168,15 +192,47 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
         children: [
           imagePart,
           const SizedBox(height: 12),
-          Text(
-            displayName,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: widget.isLarge ? 20 : 16,
-              fontWeight: fontWeight,
-              color: effectiveTextColor,
-              fontFamily: fontFamily,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  displayName,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: widget.isLarge ? 20 : 16,
+                    fontWeight: fontWeight,
+                    color: effectiveTextColor,
+                    fontFamily: fontFamily,
+                  ),
+                ),
+              ),
+              if (widget.isVerified) ...[
+                const SizedBox(width: 4),
+                Icon(
+                  PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
+                  size: widget.isLarge ? 18 : 14,
+                  color: const Color(0xFF1D9BF0), // Official Blue
+                ),
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    isUrdu ? 'قابلِ اعتماد' : 'Trusted',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: const Color(0xFF1D9BF0),
+                      fontWeight: FontWeight.bold,
+                      fontFamily: fontFamily,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
           if (widget.phone.isNotEmpty)
             Text(
@@ -219,6 +275,31 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                       ),
                     ),
                   ),
+                  if (widget.isVerified) ...[
+                    const SizedBox(width: 4),
+                    Icon(
+                      PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
+                      size: widget.isLarge ? 18 : 14,
+                      color: const Color(0xFF1D9BF0), // Official Blue
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        isUrdu ? 'قابلِ اعتماد' : 'Trusted',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: const Color(0xFF1D9BF0),
+                          fontWeight: FontWeight.bold,
+                          fontFamily: fontFamily,
+                        ),
+                      ),
+                    ),
+                  ],
                   if (widget.isSynced) ...[
                     const SizedBox(width: 4),
                     Icon(

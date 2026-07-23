@@ -700,6 +700,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                     isLarge: false,
                     isVerticalCategory: true,
                     hasUpdate: _remoteProfile != null,
+                    isVerified: party.isVerified,
                   ),
                 ),
               ),

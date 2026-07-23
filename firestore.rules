@@ -68,6 +68,37 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
 
+    // --- NEW COLLECTIONS ---
+
+    // Verification Requests: Users can only manage their own
+    match /verification_requests/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
+
+    // Reviews: Anyone can read, logged in users can create
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    // Ad Reports: Authenticated users can create
+    match /ad_reports/{reportId} {
+      allow read: if false; // Only admins (via console)
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    // Favorites: Users can manage their own favorites
+    match /favorites/{favId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow update: if false;
+    }
+
     // --- COLLECTION GROUP RULES ---
     // Required for Global Marketplace
     match /{path=**}/inventory_items/{itemId} {

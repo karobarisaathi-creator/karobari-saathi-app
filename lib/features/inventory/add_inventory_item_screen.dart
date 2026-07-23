@@ -12,10 +12,12 @@ import 'package:geocoding/geocoding.dart';
 import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
+import 'package:account_app/core/services/ai_visual_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_filter_chip.dart';
 import 'package:account_app/core/widgets/image_grid_viewer.dart';
+import 'package:account_app/core/widgets/simple_spinning_ring.dart';
 import 'widgets/mobile_sell_form.dart';
 import 'widgets/vehicle_sell_form.dart';
 import 'widgets/electronics_sell_form.dart';
@@ -55,8 +57,12 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
   final TextEditingController _commonDescController = TextEditingController();
   bool _isNegotiable = false;
   bool _isFetchingLocation = false;
+  double? _lat;
+  double? _lng;
   
   bool _isUploading = false;
+  double _uploadProgress = 0.0;
+  bool _isAnalyzing = false;
   final ImagePicker _picker = ImagePicker();
   final List<AppCategory> _categories = AppFilterChip.productCategories;
 
@@ -100,8 +106,59 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
           final fileName = 'item_${DateTime.now().millisecondsSinceEpoch}.jpg';
           final permanentFile = await File(croppedFile.path).copy('${directory.path}/$fileName');
           setState(() => _currentImages.add(permanentFile.path));
+          
+          // Trigger AI Analysis for the first image
+          if (_currentImages.length == 1) {
+            _analyzeImageWithAI(permanentFile);
+          }
         }
       }
+    }
+  }
+
+  Future<void> _analyzeImageWithAI(File image) async {
+    setState(() => _isAnalyzing = true);
+    try {
+      final aiService = AIVisualService();
+      final result = await aiService.analyzeProductImage(image);
+      
+      if (result.isSuccess && result.data != null) {
+        final aiData = result.data!;
+        final aiCategory = aiData['category']?.toLowerCase();
+        
+        if (aiCategory != null) {
+          // Find matching category in our list
+          final matched = _categories.firstWhere(
+            (c) => c.id.toLowerCase() == aiCategory || c.labelEn.toLowerCase() == aiCategory,
+            orElse: () => _categories.first,
+          );
+          
+          if (mounted) {
+            setState(() {
+              _selectedCategory = matched.id;
+              // Pre-fill some fields if available
+              if (aiData['name'] != null) _formData['name'] = aiData['name'];
+              if (aiData['brand'] != null) _formData['brand'] = aiData['brand'];
+              if (aiData['price'] != null) _formData['price'] = aiData['price'];
+            });
+            
+            final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(isUrdu 
+                  ? "AI نے اس آئٹم کو '${matched.labelUr}' کے طور پر پہچانا ہے۔" 
+                  : "AI identified this as '${matched.labelEn}'."),
+                backgroundColor: AppTheme.themeColor,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("AI Analysis error: $e");
+    } finally {
+      if (mounted) setState(() => _isAnalyzing = false);
     }
   }
 
@@ -133,6 +190,8 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
     setState(() => _isFetchingLocation = true);
     try {
       Position position = await Geolocator.getCurrentPosition();
+      _lat = position.latitude;
+      _lng = position.longitude;
       List<Placemark> placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
       if (placemarks.isNotEmpty) {
         final p = placemarks[0];
@@ -181,6 +240,8 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
         location: _locationController.text.isNotEmpty ? _locationController.text : (_formData['location'] ?? _formData['registration'] ?? 'Pakistan'),
         isNegotiable: _isNegotiable,
         sku: _formData['serial'] ?? _formData['sku'],
+        latitude: _lat,
+        longitude: _lng,
         
         // MOBILE
         ram: _formData['ram'], 
@@ -290,7 +351,35 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: CustomAppBar(title: isUrdu ? 'اشتہار پوسٹ کریں' : 'Post Ad'),
-      body: _isUploading ? const Center(child: CircularProgressIndicator(color: AppTheme.themeColor))
+      body: _isUploading 
+        ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SimpleSpinningRing(size: 60),
+                const SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: LinearProgressIndicator(
+                    value: _uploadProgress,
+                    backgroundColor: Colors.grey[200],
+                    valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.themeColor),
+                    borderRadius: BorderRadius.circular(10),
+                    minHeight: 8,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '${(_uploadProgress * 100).toInt()}%',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                Text(
+                  isUrdu ? 'تصویریں اپ لوڈ ہو رہی ہیں...' : 'Uploading images...',
+                  style: TextStyle(fontFamily: fontFamily),
+                ),
+              ],
+            ),
+          )
         : Column(children: [
             Expanded(child: SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(children: [
               _buildCategoryHeader(isUrdu, fontFamily),
@@ -376,9 +465,11 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
       child: Container(
         height: 180, width: double.infinity,
         decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade300)),
-        child: _currentImages.isEmpty 
-            ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(PhosphorIcons.camera(), size: 40, color: Colors.grey[400]), const SizedBox(height: 8), Text(isUrdu ? 'تصاویر شامل کریں' : 'Upload Images', style: TextStyle(fontFamily: fontFamily, color: Colors.grey[500], fontSize: isUrdu ? 16 : 13))]))
-            : Stack(children: [ClipRRect(borderRadius: BorderRadius.circular(12), child: ImageGridViewer(imagePaths: _currentImages, isReadOnly: false, onRemove: (i) => setState(() => _currentImages.removeAt(i)))), Positioned(right: 8, bottom: 8, child: CircleAvatar(backgroundColor: AppTheme.themeColor, radius: 18, child: IconButton(icon: const Icon(Icons.add_a_photo, color: Colors.white, size: 16), onPressed: () => _showImageSourceSheet(isUrdu, fontFamily))))]),
+        child: _isAnalyzing 
+            ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const CircularProgressIndicator(strokeWidth: 2), const SizedBox(height: 12), Text(isUrdu ? 'AI جائزہ لے رہا ہے...' : 'AI is analyzing...', style: TextStyle(fontFamily: fontFamily, fontSize: 13))]))
+            : _currentImages.isEmpty 
+                ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(PhosphorIcons.camera(), size: 40, color: Colors.grey[400]), const SizedBox(height: 8), Text(isUrdu ? 'تصاویر شامل کریں' : 'Upload Images', style: TextStyle(fontFamily: fontFamily, color: Colors.grey[500], fontSize: isUrdu ? 16 : 13))]))
+                : Stack(children: [ClipRRect(borderRadius: BorderRadius.circular(12), child: ImageGridViewer(imagePaths: _currentImages, isReadOnly: false, onRemove: (i) => setState(() => _currentImages.removeAt(i)))), Positioned(right: 8, bottom: 8, child: CircleAvatar(backgroundColor: AppTheme.themeColor, radius: 18, child: IconButton(icon: const Icon(Icons.add_a_photo, color: Colors.white, size: 16), onPressed: () => _showImageSourceSheet(isUrdu, fontFamily))))]),
       ),
     );
   }

@@ -27,6 +27,7 @@ class NotificationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isTransaction = notification.type == NotificationType.transaction && notification.data != null;
+    final bool isPriceDrop = notification.type == NotificationType.price_drop;
     final data = notification.data;
     final bool isAdded = data?['isAdded'] == true;
     
@@ -35,7 +36,10 @@ class NotificationCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: notification.isRead ? const Color(0xFFF8F9FA) : const Color(0xFFEDF0F2),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.darkColor.withOpacity(0.05), width: 1),
+        border: Border.all(
+          color: isPriceDrop ? AppTheme.incomeColor.withOpacity(0.2) : AppTheme.darkColor.withOpacity(0.05), 
+          width: isPriceDrop ? 2 : 1
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -49,21 +53,25 @@ class NotificationCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Column(
           children: [
+            if (isPriceDrop)
+              _buildPriceDropHeader(isUrdu, fontFamily),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. پروفائل، نام اور فون نمبر (ٹاپ الائنمنٹ کے ساتھ)
+                  // 1. پروفائل، نام اور فون نمبر
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: ProfileInfoWidget(
-                          name: data?['senderName'] ?? (isUrdu ? 'نامعلوم یوزر' : 'Unknown User'),
-                          phone: data?['senderPhone'] ?? '',
-                          profileImage: data?['senderPhotoUrl'],
-                        ),
+                        child: isPriceDrop 
+                          ? _buildSystemIdentity(isUrdu)
+                          : ProfileInfoWidget(
+                              name: data?['senderName'] ?? (isUrdu ? 'نامعلوم یوزر' : 'Unknown User'),
+                              phone: data?['senderPhone'] ?? '',
+                              profileImage: data?['senderPhotoUrl'],
+                            ),
                       ),
                       const SizedBox(width: 8),
                       Column(
@@ -92,7 +100,7 @@ class NotificationCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   // 2. تحریر / عنوان
                   Padding(
-                    padding: const EdgeInsets.only(left: 56), // Align with text in ProfileInfoWidget
+                    padding: EdgeInsets.only(left: isPriceDrop ? 0 : 56), 
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -126,8 +134,9 @@ class NotificationCard extends StatelessWidget {
                             notification.message,
                             style: TextStyle(
                               fontFamily: fontFamily,
-                              fontSize: 13,
+                              fontSize: isPriceDrop ? 15 : 13,
                               color: AppTheme.darkColor,
+                              fontWeight: isPriceDrop ? FontWeight.bold : FontWeight.normal,
                             ),
                           ),
                         ],
@@ -151,7 +160,7 @@ class NotificationCard extends StatelessWidget {
                         foregroundColor: Colors.white,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                        minimumSize: Size.zero, // Allows button to shrink to content
+                        minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                       ),
@@ -160,6 +169,21 @@ class NotificationCard extends StatelessWidget {
                             ? (isUrdu ? 'کھاتے میں شامل ہے' : 'Added to Ledger')
                             : (isUrdu ? 'کھاتے میں شامل کریں' : 'Add to Ledger'),
                         style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  if (isPriceDrop)
+                    ElevatedButton.icon(
+                      onPressed: onTap,
+                      icon: Icon(PhosphorIcons.tag(PhosphorIconsStyle.fill), size: 16),
+                      label: Text(
+                        isUrdu ? 'آئٹم دیکھیں' : 'View Deal',
+                        style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.incomeColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        elevation: 0,
                       ),
                     ),
                   const Spacer(),
@@ -177,6 +201,44 @@ class NotificationCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPriceDropHeader(bool isUrdu, String fontFamily) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+      decoration: BoxDecoration(
+        color: AppTheme.incomeColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+      ),
+      child: Row(
+        children: [
+          Icon(PhosphorIcons.trendDown(PhosphorIconsStyle.bold), color: Colors.white, size: 14),
+          const SizedBox(width: 8),
+          Text(
+            isUrdu ? 'قیمت میں بڑی کمی!' : 'Big Price Drop!',
+            style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSystemIdentity(bool isUrdu) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: AppTheme.themeColor.withOpacity(0.1), shape: BoxShape.circle),
+          child: Icon(PhosphorIcons.sparkle(PhosphorIconsStyle.fill), color: AppTheme.themeColor, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          isUrdu ? 'مارکیٹ الرٹ' : 'Market Alert',
+          style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.darkColor, fontSize: 14),
+        ),
+      ],
     );
   }
 

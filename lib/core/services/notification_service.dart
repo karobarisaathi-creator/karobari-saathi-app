@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/models/account_model.dart';
+import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
 import 'package:account_app/features/inventory/item_detail_screen.dart';
 import 'package:account_app/features/visual_finder/visual_finder_screen.dart';
@@ -190,15 +191,12 @@ class NotificationService with ChangeNotifier {
     if (_navigatorKey == null) return;
     
     String? accountId = data?['accountId'] ?? data?['relatedAccountId'];
-    String? productId = data?['productId'];
+    String? productId = data?['productId'] ?? data?['itemId'];
     
     if (productId != null) {
-      // Navigate to Visual Finder or specific product search
-      _navigatorKey!.currentState!.push(
-        MaterialPageRoute(
-          builder: (context) => VisualFinderScreen(initialSearchQuery: productId),
-        ),
-      );
+      // Find the item first or navigate to detail directly if we have it
+      // For price drop, we likely want to see the item detail
+      _navigateToProductDetail(productId);
       return;
     }
 
@@ -514,5 +512,26 @@ class NotificationService with ChangeNotifier {
   }
 
   Future<void> sendReportNotification(String period) async {
+  }
+
+  void _navigateToProductDetail(String itemId) async {
+    if (_navigatorKey == null) return;
+    
+    // We need to fetch the item first
+    try {
+      final db = DatabaseService(); // This is a bit hacky, better use provider if possible
+      // Actually, we can fetch from Firestore directly here or use a helper
+      final doc = await FirebaseFirestore.instance.collectionGroup('inventory_items')
+          .where('id', isEqualTo: itemId).limit(1).get();
+          
+      if (doc.docs.isNotEmpty) {
+        final item = InventoryItem.fromMap({...doc.docs.first.data(), 'id': doc.docs.first.id});
+        _navigatorKey!.currentState!.push(
+          MaterialPageRoute(builder: (context) => ItemDetailScreen(item: item)),
+        );
+      }
+    } catch (e) {
+      print("Navigation to item error: $e");
+    }
   }
 }

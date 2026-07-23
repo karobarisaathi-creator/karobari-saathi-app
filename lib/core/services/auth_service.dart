@@ -10,7 +10,14 @@ class AuthService with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Update Profile
-  Future<void> updateProfile({String? displayName, String? photoUrl, String? address, String? slogan}) async {
+  Future<void> updateProfile({
+    String? displayName, 
+    String? photoUrl, 
+    String? address, 
+    String? slogan,
+    String? storeName,
+    String? storeImage,
+  }) async {
     final user = _auth.currentUser;
     if (user == null) return;
 
@@ -31,6 +38,8 @@ class AuthService with ChangeNotifier {
 
       if (address != null) updateData['address'] = address;
       if (slogan != null) updateData['slogan'] = slogan;
+      if (storeName != null) updateData['storeName'] = storeName;
+      if (storeImage != null) updateData['storeImage'] = storeImage;
 
       await _firestore.collection('users').doc(user.uid).set(updateData, SetOptions(merge: true));
 

@@ -37,6 +37,7 @@ import 'package:account_app/core/services/chat_service.dart';
 import 'package:account_app/core/services/sharing_service.dart';
 import 'package:account_app/core/services/security_service.dart';
 import 'package:account_app/core/services/price_database_service.dart';
+import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/core/widgets/simple_spinning_ring.dart';
 import './helpers/migration_helper.dart';  // ✅ یہ import کریں
 
@@ -186,6 +187,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ChatService()),
         ChangeNotifierProvider(create: (_) => SharingService()),
         ChangeNotifierProvider(create: (_) => SecurityService()),
+        ChangeNotifierProvider(create: (_) => VerificationService()),
         Provider(create: (_) => PriceDatabaseService()),
       ],
       child: Consumer2<LanguageService, ThemeService>(

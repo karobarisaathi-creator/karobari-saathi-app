@@ -9,7 +9,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/models/inventory_item_model.dart';
@@ -20,8 +22,10 @@ import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/widgets/app_filter_chip.dart';
 import 'package:account_app/core/widgets/product_card.dart';
+import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 import 'item_detail_screen.dart';
 import 'add_inventory_item_screen.dart';
+import 'seller_items_screen.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
 
 class MarketplaceScreen extends StatefulWidget {
@@ -44,10 +48,16 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
   bool _isLoadingMore = false;
   bool _hasMore = true;
   int _currentPage = 0;
+  DocumentSnapshot? _lastDocument;
   static const int _pageSize = 20;
 
   List<InventoryItem> _allItems = [];
   List<InventoryItem> _displayedItems = [];
+  List<InventoryItem> _featuredItems = [];
+  List<InventoryItem> _recentlyViewed = [];
+  Position? _userPosition;
+  double _distanceFilter = 50.0; // 50km default
+  bool _useDistanceFilter = false;
 
   void _showCategoryPicker(bool isUrdu, String fontFamily) {
     showModalBottomSheet(
@@ -122,7 +132,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
     );
   }
   List<Account> _allAccounts = [];
-  Set<String> _favoriteItems = {};
 
   // Filters State
   Set<String> _selectedConditions = {'New', 'Used'};
@@ -179,33 +188,52 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
       _isLoading = true;
       _currentPage = 0;
       _hasMore = true;
+      _lastDocument = null;
+      _allItems = [];
     });
 
     final dbService = Provider.of<DatabaseService>(context, listen: false);
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
 
     try {
+      // 0. Get User Location (for distance calculation)
+      try {
+        _userPosition = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.medium,
+          timeLimit: const Duration(seconds: 5),
+        );
+      } catch (e) {
+        debugPrint("Could not get user position: $e");
+      }
+
       // 1. Get Local Data (Accounts/Transactions) for Interest Extraction
       final localAccounts = dbService.getAccounts();
       final localTransactions = dbService.getAllTransactions();
       _extractUserInterests(localAccounts, localTransactions);
 
       // 2. Fetch Global Marketplace Items (Professional Pagination)
-      // Initial fetch limited to 30 items to save data
-      final remoteItems = await dbService.getGlobalMarketplaceItems(limit: 30);
+      final result = await dbService.getGlobalMarketplaceItemsPaginated(
+        limit: _pageSize,
+        lastDocument: null,
+      );
+      
+      final remoteItems = result['items'] as List<InventoryItem>;
+      _lastDocument = result['lastDocument'] as DocumentSnapshot?;
+      _hasMore = result['hasMore'] as bool;
 
       // 3. Get User's Own Local Items (Offline Support)
       final localItems = dbService.getInventoryItems();
+      
+      // 4. Get Recently Viewed Items
+      final recentlyViewed = dbService.getRecentlyViewed();
 
-      // Merge Items: Unique items prioritizing local copies if they exist (for immediate isFavorite sync)
+      // Merge Items: Unique items prioritizing local copies if they exist
       final Map<String, InventoryItem> itemsMap = {};
       
-      // First, add all remote items
       for (var item in remoteItems) {
         itemsMap[item.id] = item;
       }
       
-      // Then, overwrite or add local items (ensuring user's local edits/favorites are respected)
       for (var item in localItems) {
         itemsMap[item.id] = item;
       }
@@ -213,13 +241,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
       if (mounted) {
         setState(() {
           _allItems = itemsMap.values.toList();
+          _featuredItems = _allItems.where((item) => item.isFeatured).toList();
+          _recentlyViewed = recentlyViewed;
           _allAccounts = localAccounts;
           _isLoading = false;
           
-          // Update Max Price for Slider dynamically
           if (_allItems.isNotEmpty) {
             double highestItemPrice = _allItems.map((e) => e.defaultRate).reduce((a, b) => a > b ? a : b);
-            // Ceiling is now 5 Lakh as requested
             _maxPriceFound = highestItemPrice > 500000 ? highestItemPrice : 500000;
             _priceRange = RangeValues(0, _maxPriceFound);
           }
@@ -246,15 +274,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
     }
 
     // 2. Scan Transaction Item Names and Descriptions
-    // We only take the last 50 transactions to keep it relevant
     final recentTxs = transactions.take(50);
     for (var tx in recentTxs) {
-      // From main description
       if (tx.description.length > 2) {
         keywords.addAll(_splitIntoKeywords(tx.description));
       }
-      
-      // From individual items in transaction
       for (var item in tx.items) {
         keywords.addAll(_splitIntoKeywords(item.description));
       }
@@ -263,20 +287,28 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
     setState(() {
       _interestKeywords = keywords;
     });
-    print("User Interests Extracted: ${_interestKeywords.length} keywords found");
   }
 
   List<String> _splitIntoKeywords(String text) {
-    // Remove special chars and split by space
     return text.toLowerCase()
         .replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]'), '')
         .split(' ')
-        .where((w) => w.length > 2) // Ignore very short words
+        .where((w) => w.length > 2)
         .toList();
   }
 
   void _applyFiltersAndSort() {
+    final now = DateTime.now();
+
     var filtered = _allItems.where((item) {
+      // 0. Expiry Filter
+      if (item.adExpiryDate != null && item.adExpiryDate!.isBefore(now)) {
+        return false;
+      }
+      if (now.difference(item.createdAt).inDays > 90) {
+        return false;
+      }
+
       final query = _searchQuery.toLowerCase();
       final matchesSearch = item.name.toLowerCase().contains(query) || 
                             (item.brand ?? "").toLowerCase().contains(query) ||
@@ -295,7 +327,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
         matchesCategory = item.category == _selectedCategory;
       }
 
-      // 2. Condition Filter (Multi-select)
+      // 2. Condition Filter
       bool matchesCondition = _selectedConditions.contains(item.condition ?? 'New');
 
       // 3. Price Range Filter
@@ -303,16 +335,26 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
 
       // 4. Location Filter
       bool matchesLocation = _locationFilter.isEmpty || (item.location ?? "").toLowerCase().contains(_locationFilter.toLowerCase());
+      
+      // 5. Distance Filter
+      bool matchesDistance = true;
+      if (_useDistanceFilter && _userPosition != null && item.latitude != null && item.longitude != null) {
+        final double distance = Geolocator.distanceBetween(
+          _userPosition!.latitude,
+          _userPosition!.longitude,
+          item.latitude!,
+          item.longitude!,
+        ) / 1000; // to km
+        matchesDistance = distance <= _distanceFilter;
+      }
 
-      return matchesSearch && matchesCategory && matchesCondition && matchesPrice && matchesLocation;
+      return matchesSearch && matchesCategory && matchesCondition && matchesPrice && matchesLocation && matchesDistance;
     }).toList();
 
-    // If "For You" returns nothing, show all but with a hint or keep them all
     if (_selectedCategory == 'for_you' && filtered.isEmpty && _searchQuery.isEmpty) {
-        filtered = List.from(_allItems); // Fallback to all if no interests match
+        filtered = List.from(_allItems);
     }
 
-    // Apply Sorting
     switch (_currentSort) {
       case SortOption.latest:
         filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -336,31 +378,48 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
         filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
 
-    // Pagination
-    final start = _currentPage * _pageSize;
-    final end = start + _pageSize;
-    _hasMore = end < filtered.length;
-
     setState(() {
-      _displayedItems = filtered.take(end).toList();
+      _displayedItems = filtered;
     });
   }
 
   Future<void> _loadMoreItems() async {
-    if (_isLoadingMore || !_hasMore) return;
+    if (_isLoadingMore || !_hasMore || _searchQuery.isNotEmpty) return;
 
     setState(() {
       _isLoadingMore = true;
-      _currentPage++;
     });
 
-    // Simulate network delay for smooth UX
-    await Future.delayed(const Duration(milliseconds: 500));
-    _applyFiltersAndSort();
+    final dbService = Provider.of<DatabaseService>(context, listen: false);
+    
+    try {
+      final result = await dbService.getGlobalMarketplaceItemsPaginated(
+        limit: _pageSize,
+        lastDocument: _lastDocument,
+      );
 
-    setState(() {
-      _isLoadingMore = false;
-    });
+      final newItems = result['items'] as List<InventoryItem>;
+      _lastDocument = result['lastDocument'] as DocumentSnapshot?;
+      _hasMore = result['hasMore'] as bool;
+
+      if (mounted && newItems.isNotEmpty) {
+        setState(() {
+          final existingIds = _allItems.map((e) => e.id).toSet();
+          for (var item in newItems) {
+            if (!existingIds.contains(item.id)) {
+              _allItems.add(item);
+            }
+          }
+          _isLoadingMore = false;
+          _applyFiltersAndSort();
+        });
+      } else {
+        setState(() => _isLoadingMore = false);
+      }
+    } catch (e) {
+      debugPrint("Load more failed: $e");
+      setState(() => _isLoadingMore = false);
+    }
   }
 
   void _onSearchChanged(String value) {
@@ -418,7 +477,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
     if (item.accountId == null) return null;
     try {
       final account = _allAccounts.firstWhere((a) => a.id == item.accountId);
-      return account.name;
+      return account.storeName?.isNotEmpty == true ? account.storeName : account.name;
     } catch (e) {
       return null;
     }
@@ -447,25 +506,29 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
     final languageService = Provider.of<LanguageService>(context);
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-    final currentUser = FirebaseAuth.instance.currentUser;
+    final currentUser = FirebaseAuth.instance.currentUser; // ignore: unused_local_variable
 
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBackground,
       appBar: _buildAppBar(isUrdu, fontFamily),
-      body: Column(
-        children: [
-          _buildSearchAndFilterBar(isUrdu, fontFamily),
-          _buildCategoriesRow(isUrdu, fontFamily),
-          _buildSortAndViewBar(isUrdu, fontFamily),
-          Expanded(
-            child: _isLoading
-                ? _buildLoadingShimmer()
-                : _displayedItems.isEmpty
-                ? _buildEmptyState(isUrdu, fontFamily)
-                : _buildProductsGrid(isUrdu, fontFamily),
-          ),
-          if (_isLoadingMore) _buildLoadingIndicator(),
-        ],
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        color: AppTheme.themeColor,
+        child: Column(
+          children: [
+            _buildSearchAndFilterBar(isUrdu, fontFamily),
+            _buildCategoriesRow(isUrdu, fontFamily),
+            _buildSortAndViewBar(isUrdu, fontFamily),
+            Expanded(
+              child: _isLoading
+                  ? _buildLoadingShimmer()
+                  : _displayedItems.isEmpty
+                  ? _buildEmptyState(isUrdu, fontFamily)
+                  : _buildProductsGrid(isUrdu, fontFamily),
+            ),
+            if (_isLoadingMore) _buildLoadingIndicator(),
+          ],
+        ),
       ),
     );
   }
@@ -481,6 +544,25 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
         tooltip: isUrdu ? 'میری پسندیدہ مصنوعات' : 'My Favorites',
       ),
       actions: [
+        // "My Ads" Button
+        IconButton(
+          icon: Icon(PhosphorIcons.userList(), color: Colors.white),
+          onPressed: () {
+            final user = FirebaseAuth.instance.currentUser;
+            if (user != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SellerItemsScreen(
+                    sellerUid: user.uid,
+                    sellerName: user.displayName ?? 'My Store',
+                  ),
+                ),
+              );
+            }
+          },
+          tooltip: isUrdu ? 'میرے اشتہارات' : 'My Ads',
+        ),
         // "Sell Item" Button moved from FAB to AppBar
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
@@ -747,7 +829,50 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
 
               const SizedBox(height: 24),
 
-              // 2. Condition Selection (Multiple Selection)
+              // 2. Distance / Nearby Filter
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    isUrdu ? 'میرے قریب (فاصلہ)' : 'Nearby (Distance)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: fontFamily),
+                  ),
+                  Switch(
+                    value: _useDistanceFilter,
+                    activeTrackColor: AppTheme.goldColor.withValues(alpha: 0.5),
+                    activeColor: AppTheme.goldColor,
+                    onChanged: (v) {
+                      setModalState(() => _useDistanceFilter = v);
+                      setState(() => _useDistanceFilter = v);
+                      _applyFiltersAndSort();
+                    },
+                  ),
+                ],
+              ),
+              if (_useDistanceFilter) ...[
+                const SizedBox(height: 8),
+                Slider(
+                  value: _distanceFilter,
+                  min: 1,
+                  max: 500,
+                  divisions: 50,
+                  activeColor: AppTheme.goldColor,
+                  label: '${_distanceFilter.round()} km',
+                  onChanged: (v) {
+                    setModalState(() => _distanceFilter = v);
+                    setState(() => _distanceFilter = v);
+                    _applyFiltersAndSort();
+                  },
+                ),
+                Text(
+                  isUrdu ? '${_distanceFilter.round()} کلومیٹر کے اندر' : 'Within ${_distanceFilter.round()} km',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+
+              const SizedBox(height: 24),
+
+              // 3. Condition Selection (Multiple Selection)
               Text(
                 isUrdu ? 'آئٹم کی حالت' : 'Condition',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: fontFamily),
@@ -905,6 +1030,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
             isFavorite: item.isFavorite ?? false,
             isMyItem: item.accountId == FirebaseAuth.instance.currentUser?.uid,
             sellerName: _getSellerName(item),
+            userPosition: _userPosition,
             onTap: () => _navigateToDetail(item),
             onFavoriteToggle: () => _toggleFavorite(item),
             onSellerTap: () => _navigateToSellerProfile(item),
@@ -926,6 +1052,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
             isFavorite: item.isFavorite ?? false,
             isMyItem: item.accountId == FirebaseAuth.instance.currentUser?.uid,
             sellerName: _getSellerName(item),
+            userPosition: _userPosition,
             onTap: () => _navigateToDetail(item),
             onFavoriteToggle: () => _toggleFavorite(item),
             onSellerTap: () => _navigateToSellerProfile(item),
@@ -956,6 +1083,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(vertical: 12),
       children: [
+        // Recently Viewed Section (If not searching)
+        if (_recentlyViewed.isNotEmpty && _searchQuery.isEmpty)
+          _buildRecentlyViewedSection(isUrdu, fontFamily),
+
+        // Featured Section
+        if (_featuredItems.isNotEmpty)
+          _buildFeaturedSection(isUrdu, fontFamily),
+
         // For You Section
         if (forYouItems.isNotEmpty)
           _buildCategorySection(
@@ -1039,14 +1174,195 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                   isFavorite: item.isFavorite ?? false,
                   isMyItem: item.accountId == FirebaseAuth.instance.currentUser?.uid,
                   sellerName: _getSellerName(item),
+                  userPosition: _userPosition,
                   onTap: () => _navigateToDetail(item),
                   onFavoriteToggle: () => _toggleFavorite(item),
-                  onSellerTap: () => _navigateToSellerProfile(item),
+                  onSellerTap: () => _navigateToProfile(item),
                 ),
               );
             },
           ),
         ),
+      ],
+    );
+  }
+
+  void _navigateToProfile(InventoryItem item) {
+    if (item.accountId == null) return;
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    final String sellerName = _getSellerName(item) ?? 'Seller';
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SellerItemsScreen(
+          sellerUid: item.accountId!,
+          sellerName: sellerName,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeaturedSection(bool isUrdu, String fontFamily) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          child: Row(
+            children: [
+              Icon(PhosphorIcons.crown(PhosphorIconsStyle.fill), color: AppTheme.goldColor, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                isUrdu ? 'نمایاں اشتہارات' : 'Featured Ads',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: fontFamily,
+                  color: AppTheme.darkColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 280,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: _featuredItems.length,
+            itemBuilder: (context, index) {
+              final item = _featuredItems[index];
+              return Container(
+                width: 200,
+                margin: const EdgeInsets.symmetric(horizontal: 6),
+                child: Stack(
+                  children: [
+                    ProductCard(
+                      item: item,
+                      isUrdu: isUrdu,
+                      fontFamily: fontFamily,
+                      view: ProductCardView.grid,
+                      isFavorite: item.isFavorite ?? false,
+                      isMyItem: item.accountId == FirebaseAuth.instance.currentUser?.uid,
+                      sellerName: _getSellerName(item),
+                      userPosition: _userPosition,
+                      onTap: () => _navigateToDetail(item),
+                      onFavoriteToggle: () => _toggleFavorite(item),
+                      onSellerTap: () => _navigateToProfile(item),
+                    ),
+                    Positioned(
+                      top: 10,
+                      left: isUrdu ? null : 10,
+                      right: isUrdu ? 10 : null,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.goldColor,
+                          borderRadius: BorderRadius.circular(6),
+                          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.star, color: Colors.white, size: 10),
+                            const SizedBox(width: 4),
+                            Text(
+                              isUrdu ? 'نمایاں' : 'Featured',
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecentlyViewedSection(bool isUrdu, String fontFamily) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Row(
+            children: [
+              Icon(PhosphorIcons.clockCounterClockwise(PhosphorIconsStyle.fill), color: AppTheme.themeColor, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                isUrdu ? 'حال ہی میں دیکھے گئے' : 'Recently Viewed',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: fontFamily,
+                  color: AppTheme.darkColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 120,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: _recentlyViewed.length,
+            itemBuilder: (context, index) {
+              final item = _recentlyViewed[index];
+              return GestureDetector(
+                onTap: () => _navigateToDetail(item),
+                child: Container(
+                  width: 100,
+                  margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)],
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: ClipRRect(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                          child: item.imagePaths.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: item.imagePaths.first,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                )
+                              : Container(color: Colors.grey[100], child: const Icon(Icons.image, color: Colors.grey)),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Text(
+                              item.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const Divider(indent: 16, endIndent: 16),
       ],
     );
   }
@@ -1113,25 +1429,20 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              height: 140,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-            ),
+            const SkeletonShimmer(width: double.infinity, height: 140, borderRadius: 16),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(height: 14, width: double.infinity, color: Colors.grey[200]),
+                    const SkeletonShimmer(width: double.infinity, height: 14),
                     const SizedBox(height: 8),
-                    Container(height: 10, width: 80, color: Colors.grey[200]),
-                    const SizedBox(height: 8),
-                    Container(height: 16, width: 100, color: Colors.grey[200]),
+                    const SkeletonShimmer(width: 80, height: 10),
+                    const Spacer(),
+                    const SkeletonShimmer(width: 100, height: 16),
                   ],
                 ),
               ),
@@ -1158,82 +1469,90 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
   void _showCartDialog(bool isUrdu, String fontFamily) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        final favorites = _allItems.where((item) => _favoriteItems.contains(item.id)).toList();
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.7,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                isUrdu ? 'پسندیدہ مصنوعات' : 'Favorite Products',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: fontFamily),
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: favorites.isEmpty
-                    ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(PhosphorIcons.heart(), size: 48, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      Text(
-                        isUrdu ? 'کوئی پسندیدہ مصنوعات نہیں' : 'No favorite products',
-                        style: TextStyle(color: AppTheme.textSecondary, fontFamily: fontFamily),
-                      ),
-                    ],
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final favorites = _allItems.where((item) => item.isFavorite == true).toList();
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.7,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                )
-                    : ListView.separated(
-                  itemCount: favorites.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final item = favorites[index];
-                    return ListTile(
-                      leading: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: SizedBox(
-                          width: 50,
-                          height: 50,
-                          child: item.imagePaths.isNotEmpty
-                              ? CachedNetworkImage(
-                            imageUrl: item.imagePaths.first,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(color: Colors.grey[200]),
-                            errorWidget: (context, url, error) => Icon(PhosphorIcons.image(), size: 24),
-                          )
-                              : Icon(PhosphorIcons.package(), size: 24, color: Colors.grey[400]),
-                        ),
+                  const SizedBox(height: 16),
+                  Text(
+                    isUrdu ? 'پسندیدہ مصنوعات' : 'Favorite Products',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: favorites.isEmpty
+                        ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(PhosphorIcons.heart(), size: 48, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text(
+                            isUrdu ? 'کوئی پسندیدہ مصنوعات نہیں' : 'No favorite products',
+                            style: TextStyle(color: AppTheme.textSecondary, fontFamily: fontFamily),
+                          ),
+                        ],
                       ),
-                      title: Text(item.name, style: TextStyle(fontFamily: fontFamily)),
-                      subtitle: Text('Rs ${item.defaultRate}', style: const TextStyle(fontFamily: '', fontWeight: FontWeight.bold)),
-                      trailing: IconButton(
-                        icon: Icon(PhosphorIcons.trash(), color: AppTheme.expenseColor),
-                        onPressed: () => _toggleFavorite(item),
-                      ),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _navigateToDetail(item);
+                    )
+                        : ListView.separated(
+                      itemCount: favorites.length,
+                      separatorBuilder: (context, index) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final item = favorites[index];
+                        return ListTile(
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SizedBox(
+                              width: 50,
+                              height: 50,
+                              child: item.imagePaths.isNotEmpty
+                                  ? CachedNetworkImage(
+                                imageUrl: item.imagePaths.first,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => Container(color: Colors.grey[200]),
+                                errorWidget: (context, url, error) => Icon(PhosphorIcons.image(), size: 24),
+                              )
+                                  : Icon(PhosphorIcons.package(), size: 24, color: Colors.grey[400]),
+                            ),
+                          ),
+                          title: Text(item.name, style: TextStyle(fontFamily: fontFamily)),
+                          subtitle: Text('Rs ${item.defaultRate}', style: const TextStyle(fontFamily: '', fontWeight: FontWeight.bold)),
+                          trailing: IconButton(
+                            icon: Icon(PhosphorIcons.trash(), color: AppTheme.expenseColor),
+                            onPressed: () async {
+                              await _toggleFavorite(item);
+                              setModalState(() {}); // Re-build the modal list
+                            },
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _navigateToDetail(item);
+                          },
+                        );
                       },
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );

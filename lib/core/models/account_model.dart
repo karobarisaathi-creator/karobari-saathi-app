@@ -47,6 +47,15 @@ class Account {
   @HiveField(13, defaultValue: true)
   final bool isActive;
 
+  @HiveField(14, defaultValue: false)
+  final bool isVerified;
+
+  @HiveField(15)
+  final String? storeName;
+
+  @HiveField(16)
+  final String? storeImage;
+
   Account({
     required this.id,
     required this.name,
@@ -62,6 +71,9 @@ class Account {
     required this.createdAt,
     required this.updatedAt,
     this.isActive = true,
+    this.isVerified = false,
+    this.storeName,
+    this.storeImage,
   });
 
   Map<String, dynamic> toMap() {
@@ -80,6 +92,9 @@ class Account {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'isActive': isActive,
+      'isVerified': isVerified,
+      'storeName': storeName,
+      'storeImage': storeImage,
     };
   }
 
@@ -107,6 +122,9 @@ class Account {
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
       isActive: map['isActive'] ?? true,
+      isVerified: map['isVerified'] ?? false,
+      storeName: map['storeName']?.toString(),
+      storeImage: map['storeImage']?.toString(),
     );
   }
 
@@ -124,6 +142,9 @@ class Account {
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isActive,
+    bool? isVerified,
+    String? storeName,
+    String? storeImage,
   }) {
     return Account(
       id: id,
@@ -140,6 +161,9 @@ class Account {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
       isActive: isActive ?? this.isActive,
+      isVerified: isVerified ?? this.isVerified,
+      storeName: storeName ?? this.storeName,
+      storeImage: storeImage ?? this.storeImage,
     );
   }
 }

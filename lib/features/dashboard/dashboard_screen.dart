@@ -209,6 +209,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   isLarge: false,
                   showText: false, 
                   textColor: Colors.white,
+                  isVerified: myAccount.isVerified,
                 ),
               ),
             ),
