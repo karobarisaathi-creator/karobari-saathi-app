@@ -21,8 +21,15 @@ import 'package:account_app/core/widgets/custom_app_bar.dart';
 class AddTransactionScreen extends StatefulWidget {
   final Account? account;
   final Transaction? transactionToEdit;
+  final String? initialDescription;
+  final double? initialAmount;
 
-  const AddTransactionScreen({this.account, this.transactionToEdit});
+  const AddTransactionScreen({
+    this.account,
+    this.transactionToEdit,
+    this.initialDescription,
+    this.initialAmount,
+  });
 
   @override
   _AddTransactionScreenState createState() => _AddTransactionScreenState();
@@ -103,6 +110,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       }
     } else {
       _addNewItem();
+      if (widget.initialDescription != null || widget.initialAmount != null) {
+        final entry = _itemEntries.first;
+        if (widget.initialDescription != null) {
+          entry.descriptionController.text = widget.initialDescription!;
+        }
+        if (widget.initialAmount != null) {
+          entry.rateController.text = widget.initialAmount!.toStringAsFixed(0);
+          entry.quantityController.text = '1';
+          entry.totalController.text = widget.initialAmount!.toStringAsFixed(0);
+          _amountController.text = widget.initialAmount!.toStringAsFixed(0);
+        }
+      }
     }
 
     _dateInputController.text = DateFormat('dd/MM/yy').format(_selectedDate);

@@ -23,10 +23,11 @@ class ProfileInfoWidget extends StatefulWidget {
   final bool isCentered;
   final bool showText;
   final bool isVerticalCategory;
+  final String? topLabel;
+  final bool isStore;
   final Color? textColor;
   final Color? subtitleColor;
   final bool hasUpdate;
-  final bool isSynced;
   final bool isVerified;
 
   const ProfileInfoWidget({
@@ -42,10 +43,11 @@ class ProfileInfoWidget extends StatefulWidget {
     this.isCentered = false,
     this.showText = true,
     this.isVerticalCategory = false,
+    this.topLabel,
+    this.isStore = false,
     this.textColor,
     this.subtitleColor,
     this.hasUpdate = false,
-    this.isSynced = true,
     this.isVerified = false,
   });
 
@@ -56,16 +58,15 @@ class ProfileInfoWidget extends StatefulWidget {
 class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
   String _getTranslatedCategory(String category, bool isUrdu) {
     if (!isUrdu) return category;
-    
+
     final key = category.trim().toLowerCase();
-    
+
     try {
       // صرف CategoryChip کی لسٹ سے میچ کرنے کی کوشش کریں
-      final match = CategoryChip.partyCategories.firstWhere(
-        (c) => c.id.toLowerCase() == key || 
-               c.labelEn.toLowerCase() == key || 
-               c.labelUr == category.trim()
-      );
+      final match = CategoryChip.partyCategories.firstWhere((c) =>
+          c.id.toLowerCase() == key ||
+          c.labelEn.toLowerCase() == key ||
+          c.labelUr == category.trim());
       return match.labelUr;
     } catch (_) {
       // اگر لسٹ میں نہ ملے تو اصل ٹیکسٹ ہی واپس کر دیں (جو شاید پہلے سے ہی اردو ہو یا کوئی سسٹم کیٹگری ہو)
@@ -80,16 +81,19 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
     final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
     final effectiveTextColor = widget.textColor ?? AppTheme.darkColor;
-    final effectiveSubtitleColor = widget.subtitleColor ?? AppTheme.textSecondary;
+    final effectiveSubtitleColor =
+        widget.subtitleColor ?? AppTheme.textSecondary;
 
-    final String displayCategory = widget.category != null 
-        ? _getTranslatedCategory(widget.category!, isUrdu) 
+    final String displayCategory = widget.category != null
+        ? _getTranslatedCategory(widget.category!, isUrdu)
         : '';
 
     // Default values
-    String displayName = widget.name.trim().isEmpty ? (isUrdu ? 'نامعلوم' : 'Unknown') : widget.name;
+    String displayName = widget.name.trim().isEmpty
+        ? (isUrdu ? 'نامعلوم' : 'Unknown')
+        : widget.name;
     String? displayImage = widget.profileImage;
-    
+
     final double size = widget.isLarge ? 50 : 36;
     final double radius = 6.0; // Fixed radius as requested
 
@@ -98,34 +102,12 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
 
     // Build the Image Widget
     Widget imagePart = SizedBox(
-      width: size + 4, // Added space for the ring
-      height: size + 4,
+      width: size,
+      height: size,
       child: Stack(
         alignment: Alignment.center,
         clipBehavior: Clip.none,
         children: [
-          // Ring/Border for Verified Users
-          if (widget.isVerified)
-            Container(
-              width: size + 4,
-              height: size + 4,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(radius + 2),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFFD700), Color(0xFFFFA500), Color(0xFFFFD700)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.orange.withOpacity(0.3),
-                    blurRadius: 8,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-            ),
-          
           // Main Image Container
           Container(
             width: size,
@@ -134,8 +116,8 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(radius),
               border: Border.all(
-                color: widget.isVerified ? Colors.white : AppTheme.darkColor.withOpacity(0.12),
-                width: widget.isVerified ? 1.5 : 1,
+                color: AppTheme.darkColor.withOpacity(0.12),
+                width: 1,
               ),
             ),
             child: ClipRRect(
@@ -148,16 +130,20 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                           placeholder: (context, url) => Container(
                             color: AppTheme.darkColor.withOpacity(0.05),
                           ),
-                          errorWidget: (context, url, error) => _buildInitials(displayName, widget.isLarge, AppTheme.darkColor),
+                          errorWidget: (context, url, error) => _buildInitials(
+                              displayName, widget.isLarge, AppTheme.darkColor),
                         )
-                      : (File(displayImage).existsSync() 
+                      : (File(displayImage).existsSync()
                           ? Image.file(File(displayImage), fit: BoxFit.cover)
-                          : _buildInitials(displayName, widget.isLarge, AppTheme.darkColor)))
-                  : _buildInitials(displayName, widget.isLarge, AppTheme.darkColor),
+                          : _buildInitials(
+                              displayName, widget.isLarge, AppTheme.darkColor)))
+                  : _buildInitials(
+                      displayName, widget.isLarge, AppTheme.darkColor,
+                      isStore: widget.isStore),
             ),
           ),
-          
-          // Small Update Badge (Static blue dot/icon at the corner)
+
+          // Small Update Badge
           if (widget.hasUpdate)
             Positioned(
               right: -2,
@@ -207,31 +193,6 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                   ),
                 ),
               ),
-              if (widget.isVerified) ...[
-                const SizedBox(width: 4),
-                Icon(
-                  PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
-                  size: widget.isLarge ? 18 : 14,
-                  color: const Color(0xFF1D9BF0), // Official Blue
-                ),
-                const SizedBox(width: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    isUrdu ? 'قابلِ اعتماد' : 'Trusted',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: const Color(0xFF1D9BF0),
-                      fontWeight: FontWeight.bold,
-                      fontFamily: fontFamily,
-                    ),
-                  ),
-                ),
-              ],
             ],
           ),
           if (widget.phone.isNotEmpty)
@@ -259,6 +220,15 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (widget.topLabel != null && widget.topLabel!.isNotEmpty)
+                Text(
+                  widget.topLabel!,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: effectiveSubtitleColor.withOpacity(0.7),
+                    fontFamily: fontFamily,
+                  ),
+                ),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -280,32 +250,7 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                     Icon(
                       PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
                       size: widget.isLarge ? 18 : 14,
-                      color: const Color(0xFF1D9BF0), // Official Blue
-                    ),
-                    const SizedBox(width: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        isUrdu ? 'قابلِ اعتماد' : 'Trusted',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: const Color(0xFF1D9BF0),
-                          fontWeight: FontWeight.bold,
-                          fontFamily: fontFamily,
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (widget.isSynced) ...[
-                    const SizedBox(width: 4),
-                    Icon(
-                      PhosphorIcons.cloudCheck(),
-                      size: widget.isLarge ? 16 : 12,
-                      color: AppTheme.themeColor.withOpacity(0.7),
+                      color: AppTheme.verifiedGold,
                     ),
                   ],
                 ],
@@ -376,7 +321,11 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                 const SizedBox(height: 2),
                 Text(
                   widget.address!,
-                  style: TextStyle(fontSize: 11, color: effectiveSubtitleColor, fontFamily: fontFamily, fontWeight: fontWeight),
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: effectiveSubtitleColor,
+                      fontFamily: fontFamily,
+                      fontWeight: fontWeight),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -385,7 +334,11 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                 const SizedBox(height: 2),
                 Text(
                   Formatters.formatDate(widget.date!),
-                  style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary, fontFamily: '', fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 10,
+                      color: AppTheme.textSecondary,
+                      fontFamily: '',
+                      fontWeight: FontWeight.bold),
                 ),
               ],
             ],
@@ -395,17 +348,18 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
     );
   }
 
-  Widget _buildInitials(String name, bool isLarge, Color color) {
+  Widget _buildInitials(String name, bool isLarge, Color color,
+      {bool isStore = false}) {
     if (name.trim().isEmpty || name == 'Unknown' || name == 'نامعلوم') {
       return Center(
         child: Icon(
-          PhosphorIcons.user(),
+          isStore ? PhosphorIcons.storefront() : PhosphorIcons.user(),
           size: isLarge ? 24 : 18,
           color: color.withOpacity(0.5),
         ),
       );
     }
-    
+
     try {
       return Center(
         child: Text(
@@ -420,7 +374,7 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
     } catch (e) {
       return Center(
         child: Icon(
-          PhosphorIcons.user(),
+          isStore ? PhosphorIcons.storefront() : PhosphorIcons.user(),
           size: isLarge ? 24 : 18,
           color: color.withOpacity(0.5),
         ),
@@ -444,7 +398,7 @@ class _GradientBorderPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);
     final rrect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
-    
+
     final paint = Paint()
       ..shader = gradient.createShader(rect)
       ..strokeWidth = strokeWidth

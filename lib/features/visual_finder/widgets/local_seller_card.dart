@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/inventory_item_model.dart';
 import '../../../core/services/database_service.dart';
+import '../../../core/widgets/profile_info_widget.dart';
 import 'package:provider/provider.dart';
 import '../../inventory/item_detail_screen.dart';
 
@@ -27,9 +28,9 @@ class LocalSellerCard extends StatelessWidget {
     final bool hasCoords = distance.isNotEmpty;
     final db = Provider.of<DatabaseService>(context, listen: false);
     
-    final sellerName = item.accountId != null 
-        ? (db.getAccount(item.accountId!)?.name ?? (isUrdu ? "نامعلوم دکاندار" : "Unknown Seller"))
-        : (isUrdu ? "زلوق یوزر" : "Zalooq User");
+    final account = item.accountId != null ? db.getAccount(item.accountId!) : null;
+    final sellerName = account?.name ?? (isUrdu ? "نامعلوم دکاندار" : "Unknown Seller");
+    final bool isVerified = account?.isVerified ?? false;
 
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ItemDetailScreen(item: item))),
@@ -44,40 +45,26 @@ class LocalSellerCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Image Section
-            SizedBox(
-              width: 50,
-              height: 50,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: _buildImage(item.imagePaths.isNotEmpty ? item.imagePaths[0] : null),
-              ),
-            ),
-            const SizedBox(width: 12),
-            
-            // Content Section
             Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.name, 
-                    maxLines: 1, 
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white, 
-                      fontWeight: FontWeight.bold, 
-                      fontSize: 14, 
-                      fontFamily: getFont(item.name, isUrdu)
-                    ),
+                  ProfileInfoWidget(
+                    name: item.name,
+                    phone: '',
+                    profileImage: item.imagePaths.isNotEmpty ? item.imagePaths[0] : null,
+                    isVerified: false, // Item name is shown here, verified badge should be next to SELLER name
+                    isLarge: false,
+                    textColor: Colors.white,
+                    subtitleColor: Colors.white70,
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 8),
                   
                   // Seller Info & Address Row
                   Row(
                     children: [
-                      Icon(PhosphorIcons.user(PhosphorIconsStyle.fill), size: 10, color: AppTheme.themeColor),
+                      Icon(PhosphorIcons.storefront(PhosphorIconsStyle.fill), size: 10, color: AppTheme.themeColor),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
@@ -92,6 +79,10 @@ class LocalSellerCard extends StatelessWidget {
                           ),
                         ),
                       ),
+                      if (isVerified) ...[
+                        const SizedBox(width: 4),
+                        Icon(PhosphorIcons.sealCheck(PhosphorIconsStyle.fill), size: 11, color: AppTheme.verifiedGold),
+                      ],
                       if (item.location != null && item.location!.isNotEmpty) ...[
                         const Text(" | ", style: TextStyle(color: Colors.white24, fontSize: 10)),
                         Flexible(
@@ -114,6 +105,7 @@ class LocalSellerCard extends StatelessWidget {
                   // Price and Distance Row
                   Row(
                     children: [
+                      const SizedBox(width: 48), // Align with profile text
                       Text(
                         "Rs ${item.defaultRate.toStringAsFixed(0)}", 
                         style: const TextStyle(

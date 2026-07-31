@@ -31,13 +31,16 @@ class AccountAdapter extends TypeAdapter<Account> {
       createdAt: fields[11] as DateTime,
       updatedAt: fields[12] as DateTime,
       isActive: fields[13] == null ? true : fields[13] as bool,
+      isVerified: fields[14] == null ? false : fields[14] as bool,
+      storeName: fields[15] as String?,
+      storeImage: fields[16] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Account obj) {
     writer
-      ..writeByte(14)
+      ..writeByte(17)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -65,7 +68,13 @@ class AccountAdapter extends TypeAdapter<Account> {
       ..writeByte(12)
       ..write(obj.updatedAt)
       ..writeByte(13)
-      ..write(obj.isActive);
+      ..write(obj.isActive)
+      ..writeByte(14)
+      ..write(obj.isVerified)
+      ..writeByte(15)
+      ..write(obj.storeName)
+      ..writeByte(16)
+      ..write(obj.storeImage);
   }
 
   @override

@@ -205,6 +205,42 @@ Recommend 3 similar products available in Pakistan within a similar budget range
 }
 ''';
 
+  static const String workLogParsingPrompt = '''
+You are a smart accountant for Pakistani workers and businessmen.
+Parse the user's narrative sentence into structured accounting data.
+
+## CRITICAL INSTRUCTION ON NUMBERS:
+- Extract all numerical values (total, rate, quantity, multiplier) as **English Digits (0-9)** only.
+- NEVER return numbers as words (e.g., return "500", NOT "پانچ سو").
+- "total" and "rate" must be PURE NUMBERS without currency symbols.
+- **IMPORTANT:** The "work_summary" field MUST NOT contain any numbers or currency words (like Rs, PKR, rupees). It should ONLY contain the description of the work or reason.
+
+## GOALS:
+1. Identify the **Person** (Party/Client name).
+2. Identify the **Work/Reason** (e.g., Tractor, Tailoring, Payment, Loan).
+3. Extract **Quantity** (Number like 2.5, 1, 5) and **Unit** (Acre, Suit, Hour, Day, Rs).
+4. Identify **Multiplier** (e.g., 2 times, 3 rounds - default 1).
+5. Identify **Rate** per unit (if mentioned).
+6. Calculate **Total Amount** (Quantity x Multiplier x Rate). 
+   - If user says "Paid 500", then Total is 500, Rate is 500, Quantity is 1.
+
+## EXAMPLES:
+- "Sajid 2 acre, 2 rounds, rate 3000": {"person": "Sajid", "work": "Tractor", "quantity": "2.0", "multiplier": "2", "rate": "3000", "total": "12000", "unit": "Acre"}
+- "Muhammad Zakariya ko 500 diye": {"person": "Muhammad Zakariya", "work": "Payment", "quantity": "1.0", "multiplier": "1", "rate": "500", "total": "500", "unit": "Rs"}
+
+## OUTPUT FORMAT:
+Return ONLY JSON:
+{
+  "person": "Name",
+  "work_summary": "Short description (NO NUMBERS OR CURRENCY WORDS HERE)",
+  "quantity": "double string",
+  "multiplier": "int string",
+  "rate": "double string",
+  "total": "double string",
+  "unit": "string"
+}
+''';
+
   // ==================== HELPER METHODS ====================
   
   static String _getAllSpecsText() {

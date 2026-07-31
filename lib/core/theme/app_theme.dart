@@ -9,6 +9,7 @@ class AppTheme {
   static const Color textSecondary = Color(0xFF757575);
   static const Color incomeColor = Color(0xFF515D11); // Green for Received (Olive Green)
   static const Color expenseColor = Color(0xFFC83120); // گہرا سرخ رنگ (Cinnabar Red)
+  static const Color verifiedGold = Color(0xFFDAA520); // Richer Darker Gold
   static const Color scaffoldBackground = Color(0xFFFFFFFF);
 
   // Dark Mode Colors

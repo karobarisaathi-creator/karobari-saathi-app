@@ -238,6 +238,53 @@ class AIVisualService {
   }
 
   /// ============================================================
+  /// WORK LOG PARSING
+  /// ============================================================
+
+  Future<AIResult> parseWorkLog(String text) async {
+    if (text.trim().isEmpty) {
+      return AIResult.failure(AIErrorType.parsing);
+    }
+
+    final prompt = AIPrompts.buildPrompt(
+      AIPrompts.workLogParsingPrompt,
+      query: text,
+    );
+
+    for (final modelName in _geminiModels) {
+      try {
+        debugPrint('Trying Gemini Model for Work Log: $modelName');
+
+        final model = GenerativeModel(
+          model: modelName,
+          apiKey: _geminiApiKey,
+        );
+
+        final response = await model
+            .generateContent([Content.text(prompt)])
+            .timeout(const Duration(seconds: 10));
+
+        if (response.text == null) {
+          continue;
+        }
+
+        final parsed = _parseJsonResponse(response.text!);
+
+        if (parsed != null) {
+          return AIResult.success(parsed);
+        }
+      } catch (e) {
+        debugPrint('Gemini Work Log Error with $modelName: $e');
+        if (e.toString().contains('quota')) {
+          return AIResult.failure(AIErrorType.quota);
+        }
+      }
+    }
+
+    return AIResult.failure(AIErrorType.unknown);
+  }
+
+  /// ============================================================
   /// DEEPSEEK SEARCH
   /// ============================================================
 

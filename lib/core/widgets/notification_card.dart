@@ -71,6 +71,7 @@ class NotificationCard extends StatelessWidget {
                               name: data?['senderName'] ?? (isUrdu ? 'نامعلوم یوزر' : 'Unknown User'),
                               phone: data?['senderPhone'] ?? '',
                               profileImage: data?['senderPhotoUrl'],
+                              isVerified: data?['isSenderVerified'] == true || data?['isSenderVerified'] == 'true',
                             ),
                       ),
                       const SizedBox(width: 8),

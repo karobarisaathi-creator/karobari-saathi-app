@@ -12,6 +12,7 @@ import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/models/review_model.dart';
 import 'package:account_app/core/models/ad_report_model.dart';
+import 'package:account_app/core/models/work_log_model.dart';
 import 'package:account_app/helpers/migration_helper.dart';
 
 class DatabaseService with ChangeNotifier {
@@ -25,6 +26,7 @@ class DatabaseService with ChangeNotifier {
   Box<InventoryItem>? _itemsBox;
   Box<List>? _remoteCachedItemsBox;
   Box<InventoryItem>? _recentlyViewedBox;
+  Box<WorkLog>? _workLogsBox;
   Box? _settingsBox;
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
@@ -40,7 +42,8 @@ class DatabaseService with ChangeNotifier {
 
   // Getters for lists
   List<Account> get accounts => _accountsBox?.values.toList() ?? [];
-  List<model.Transaction> get transactions => _transactionsBox?.values.toList() ?? [];
+  List<model.Transaction> get transactions =>
+      _transactionsBox?.values.toList() ?? [];
 
   DatabaseService() {
     // init(); // Removing auto-init from constructor to better control lifecycle
@@ -60,6 +63,7 @@ class DatabaseService with ChangeNotifier {
       _itemsBox = await Hive.openBox<InventoryItem>('inventory_items');
       _remoteCachedItemsBox = await Hive.openBox<List>('remote_cached_items');
       _recentlyViewedBox = await Hive.openBox<InventoryItem>('recently_viewed');
+      _workLogsBox = await Hive.openBox<WorkLog>('work_logs');
       _settingsBox = await Hive.openBox('settings');
 
       _isInitialized = true;
@@ -81,7 +85,9 @@ class DatabaseService with ChangeNotifier {
 
       _triggerSync();
 
-      _connectivitySubscription = Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
+      _connectivitySubscription = Connectivity()
+          .onConnectivityChanged
+          .listen((List<ConnectivityResult> results) {
         if (results.contains(ConnectivityResult.mobile) ||
             results.contains(ConnectivityResult.wifi) ||
             results.contains(ConnectivityResult.ethernet)) {
@@ -101,7 +107,7 @@ class DatabaseService with ChangeNotifier {
   }
 
   // --- Migration Method Removed (Moved to MigrationHelper) ---
-  // Future<void> _migrateExistingProfessions() async { ... } 
+  // Future<void> _migrateExistingProfessions() async { ... }
   // Functionality is now covered by MigrationHelper.runAllMigrations
 
   // --- نئے حساب کتاب کے فنکشن ---
@@ -138,10 +144,12 @@ class DatabaseService with ChangeNotifier {
   }
 
   // 3. سیزن موازنہ ڈیٹا
-  Future<Map<String, dynamic>> getSeasonComparison(String professionName) async {
+  Future<Map<String, dynamic>> getSeasonComparison(
+      String professionName) async {
     final sameNameProfessions = _professionsBox?.values
-        .where((p) => p.name == professionName && p.season.isNotEmpty)
-        .toList() ?? [];
+            .where((p) => p.name == professionName && p.season.isNotEmpty)
+            .toList() ??
+        [];
 
     if (sameNameProfessions.length < 2) {
       return {'hasComparison': false};
@@ -151,7 +159,8 @@ class DatabaseService with ChangeNotifier {
     sameNameProfessions.sort((a, b) => b.season.compareTo(a.season));
 
     final latest = sameNameProfessions.first;
-    final previous = sameNameProfessions.length > 1 ? sameNameProfessions[1] : null;
+    final previous =
+        sameNameProfessions.length > 1 ? sameNameProfessions[1] : null;
 
     if (previous == null) {
       return {'hasComparison': false};
@@ -165,10 +174,14 @@ class DatabaseService with ChangeNotifier {
       'profitChange': latest.netProfit - previous.netProfit,
       'productionChange': latest.totalProduction - previous.totalProduction,
       'costChangePercent': previous.costPerUnit > 0
-          ? ((latest.costPerUnit - previous.costPerUnit) / previous.costPerUnit * 100)
+          ? ((latest.costPerUnit - previous.costPerUnit) /
+              previous.costPerUnit *
+              100)
           : 0,
       'profitChangePercent': previous.netProfit.abs() > 0
-          ? ((latest.netProfit - previous.netProfit) / previous.netProfit.abs() * 100)
+          ? ((latest.netProfit - previous.netProfit) /
+              previous.netProfit.abs() *
+              100)
           : 0,
     };
   }
@@ -182,12 +195,16 @@ class DatabaseService with ChangeNotifier {
 
     // 1. Cost recommendations
     if (profession.benchmarkCostPerUnit > 0 && profession.costPerUnit > 0) {
-      final diffPercent = ((profession.costPerUnit - profession.benchmarkCostPerUnit) /
-          profession.benchmarkCostPerUnit * 100);
+      final diffPercent =
+          ((profession.costPerUnit - profession.benchmarkCostPerUnit) /
+              profession.benchmarkCostPerUnit *
+              100);
       if (diffPercent > 20) {
-        recommendations.add('لاگت ${diffPercent.toStringAsFixed(1)}% زیادہ ہے۔ سپلائرز سے ریٹ کم کریں۔');
+        recommendations.add(
+            'لاگت ${diffPercent.toStringAsFixed(1)}% زیادہ ہے۔ سپلائرز سے ریٹ کم کریں۔');
       } else if (diffPercent < -10) {
-        recommendations.add('لاگت ${diffPercent.abs().toStringAsFixed(1)}% کم ہے۔ بہترین!');
+        recommendations.add(
+            'لاگت ${diffPercent.abs().toStringAsFixed(1)}% کم ہے۔ بہترین!');
       }
     }
 
@@ -195,9 +212,11 @@ class DatabaseService with ChangeNotifier {
     if (profession.targetProduction > 0) {
       final progress = profession.productionProgress;
       if (progress < 50) {
-        recommendations.add('پیداوار صرف ${progress.toStringAsFixed(1)}% ہے۔ کوالٹی بیج اور کھاد استعمال کریں۔');
+        recommendations.add(
+            'پیداوار صرف ${progress.toStringAsFixed(1)}% ہے۔ کوالٹی بیج اور کھاد استعمال کریں۔');
       } else if (progress > 100) {
-        recommendations.add('پیداوار ہدف سے ${(progress - 100).toStringAsFixed(1)}% زیادہ ہے۔ بہترین!');
+        recommendations.add(
+            'پیداوار ہدف سے ${(progress - 100).toStringAsFixed(1)}% زیادہ ہے۔ بہترین!');
       }
     }
 
@@ -205,20 +224,24 @@ class DatabaseService with ChangeNotifier {
     if (profession.netProfit < 0) {
       recommendations.add('نقصان ہو رہا ہے۔ خرچ کم کریں یا قیمتیں بڑھائیں۔');
     } else if (profession.netProfit > profession.totalIncome * 0.3) {
-      recommendations.add('منافع اچھا ہے (${(profession.netProfit / profession.totalIncome * 100).toStringAsFixed(1)}%)۔');
+      recommendations.add(
+          'منافع اچھا ہے (${(profession.netProfit / profession.totalIncome * 100).toStringAsFixed(1)}%)۔');
     }
 
     // 4. Budget recommendations
     final budgetAlerts = await checkBudgetAlerts(professionId);
-    final exceededCategories = budgetAlerts.entries.where((e) => e.value).map((e) => e.key).toList();
+    final exceededCategories =
+        budgetAlerts.entries.where((e) => e.value).map((e) => e.key).toList();
     if (exceededCategories.isNotEmpty) {
-      recommendations.add('${exceededCategories.join(', ')} میں بجٹ سے زیادہ خرچ ہوا ہے۔');
+      recommendations
+          .add('${exceededCategories.join(', ')} میں بجٹ سے زیادہ خرچ ہوا ہے۔');
     }
 
     // 5. Performance score based
     final score = profession.performanceScore;
     if (score < 40) {
-      recommendations.add('کارکردگی کم ہے (${score.toStringAsFixed(0)}%)۔ بہتری کی ضرورت ہے۔');
+      recommendations.add(
+          'کارکردگی کم ہے (${score.toStringAsFixed(0)}%)۔ بہتری کی ضرورت ہے۔');
     } else if (score > 80) {
       recommendations.add('شاندار کارکردگی! (${score.toStringAsFixed(0)}%)');
     }
@@ -243,11 +266,8 @@ class DatabaseService with ChangeNotifier {
     double benchmarkCostPerUnit = 0.0,
     ProfessionCategory categoryType = ProfessionCategory.general,
   }) async {
-
     // Generate season key
-    final seasonKey = season.isNotEmpty
-        ? _generateSeasonKey(name, season)
-        : "";
+    final seasonKey = season.isNotEmpty ? _generateSeasonKey(name, season) : "";
 
     return Profession(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -472,7 +492,8 @@ class DatabaseService with ChangeNotifier {
       }
 
       for (String p in potentials) {
-        final query = await _firestore.collection('users')
+        final query = await _firestore
+            .collection('users')
             .where('phoneNumber', isEqualTo: p)
             .limit(1)
             .get();
@@ -483,7 +504,10 @@ class DatabaseService with ChangeNotifier {
           return {
             'uid': uid,
             'name': data['displayName'] ?? data['name'] ?? '',
-            'photoUrl': data['photoURL'] ?? data['photoUrl'] ?? data['profileImage'] ?? '',
+            'photoUrl': data['photoURL'] ??
+                data['photoUrl'] ??
+                data['profileImage'] ??
+                '',
           };
         }
       }
@@ -493,7 +517,8 @@ class DatabaseService with ChangeNotifier {
     return null;
   }
 
-  Future<List<InventoryItem>> getRemoteInventoryItems(String uid, {int limit = 50}) async {
+  Future<List<InventoryItem>> getRemoteInventoryItems(String uid,
+      {int limit = 50}) async {
     try {
       // Professional approach: Filter at the source (Firestore) and use limits for performance
       final querySnapshot = await _firestore
@@ -503,15 +528,17 @@ class DatabaseService with ChangeNotifier {
           .orderBy('createdAt', descending: true)
           .limit(limit)
           .get();
-      
-      final items = querySnapshot.docs.map((doc) => InventoryItem.fromMap({
-        ...doc.data(),
-        'id': doc.id,
-      })).toList();
+
+      final items = querySnapshot.docs
+          .map((doc) => InventoryItem.fromMap({
+                ...doc.data(),
+                'id': doc.id,
+              }))
+          .toList();
 
       // Cache these items locally for offline access
       await saveRemoteCachedItems(uid, items);
-      
+
       return items;
     } catch (e) {
       print("Error fetching remote inventory: $e");
@@ -520,9 +547,10 @@ class DatabaseService with ChangeNotifier {
   }
 
   /// Global Search across all sellers in the app (Name, Brand, Category, SKU)
-  Future<List<InventoryItem>> searchGlobalInventory(String query, {int limit = 15}) async {
+  Future<List<InventoryItem>> searchGlobalInventory(String query,
+      {int limit = 15}) async {
     if (query.isEmpty) return [];
-    
+
     final trimmedQuery = query.trim();
     final lowerQuery = trimmedQuery.toLowerCase();
     final isUrdu = RegExp(r'[\u0600-\u06FF]').hasMatch(trimmedQuery);
@@ -535,7 +563,7 @@ class DatabaseService with ChangeNotifier {
           .where('name', isLessThanOrEqualTo: '$trimmedQuery\uf8ff')
           .limit(limit)
           .get();
-      
+
       // 2. Search by SKU/Barcode (Exact)
       final skuQuery = _firestore
           .collectionGroup('inventory_items')
@@ -545,7 +573,7 @@ class DatabaseService with ChangeNotifier {
 
       // Execute queries in parallel
       final results = await Future.wait([nameQuery, skuQuery]);
-      
+
       Map<String, InventoryItem> uniqueItems = {};
       for (var snapshot in results) {
         for (var doc in snapshot.docs) {
@@ -556,38 +584,44 @@ class DatabaseService with ChangeNotifier {
 
       // 3. Additional check for English Case Sensitivity if not Urdu
       if (!isUrdu && uniqueItems.length < limit) {
-         String capitalizedQuery = lowerQuery[0].toUpperCase() + lowerQuery.substring(1);
-         final capQuery = await _firestore
-          .collectionGroup('inventory_items')
-          .where('name', isGreaterThanOrEqualTo: capitalizedQuery)
-          .where('name', isLessThanOrEqualTo: '$capitalizedQuery\uf8ff')
-          .limit(limit)
-          .get();
-          
-          for (var doc in capQuery.docs) {
-            final item = InventoryItem.fromMap({...doc.data(), 'id': doc.id});
-            uniqueItems[item.id] = item;
-          }
+        String capitalizedQuery =
+            lowerQuery[0].toUpperCase() + lowerQuery.substring(1);
+        final capQuery = await _firestore
+            .collectionGroup('inventory_items')
+            .where('name', isGreaterThanOrEqualTo: capitalizedQuery)
+            .where('name', isLessThanOrEqualTo: '$capitalizedQuery\uf8ff')
+            .limit(limit)
+            .get();
+
+        for (var doc in capQuery.docs) {
+          final item = InventoryItem.fromMap({...doc.data(), 'id': doc.id});
+          uniqueItems[item.id] = item;
+        }
       }
 
       return uniqueItems.values.toList();
     } catch (e) {
       print("Global multi-search error: $e");
       // PRO FALLBACK: Search everything in local cache (Handles "contains" search for Urdu/English)
-      return _itemsBox?.values.where((item) {
-        final n = item.name.toLowerCase();
-        final b = (item.brand ?? '').toLowerCase();
-        final s = (item.sku ?? '').toLowerCase();
-        
-        return n.contains(lowerQuery) || 
-               b.contains(lowerQuery) || 
-               s.contains(lowerQuery);
-      }).take(limit).toList() ?? [];
+      return _itemsBox?.values
+              .where((item) {
+                final n = item.name.toLowerCase();
+                final b = (item.brand ?? '').toLowerCase();
+                final s = (item.sku ?? '').toLowerCase();
+
+                return n.contains(lowerQuery) ||
+                    b.contains(lowerQuery) ||
+                    s.contains(lowerQuery);
+              })
+              .take(limit)
+              .toList() ??
+          [];
     }
   }
 
   // --- Remote Item Caching ---
-  Future<void> saveRemoteCachedItems(String partyUid, List<InventoryItem> items) async {
+  Future<void> saveRemoteCachedItems(
+      String partyUid, List<InventoryItem> items) async {
     if (_remoteCachedItemsBox == null) return;
     // Map items to Maps for storage if needed, or if they are HiveObjects ensure they don't conflict
     // Since InventoryItem is a HiveObject, it might be safer to store as Map to keep it simple and separate from local items box
@@ -599,15 +633,15 @@ class DatabaseService with ChangeNotifier {
     if (_remoteCachedItemsBox == null) return [];
     final data = _remoteCachedItemsBox!.get(partyUid);
     if (data == null) return [];
-    
-    return data.map((e) => InventoryItem.fromMap(Map<String, dynamic>.from(e))).toList();
+
+    return data
+        .map((e) => InventoryItem.fromMap(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
   // --- Global Marketplace ---
-  Future<Map<String, dynamic>> getGlobalMarketplaceItemsPaginated({
-    int limit = 20, 
-    DocumentSnapshot? lastDocument
-  }) async {
+  Future<Map<String, dynamic>> getGlobalMarketplaceItemsPaginated(
+      {int limit = 20, DocumentSnapshot? lastDocument}) async {
     try {
       Query query = _firestore
           .collectionGroup('inventory_items')
@@ -620,23 +654,31 @@ class DatabaseService with ChangeNotifier {
 
       final querySnapshot = await query.get();
 
-      final items = querySnapshot.docs.map((doc) => InventoryItem.fromMap({
-        ...doc.data() as Map<String, dynamic>,
-        'id': doc.id,
-      })).toList();
+      final items = querySnapshot.docs
+          .map((doc) => InventoryItem.fromMap({
+                ...doc.data() as Map<String, dynamic>,
+                'id': doc.id,
+              }))
+          .toList();
 
       return {
         'items': items,
-        'lastDocument': querySnapshot.docs.isNotEmpty ? querySnapshot.docs.last : null,
+        'lastDocument':
+            querySnapshot.docs.isNotEmpty ? querySnapshot.docs.last : null,
         'hasMore': items.length == limit,
       };
     } catch (e) {
       debugPrint("Error fetching global marketplace paginated: $e");
-      return {'items': <InventoryItem>[], 'lastDocument': null, 'hasMore': false};
+      return {
+        'items': <InventoryItem>[],
+        'lastDocument': null,
+        'hasMore': false
+      };
     }
   }
 
-  Future<List<InventoryItem>> getGlobalMarketplaceItems({int limit = 50}) async {
+  Future<List<InventoryItem>> getGlobalMarketplaceItems(
+      {int limit = 50}) async {
     try {
       // Using collectionGroup to fetch items from ALL users
       final querySnapshot = await _firestore
@@ -645,12 +687,58 @@ class DatabaseService with ChangeNotifier {
           .limit(limit)
           .get();
 
-      return querySnapshot.docs.map((doc) => InventoryItem.fromMap({
-        ...doc.data(),
-        'id': doc.id,
-      })).toList();
+      return querySnapshot.docs
+          .map((doc) => InventoryItem.fromMap({
+                ...doc.data(),
+                'id': doc.id,
+              }))
+          .toList();
     } catch (e) {
       print("Error fetching global marketplace: $e");
+      return [];
+    }
+  }
+
+  Future<List<InventoryItem>> searchGlobalMarketplaceItems({
+    required String searchQuery,
+    int limit = 50,
+  }) async {
+    try {
+      final queryText = searchQuery.trim();
+      if (queryText.isEmpty) return [];
+
+      final searchQueries = <Query>[
+        _firestore
+            .collectionGroup('inventory_items')
+            .orderBy('name')
+            .startAt([queryText]).endAt([queryText + '\uf8ff']).limit(limit),
+        _firestore
+            .collectionGroup('inventory_items')
+            .orderBy('brand')
+            .startAt([queryText]).endAt([queryText + '\uf8ff']).limit(limit),
+        _firestore
+            .collectionGroup('inventory_items')
+            .orderBy('location')
+            .startAt([queryText]).endAt([queryText + '\uf8ff']).limit(limit),
+      ];
+
+      final Map<String, InventoryItem> itemsMap = {};
+
+      for (final query in searchQueries) {
+        final querySnapshot = await query.get();
+        for (final doc in querySnapshot.docs) {
+          if (!itemsMap.containsKey(doc.id)) {
+            itemsMap[doc.id] = InventoryItem.fromMap({
+              ...doc.data() as Map<String, dynamic>,
+              'id': doc.id,
+            });
+          }
+        }
+      }
+
+      return itemsMap.values.toList();
+    } catch (e) {
+      debugPrint("Error searching global marketplace: $e");
       return [];
     }
   }
@@ -668,24 +756,48 @@ class DatabaseService with ChangeNotifier {
   }
 
   Future<Map<String, String>?> findPublicProfileByUid(String uid) async {
+    // 1. Try local accounts first (Offline/Fast support)
+    final localAccount = getAccount(uid);
+    if (localAccount != null) {
+      return {
+        'uid': localAccount.id,
+        'name': localAccount.name,
+        'photoUrl': localAccount.profileImage ?? '',
+        'phone': localAccount.phone,
+        'slogan': '',
+        'address': localAccount.address ?? '',
+        'isVerified': localAccount.isVerified.toString(),
+        'storeName': localAccount.storeName ?? '',
+        'storeImage': localAccount.storeImage ?? '',
+        'createdAt': localAccount.createdAt.toIso8601String(),
+      };
+    }
+
     try {
+      // 2. Try Firestore for global profiles
       final doc = await _firestore.collection('users').doc(uid).get();
       if (doc.exists) {
         final data = doc.data()!;
         return {
           'uid': uid,
           'name': data['displayName'] ?? data['name'] ?? '',
-          'photoUrl': data['photoURL'] ?? data['photoUrl'] ?? data['profileImage'] ?? '',
+          'photoUrl': data['photoURL'] ??
+              data['photoUrl'] ??
+              data['profileImage'] ??
+              '',
           'phone': data['phoneNumber'] ?? '',
           'slogan': data['slogan'] ?? '',
           'address': data['address'] ?? '',
           'isVerified': (data['isVerified'] ?? false).toString(),
           'storeName': data['storeName'] ?? '',
           'storeImage': data['storeImage'] ?? '',
+          'createdAt': data['createdAt'] != null
+              ? (data['createdAt'] as Timestamp).toDate().toIso8601String()
+              : '',
         };
       }
     } catch (e) {
-      print("UID lookup error: $e");
+      debugPrint("Firestore UID lookup error: $e");
     }
     return null;
   }
@@ -709,13 +821,19 @@ class DatabaseService with ChangeNotifier {
     if (account == null) return;
 
     final transactionsToDelete = _transactionsBox?.values
-        .where((t) => t.accountId == accountId)
-        .toList() ?? [];
+            .where((t) => t.accountId == accountId)
+            .toList() ??
+        [];
     for (var transaction in transactionsToDelete) {
       await _transactionsBox?.delete(transaction.id);
       if (_auth.currentUser != null) {
-        _firestore.collection('users').doc(_auth.currentUser!.uid)
-            .collection('transactions').doc(transaction.id).delete().catchError((e) => print("Error deleting transaction: $e"));
+        _firestore
+            .collection('users')
+            .doc(_auth.currentUser!.uid)
+            .collection('transactions')
+            .doc(transaction.id)
+            .delete()
+            .catchError((e) => print("Error deleting transaction: $e"));
       }
     }
 
@@ -725,8 +843,13 @@ class DatabaseService with ChangeNotifier {
     _triggerSync();
 
     if (_auth.currentUser != null) {
-      _firestore.collection('users').doc(_auth.currentUser!.uid)
-          .collection('accounts').doc(accountId).delete().catchError((e) => print("Error deleting account: $e"));
+      _firestore
+          .collection('users')
+          .doc(_auth.currentUser!.uid)
+          .collection('accounts')
+          .doc(accountId)
+          .delete()
+          .catchError((e) => print("Error deleting account: $e"));
     }
 
     notifyListeners();
@@ -780,7 +903,8 @@ class DatabaseService with ChangeNotifier {
     _triggerSync();
   }
 
-  Future<void> _syncTransactionToSharedUsers(model.Transaction transaction, Account account) async {
+  Future<void> _syncTransactionToSharedUsers(
+      model.Transaction transaction, Account account) async {
     if (account.isShared && account.sharedWith.isNotEmpty) {
       try {
         for (String phone in account.sharedWith) {
@@ -799,15 +923,21 @@ class DatabaseService with ChangeNotifier {
             potentials.add('0$clean');
           } else {
             potentials.add(phone);
-            if (phone.startsWith('+')) potentials.add(phone.substring(1));
-            else potentials.add('+$phone');
+            if (phone.startsWith('+'))
+              potentials.add(phone.substring(1));
+            else
+              potentials.add('+$phone');
           }
 
           String? targetUserId;
 
           // Try to find user with any of the formats
           for (String p in potentials) {
-            final query = await _firestore.collection('users').where('phoneNumber', isEqualTo: p).limit(1).get();
+            final query = await _firestore
+                .collection('users')
+                .where('phoneNumber', isEqualTo: p)
+                .limit(1)
+                .get();
             if (query.docs.isNotEmpty) {
               targetUserId = query.docs.first.id;
               break;
@@ -819,7 +949,12 @@ class DatabaseService with ChangeNotifier {
             if (targetUserId == _auth.currentUser?.uid) continue;
 
             // Write to target's transactions
-            await _firestore.collection('users').doc(targetUserId).collection('transactions').doc(transaction.id).set(transaction.toMap());
+            await _firestore
+                .collection('users')
+                .doc(targetUserId)
+                .collection('transactions')
+                .doc(transaction.id)
+                .set(transaction.toMap());
 
             // Update target's Account Balance (Optional/Risky - let target calculate)
             // We skip balance update here to avoid conflicts, target app calculates from txs
@@ -831,7 +966,8 @@ class DatabaseService with ChangeNotifier {
     }
   }
 
-  Future<void> _syncDeleteToSharedUsers(String transactionId, Account account) async {
+  Future<void> _syncDeleteToSharedUsers(
+      String transactionId, Account account) async {
     if (account.isShared && account.sharedWith.isNotEmpty) {
       try {
         for (String phone in account.sharedWith) {
@@ -848,13 +984,19 @@ class DatabaseService with ChangeNotifier {
             potentials.add('0$clean');
           } else {
             potentials.add(phone);
-            if (phone.startsWith('+')) potentials.add(phone.substring(1));
-            else potentials.add('+$phone');
+            if (phone.startsWith('+'))
+              potentials.add(phone.substring(1));
+            else
+              potentials.add('+$phone');
           }
 
           String? targetUserId;
           for (String p in potentials) {
-            final query = await _firestore.collection('users').where('phoneNumber', isEqualTo: p).limit(1).get();
+            final query = await _firestore
+                .collection('users')
+                .where('phoneNumber', isEqualTo: p)
+                .limit(1)
+                .get();
             if (query.docs.isNotEmpty) {
               targetUserId = query.docs.first.id;
               break;
@@ -863,7 +1005,12 @@ class DatabaseService with ChangeNotifier {
 
           if (targetUserId != null) {
             if (targetUserId == _auth.currentUser?.uid) continue;
-            await _firestore.collection('users').doc(targetUserId).collection('transactions').doc(transactionId).delete();
+            await _firestore
+                .collection('users')
+                .doc(targetUserId)
+                .collection('transactions')
+                .doc(transactionId)
+                .delete();
           }
         }
       } catch (e) {
@@ -895,7 +1042,8 @@ class DatabaseService with ChangeNotifier {
       await recalculateProfessionFinance(transaction.professionId!);
     }
     // If profession was changed/removed, recalculate old profession too
-    if (oldProfessionId != null && oldProfessionId != transaction.professionId) {
+    if (oldProfessionId != null &&
+        oldProfessionId != transaction.professionId) {
       await recalculateProfessionFinance(oldProfessionId);
     }
 
@@ -905,7 +1053,7 @@ class DatabaseService with ChangeNotifier {
 
   Future<void> deleteTransaction(String transactionId) async {
     final transaction = _transactionsBox?.get(transactionId);
-    if(transaction != null) {
+    if (transaction != null) {
       // Sync Delete
       final account = _accountsBox?.get(transaction.accountId);
       if (account != null && account.isShared) {
@@ -921,8 +1069,13 @@ class DatabaseService with ChangeNotifier {
       }
 
       if (_auth.currentUser != null) {
-        _firestore.collection('users').doc(_auth.currentUser!.uid)
-            .collection('transactions').doc(transactionId).delete().catchError((e) => print("Delete tx error: $e"));
+        _firestore
+            .collection('users')
+            .doc(_auth.currentUser!.uid)
+            .collection('transactions')
+            .doc(transactionId)
+            .delete()
+            .catchError((e) => print("Delete tx error: $e"));
       }
 
       notifyListeners();
@@ -942,7 +1095,8 @@ class DatabaseService with ChangeNotifier {
           .where((t) => t.type == 'expense')
           .fold(0.0, (sum, t) => sum + t.pendingAmount);
 
-      double newBalance = account.initialBalance + pendingIncome - pendingExpense;
+      double newBalance =
+          account.initialBalance + pendingIncome - pendingExpense;
 
       final updatedAccount = account.copyWith(balance: newBalance);
       await _accountsBox?.put(updatedAccount.id, updatedAccount);
@@ -953,16 +1107,15 @@ class DatabaseService with ChangeNotifier {
     final profession = _professionsBox?.get(professionId);
     if (profession != null) {
       final transactions = _transactionsBox?.values
-          .where((t) => t.professionId == professionId)
-          .toList() ?? [];
+              .where((t) => t.professionId == professionId)
+              .toList() ??
+          [];
 
-      double totalIncome = transactions
-          .where((t) => t.type == 'income')
-          .fold(0.0, (sum, t) => sum + t.amount); // Using total amount (bill amount)
+      double totalIncome = transactions.where((t) => t.type == 'income').fold(
+          0.0, (sum, t) => sum + t.amount); // Using total amount (bill amount)
 
-      double totalExpense = transactions
-          .where((t) => t.type == 'expense')
-          .fold(0.0, (sum, t) => sum + t.amount); // Using total amount (bill amount)
+      double totalExpense = transactions.where((t) => t.type == 'expense').fold(
+          0.0, (sum, t) => sum + t.amount); // Using total amount (bill amount)
 
       final updatedProfession = profession.copyWith(
         totalIncome: totalIncome,
@@ -974,16 +1127,21 @@ class DatabaseService with ChangeNotifier {
 
       // Also sync updated profession to Firestore
       if (_auth.currentUser != null) {
-        _firestore.collection('users').doc(_auth.currentUser!.uid)
-            .collection('professions').doc(profession.id).set(updatedProfession.toMap());
+        _firestore
+            .collection('users')
+            .doc(_auth.currentUser!.uid)
+            .collection('professions')
+            .doc(profession.id)
+            .set(updatedProfession.toMap());
       }
     }
   }
 
   List<model.Transaction> getTransactions(String accountId) {
     return _transactionsBox?.values
-        .where((t) => t.accountId == accountId)
-        .toList() ?? [];
+            .where((t) => t.accountId == accountId)
+            .toList() ??
+        [];
   }
 
   List<model.Transaction> getAllTransactions() {
@@ -1004,7 +1162,7 @@ class DatabaseService with ChangeNotifier {
 
     // 1. Save to Local Hive first (Instant)
     await _professionsBox?.put(profession.id, updatedProfession);
-    
+
     notifyListeners();
 
     // 2. Trigger background sync (Non-blocking)
@@ -1014,23 +1172,33 @@ class DatabaseService with ChangeNotifier {
   Future<void> deleteProfession(String professionId) async {
     // Delete associated transactions first
     final transactionsToDelete = _transactionsBox?.values
-        .where((t) => t.professionId == professionId)
-        .toList() ?? [];
+            .where((t) => t.professionId == professionId)
+            .toList() ??
+        [];
 
     for (var transaction in transactionsToDelete) {
       await _transactionsBox?.delete(transaction.id);
       if (_auth.currentUser != null) {
-        _firestore.collection('users').doc(_auth.currentUser!.uid)
-            .collection('transactions').doc(transaction.id).delete()
-            .catchError((e) => print("Error deleting profession transaction: $e"));
+        _firestore
+            .collection('users')
+            .doc(_auth.currentUser!.uid)
+            .collection('transactions')
+            .doc(transaction.id)
+            .delete()
+            .catchError(
+                (e) => print("Error deleting profession transaction: $e"));
       }
     }
 
     await _professionsBox?.delete(professionId);
 
     if (_auth.currentUser != null) {
-      _firestore.collection('users').doc(_auth.currentUser!.uid)
-          .collection('professions').doc(professionId).delete();
+      _firestore
+          .collection('users')
+          .doc(_auth.currentUser!.uid)
+          .collection('professions')
+          .doc(professionId)
+          .delete();
     }
 
     notifyListeners();
@@ -1045,10 +1213,10 @@ class DatabaseService with ChangeNotifier {
   }
 
   Future<void> updateProfessionFinance(
-      String professionId,
-      String type,
-      double amount,
-      ) async {
+    String professionId,
+    String type,
+    double amount,
+  ) async {
     // This method is deprecated in favor of recalculateProfessionFinance
     // but kept for compatibility if used elsewhere, pointing to recalculate.
     await recalculateProfessionFinance(professionId);
@@ -1056,8 +1224,9 @@ class DatabaseService with ChangeNotifier {
 
   List<model.Transaction> getProfessionTransactions(String professionId) {
     return _transactionsBox?.values
-        .where((t) => t.professionId == professionId)
-        .toList() ?? [];
+            .where((t) => t.professionId == professionId)
+            .toList() ??
+        [];
   }
 
   // --- Category Operations ---
@@ -1078,8 +1247,12 @@ class DatabaseService with ChangeNotifier {
     await _categoriesBox?.delete(categoryId);
 
     if (_auth.currentUser != null) {
-      _firestore.collection('users').doc(_auth.currentUser!.uid)
-          .collection('categories').doc(categoryId).delete();
+      _firestore
+          .collection('users')
+          .doc(_auth.currentUser!.uid)
+          .collection('categories')
+          .doc(categoryId)
+          .delete();
     }
 
     notifyListeners();
@@ -1098,7 +1271,9 @@ class DatabaseService with ChangeNotifier {
 
   Future<int> getPendingDuesCount() async {
     if (!_isInitialized) await init();
-    final parties = _accountsBox?.values.where((party) => party.balance != 0).toList() ?? [];
+    final parties =
+        _accountsBox?.values.where((party) => party.balance != 0).toList() ??
+            [];
     return parties.length;
   }
 
@@ -1106,6 +1281,8 @@ class DatabaseService with ChangeNotifier {
     if (!_isInitialized) await init();
     return _professionsBox?.length ?? 0;
   }
+
+  // --- Verified Account & Marketplace Mock Setup ---
 
   // --- Settings ---
 
@@ -1141,18 +1318,24 @@ class DatabaseService with ChangeNotifier {
   Future<void> _triggerPriceDropNotification(InventoryItem item) async {
     try {
       // Find all users who favorited this item in Firestore
-      final favs = await _firestore.collection('favorites')
+      final favs = await _firestore
+          .collection('favorites')
           .where('itemId', isEqualTo: item.id)
           .get();
-      
+
       for (var doc in favs.docs) {
         final userId = doc.data()['userId'];
         if (userId == _auth.currentUser?.uid) continue;
-        
+
         // Add notification to their collection
-        await _firestore.collection('users').doc(userId).collection('notifications').add({
+        await _firestore
+            .collection('users')
+            .doc(userId)
+            .collection('notifications')
+            .add({
           'title': 'قیمت کم ہو گئی! 🔥',
-          'message': 'آپ کی پسندیدہ چیز "${item.name}" اب Rs. ${item.defaultRate} میں دستیاب ہے۔',
+          'message':
+              'آپ کی پسندیدہ چیز "${item.name}" اب Rs. ${item.defaultRate} میں دستیاب ہے۔',
           'timestamp': FieldValue.serverTimestamp(),
           'type': 'price_drop',
           'isRead': false,
@@ -1167,7 +1350,7 @@ class DatabaseService with ChangeNotifier {
   Future<void> toggleFirestoreFavorite(String itemId, bool isFav) async {
     final user = _auth.currentUser;
     if (user == null) return;
-    
+
     final favId = "${user.uid}_$itemId";
     if (isFav) {
       await _firestore.collection('favorites').doc(favId).set({
@@ -1185,7 +1368,7 @@ class DatabaseService with ChangeNotifier {
   Future<void> addReview(Review review) async {
     try {
       await _firestore.collection('reviews').doc(review.id).set(review.toMap());
-      
+
       // Update item average rating in Firestore
       final reviews = await getItemReviews(review.itemId);
       if (reviews.isNotEmpty) {
@@ -1194,7 +1377,7 @@ class DatabaseService with ChangeNotifier {
           totalRating += r.rating;
         }
         final double avgRating = totalRating / reviews.length;
-        
+
         await _firestore.collection('inventory').doc(review.itemId).update({
           'rating': avgRating,
         });
@@ -1232,15 +1415,20 @@ class DatabaseService with ChangeNotifier {
         }
       }
     }
-    
+
     await _itemsBox?.delete(id);
     notifyListeners();
     _triggerSync();
 
     if (_auth.currentUser != null) {
-      _firestore.collection('users').doc(_auth.currentUser!.uid)
-          .collection('inventory_items').doc(id).delete()
-          .catchError((e) => print("Error deleting inventory item from Firestore: $e"));
+      _firestore
+          .collection('users')
+          .doc(_auth.currentUser!.uid)
+          .collection('inventory_items')
+          .doc(id)
+          .delete()
+          .catchError(
+              (e) => print("Error deleting inventory item from Firestore: $e"));
     }
   }
 
@@ -1252,17 +1440,56 @@ class DatabaseService with ChangeNotifier {
     return _itemsBox?.get(id);
   }
 
+  // --- Work Log & Smart Diary ---
+
+  Future<void> addWorkLog(WorkLog log, {bool syncToKhata = true}) async {
+    if (_workLogsBox == null) return;
+
+    await _workLogsBox!.put(log.id, log);
+
+    if (syncToKhata) {
+      final transaction = model.Transaction(
+        id: "log_${log.id}",
+        accountId: log.accountId,
+        amount: log.totalAmount,
+        type: 'income', // Narrative for "Taking money/Receivable"
+        category: 'Service',
+        description: log.description,
+        date: log.date,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        professionId: log.professionId,
+      );
+      await addTransaction(transaction);
+    }
+
+    notifyListeners();
+    _triggerSync();
+  }
+
+  List<WorkLog> getWorkLogs() {
+    return _workLogsBox?.values.toList().reversed.toList() ?? [];
+  }
+
+  Future<void> deleteWorkLog(String id) async {
+    await _workLogsBox?.delete(id);
+    // Note: We don't automatically delete the Khata entry to avoid confusion,
+    // but we could if needed via "log_$id"
+    notifyListeners();
+    _triggerSync();
+  }
+
   // --- Ad Engagement & Reports ---
 
   Future<void> addRecentlyViewed(InventoryItem item) async {
     if (_recentlyViewedBox == null) return;
-    
+
     // Remove if already exists to move to top
     await _recentlyViewedBox!.delete(item.id);
-    
+
     // Add to box
     await _recentlyViewedBox!.put(item.id, item);
-    
+
     // Maintain limit (e.g., 15 items)
     if (_recentlyViewedBox!.length > 15) {
       final keys = _recentlyViewedBox!.keys.toList();
@@ -1278,7 +1505,10 @@ class DatabaseService with ChangeNotifier {
 
   Future<void> reportAd(AdReport report) async {
     try {
-      await _firestore.collection('ad_reports').doc(report.id).set(report.toMap());
+      await _firestore
+          .collection('ad_reports')
+          .doc(report.id)
+          .set(report.toMap());
     } catch (e) {
       debugPrint("Report ad error: $e");
       rethrow;
@@ -1288,11 +1518,12 @@ class DatabaseService with ChangeNotifier {
   Future<void> incrementView(String itemId) async {
     try {
       // Find the document across all users using collectionGroup
-      final query = await _firestore.collectionGroup('inventory_items')
+      final query = await _firestore
+          .collectionGroup('inventory_items')
           .where('id', isEqualTo: itemId)
           .limit(1)
           .get();
-          
+
       if (query.docs.isNotEmpty) {
         await query.docs.first.reference.update({
           'views': FieldValue.increment(1),
@@ -1305,11 +1536,12 @@ class DatabaseService with ChangeNotifier {
 
   Future<void> incrementShare(String itemId) async {
     try {
-      final query = await _firestore.collectionGroup('inventory_items')
+      final query = await _firestore
+          .collectionGroup('inventory_items')
           .where('id', isEqualTo: itemId)
           .limit(1)
           .get();
-          
+
       if (query.docs.isNotEmpty) {
         await query.docs.first.reference.update({
           'shares': FieldValue.increment(1),
@@ -1325,7 +1557,8 @@ class DatabaseService with ChangeNotifier {
   Future<void> syncWithFirebase() async {
     try {
       final connectivityResult = await Connectivity().checkConnectivity();
-      if (connectivityResult.contains(ConnectivityResult.none) && connectivityResult.length == 1) {
+      if (connectivityResult.contains(ConnectivityResult.none) &&
+          connectivityResult.length == 1) {
         print("Offline: Skipping sync");
         return;
       }
@@ -1339,42 +1572,72 @@ class DatabaseService with ChangeNotifier {
 
       if (_accountsBox != null) {
         for (var account in _accountsBox!.values) {
-          final docRef = _firestore.collection('users').doc(user.uid).collection('accounts').doc(account.id);
+          final docRef = _firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('accounts')
+              .doc(account.id);
           batch.set(docRef, account.toMap());
         }
       }
 
       if (_transactionsBox != null) {
         for (var transaction in _transactionsBox!.values) {
-          final docRef = _firestore.collection('users').doc(user.uid).collection('transactions').doc(transaction.id);
+          final docRef = _firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('transactions')
+              .doc(transaction.id);
           batch.set(docRef, transaction.toMap());
         }
       }
 
       if (_professionsBox != null) {
         for (var profession in _professionsBox!.values) {
-          final docRef = _firestore.collection('users').doc(user.uid).collection('professions').doc(profession.id);
+          final docRef = _firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('professions')
+              .doc(profession.id);
           batch.set(docRef, profession.toMap());
         }
       }
 
       if (_categoriesBox != null) {
         for (var category in _categoriesBox!.values) {
-          final docRef = _firestore.collection('users').doc(user.uid).collection('categories').doc(category.id);
+          final docRef = _firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('categories')
+              .doc(category.id);
           batch.set(docRef, category.toMap());
         }
       }
 
       if (_itemsBox != null) {
+        // Get user's verification status for marketplace filtering
+        bool isVerified = false;
+        final userDoc = await _firestore.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+          isVerified = userDoc.data()?['isVerified'] == true;
+        }
+
         for (var item in _itemsBox!.values) {
-          final docRef = _firestore.collection('users').doc(user.uid).collection('inventory_items').doc(item.id);
-          batch.set(docRef, item.toMap());
+          final docRef = _firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('inventory_items')
+              .doc(item.id);
+          
+          final itemData = item.toMap();
+          itemData['isSellerVerified'] = isVerified; // Inject verification status
+          
+          batch.set(docRef, itemData);
         }
       }
 
       await batch.commit();
       print("✅ Sync successful");
-
     } catch (e) {
       print('❌ Sync error: $e');
     }
@@ -1383,7 +1646,8 @@ class DatabaseService with ChangeNotifier {
   Future<void> fetchFromFirebase() async {
     try {
       final connectivityResult = await Connectivity().checkConnectivity();
-      if (connectivityResult.contains(ConnectivityResult.none) && connectivityResult.length == 1) {
+      if (connectivityResult.contains(ConnectivityResult.none) &&
+          connectivityResult.length == 1) {
         print("Offline: Skipping fetch");
         return;
       }
@@ -1395,32 +1659,52 @@ class DatabaseService with ChangeNotifier {
 
       if (_accountsBox == null) await init();
 
-      final accountsSnapshot = await _firestore.collection('users').doc(user.uid).collection('accounts').get();
+      final accountsSnapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('accounts')
+          .get();
       for (var doc in accountsSnapshot.docs) {
         final account = Account.fromMap(doc.data());
         await _accountsBox?.put(account.id, account);
       }
 
-      final transactionsSnapshot = await _firestore.collection('users').doc(user.uid).collection('transactions').get();
+      final transactionsSnapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('transactions')
+          .get();
       for (var doc in transactionsSnapshot.docs) {
         final transaction = model.Transaction.fromMap(doc.data());
         await _transactionsBox?.put(transaction.id, transaction);
       }
 
-      final professionsSnapshot = await _firestore.collection('users').doc(user.uid).collection('professions').get();
+      final professionsSnapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('professions')
+          .get();
       for (var doc in professionsSnapshot.docs) {
         final profession = Profession.fromMap(doc.data());
         await _professionsBox?.put(profession.id, profession);
       }
 
-      final categoriesSnapshot = await _firestore.collection('users').doc(user.uid).collection('categories').get();
+      final categoriesSnapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('categories')
+          .get();
       for (var doc in categoriesSnapshot.docs) {
         final category = Category.fromMap(doc.data());
         await _categoriesBox?.put(category.id, category);
       }
 
-      // Inventory Items 
-      final itemsSnapshot = await _firestore.collection('users').doc(user.uid).collection('inventory_items').get();
+      // Inventory Items
+      final itemsSnapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('inventory_items')
+          .get();
       for (var doc in itemsSnapshot.docs) {
         final item = InventoryItem.fromMap(doc.data());
         await _itemsBox?.put(item.id, item);
@@ -1441,8 +1725,10 @@ class DatabaseService with ChangeNotifier {
     if (_professionsBox?.isOpen ?? false) await _professionsBox?.clear();
     if (_itemsBox?.isOpen ?? false) await _itemsBox?.clear();
     if (_recentlyViewedBox?.isOpen ?? false) await _recentlyViewedBox?.clear();
-    if (_remoteCachedItemsBox?.isOpen ?? false) await _remoteCachedItemsBox?.clear();
-    
+    if (_workLogsBox?.isOpen ?? false) await _workLogsBox?.clear();
+    if (_remoteCachedItemsBox?.isOpen ?? false)
+      await _remoteCachedItemsBox?.clear();
+
     notifyListeners();
     print("🧹 Local data cleared.");
   }
@@ -1467,7 +1753,9 @@ class DatabaseService with ChangeNotifier {
 
     for (var transaction in transactions) {
       final account = getAccount(transaction.accountId);
-      final profession = transaction.professionId != null ? getProfession(transaction.professionId!) : null;
+      final profession = transaction.professionId != null
+          ? getProfession(transaction.professionId!)
+          : null;
 
       bool isOrphaned = false;
 
@@ -1482,8 +1770,11 @@ class DatabaseService with ChangeNotifier {
       if (isOrphaned) {
         await _transactionsBox?.delete(transaction.id);
         if (user != null) {
-          final ref = _firestore.collection('users').doc(user.uid)
-              .collection('transactions').doc(transaction.id);
+          final ref = _firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('transactions')
+              .doc(transaction.id);
           batch.delete(ref);
         }
         deletedCount++;
@@ -1507,6 +1798,7 @@ class DatabaseService with ChangeNotifier {
     await _professionsBox?.close();
     await _itemsBox?.close();
     await _recentlyViewedBox?.close();
+    await _workLogsBox?.close();
     await _remoteCachedItemsBox?.close();
     await _settingsBox?.close();
     _isInitialized = false;

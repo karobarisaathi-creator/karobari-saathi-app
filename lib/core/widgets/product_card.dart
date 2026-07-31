@@ -51,21 +51,39 @@ class ProductCard extends StatefulWidget {
 
 class _ProductCardState extends State<ProductCard> {
   Color? _dynamicColor;
+  String? _sellerTenure;
+  String? _sellerProfileName;
   bool _isSellerVerified = false;
 
   @override
   void initState() {
     super.initState();
     _extractColor();
-    _checkVerification();
+    _loadSellerStats();
   }
 
-  Future<void> _checkVerification() async {
+  Future<void> _loadSellerStats() async {
     if (widget.item.accountId == null) return;
     final dbService = Provider.of<DatabaseService>(context, listen: false);
-    final verified = await dbService.isSellerVerified(widget.item.accountId!);
-    if (mounted) {
-      setState(() => _isSellerVerified = verified);
+    final profile = await dbService.findPublicProfileByUid(widget.item.accountId!);
+    if (profile != null && mounted) {
+      setState(() {
+        _sellerProfileName = profile['storeName']?.isNotEmpty == true
+            ? profile['storeName']
+            : profile['name'];
+        _isSellerVerified = profile['isVerified'] == true || profile['isVerified'] == 'true';
+        if (profile['createdAt'] != null && profile['createdAt']!.isNotEmpty) {
+          final date = DateTime.parse(profile['createdAt']!);
+          final diff = DateTime.now().difference(date).inDays;
+          if (diff > 365) {
+            _sellerTenure = "${(diff / 365).floor()}y+";
+          } else if (diff > 30) {
+            _sellerTenure = "${(diff / 30).floor()}m+";
+          } else {
+            _sellerTenure = "New";
+          }
+        }
+      });
     }
   }
 
@@ -169,7 +187,7 @@ class _ProductCardState extends State<ProductCard> {
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
                   child: SizedBox(
-                    height: 140,
+                    height: 125,
                     width: double.infinity,
                     child: _buildImage(widget.item.imagePaths.isNotEmpty ? widget.item.imagePaths.first : null),
                   ),
@@ -220,7 +238,7 @@ class _ProductCardState extends State<ProductCard> {
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -235,7 +253,9 @@ class _ProductCardState extends State<ProductCard> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
+                    _buildSellerName(fontSize: 11),
+                    const SizedBox(height: 2),
                     Text(
                       'Rs ${NumberFormat('#,###').format(widget.item.defaultRate)}',
                       style: const TextStyle(
@@ -267,7 +287,7 @@ class _ProductCardState extends State<ProductCard> {
                           ),
                         ],
                       ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 2),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -380,9 +400,6 @@ class _ProductCardState extends State<ProductCard> {
                         ],
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    if (widget.sellerName != null)
-                      _buildSellerName(fontSize: 11, color: AppTheme.darkColor.withOpacity(0.7)),
                     const SizedBox(height: 8),
                     Text(
                       'Rs ${NumberFormat('#,###').format(widget.item.defaultRate)}',
@@ -458,7 +475,7 @@ class _ProductCardState extends State<ProductCard> {
               children: [
                 Flexible(
                   child: Text(
-                    widget.sellerName!,
+                    widget.sellerName ?? _sellerProfileName ?? '',
                     style: TextStyle(fontSize: fontSize, color: color ?? AppTheme.textSecondary, fontFamily: widget.fontFamily),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -466,7 +483,25 @@ class _ProductCardState extends State<ProductCard> {
                 ),
                 if (_isSellerVerified) ...[
                   const SizedBox(width: 4),
-                  Icon(PhosphorIcons.sealCheck(PhosphorIconsStyle.fill), size: fontSize + 2, color: Colors.blue),
+                  Icon(
+                    PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
+                    size: fontSize + 2,
+                    color: AppTheme.verifiedGold,
+                  ),
+                ],
+                if (_sellerTenure != null) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: AppTheme.darkColor.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      _sellerTenure!,
+                      style: TextStyle(fontSize: fontSize - 2, fontWeight: FontWeight.bold, color: AppTheme.darkColor.withOpacity(0.5)),
+                    ),
+                  ),
                 ],
               ],
             ),

@@ -20,6 +20,9 @@
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.WRITE_CONTACTS" />
 
+    <!-- Microphone Permission for Speech to Text -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- Make telephony hardware optional -->
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
@@ -84,6 +87,9 @@
     </application>
 
     <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

@@ -242,6 +242,12 @@ class _VisualFinderScreenState extends State<VisualFinderScreen> with SingleTick
     if (scanData is String) {
       _performTextSearch(scanData);
     } else if (scanData is File) {
+      // Basic Blur Detection Heuristic
+      final bytes = await scanData.readAsBytes();
+      if (bytes.length < 50000) { // Very small file might be blurry or low detail
+         _showError(isUrdu ? "تصویر صاف نہیں ہے، دوبارہ لیں" : "Image is too blurry, please take a clearer one.");
+      }
+
       final limitCheck = await _limitService.canScan();
       if (!limitCheck['allowed']) {
         _showError(limitCheck['message']);
@@ -506,6 +512,7 @@ class _VisualFinderScreenState extends State<VisualFinderScreen> with SingleTick
       controller: _searchController,
       hintText: isUrdu ? "نام لکھیں یا اسکین کریں..." : "Type name or scan...",
       padding: EdgeInsets.zero,
+      showVoiceSearch: true,
       onSearchChanged: (val) {
         if (_searchDebounce?.isActive ?? false) _searchDebounce!.cancel();
         _searchDebounce = Timer(const Duration(milliseconds: 500), () {
@@ -627,28 +634,32 @@ class _VisualFinderScreenState extends State<VisualFinderScreen> with SingleTick
 
   List<Widget> _getPlatformButtons() {
     if (_result == null) return [];
-    List<String> platforms = [];
+    List<Map<String, String>> platforms = [];
     String cat = (_result!['category'] ?? "").toLowerCase();
     
+    void add(String name, String icon) => platforms.add({"name": name, "icon": icon});
+
     if (cat.contains("mobile")) {
-      platforms = ["WhatMobile", "PriceOye", "Daraz", "OLX"];
+      add("WhatMobile", "📱"); add("PriceOye", "🔥"); add("Daraz", "📦"); add("OLX", "🛒");
     } else if (cat.contains("electron")) {
-      platforms = ["PriceOye", "Daraz", "OLX", "Google"];
+      add("PriceOye", "⚡"); add("Daraz", "📦"); add("OLX", "🛒"); add("Google", "🌐");
     } else if (cat.contains("vehicle") || cat.contains("car") || cat.contains("bike")) {
-      platforms = ["PakWheels", "OLX", "Google"];
+      add("PakWheels", "🚗"); add("OLX", "🛒"); add("Google", "🌐");
     } else if (cat.contains("estate") || cat.contains("property")) {
-      platforms = ["Zameen", "OLX", "Google"];
+      add("Zameen", "🏠"); add("OLX", "🛒"); add("Google", "🌐");
     } else {
-      platforms = ["Daraz", "OLX", "Google"];
+      add("Daraz", "📦"); add("OLX", "🛒"); add("Google", "🌐");
     }
 
     return platforms.map((p) => Padding(
       padding: const EdgeInsets.only(right: 8),
       child: ActionChip(
-        label: Text(p, style: const TextStyle(fontSize: 12, color: Colors.white)),
-        backgroundColor: AppTheme.themeColor.withValues(alpha: 0.8),
+        avatar: Text(p['icon']!),
+        label: Text(p['name']!, style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: AppTheme.themeColor.withValues(alpha: 0.9),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        onPressed: () => _searchOnline(p),
+        onPressed: () => _searchOnline(p['name']!),
       ),
     )).toList();
   }

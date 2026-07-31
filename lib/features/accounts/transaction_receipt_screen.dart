@@ -89,6 +89,7 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                                   address: account?.address,
                                   textColor: Colors.white,
                                   subtitleColor: Colors.white70,
+                                  isVerified: account?.isVerified ?? false,
                                 ),
                               ),
                               const SizedBox(width: 8),

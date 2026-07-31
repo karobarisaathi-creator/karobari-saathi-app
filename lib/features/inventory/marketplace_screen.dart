@@ -23,6 +23,7 @@ import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/widgets/app_filter_chip.dart';
 import 'package:account_app/core/widgets/product_card.dart';
 import 'package:account_app/core/widgets/skeleton_shimmer.dart';
+import 'package:account_app/features/visual_finder/visual_finder_screen.dart';
 import 'item_detail_screen.dart';
 import 'add_inventory_item_screen.dart';
 import 'seller_items_screen.dart';
@@ -35,7 +36,8 @@ class MarketplaceScreen extends StatefulWidget {
   State<MarketplaceScreen> createState() => _MarketplaceScreenState();
 }
 
-class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProviderStateMixin {
+class _MarketplaceScreenState extends State<MarketplaceScreen>
+    with TickerProviderStateMixin {
   // ==================== STATE MANAGEMENT ====================
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -55,6 +57,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
   List<InventoryItem> _displayedItems = [];
   List<InventoryItem> _featuredItems = [];
   List<InventoryItem> _recentlyViewed = [];
+  List<String> _recentSearches = [];
+  bool _isSearchFocused = false;
   Position? _userPosition;
   double _distanceFilter = 50.0; // 50km default
   bool _useDistanceFilter = false;
@@ -64,7 +68,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.7,
         maxChildSize: 0.9,
@@ -74,11 +79,18 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
           children: [
             Container(
               margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2)),
             ),
             Text(
               isUrdu ? 'کیٹیگری منتخب کریں' : 'Select Category',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: fontFamily),
             ),
             const SizedBox(height: 16),
             Expanded(
@@ -99,7 +111,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                       Navigator.pop(context);
                       final result = await Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => AddInventoryItemScreen(initialCategory: cat.id)),
+                        MaterialPageRoute(
+                            builder: (context) => AddInventoryItemScreen(
+                                initialCategory: cat.id)),
                       );
                       if (result == true) _loadData();
                     },
@@ -112,13 +126,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                             color: AppTheme.themeColor.withOpacity(0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(cat.icon, color: AppTheme.themeColor, size: 28),
+                          child: Icon(cat.icon,
+                              color: AppTheme.themeColor, size: 28),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           isUrdu ? cat.labelUr : cat.labelEn,
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, fontFamily: fontFamily),
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: fontFamily),
                         ),
                       ],
                     ),
@@ -131,6 +149,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
       ),
     );
   }
+
   List<Account> _allAccounts = [];
 
   // Filters State
@@ -140,8 +159,16 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
 
   // Categories with Icons
   final List<AppCategory> _categories = [
-    AppCategory(id: 'all', labelEn: 'All', labelUr: 'سب', icon: PhosphorIcons.gridFour()),
-    AppCategory(id: 'for_you', labelEn: 'For You', labelUr: 'آپ کے لیے', icon: PhosphorIcons.sparkle(PhosphorIconsStyle.fill)),
+    AppCategory(
+        id: 'all',
+        labelEn: 'All',
+        labelUr: 'سب',
+        icon: PhosphorIcons.gridFour()),
+    AppCategory(
+        id: 'for_you',
+        labelEn: 'For You',
+        labelUr: 'آپ کے لیے',
+        icon: PhosphorIcons.sparkle(PhosphorIconsStyle.fill)),
     ...AppFilterChip.productCategories,
   ];
 
@@ -156,6 +183,30 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
     super.initState();
     _setupScrollListener();
     _loadData();
+    _loadSearchHistory();
+    _searchController.addListener(() {
+      if (_searchController.text.isEmpty && _isSearchFocused == false) {
+        setState(() => _isSearchFocused = true);
+      }
+    });
+  }
+
+  Future<void> _loadSearchHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _recentSearches =
+          prefs.getStringList('marketplace_recent_searches') ?? [];
+    });
+  }
+
+  Future<void> _saveSearchQuery(String query) async {
+    if (query.trim().isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    _recentSearches.remove(query);
+    _recentSearches.insert(0, query);
+    if (_recentSearches.length > 5) _recentSearches.removeLast();
+    await prefs.setStringList('marketplace_recent_searches', _recentSearches);
+    setState(() {});
   }
 
   void _setupScrollListener() {
@@ -212,28 +263,38 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
       _extractUserInterests(localAccounts, localTransactions);
 
       // 2. Fetch Global Marketplace Items (Professional Pagination)
-      final result = await dbService.getGlobalMarketplaceItemsPaginated(
-        limit: _pageSize,
-        lastDocument: null,
-      );
-      
-      final remoteItems = result['items'] as List<InventoryItem>;
-      _lastDocument = result['lastDocument'] as DocumentSnapshot?;
-      _hasMore = result['hasMore'] as bool;
+      late final List<InventoryItem> remoteItems;
+      if (_searchQuery.trim().isNotEmpty && _searchQuery.trim().length > 2) {
+        remoteItems = await dbService.searchGlobalMarketplaceItems(
+          searchQuery: _searchQuery.trim(),
+          limit: 80,
+        );
+        _lastDocument = null;
+        _hasMore = false;
+      } else {
+        final result = await dbService.getGlobalMarketplaceItemsPaginated(
+          limit: _pageSize,
+          lastDocument: null,
+        );
+
+        remoteItems = result['items'] as List<InventoryItem>;
+        _lastDocument = result['lastDocument'] as DocumentSnapshot?;
+        _hasMore = result['hasMore'] as bool;
+      }
 
       // 3. Get User's Own Local Items (Offline Support)
       final localItems = dbService.getInventoryItems();
-      
+
       // 4. Get Recently Viewed Items
       final recentlyViewed = dbService.getRecentlyViewed();
 
       // Merge Items: Unique items prioritizing local copies if they exist
       final Map<String, InventoryItem> itemsMap = {};
-      
+
       for (var item in remoteItems) {
         itemsMap[item.id] = item;
       }
-      
+
       for (var item in localItems) {
         itemsMap[item.id] = item;
       }
@@ -245,10 +306,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
           _recentlyViewed = recentlyViewed;
           _allAccounts = localAccounts;
           _isLoading = false;
-          
+
           if (_allItems.isNotEmpty) {
-            double highestItemPrice = _allItems.map((e) => e.defaultRate).reduce((a, b) => a > b ? a : b);
-            _maxPriceFound = highestItemPrice > 500000 ? highestItemPrice : 500000;
+            double highestItemPrice = _allItems
+                .map((e) => e.defaultRate)
+                .reduce((a, b) => a > b ? a : b);
+            _maxPriceFound =
+                highestItemPrice > 500000 ? highestItemPrice : 500000;
             _priceRange = RangeValues(0, _maxPriceFound);
           }
         });
@@ -258,12 +322,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        _showSnackBar(isUrdu ? 'مارکیٹ پلیس لوڈ کرنے میں غلطی: $e' : 'Error loading marketplace: $e', isError: true);
+        _showSnackBar(
+            isUrdu
+                ? 'مارکیٹ پلیس لوڈ کرنے میں غلطی: $e'
+                : 'Error loading marketplace: $e',
+            isError: true);
       }
     }
   }
 
-  void _extractUserInterests(List<Account> accounts, List<model.Transaction> transactions) {
+  void _extractUserInterests(
+      List<Account> accounts, List<model.Transaction> transactions) {
     Set<String> keywords = {};
 
     // 1. Scan Account Categories
@@ -290,7 +359,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
   }
 
   List<String> _splitIntoKeywords(String text) {
-    return text.toLowerCase()
+    return text
+        .toLowerCase()
         .replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]'), '')
         .split(' ')
         .where((w) => w.length > 2)
@@ -310,10 +380,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
       }
 
       final query = _searchQuery.toLowerCase();
-      final matchesSearch = item.name.toLowerCase().contains(query) || 
-                            (item.brand ?? "").toLowerCase().contains(query) ||
-                            (item.location ?? "").toLowerCase().contains(query);
-      
+      final matchesSearch = item.name.toLowerCase().contains(query) ||
+          (item.brand ?? "").toLowerCase().contains(query) ||
+          (item.location ?? "").toLowerCase().contains(query) ||
+          (item.description ?? "").toLowerCase().contains(query) ||
+          (item.category ?? "").toLowerCase().contains(query) ||
+          (item.sku ?? "").toLowerCase().contains(query);
+
       // 1. Category Filter
       bool matchesCategory = false;
       if (_selectedCategory == 'all') {
@@ -322,37 +395,56 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
         final itemName = item.name.toLowerCase();
         final itemDesc = (item.description ?? "").toLowerCase();
         final itemCat = (item.category ?? "").toLowerCase();
-        matchesCategory = _interestKeywords.any((k) => itemName.contains(k) || itemDesc.contains(k) || itemCat.contains(k));
+        matchesCategory = _interestKeywords.any((k) =>
+            itemName.contains(k) ||
+            itemDesc.contains(k) ||
+            itemCat.contains(k));
       } else {
         matchesCategory = item.category == _selectedCategory;
       }
 
       // 2. Condition Filter
-      bool matchesCondition = _selectedConditions.contains(item.condition ?? 'New');
+      bool matchesCondition =
+          _selectedConditions.contains(item.condition ?? 'New');
 
       // 3. Price Range Filter
-      bool matchesPrice = item.defaultRate >= _priceRange.start && item.defaultRate <= _priceRange.end;
+      bool matchesPrice = item.defaultRate >= _priceRange.start &&
+          item.defaultRate <= _priceRange.end;
 
       // 4. Location Filter
-      bool matchesLocation = _locationFilter.isEmpty || (item.location ?? "").toLowerCase().contains(_locationFilter.toLowerCase());
-      
+      bool matchesLocation = _locationFilter.isEmpty ||
+          (item.location ?? "")
+              .toLowerCase()
+              .contains(_locationFilter.toLowerCase());
+
       // 5. Distance Filter
       bool matchesDistance = true;
-      if (_useDistanceFilter && _userPosition != null && item.latitude != null && item.longitude != null) {
+      if (_useDistanceFilter &&
+          _userPosition != null &&
+          item.latitude != null &&
+          item.longitude != null) {
         final double distance = Geolocator.distanceBetween(
-          _userPosition!.latitude,
-          _userPosition!.longitude,
-          item.latitude!,
-          item.longitude!,
-        ) / 1000; // to km
+              _userPosition!.latitude,
+              _userPosition!.longitude,
+              item.latitude!,
+              item.longitude!,
+            ) /
+            1000; // to km
         matchesDistance = distance <= _distanceFilter;
       }
 
-      return matchesSearch && matchesCategory && matchesCondition && matchesPrice && matchesLocation && matchesDistance;
+      return matchesSearch &&
+          matchesCategory &&
+          matchesCondition &&
+          matchesPrice &&
+          matchesLocation &&
+          matchesDistance;
     }).toList();
 
-    if (_selectedCategory == 'for_you' && filtered.isEmpty && _searchQuery.isEmpty) {
-        filtered = List.from(_allItems);
+    if (_selectedCategory == 'for_you' &&
+        filtered.isEmpty &&
+        _searchQuery.isEmpty) {
+      filtered = List.from(_allItems);
     }
 
     switch (_currentSort) {
@@ -391,7 +483,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
     });
 
     final dbService = Provider.of<DatabaseService>(context, listen: false);
-    
+
     try {
       final result = await dbService.getGlobalMarketplaceItemsPaginated(
         limit: _pageSize,
@@ -426,8 +518,22 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
     setState(() {
       _searchQuery = value;
       _currentPage = 0;
-      _applyFiltersAndSort();
+      _isSearchFocused = value.isEmpty;
     });
+
+    if (value.trim().isEmpty) {
+      _loadData();
+    } else {
+      _applyFiltersAndSort();
+    }
+  }
+
+  void _onSearchSubmitted(String value) {
+    if (value.isNotEmpty) {
+      _saveSearchQuery(value);
+      setState(() => _isSearchFocused = false);
+      _loadData();
+    }
   }
 
   void _onSortChanged(SortOption sort) {
@@ -465,11 +571,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => PartyDetailScreen(party: account, isReadOnly: true),
+          builder: (context) =>
+              PartyDetailScreen(party: account, isReadOnly: true),
         ),
       );
     } catch (e) {
-      _showSnackBar(isUrdu ? 'بیچنے والا نہیں ملا' : 'Seller not found', isError: true);
+      _showSnackBar(isUrdu ? 'بیچنے والا نہیں ملا' : 'Seller not found',
+          isError: true);
     }
   }
 
@@ -477,7 +585,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
     if (item.accountId == null) return null;
     try {
       final account = _allAccounts.firstWhere((a) => a.id == item.accountId);
-      return account.storeName?.isNotEmpty == true ? account.storeName : account.name;
+      return account.storeName?.isNotEmpty == true
+          ? account.storeName
+          : account.name;
     } catch (e) {
       return null;
     }
@@ -506,7 +616,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
     final languageService = Provider.of<LanguageService>(context);
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-    final currentUser = FirebaseAuth.instance.currentUser; // ignore: unused_local_variable
+    final currentUser =
+        FirebaseAuth.instance.currentUser; // ignore: unused_local_variable
 
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBackground,
@@ -523,8 +634,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
               child: _isLoading
                   ? _buildLoadingShimmer()
                   : _displayedItems.isEmpty
-                  ? _buildEmptyState(isUrdu, fontFamily)
-                  : _buildProductsGrid(isUrdu, fontFamily),
+                      ? _buildEmptyState(isUrdu, fontFamily)
+                      : _buildProductsGrid(isUrdu, fontFamily),
             ),
             if (_isLoadingMore) _buildLoadingIndicator(),
           ],
@@ -577,10 +688,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               shape: const StadiumBorder(),
             ),
-            icon: const Icon(Icons.add_shopping_cart, size: 14, color: Colors.white),
+            icon: const Icon(Icons.add_shopping_cart,
+                size: 14, color: Colors.white),
             label: Text(
               isUrdu ? 'کچھ بیچیں' : 'Sell Item',
-              style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 10),
+              style: TextStyle(
+                  fontFamily: fontFamily,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10),
             ),
           ),
         ),
@@ -593,38 +708,54 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
       children: [
         const SizedBox(height: 12),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20), // Increased horizontal margin
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
             children: [
               Expanded(
-                child: SearchSortBar(
-                  controller: _searchController,
-                  padding: EdgeInsets.zero, // Removed inner padding to let Row handle it
-                  hintText: isUrdu ? 'مصنوعات تلاش کریں...' : 'Search products...',
-                  isAscending: _currentSort == SortOption.priceLow || _currentSort == SortOption.latest,
-                  onSearchChanged: _onSearchChanged,
-                  onSortToggled: () {
-                    setState(() {
-                      if (_currentSort == SortOption.latest) {
-                        _currentSort = SortOption.oldest;
-                      } else if (_currentSort == SortOption.oldest) {
-                        _currentSort = SortOption.latest;
-                      } else if (_currentSort == SortOption.priceLow) {
-                        _currentSort = SortOption.priceHigh;
-                      } else {
-                        _currentSort = SortOption.latest;
-                      }
-                      _applyFiltersAndSort();
-                    });
+                child: Focus(
+                  onFocusChange: (hasFocus) {
+                    setState(() => _isSearchFocused =
+                        hasFocus && _searchController.text.isEmpty);
                   },
+                  child: SearchSortBar(
+                    controller: _searchController,
+                    padding: EdgeInsets.zero,
+                    showVoiceSearch: true,
+                    showScanner: true,
+                    onScannerTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const VisualFinderScreen())),
+                    hintText:
+                        isUrdu ? 'مصنوعات تلاش کریں...' : 'Search products...',
+                    isAscending: _currentSort == SortOption.priceLow ||
+                        _currentSort == SortOption.latest,
+                    onSearchChanged: _onSearchChanged,
+                    onSubmitted: _onSearchSubmitted,
+                    onSortToggled: () {
+                      setState(() {
+                        if (_currentSort == SortOption.latest) {
+                          _currentSort = SortOption.oldest;
+                        } else if (_currentSort == SortOption.oldest) {
+                          _currentSort = SortOption.latest;
+                        } else if (_currentSort == SortOption.priceLow) {
+                          _currentSort = SortOption.priceHigh;
+                        } else {
+                          _currentSort = SortOption.latest;
+                        }
+                        _applyFiltersAndSort();
+                      });
+                    },
+                  ),
                 ),
               ),
-              const SizedBox(width: 12), // More space between search and button
-              // View Mode Toggle Button
+              const SizedBox(width: 12),
               GestureDetector(
                 onTap: () {
                   setState(() {
-                    _viewMode = _viewMode == ViewMode.grid ? ViewMode.list : ViewMode.grid;
+                    _viewMode = _viewMode == ViewMode.grid
+                        ? ViewMode.list
+                        : ViewMode.grid;
                   });
                 },
                 child: Container(
@@ -633,10 +764,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                   decoration: BoxDecoration(
                     color: AppTheme.themeColor.withOpacity(0.1),
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppTheme.themeColor.withOpacity(0.2)),
+                    border:
+                        Border.all(color: AppTheme.themeColor.withOpacity(0.2)),
                   ),
                   child: Icon(
-                    _viewMode == ViewMode.grid ? PhosphorIcons.list() : PhosphorIcons.gridFour(),
+                    _viewMode == ViewMode.grid
+                        ? PhosphorIcons.list()
+                        : PhosphorIcons.gridFour(),
                     color: AppTheme.themeColor,
                     size: 20,
                   ),
@@ -645,8 +779,56 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
             ],
           ),
         ),
+        if (_isSearchFocused && _recentSearches.isNotEmpty)
+          _buildRecentSearches(isUrdu, fontFamily),
         const SizedBox(height: 8),
       ],
+    );
+  }
+
+  Widget _buildRecentSearches(bool isUrdu, String fontFamily) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isUrdu ? 'حالیہ تلاشیں' : 'Recent Searches',
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+                fontFamily: fontFamily),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: _recentSearches
+                .map((s) => ActionChip(
+                      label: Text(s, style: const TextStyle(fontSize: 11)),
+                      onPressed: () {
+                        _searchController.text = s;
+                        _onSearchChanged(s);
+                        _onSearchSubmitted(s);
+                      },
+                      backgroundColor: Colors.grey[100],
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
+                    ))
+                .toList(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -694,7 +876,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                   const SizedBox(width: 4),
                   Text(
                     isUrdu ? 'فلٹر' : 'Filter',
-                    style: TextStyle(fontFamily: fontFamily, fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        fontFamily: fontFamily,
+                        fontSize: 11,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -710,18 +896,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
               physics: const BouncingScrollPhysics(),
               child: Row(
                 children: [
-                  _buildMiniTag(_getSortLabel(_currentSort, isUrdu), fontFamily),
                   _buildMiniTag(
-                    '${NumberFormat.compact().format(_priceRange.start)}-${NumberFormat.compact().format(_priceRange.end)}', 
-                    ''
-                  ),
+                      _getSortLabel(_currentSort, isUrdu), fontFamily),
+                  _buildMiniTag(
+                      '${NumberFormat.compact().format(_priceRange.start)}-${NumberFormat.compact().format(_priceRange.end)}',
+                      ''),
                   if (_selectedConditions.length == 1)
                     _buildMiniTag(
-                      _selectedConditions.first == 'New' 
-                          ? (isUrdu ? 'صرف نیا' : 'New Only') 
-                          : (isUrdu ? 'صرف پرانا' : 'Used Only'), 
-                      fontFamily
-                    ),
+                        _selectedConditions.first == 'New'
+                            ? (isUrdu ? 'صرف نیا' : 'New Only')
+                            : (isUrdu ? 'صرف پرانا' : 'Used Only'),
+                        fontFamily),
                 ],
               ),
             ),
@@ -737,11 +922,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
             child: Text(
               '${_displayedItems.length} ${isUrdu ? 'آئٹم' : 'items'}',
               style: TextStyle(
-                fontSize: 10,
-                color: Colors.grey[600],
-                fontFamily: fontFamily,
-                fontWeight: FontWeight.bold
-              ),
+                  fontSize: 10,
+                  color: Colors.grey[600],
+                  fontFamily: fontFamily,
+                  fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -752,15 +936,21 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
   Widget _buildMiniTag(String text, String fontFamily) {
     return Container(
       margin: const EdgeInsets.only(right: 6, left: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), // Reduced vertical padding
+      padding: const EdgeInsets.symmetric(
+          horizontal: 8, vertical: 3), // Reduced vertical padding
       decoration: BoxDecoration(
         color: AppTheme.goldColor.withOpacity(0.05), // Light gold background
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppTheme.goldColor.withOpacity(0.2)), // Gold border
+        border: Border.all(
+            color: AppTheme.goldColor.withOpacity(0.2)), // Gold border
       ),
       child: Text(
         text,
-        style: TextStyle(fontSize: 9, color: AppTheme.goldColor, fontFamily: fontFamily, fontWeight: FontWeight.bold), // Gold text, smaller font
+        style: TextStyle(
+            fontSize: 9,
+            color: AppTheme.goldColor,
+            fontFamily: fontFamily,
+            fontWeight: FontWeight.bold), // Gold text, smaller font
       ),
     );
   }
@@ -769,7 +959,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Container(
           padding: const EdgeInsets.all(24),
@@ -783,7 +974,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                 children: [
                   Text(
                     isUrdu ? 'فلٹرز اور ترتیب' : 'Filter & Sort',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: fontFamily),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
@@ -797,7 +991,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
               // 1. Price Range Section (Professional Slider)
               Text(
                 isUrdu ? 'قیمت کی حد' : 'Price Range',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: fontFamily),
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    fontFamily: fontFamily),
               ),
               const SizedBox(height: 8),
               RangeSlider(
@@ -812,7 +1009,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                 ),
                 onChanged: (values) {
                   // Ensure a minimum distance between start and end to prevent overlapping
-                  if ((values.end - values.start).abs() < (_maxPriceFound * 0.05)) return;
+                  if ((values.end - values.start).abs() <
+                      (_maxPriceFound * 0.05)) return;
 
                   setModalState(() => _priceRange = values);
                   setState(() => _priceRange = values);
@@ -822,8 +1020,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Rs ${_priceRange.start.round()}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  Text('Rs ${_priceRange.end.round()}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text('Rs ${_priceRange.start.round()}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text('Rs ${_priceRange.end.round()}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 ],
               ),
 
@@ -835,7 +1035,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                 children: [
                   Text(
                     isUrdu ? 'میرے قریب (فاصلہ)' : 'Nearby (Distance)',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: fontFamily),
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontFamily: fontFamily),
                   ),
                   Switch(
                     value: _useDistanceFilter,
@@ -865,7 +1068,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                   },
                 ),
                 Text(
-                  isUrdu ? '${_distanceFilter.round()} کلومیٹر کے اندر' : 'Within ${_distanceFilter.round()} km',
+                  isUrdu
+                      ? '${_distanceFilter.round()} کلومیٹر کے اندر'
+                      : 'Within ${_distanceFilter.round()} km',
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],
@@ -875,14 +1080,19 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
               // 3. Condition Selection (Multiple Selection)
               Text(
                 isUrdu ? 'آئٹم کی حالت' : 'Condition',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: fontFamily),
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    fontFamily: fontFamily),
               ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  _buildFilterChip('New', isUrdu ? 'نیا' : 'New', setModalState, fontFamily),
+                  _buildFilterChip(
+                      'New', isUrdu ? 'نیا' : 'New', setModalState, fontFamily),
                   const SizedBox(width: 12),
-                  _buildFilterChip('Used', isUrdu ? 'استعمال شدہ' : 'Used', setModalState, fontFamily),
+                  _buildFilterChip('Used', isUrdu ? 'استعمال شدہ' : 'Used',
+                      setModalState, fontFamily),
                 ],
               ),
 
@@ -891,7 +1101,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
               // 3. Location Filter
               Text(
                 isUrdu ? 'شہر / علاقہ' : 'Location',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: fontFamily),
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    fontFamily: fontFamily),
               ),
               const SizedBox(height: 8),
               TextField(
@@ -903,8 +1116,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                 decoration: InputDecoration(
                   hintText: isUrdu ? 'شہر تلاش کریں...' : 'Search city...',
                   prefixIcon: const Icon(Icons.location_on_outlined),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
 
@@ -913,31 +1128,43 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
               // 4. Sorting Options
               Text(
                 isUrdu ? 'ترتیب دیں' : 'Sort By',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: fontFamily),
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    fontFamily: fontFamily),
               ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: SortOption.values
-                  .where((opt) => opt != SortOption.conditionNew && opt != SortOption.conditionUsed)
-                  .map((opt) => ChoiceChip(
-                    label: Text(_getSortLabel(opt, isUrdu), style: TextStyle(fontSize: 12, fontFamily: fontFamily)),
-                    selected: _currentSort == opt,
-                    onSelected: (selected) {
-                      if (selected) {
-                        setModalState(() => _currentSort = opt);
-                        setState(() => _currentSort = opt);
-                        _applyFiltersAndSort();
-                      }
-                    },
-                    selectedColor: AppTheme.goldColor.withOpacity(0.2), // Changed to Gold
-                    labelStyle: TextStyle(color: _currentSort == opt ? AppTheme.goldColor : Colors.black), // Changed to Gold
-                  )).toList(),
+                    .where((opt) =>
+                        opt != SortOption.conditionNew &&
+                        opt != SortOption.conditionUsed)
+                    .map((opt) => ChoiceChip(
+                          label: Text(_getSortLabel(opt, isUrdu),
+                              style: TextStyle(
+                                  fontSize: 12, fontFamily: fontFamily)),
+                          selected: _currentSort == opt,
+                          onSelected: (selected) {
+                            if (selected) {
+                              setModalState(() => _currentSort = opt);
+                              setState(() => _currentSort = opt);
+                              _applyFiltersAndSort();
+                            }
+                          },
+                          selectedColor: AppTheme.goldColor
+                              .withOpacity(0.2), // Changed to Gold
+                          labelStyle: TextStyle(
+                              color: _currentSort == opt
+                                  ? AppTheme.goldColor
+                                  : Colors.black), // Changed to Gold
+                        ))
+                    .toList(),
               ),
 
               const SizedBox(height: 32),
-              
+
               // Apply Button
               SizedBox(
                 width: double.infinity,
@@ -946,11 +1173,15 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.darkColor,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                   child: Text(
                     isUrdu ? 'فلٹرز لگائیں' : 'Apply Filters',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: fontFamily),
                   ),
                 ),
               ),
@@ -962,17 +1193,20 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
     );
   }
 
-  Widget _buildFilterChip(String value, String label, Function setModalState, String fontFamily) {
+  Widget _buildFilterChip(
+      String value, String label, Function setModalState, String fontFamily) {
     bool isSelected = _selectedConditions.contains(value);
     return FilterChip(
-      label: Text(label, style: TextStyle(fontFamily: fontFamily, fontSize: 13)),
+      label:
+          Text(label, style: TextStyle(fontFamily: fontFamily, fontSize: 13)),
       selected: isSelected,
       onSelected: (selected) {
         setModalState(() {
           if (selected) {
             _selectedConditions.add(value);
           } else {
-            if (_selectedConditions.length > 1) _selectedConditions.remove(value);
+            if (_selectedConditions.length > 1)
+              _selectedConditions.remove(value);
           }
         });
         setState(() {}); // Sync main state
@@ -1012,10 +1246,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
     if (_viewMode == ViewMode.grid) {
       return GridView.builder(
         controller: _scrollController,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          childAspectRatio: 0.72,
+          childAspectRatio: 0.75,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
         ),
@@ -1076,7 +1310,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
       final itemName = item.name.toLowerCase();
       final itemDesc = (item.description ?? "").toLowerCase();
       final itemCat = (item.category ?? "").toLowerCase();
-      return _interestKeywords.any((k) => itemName.contains(k) || itemDesc.contains(k) || itemCat.contains(k));
+      return _interestKeywords.any((k) =>
+          itemName.contains(k) || itemDesc.contains(k) || itemCat.contains(k));
     }).toList();
 
     return ListView(
@@ -1109,7 +1344,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
         ),
 
         // Individual Category Sections
-        ..._categories.where((c) => c.id != 'all' && c.id != 'for_you').map((cat) {
+        ..._categories
+            .where((c) => c.id != 'all' && c.id != 'for_you')
+            .map((cat) {
           final items = categoryGroups[cat.id] ?? [];
           if (items.isEmpty) return const SizedBox.shrink();
           return _buildCategorySection(
@@ -1120,13 +1357,15 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
             categoryId: cat.id,
           );
         }),
-        
+
         const SizedBox(height: 80), // Space for bottom
       ],
     );
   }
 
-  Widget _buildCategorySection(String title, List<InventoryItem> items, bool isUrdu, String fontFamily, {String? categoryId}) {
+  Widget _buildCategorySection(
+      String title, List<InventoryItem> items, bool isUrdu, String fontFamily,
+      {String? categoryId}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1149,14 +1388,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                   onPressed: () => _onCategorySelected(categoryId),
                   child: Text(
                     isUrdu ? 'مزید دیکھیں' : 'See All',
-                    style: TextStyle(fontFamily: fontFamily, fontSize: 13, color: AppTheme.themeColor),
+                    style: TextStyle(
+                        fontFamily: fontFamily,
+                        fontSize: 13,
+                        color: AppTheme.themeColor),
                   ),
                 ),
             ],
           ),
         ),
         SizedBox(
-          height: 260, // Optimized height for horizontal cards
+          height: 240, // Optimized height for horizontal cards
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1172,7 +1414,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                   fontFamily: fontFamily,
                   view: ProductCardView.grid,
                   isFavorite: item.isFavorite ?? false,
-                  isMyItem: item.accountId == FirebaseAuth.instance.currentUser?.uid,
+                  isMyItem:
+                      item.accountId == FirebaseAuth.instance.currentUser?.uid,
                   sellerName: _getSellerName(item),
                   userPosition: _userPosition,
                   onTap: () => _navigateToDetail(item),
@@ -1191,7 +1434,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
     if (item.accountId == null) return;
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
     final String sellerName = _getSellerName(item) ?? 'Seller';
-    
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -1211,7 +1454,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
           child: Row(
             children: [
-              Icon(PhosphorIcons.crown(PhosphorIconsStyle.fill), color: AppTheme.goldColor, size: 20),
+              Icon(PhosphorIcons.crown(PhosphorIconsStyle.fill),
+                  color: AppTheme.goldColor, size: 20),
               const SizedBox(width: 8),
               Text(
                 isUrdu ? 'نمایاں اشتہارات' : 'Featured Ads',
@@ -1226,7 +1470,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
           ),
         ),
         SizedBox(
-          height: 280,
+          height: 240,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1234,7 +1478,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
             itemBuilder: (context, index) {
               final item = _featuredItems[index];
               return Container(
-                width: 200,
+                width: 180,
                 margin: const EdgeInsets.symmetric(horizontal: 6),
                 child: Stack(
                   children: [
@@ -1244,7 +1488,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                       fontFamily: fontFamily,
                       view: ProductCardView.grid,
                       isFavorite: item.isFavorite ?? false,
-                      isMyItem: item.accountId == FirebaseAuth.instance.currentUser?.uid,
+                      isMyItem: item.accountId ==
+                          FirebaseAuth.instance.currentUser?.uid,
                       sellerName: _getSellerName(item),
                       userPosition: _userPosition,
                       onTap: () => _navigateToDetail(item),
@@ -1256,20 +1501,27 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                       left: isUrdu ? null : 10,
                       right: isUrdu ? 10 : null,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: AppTheme.goldColor,
                           borderRadius: BorderRadius.circular(6),
-                          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                          boxShadow: [
+                            BoxShadow(color: Colors.black26, blurRadius: 4)
+                          ],
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.star, color: Colors.white, size: 10),
+                            const Icon(Icons.star,
+                                color: Colors.white, size: 10),
                             const SizedBox(width: 4),
                             Text(
                               isUrdu ? 'نمایاں' : 'Featured',
-                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
@@ -1293,7 +1545,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Row(
             children: [
-              Icon(PhosphorIcons.clockCounterClockwise(PhosphorIconsStyle.fill), color: AppTheme.themeColor, size: 20),
+              Icon(PhosphorIcons.clockCounterClockwise(PhosphorIconsStyle.fill),
+                  color: AppTheme.themeColor, size: 20),
               const SizedBox(width: 8),
               Text(
                 isUrdu ? 'حال ہی میں دیکھے گئے' : 'Recently Viewed',
@@ -1319,11 +1572,16 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                 onTap: () => _navigateToDetail(item),
                 child: Container(
                   width: 100,
-                  margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)],
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 4)
+                    ],
                     border: Border.all(color: Colors.grey[200]!),
                   ),
                   child: Column(
@@ -1331,14 +1589,18 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                       Expanded(
                         flex: 2,
                         child: ClipRRect(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                          borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(12)),
                           child: item.imagePaths.isNotEmpty
                               ? CachedNetworkImage(
                                   imageUrl: item.imagePaths.first,
                                   fit: BoxFit.cover,
                                   width: double.infinity,
                                 )
-                              : Container(color: Colors.grey[100], child: const Icon(Icons.image, color: Colors.grey)),
+                              : Container(
+                                  color: Colors.grey[100],
+                                  child: const Icon(Icons.image,
+                                      color: Colors.grey)),
                         ),
                       ),
                       Expanded(
@@ -1350,7 +1612,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                               item.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: fontFamily),
                             ),
                           ),
                         ),
@@ -1378,24 +1643,33 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
               color: Colors.grey[100],
               shape: BoxShape.circle,
             ),
-            child: Icon(PhosphorIcons.package(), size: 48, color: Colors.grey[400]),
+            child: Icon(PhosphorIcons.package(),
+                size: 48, color: Colors.grey[400]),
           ),
           const SizedBox(height: 24),
           Text(
             isUrdu ? 'کوئی مصنوعات نہیں ملی' : 'No products found',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppTheme.darkColor, fontFamily: fontFamily),
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.darkColor,
+                fontFamily: fontFamily),
           ),
           const SizedBox(height: 8),
           Text(
             isUrdu ? 'پہلی مصنوعات شامل کریں' : 'Add your first product',
-            style: TextStyle(fontSize: 14, color: AppTheme.textSecondary, fontFamily: fontFamily),
+            style: TextStyle(
+                fontSize: 14,
+                color: AppTheme.textSecondary,
+                fontFamily: fontFamily),
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () async {
               final result = await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const AddInventoryItemScreen()),
+                MaterialPageRoute(
+                    builder: (context) => const AddInventoryItemScreen()),
               );
               if (result == true) await _loadData();
             },
@@ -1405,7 +1679,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
               backgroundColor: AppTheme.themeColor,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30)),
             ),
           ),
         ],
@@ -1418,7 +1693,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
       padding: const EdgeInsets.all(12),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.72,
+        childAspectRatio: 0.75,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
@@ -1431,7 +1706,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SkeletonShimmer(width: double.infinity, height: 140, borderRadius: 16),
+            const SkeletonShimmer(
+                width: double.infinity, height: 140, borderRadius: 16),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(10),
@@ -1476,7 +1752,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final favorites = _allItems.where((item) => item.isFavorite == true).toList();
+            final favorites =
+                _allItems.where((item) => item.isFavorite == true).toList();
             return Container(
               height: MediaQuery.of(context).size.height * 0.7,
               padding: const EdgeInsets.all(16),
@@ -1493,61 +1770,82 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                   const SizedBox(height: 16),
                   Text(
                     isUrdu ? 'پسندیدہ مصنوعات' : 'Favorite Products',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: fontFamily),
                   ),
                   const SizedBox(height: 16),
                   Expanded(
                     child: favorites.isEmpty
                         ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(PhosphorIcons.heart(), size: 48, color: Colors.grey[400]),
-                          const SizedBox(height: 16),
-                          Text(
-                            isUrdu ? 'کوئی پسندیدہ مصنوعات نہیں' : 'No favorite products',
-                            style: TextStyle(color: AppTheme.textSecondary, fontFamily: fontFamily),
-                          ),
-                        ],
-                      ),
-                    )
-                        : ListView.separated(
-                      itemCount: favorites.length,
-                      separatorBuilder: (context, index) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final item = favorites[index];
-                        return ListTile(
-                          leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: SizedBox(
-                              width: 50,
-                              height: 50,
-                              child: item.imagePaths.isNotEmpty
-                                  ? CachedNetworkImage(
-                                imageUrl: item.imagePaths.first,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(color: Colors.grey[200]),
-                                errorWidget: (context, url, error) => Icon(PhosphorIcons.image(), size: 24),
-                              )
-                                  : Icon(PhosphorIcons.package(), size: 24, color: Colors.grey[400]),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(PhosphorIcons.heart(),
+                                    size: 48, color: Colors.grey[400]),
+                                const SizedBox(height: 16),
+                                Text(
+                                  isUrdu
+                                      ? 'کوئی پسندیدہ مصنوعات نہیں'
+                                      : 'No favorite products',
+                                  style: TextStyle(
+                                      color: AppTheme.textSecondary,
+                                      fontFamily: fontFamily),
+                                ),
+                              ],
                             ),
-                          ),
-                          title: Text(item.name, style: TextStyle(fontFamily: fontFamily)),
-                          subtitle: Text('Rs ${item.defaultRate}', style: const TextStyle(fontFamily: '', fontWeight: FontWeight.bold)),
-                          trailing: IconButton(
-                            icon: Icon(PhosphorIcons.trash(), color: AppTheme.expenseColor),
-                            onPressed: () async {
-                              await _toggleFavorite(item);
-                              setModalState(() {}); // Re-build the modal list
+                          )
+                        : ListView.separated(
+                            itemCount: favorites.length,
+                            separatorBuilder: (context, index) =>
+                                const Divider(height: 1),
+                            itemBuilder: (context, index) {
+                              final item = favorites[index];
+                              return ListTile(
+                                leading: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: SizedBox(
+                                    width: 50,
+                                    height: 50,
+                                    child: item.imagePaths.isNotEmpty
+                                        ? CachedNetworkImage(
+                                            imageUrl: item.imagePaths.first,
+                                            fit: BoxFit.cover,
+                                            placeholder: (context, url) =>
+                                                Container(
+                                                    color: Colors.grey[200]),
+                                            errorWidget:
+                                                (context, url, error) => Icon(
+                                                    PhosphorIcons.image(),
+                                                    size: 24),
+                                          )
+                                        : Icon(PhosphorIcons.package(),
+                                            size: 24, color: Colors.grey[400]),
+                                  ),
+                                ),
+                                title: Text(item.name,
+                                    style: TextStyle(fontFamily: fontFamily)),
+                                subtitle: Text('Rs ${item.defaultRate}',
+                                    style: const TextStyle(
+                                        fontFamily: '',
+                                        fontWeight: FontWeight.bold)),
+                                trailing: IconButton(
+                                  icon: Icon(PhosphorIcons.trash(),
+                                      color: AppTheme.expenseColor),
+                                  onPressed: () async {
+                                    await _toggleFavorite(item);
+                                    setModalState(
+                                        () {}); // Re-build the modal list
+                                  },
+                                ),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _navigateToDetail(item);
+                                },
+                              );
                             },
                           ),
-                          onTap: () {
-                            Navigator.pop(context);
-                            _navigateToDetail(item);
-                          },
-                        );
-                      },
-                    ),
                   ),
                 ],
               ),
@@ -1567,7 +1865,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
 }
 
 // ==================== ENUMS & MODELS ====================
-enum SortOption { latest, oldest, priceLow, priceHigh, rating, popular, conditionNew, conditionUsed }
+enum SortOption {
+  latest,
+  oldest,
+  priceLow,
+  priceHigh,
+  rating,
+  popular,
+  conditionNew,
+  conditionUsed
+}
+
 enum ViewMode { grid, list }
 
 class CategoryChip {

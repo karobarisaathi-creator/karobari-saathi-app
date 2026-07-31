@@ -26,7 +26,7 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
       description: fields[6] as String?,
       imagePaths: (fields[7] as List).cast<String>(),
       rating: fields[8] as double,
-      isFavorite: fields[9] as bool,
+      isFavorite: fields[9] as bool?,
       accountId: fields[10] as String?,
       category: fields[11] as String?,
       sku: fields[12] as String?,
@@ -35,7 +35,7 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
       likes: fields[15] as int,
       condition: fields[16] as String?,
       location: fields[17] as String?,
-      isNegotiable: fields[18] as bool,
+      isNegotiable: fields[18] as bool?,
       warranty: fields[19] as String?,
       brand: fields[20] as String?,
       ram: fields[21] as String?,
@@ -96,6 +96,8 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
       assetModel: fields[76] as String?,
       serialNumber: fields[77] as String?,
       depreciation: fields[78] as String?,
+      latitude: fields[79] as double?,
+      longitude: fields[80] as double?,
       isFeatured: fields[81] == null ? false : fields[81] as bool,
       views: fields[82] == null ? 0 : fields[82] as int,
       shares: fields[83] == null ? 0 : fields[83] as int,
@@ -106,7 +108,7 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
   @override
   void write(BinaryWriter writer, InventoryItem obj) {
     writer
-      ..writeByte(83)
+      ..writeByte(85)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -265,6 +267,10 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
       ..write(obj.serialNumber)
       ..writeByte(78)
       ..write(obj.depreciation)
+      ..writeByte(79)
+      ..write(obj.latitude)
+      ..writeByte(80)
+      ..write(obj.longitude)
       ..writeByte(81)
       ..write(obj.isFeatured)
       ..writeByte(82)

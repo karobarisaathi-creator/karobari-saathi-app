@@ -297,6 +297,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                                     profileImage: _remoteImageUrl ?? (_foundProfile != null && _profileImage == null ? _foundProfile!['photoUrl'] : null) ?? _profileImage?.path,
                                     category: _foundProfile == null ? _selectedCategory : null,
                                     isLarge: true,
+                                    isVerified: (_foundProfile != null && _foundProfile!['isVerified'] == 'true') || (widget.partyToEdit?.isVerified ?? false),
                                   ),
                                   if (_foundProfile != null) ...[
                                     const SizedBox(height: 20),

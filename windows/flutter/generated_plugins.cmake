@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  app_links
   audioplayers_windows
   cloud_firestore
   connectivity_plus
@@ -17,6 +18,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   printing
   record_windows
   share_plus
+  speech_to_text_windows
   url_launcher_windows
 )
 

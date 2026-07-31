@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'dashboard_screen.dart';
+import 'smart_diary_screen.dart';
 import 'package:account_app/features/professions/professions_screen.dart';
 import 'package:account_app/features/settings/settings_screen.dart';
-import 'package:account_app/features/visual_finder/visual_finder_screen.dart';
 import 'package:account_app/features/inventory/marketplace_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart';
+import 'package:account_app/core/services/language_service.dart';
+import 'package:provider/provider.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -24,7 +26,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   final List<Widget> _screens = [
     DashboardScreen(),
     ProfessionsScreen(),
-    const VisualFinderScreen(),
+    const SmartDiaryScreen(),
     MarketplaceScreen(),
     SettingsScreen(),
   ];
@@ -37,6 +39,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isUrdu = Provider.of<LanguageService>(context).isUrdu;
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
+    
     // Calculate dynamic bottom bar height based on device settings
     final double bottomPadding = MediaQuery.of(context).padding.bottom;
     final double textScaleFactor = MediaQuery.of(context).textScaleFactor;
@@ -86,9 +91,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   label: 'Professions',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(PhosphorIcons.scan(), size: 24),
-                  activeIcon: Icon(PhosphorIcons.scan(PhosphorIconsStyle.fill), size: 24),
-                  label: 'Deal Finder',
+                  icon: Icon(PhosphorIcons.notebook(), size: 24),
+                  activeIcon: Icon(PhosphorIcons.notebook(PhosphorIconsStyle.fill), size: 24),
+                  label: isUrdu ? 'روزنامچہ' : 'Diary',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(PhosphorIcons.storefront(), size: 24),

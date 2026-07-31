@@ -36,7 +36,13 @@ class VerificationService with ChangeNotifier {
   }
 
   void _listenToStatus(String uid) {
-    _firestore.collection('verification_requests').doc(uid).snapshots().listen((doc) {
+    VerificationStatus previousStatus = _currentStatus;
+
+    _firestore
+        .collection('verification_requests')
+        .doc(uid)
+        .snapshots()
+        .listen((doc) async {
       if (doc.exists) {
         final data = doc.data()!;
         final statusStr = data['status'] as String?;
@@ -48,6 +54,9 @@ class VerificationService with ChangeNotifier {
             break;
           case 'approved':
             _currentStatus = VerificationStatus.approved;
+            if (previousStatus != VerificationStatus.approved) {
+              await _markUserVerified(uid);
+            }
             break;
           case 'rejected':
             _currentStatus = VerificationStatus.rejected;
@@ -59,8 +68,21 @@ class VerificationService with ChangeNotifier {
         _currentStatus = VerificationStatus.none;
         _adminNote = null;
       }
+      previousStatus = _currentStatus;
       notifyListeners();
     });
+  }
+
+  Future<void> _markUserVerified(String uid) async {
+    try {
+      await _firestore.collection('users').doc(uid).set({
+        'isVerified': true,
+        'verifiedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      debugPrint('User $uid marked as verified in users collection.');
+    } catch (e) {
+      debugPrint('Failed to mark user verified: $e');
+    }
   }
 
   Future<void> submitRequest({
@@ -93,7 +115,6 @@ class VerificationService with ChangeNotifier {
         'submittedAt': FieldValue.serverTimestamp(),
         'adminNote': null,
       });
-
     } catch (e) {
       print('Verification submission error: $e');
       rethrow;
@@ -104,7 +125,8 @@ class VerificationService with ChangeNotifier {
   }
 
   Future<String> _uploadImage(File file, String fileName) async {
-    final ref = _storage.ref().child('verification_documents').child('$fileName.jpg');
+    final ref =
+        _storage.ref().child('verification_documents').child('$fileName.jpg');
     final uploadTask = await ref.putFile(file);
     return await uploadTask.ref.getDownloadURL();
   }
@@ -114,7 +136,10 @@ class VerificationService with ChangeNotifier {
     if (user == null) return;
 
     try {
-      await _firestore.collection('verification_requests').doc(user.uid).delete();
+      await _firestore
+          .collection('verification_requests')
+          .doc(user.uid)
+          .delete();
     } catch (e) {
       print('Cancel request error: $e');
     }

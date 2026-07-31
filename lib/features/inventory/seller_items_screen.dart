@@ -233,56 +233,24 @@ class _SellerItemsScreenState extends State<SellerItemsScreen> {
         : (_sellerProfile?['storeImage']?.isNotEmpty == true ? _sellerProfile!['storeImage']! : (_sellerProfile?['photoUrl'] ?? ''));
 
     final bool isVerified = isMe 
-        ? Provider.of<DatabaseService>(context, listen: false).getAccount('me')?.isVerified ?? false
+        ? Provider.of<DatabaseService>(context, listen: false).getAccount(user?.uid ?? '')?.isVerified ?? false
         : _sellerProfile?['isVerified'] == 'true';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Row(
         children: [
-          ProfileInfoWidget(
-            name: displayName,
-            phone: '', // No phone needed in header
-            profileImage: photoUrl,
-            isVerified: isVerified,
-            isLarge: false,
-            showText: false, // Only image with ring
-          ),
-          const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isUrdu ? 'خوش آمدید' : 'Welcome Back 👋',
-                  style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7), fontFamily: fontFamily),
-                ),
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        displayName,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          fontFamily: _getFont(displayName, isUrdu),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (isVerified) ...[
-                      const SizedBox(width: 4),
-                      Icon(
-                        PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
-                        size: 16,
-                        color: const Color(0xFF1D9BF0),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
+            child: ProfileInfoWidget(
+              name: displayName,
+              phone: '',
+              profileImage: photoUrl,
+              isVerified: isVerified,
+              topLabel: isUrdu ? 'خوش آمدید' : 'Welcome Back 👋',
+              isLarge: false,
+              textColor: Colors.white,
+              subtitleColor: Colors.white.withOpacity(0.7),
+              isStore: true,
             ),
           ),
           if (isMe)
@@ -490,7 +458,7 @@ class _SellerItemsScreenState extends State<SellerItemsScreen> {
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          childAspectRatio: 0.72,
+          childAspectRatio: 0.75,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
         ),
