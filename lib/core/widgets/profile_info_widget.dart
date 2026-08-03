@@ -29,6 +29,8 @@ class ProfileInfoWidget extends StatefulWidget {
   final Color? subtitleColor;
   final bool hasUpdate;
   final bool isVerified;
+  final Widget? suffix;
+  final String? reputationLabel;
 
   const ProfileInfoWidget({
     super.key,
@@ -49,6 +51,8 @@ class ProfileInfoWidget extends StatefulWidget {
     this.subtitleColor,
     this.hasUpdate = false,
     this.isVerified = false,
+    this.suffix,
+    this.reputationLabel,
   });
 
   @override
@@ -211,11 +215,11 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
     // Default Row Layout
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: widget.suffix != null ? MainAxisSize.max : MainAxisSize.min,
       children: [
         imagePart,
         const SizedBox(width: 12),
-        Flexible(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -230,28 +234,59 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                   ),
                 ),
               Row(
-                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Flexible(
-                    child: Text(
-                      displayName,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: widget.isLarge ? 20 : 16,
-                        fontWeight: fontWeight,
-                        color: effectiveTextColor,
-                        fontFamily: fontFamily,
-                        height: 1.2,
-                      ),
+                  Expanded(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            displayName,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: widget.isLarge ? 20 : 16,
+                              fontWeight: fontWeight,
+                              color: effectiveTextColor,
+                              fontFamily: fontFamily,
+                              height: 1.2,
+                            ),
+                          ),
+                        ),
+                        if (widget.isVerified) ...[
+                          const SizedBox(width: 4),
+                          Icon(
+                            PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
+                            size: widget.isLarge ? 18 : 14,
+                            color: AppTheme.verifiedGold,
+                          ),
+                        ],
+                        if (widget.reputationLabel != null) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                            ),
+                            child: Text(
+                              widget.reputationLabel!,
+                              style: TextStyle(
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue[700],
+                                fontFamily: fontFamily,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  if (widget.isVerified) ...[
-                    const SizedBox(width: 4),
-                    Icon(
-                      PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
-                      size: widget.isLarge ? 18 : 14,
-                      color: AppTheme.verifiedGold,
-                    ),
+                  if (widget.suffix != null) ...[
+                    const SizedBox(width: 8),
+                    widget.suffix!,
                   ],
                 ],
               ),

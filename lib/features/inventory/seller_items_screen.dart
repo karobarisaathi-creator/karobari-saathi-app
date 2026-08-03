@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/models/inventory_item_model.dart';
@@ -216,66 +217,170 @@ class _SellerItemsScreenState extends State<SellerItemsScreen> {
                 ),
               ],
             ),
+      bottomNavigationBar: isOwner ? _buildBottomAction(isUrdu, fontFamily) : null,
     );
   }
 
   Widget _buildTopAppBar(bool isUrdu, String fontFamily) {
     final user = FirebaseAuth.instance.currentUser;
     final bool isMe = user?.uid == widget.sellerUid;
+    final myAccount = isMe ? Provider.of<DatabaseService>(context, listen: false).getAccount(user?.uid ?? '') : null;
     
-    // Identity logic: Priority to Store Info, Fallback to Personal Info
-    final String displayName = isMe 
-        ? (_storeName ?? user?.displayName ?? widget.sellerName)
-        : (_sellerProfile?['storeName']?.isNotEmpty == true ? _sellerProfile!['storeName']! : (_sellerProfile?['name'] ?? widget.sellerName));
+    // Priority logic: Firestore Profile > Local Hive Account > Firebase Auth > Fallback
+    String displayName = isMe 
+        ? (_storeName ?? myAccount?.storeName ?? myAccount?.name ?? user?.displayName ?? (isUrdu ? 'میرا اسٹور' : 'My Store'))
+        : (_sellerProfile?['storeName'] ?? _sellerProfile?['name'] ?? widget.sellerName);
+    
+    // Final check to prevent "Unknown" flicker
+    if (displayName.isEmpty || displayName == 'null') {
+      displayName = isMe ? (isUrdu ? 'میرا اسٹور' : 'My Store') : widget.sellerName;
+    }
     
     final String? photoUrl = isMe 
-        ? (_storeImage ?? user?.photoURL)
-        : (_sellerProfile?['storeImage']?.isNotEmpty == true ? _sellerProfile!['storeImage']! : (_sellerProfile?['photoUrl'] ?? ''));
+        ? (_storeImage ?? myAccount?.storeImage ?? myAccount?.profileImage ?? user?.photoURL)
+        : (_sellerProfile?['storeImage'] ?? _sellerProfile?['photoUrl'] ?? '');
 
     final bool isVerified = isMe 
-        ? Provider.of<DatabaseService>(context, listen: false).getAccount(user?.uid ?? '')?.isVerified ?? false
-        : _sellerProfile?['isVerified'] == 'true';
+        ? myAccount?.isVerified ?? false
+        : _sellerProfile?['isVerified'] == 'true' || _sellerProfile?['isVerified'] == true;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: ProfileInfoWidget(
-              name: displayName,
-              phone: '',
-              profileImage: photoUrl,
-              isVerified: isVerified,
-              topLabel: isUrdu ? 'خوش آمدید' : 'Welcome Back 👋',
-              isLarge: false,
-              textColor: Colors.white,
-              subtitleColor: Colors.white.withOpacity(0.7),
-              isStore: true,
+          ProfileInfoWidget(
+            name: displayName,
+            phone: '',
+            profileImage: photoUrl,
+            isVerified: isVerified,
+            topLabel: isUrdu ? 'خوش آمدید' : 'Welcome Back 👋',
+            isLarge: false,
+            textColor: Colors.white,
+            subtitleColor: Colors.white.withOpacity(0.7),
+            isStore: true,
+            suffix: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isVerified)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.verifiedGold.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppTheme.verifiedGold.withOpacity(0.4)),
+                    ),
+                    child: Text(
+                      isUrdu ? 'تصدیق شدہ سیلر' : 'Verified Seller',
+                      style: TextStyle(
+                        color: AppTheme.verifiedGold,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: fontFamily,
+                      ),
+                    ),
+                  ),
+                if (!isMe) ...[
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: () => _showReportSellerDialog(isUrdu, fontFamily),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.report_gmailerrorred, color: Colors.white60, size: 18),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          if (isMe)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: ElevatedButton.icon(
-                onPressed: () => _showCategoryPicker(isUrdu, fontFamily),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.goldColor,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  minimumSize: const Size(0, 32),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: const StadiumBorder(),
-                ),
-                icon: const Icon(Icons.add, size: 14, color: Colors.white),
-                label: Text(
-                  isUrdu ? 'آئٹم شامل کریں' : 'Add Item',
-                  style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 10),
-                ),
-              ),
-            ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBottomAction(bool isUrdu, String fontFamily) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -4)),
+        ],
+      ),
+      child: SafeArea(
+        child: SizedBox(
+          width: double.infinity,
+          height: 55,
+          child: ElevatedButton.icon(
+            onPressed: () => _showCategoryPicker(isUrdu, fontFamily),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.goldColor,
+              foregroundColor: Colors.white,
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            icon: const Icon(Icons.add_circle_outline, size: 24),
+            label: Text(
+              isUrdu ? 'نئی آئٹم شامل کریں' : 'Add New Item',
+              style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showReportSellerDialog(bool isUrdu, String fontFamily) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.darkColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          isUrdu ? 'سیلر کی رپورٹ کریں' : 'Report Seller',
+          style: TextStyle(color: Colors.white, fontFamily: fontFamily),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildReportOption(isUrdu ? 'جعلی سیلر / فراڈ' : 'Fake Seller / Fraud', isUrdu, fontFamily),
+            _buildReportOption(isUrdu ? 'بدتمیزی / غلط زبان' : 'Inappropriate Language', isUrdu, fontFamily),
+            _buildReportOption(isUrdu ? 'غلط قیمتیں' : 'Misleading Prices', isUrdu, fontFamily),
+            _buildReportOption(isUrdu ? 'دیگر مسائل' : 'Other Issues', isUrdu, fontFamily),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReportOption(String label, bool isUrdu, String fontFamily) {
+    return ListTile(
+      title: Text(label, style: TextStyle(color: Colors.white70, fontSize: 14, fontFamily: fontFamily)),
+      onTap: () async {
+        Navigator.pop(context);
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) return;
+
+        try {
+          await FirebaseFirestore.instance.collection('seller_reports').add({
+            'sellerUid': widget.sellerUid,
+            'reporterUid': user.uid,
+            'reason': label,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(isUrdu ? 'رپورٹ جمع کر دی گئی ہے' : 'Report submitted')),
+            );
+          }
+        } catch (e) {
+          debugPrint("Report error: $e");
+        }
+      },
     );
   }
 

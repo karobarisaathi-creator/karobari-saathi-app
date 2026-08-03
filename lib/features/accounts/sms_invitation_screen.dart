@@ -25,7 +25,8 @@ class _BalanceAlertScreenState extends State<BalanceAlertScreen> {
     super.initState();
     // Initial Message Setup
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final languageService = Provider.of<LanguageService>(context, listen: false);
+      final languageService =
+          Provider.of<LanguageService>(context, listen: false);
       final isUrdu = languageService.isUrdu;
       final balance = widget.party.balance.abs().toStringAsFixed(0);
       final status = widget.party.balance >= 0
@@ -73,7 +74,10 @@ Please verify. Thanks.""";
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 5)),
+                  BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5)),
                 ],
               ),
               child: Column(
@@ -90,29 +94,48 @@ Please verify. Thanks.""";
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(isUrdu ? 'نام:' : 'Name:', style: TextStyle(color: Colors.grey, fontFamily: fontFamily, fontWeight: fontWeight)),
+                                Text(isUrdu ? 'نام:' : 'Name:',
+                                    style: TextStyle(
+                                        color: Colors.grey,
+                                        fontFamily: fontFamily,
+                                        fontWeight: fontWeight)),
                                 Text(
                                   widget.party.name,
-                                  style: TextStyle(fontSize: 18, fontWeight: fontWeight, fontFamily: fontFamily, color: AppTheme.darkColor),
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: fontWeight,
+                                      fontFamily: fontFamily,
+                                      color: AppTheme.darkColor),
                                 ),
                                 if (widget.party.phone.isNotEmpty)
                                   Text(
-                                    Formatters.formatPhoneNumber(widget.party.phone),
-                                    style: const TextStyle(color: Colors.blueGrey, fontSize: 14, fontFamily: '', fontWeight: FontWeight.bold),
+                                    Formatters.formatPhoneNumber(
+                                        widget.party.phone),
+                                    style: const TextStyle(
+                                        color: Colors.blueGrey,
+                                        fontSize: 14,
+                                        fontFamily: '',
+                                        fontWeight: FontWeight.bold),
                                   ),
                               ],
                             ),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Text(isUrdu ? 'کل بیلنس' : 'Net Balance', style: TextStyle(color: Colors.grey, fontFamily: fontFamily, fontWeight: fontWeight)),
+                                Text(isUrdu ? 'کل بیلنس' : 'Net Balance',
+                                    style: TextStyle(
+                                        color: Colors.grey,
+                                        fontFamily: fontFamily,
+                                        fontWeight: fontWeight)),
                                 Text(
                                   'RS ${widget.party.balance.abs().toStringAsFixed(0)}',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                     fontFamily: '',
-                                    color: widget.party.balance >= 0 ? AppTheme.incomeColor : AppTheme.expenseColor,
+                                    color: widget.party.balance >= 0
+                                        ? AppTheme.incomeColor
+                                        : AppTheme.expenseColor,
                                   ),
                                 ),
                               ],
@@ -154,11 +177,13 @@ Please verify. Thanks.""";
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12.0),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade300),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12.0),
-                              borderSide: const BorderSide(color: AppTheme.themeColor, width: 2),
+                              borderSide: const BorderSide(
+                                  color: AppTheme.themeColor, width: 2),
                             ),
                           ),
                         ),
@@ -169,7 +194,11 @@ Please verify. Thanks.""";
                         Center(
                           child: Text(
                             isUrdu ? 'شکریہ!' : 'Thank you!',
-                            style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey, fontFamily: fontFamily, fontWeight: fontWeight),
+                            style: TextStyle(
+                                fontStyle: FontStyle.italic,
+                                color: Colors.grey,
+                                fontFamily: fontFamily,
+                                fontWeight: fontWeight),
                           ),
                         ),
                       ],
@@ -187,7 +216,9 @@ Please verify. Thanks.""";
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () => _sendSMS(context),
-                    icon: Icon(PhosphorIcons.chatTeardropDots(PhosphorIconsStyle.bold), size: 20),
+                    icon: Icon(
+                        PhosphorIcons.chatTeardropDots(PhosphorIconsStyle.bold),
+                        size: 20),
                     label: Text(
                       'SMS',
                       style: TextStyle(
@@ -199,7 +230,8 @@ Please verify. Thanks.""";
                       backgroundColor: Colors.blueGrey,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.0)),
                     ),
                   ),
                 ),
@@ -207,7 +239,9 @@ Please verify. Thanks.""";
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () => _sendWhatsApp(context),
-                    icon: Icon(PhosphorIcons.whatsappLogo(PhosphorIconsStyle.bold), size: 20),
+                    icon: Icon(
+                        PhosphorIcons.whatsappLogo(PhosphorIconsStyle.bold),
+                        size: 20),
                     label: Text(
                       'WhatsApp',
                       style: TextStyle(
@@ -219,7 +253,8 @@ Please verify. Thanks.""";
                       backgroundColor: Colors.green, // WhatsApp Green
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.0)),
                     ),
                   ),
                 ),
@@ -232,11 +267,21 @@ Please verify. Thanks.""";
   }
 
   void _sendSMS(BuildContext context) async {
+    final rawPhone = widget.party.phone;
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    final normalizedPhone = Formatters.normalizePhoneNumber(rawPhone);
+
+    if (normalizedPhone == null) {
+      _showErrorSnackBar(
+          context, isUrdu ? 'فون نمبر درست نہیں ہے' : 'Invalid phone number');
+      return;
+    }
+
     final Uri smsUri = Uri(
       scheme: 'sms',
-      path: widget.party.phone,
+      path: normalizedPhone.replaceAll('+', ''),
       queryParameters: <String, String>{
-        'body': _messageController.text,
+        'body': _messageController.text.trim(),
       },
     );
 
@@ -244,24 +289,31 @@ Please verify. Thanks.""";
       if (await canLaunchUrl(smsUri)) {
         await launchUrl(smsUri);
       } else {
-        // Fallback for some devices
         await launchUrl(smsUri, mode: LaunchMode.externalApplication);
       }
     } catch (e) {
-      _showErrorSnackBar(context, 'Could not launch SMS: \$e');
+      _showErrorSnackBar(
+          context, isUrdu ? 'SMS شروع نہیں ہو سکا' : 'Could not launch SMS');
     }
   }
 
   void _sendWhatsApp(BuildContext context) async {
-    String phone = widget.party.phone.replaceAll(RegExp(r'\D'), ''); // Remove non-digits
-    // Ensure international format for WhatsApp (assuming PK if not present)
-    if (phone.startsWith('0')) {
-      phone = '92' + phone.substring(1);
+    final rawPhone = widget.party.phone;
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    final normalizedPhone = Formatters.normalizePhoneNumber(rawPhone);
+
+    if (normalizedPhone == null) {
+      _showErrorSnackBar(
+          context, isUrdu ? 'فون نمبر درست نہیں ہے' : 'Invalid phone number');
+      return;
     }
-    
-    final String message = Uri.encodeComponent(_messageController.text);
-    final Uri whatsappUri = Uri.parse("whatsapp://send?phone=\$phone&text=\$message");
-    final Uri whatsappWebUri = Uri.parse("https://wa.me/\$phone?text=\$message");
+
+    final phoneDigits = normalizedPhone.replaceAll('+', '');
+    final String message = Uri.encodeComponent(_messageController.text.trim());
+    final Uri whatsappUri =
+        Uri.parse('whatsapp://send?phone=$phoneDigits&text=$message');
+    final Uri whatsappWebUri =
+        Uri.parse('https://wa.me/$phoneDigits?text=$message');
 
     try {
       if (await canLaunchUrl(whatsappUri)) {
@@ -269,10 +321,15 @@ Please verify. Thanks.""";
       } else if (await canLaunchUrl(whatsappWebUri)) {
         await launchUrl(whatsappWebUri, mode: LaunchMode.externalApplication);
       } else {
-        _showErrorSnackBar(context, 'WhatsApp not installed or could not launch.');
+        _showErrorSnackBar(
+            context,
+            isUrdu
+                ? 'واٹس ایپ چل نہیں سکی'
+                : 'WhatsApp not installed or could not launch.');
       }
     } catch (e) {
-      _showErrorSnackBar(context, 'Error launching WhatsApp: \$e');
+      _showErrorSnackBar(context,
+          isUrdu ? 'واٹس ایپ چل نہیں سکی' : 'Could not launch WhatsApp');
     }
   }
 

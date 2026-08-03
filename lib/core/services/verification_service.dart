@@ -7,6 +7,15 @@ import 'package:firebase_storage/firebase_storage.dart';
 enum VerificationStatus { none, pending, approved, rejected }
 
 class VerificationService with ChangeNotifier {
+  static const Set<String> _trustedAdminEmails = {
+    'karobarisaathi@gmail.com',
+    'admin@accountapp.com',
+  };
+
+  static const Set<String> _trustedAdminUids = {
+    'trusted-admin',
+  };
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
@@ -18,6 +27,30 @@ class VerificationService with ChangeNotifier {
   VerificationStatus get currentStatus => _currentStatus;
   String? get adminNote => _adminNote;
   bool get isLoading => _isLoading;
+
+  static bool canAccessAdminPanel({
+    required Map<String, dynamic>? userData,
+    required String? uid,
+    required String? email,
+    required String? phone,
+  }) {
+    final data = userData ?? const <String, dynamic>{};
+    final normalizedEmail = email?.trim().toLowerCase();
+    final normalizedPhone = phone?.trim();
+    final rawRole = data['role'];
+    final rawAdminFlag = data['isAdmin'];
+
+    final isAdminFlag = rawAdminFlag is bool
+        ? rawAdminFlag
+        : rawAdminFlag is String && rawAdminFlag.toLowerCase() == 'true';
+    final isAdminRole = rawRole is String && rawRole.toLowerCase() == 'admin';
+
+    return isAdminFlag ||
+        isAdminRole ||
+        (_trustedAdminEmails.contains(normalizedEmail) ||
+            _trustedAdminUids.contains(uid) ||
+            normalizedPhone == '+923036363520');
+  }
 
   VerificationService() {
     _init();
@@ -51,37 +84,64 @@ class VerificationService with ChangeNotifier {
         switch (statusStr) {
           case 'pending':
             _currentStatus = VerificationStatus.pending;
+            if (previousStatus == VerificationStatus.approved) {
+              await _updateUserVerifiedFlag(uid, false);
+            }
             break;
           case 'approved':
             _currentStatus = VerificationStatus.approved;
             if (previousStatus != VerificationStatus.approved) {
-              await _markUserVerified(uid);
+              await _updateUserVerifiedFlag(uid, true);
+              // Send notification only if it was a new approval from pending
+              if (previousStatus == VerificationStatus.pending) {
+                _createVerificationNotification(uid, true);
+              }
             }
             break;
           case 'rejected':
             _currentStatus = VerificationStatus.rejected;
+            if (previousStatus == VerificationStatus.approved) {
+              await _updateUserVerifiedFlag(uid, false);
+            }
+            // Notify rejection
+            if (previousStatus == VerificationStatus.pending) {
+              _createVerificationNotification(uid, false);
+            }
             break;
           default:
             _currentStatus = VerificationStatus.none;
+            _adminNote = null;
+            if (previousStatus == VerificationStatus.approved) {
+              await _updateUserVerifiedFlag(uid, false);
+            }
         }
       } else {
         _currentStatus = VerificationStatus.none;
         _adminNote = null;
+        if (previousStatus == VerificationStatus.approved) {
+          await _updateUserVerifiedFlag(uid, false);
+        }
       }
       previousStatus = _currentStatus;
       notifyListeners();
     });
   }
 
-  Future<void> _markUserVerified(String uid) async {
+  Future<void> _updateUserVerifiedFlag(String uid, bool isVerified) async {
     try {
-      await _firestore.collection('users').doc(uid).set({
-        'isVerified': true,
-        'verifiedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      debugPrint('User $uid marked as verified in users collection.');
+      final data = <String, dynamic>{'isVerified': isVerified};
+      if (isVerified) {
+        data['verifiedAt'] = FieldValue.serverTimestamp();
+      } else {
+        data['verifiedAt'] = FieldValue.delete();
+      }
+      await _firestore
+          .collection('users')
+          .doc(uid)
+          .set(data, SetOptions(merge: true));
+      debugPrint('User $uid verification flag updated to $isVerified.');
     } catch (e) {
-      debugPrint('Failed to mark user verified: $e');
+      debugPrint('Failed to update verification flag: $e');
     }
   }
 
@@ -98,15 +158,15 @@ class VerificationService with ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. Upload Images
-      final shopUrl = await _uploadImage(shopImage, 'shop_${user.uid}');
-      final idUrl = await _uploadImage(idImage, 'id_${user.uid}');
+      final shopUrl = await _uploadImage(shopImage,
+          'shop_${user.uid}_${DateTime.now().millisecondsSinceEpoch}');
+      final idUrl = await _uploadImage(
+          idImage, 'id_${user.uid}_${DateTime.now().millisecondsSinceEpoch}');
 
-      // 2. Save Request to Firestore
       await _firestore.collection('verification_requests').doc(user.uid).set({
         'uid': user.uid,
-        'name': user.displayName,
-        'phone': user.phoneNumber,
+        'name': user.displayName ?? '',
+        'phone': user.phoneNumber ?? '',
         'businessName': businessName,
         'businessType': businessType,
         'shopImageUrl': shopUrl,
@@ -114,9 +174,11 @@ class VerificationService with ChangeNotifier {
         'status': 'pending',
         'submittedAt': FieldValue.serverTimestamp(),
         'adminNote': null,
-      });
+        'reviewedBy': null,
+        'reviewedAt': null,
+      }, SetOptions(merge: false));
     } catch (e) {
-      print('Verification submission error: $e');
+      debugPrint('Verification submission error: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -125,8 +187,11 @@ class VerificationService with ChangeNotifier {
   }
 
   Future<String> _uploadImage(File file, String fileName) async {
-    final ref =
-        _storage.ref().child('verification_documents').child('$fileName.jpg');
+    final extension = file.path.split('.').last;
+    final ref = _storage
+        .ref()
+        .child('verification_documents')
+        .child('$fileName.$extension');
     final uploadTask = await ref.putFile(file);
     return await uploadTask.ref.getDownloadURL();
   }
@@ -141,7 +206,211 @@ class VerificationService with ChangeNotifier {
           .doc(user.uid)
           .delete();
     } catch (e) {
-      print('Cancel request error: $e');
+      debugPrint('Cancel request error: $e');
+    }
+  }
+
+  // ==================== ADMIN FUNCTIONS ====================
+
+  /// Fetch all pending verification requests
+  Stream<List<Map<String, dynamic>>> getPendingRequests() {
+    return _firestore
+        .collection('verification_requests')
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((snapshot) {
+      final requests = snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['uid'] = doc.id;
+        return data;
+      }).toList();
+
+      requests.sort((a, b) {
+        final aDate = (a['submittedAt'] as Timestamp?)?.toDate() ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = (b['submittedAt'] as Timestamp?)?.toDate() ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      });
+
+      return requests;
+    });
+  }
+
+  /// Update request status (Approve/Reject)
+  Future<void> processRequest({
+    required String uid,
+    required bool approve,
+    String? adminNote,
+  }) async {
+    final adminUser = _auth.currentUser;
+    if (adminUser == null) throw Exception('Admin not logged in');
+
+    try {
+      final status = approve ? 'approved' : 'rejected';
+
+      await _firestore.collection('verification_requests').doc(uid).update({
+        'status': status,
+        'adminNote': adminNote,
+        'reviewedBy': adminUser.email ?? adminUser.phoneNumber,
+        'reviewedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Verification flag update and notification creation is already handled by
+      // the existing _listenToStatus listener which monitors this collection.
+
+      debugPrint('Request for $uid processed: $status');
+    } catch (e) {
+      debugPrint('Process request error: $e');
+      rethrow;
+    }
+  }
+
+  // ==================== MASTER ADMIN FUNCTIONS ====================
+
+  /// Get global app statistics
+  Future<Map<String, dynamic>> getAppStats() async {
+    try {
+      final usersCount = await _firestore.collection('users').count().get();
+      final itemsCount =
+          await _firestore.collectionGroup('inventory_items').count().get();
+      final verifiedCount = await _firestore
+          .collection('users')
+          .where('isVerified', isEqualTo: true)
+          .count()
+          .get();
+      final reportsCount =
+          await _firestore.collection('seller_reports').count().get();
+
+      return {
+        'totalUsers': usersCount.count,
+        'totalItems': itemsCount.count,
+        'totalVerified': verifiedCount.count,
+        'totalReports': reportsCount.count,
+      };
+    } catch (e) {
+      debugPrint('Get stats error: $e');
+      return {};
+    }
+  }
+
+  /// Stream all registered users
+  Stream<List<Map<String, dynamic>>> getAllUsers() {
+    return _firestore
+        .collection('users')
+        .orderBy('createdAt', descending: true)
+        .limit(100)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => {...doc.data(), 'uid': doc.id})
+            .toList());
+  }
+
+  /// Search user by phone
+  Future<List<Map<String, dynamic>>> searchUsers(String phone) async {
+    final query = await _firestore
+        .collection('users')
+        .where('phoneNumber', isGreaterThanOrEqualTo: phone)
+        .where('phoneNumber', isLessThanOrEqualTo: phone + '\uf8ff')
+        .get();
+    return query.docs.map((doc) => {...doc.data(), 'uid': doc.id}).toList();
+  }
+
+  /// Stream complaints/reports
+  Stream<List<Map<String, dynamic>>> getReports() {
+    return _firestore.collection('seller_reports').snapshots().map((snapshot) {
+      final reports = snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+
+      reports.sort((a, b) {
+        final aDate = (a['timestamp'] as Timestamp?)?.toDate() ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = (b['timestamp'] as Timestamp?)?.toDate() ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      });
+
+      return reports;
+    });
+  }
+
+  /// Block/Deactivate a user
+  Future<void> toggleUserStatus(String uid, bool deactivate) async {
+    await _firestore.collection('users').doc(uid).update({
+      'isDeactivated': deactivate,
+      'deactivatedAt': deactivate ? FieldValue.serverTimestamp() : null,
+    });
+  }
+
+  /// Revoke verification badge from a user
+  Future<void> revokeVerification(String uid) async {
+    await _firestore.collection('users').doc(uid).set({
+      'isVerified': false,
+      'verifiedAt': FieldValue.delete(),
+    }, SetOptions(merge: true));
+  }
+
+  /// Send a notification to ALL users
+  Future<void> sendBroadcastNotification({
+    required String title,
+    required String message,
+  }) async {
+    try {
+      final usersSnapshot = await _firestore.collection('users').get();
+      final batch = _firestore.batch();
+
+      for (var doc in usersSnapshot.docs) {
+        final notifId =
+            "broadcast_${DateTime.now().millisecondsSinceEpoch}_${doc.id.substring(0, 4)}";
+        final ref = _firestore
+            .collection('users')
+            .doc(doc.id)
+            .collection('notifications')
+            .doc(notifId);
+
+        batch.set(ref, {
+          'id': notifId,
+          'title': title,
+          'message': message,
+          'timestamp': FieldValue.serverTimestamp(),
+          'type': 'system',
+          'isRead': false,
+        });
+      }
+
+      await batch.commit();
+      debugPrint('Broadcast sent to ${usersSnapshot.docs.length} users');
+    } catch (e) {
+      debugPrint('Broadcast error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> _createVerificationNotification(
+      String uid, bool isApproved) async {
+    try {
+      final notifId = "verify_${DateTime.now().millisecondsSinceEpoch}";
+      await _firestore
+          .collection('users')
+          .doc(uid)
+          .collection('notifications')
+          .doc(notifId)
+          .set({
+        'id': notifId,
+        'title': isApproved ? 'تصدیق مکمل! 🎉' : 'تصدیق مسترد ❌',
+        'message': isApproved
+            ? 'مبارک ہو! آپ کا اکاؤنٹ اب ویریفائیڈ ہو گیا ہے۔'
+            : 'معذرت، آپ کی تصدیق کی درخواست مسترد کر دی گئی ہے۔ تفصیلات کے لیے سیٹنگز دیکھیں۔',
+        'timestamp': FieldValue.serverTimestamp(),
+        'type': 'system',
+        'isRead': false,
+        'data': {'status': isApproved ? 'approved' : 'rejected'},
+      });
+    } catch (e) {
+      debugPrint('Failed to create verification notification: $e');
     }
   }
 }

@@ -13,8 +13,11 @@ import 'package:photo_view/photo_view_gallery.dart';
 import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/models/review_model.dart';
 import 'package:account_app/core/models/ad_report_model.dart';
+import 'package:account_app/core/models/order_model.dart';
+import 'package:account_app/features/inventory/chat_screen.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
+import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/app_filter_chip.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/theme/app_theme.dart';
@@ -44,6 +47,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   Map<String, String>? _sellerInfo;
   bool _isSellerVerified = false;
   bool _isLoadingSeller = false;
+  bool _showFullContact = false;
   List<Review> _reviews = [];
   bool _isLoadingReviews = false;
 
@@ -265,50 +269,104 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   }
 
   void _whatsappSeller() async {
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+
     if (_sellerInfo == null || _sellerInfo!['phone'] == null) {
       _showMissingInfoSnackBar();
       return;
     }
-    final phone = _sellerInfo!['phone']!;
-    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    final rawPhone = _sellerInfo!['phone']!;
+    if (rawPhone.trim().isEmpty) {
+      _showMissingInfoSnackBar();
+      return;
+    }
+
+    final phoneE164 = Formatters.normalizePhoneNumber(rawPhone);
+    if (phoneE164 == null) {
+      _showErrorSnackBar(
+          isUrdu ? 'فون نمبر درست نہیں ہے' : 'Invalid phone number');
+      return;
+    }
+
+    final phoneDigits = phoneE164.replaceAll('+', '');
+    final sanitizedTitle = Formatters.sanitizeText(widget.item.name);
     final message = isUrdu
-        ? "اسلام علیکم، مجھے آپ کی اس چیز میں دلچسپی ہے: ${widget.item.name}"
-        : "Salam, I am interested in your product: ${widget.item.name}";
-    final url =
-        'whatsapp://send?phone=$phone&text=${Uri.encodeComponent(message)}';
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
+        ? "اسلام علیکم، مجھے آپ کی اس چیز میں دلچسپی ہے: $sanitizedTitle"
+        : "Salam, I am interested in your product: $sanitizedTitle";
+
+    final uri = Uri.parse(
+        'https://wa.me/$phoneDigits?text=${Uri.encodeComponent(message)}');
+
+    if (await canLaunchUrl(uri)) {
+      await Provider.of<DatabaseService>(context, listen: false)
+          .logContactEvent(
+              itemId: widget.item.id,
+              action: 'whatsapp_seller',
+              targetPhone: phoneE164);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
       _showErrorSnackBar(isUrdu ? 'واٹس ایپ نہیں ملا' : 'WhatsApp not found');
     }
   }
 
   void _callSeller() async {
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+
     if (_sellerInfo == null || _sellerInfo!['phone'] == null) {
       _showMissingInfoSnackBar();
       return;
     }
-    final phone = _sellerInfo!['phone']!;
-    final url = 'tel:$phone';
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
+
+    if (!_showFullContact) {
+      final dbService = Provider.of<DatabaseService>(context, listen: false);
+      await dbService.logContactEvent(
+          itemId: widget.item.id, action: 'view_contact');
+      setState(() => _showFullContact = true);
+      return;
+    }
+
+    final rawPhone = _sellerInfo!['phone']!;
+    if (rawPhone.trim().isEmpty) {
+      _showMissingInfoSnackBar();
+      return;
+    }
+
+    final phoneE164 = Formatters.normalizePhoneNumber(rawPhone);
+    if (phoneE164 == null) {
+      _showErrorSnackBar(
+          isUrdu ? 'فون نمبر درست نہیں ہے' : 'Could not parse phone number');
+      return;
+    }
+
+    final telUri = Uri(scheme: 'tel', path: phoneE164);
+    if (await canLaunchUrl(telUri)) {
+      await Provider.of<DatabaseService>(context, listen: false)
+          .logContactEvent(
+              itemId: widget.item.id,
+              action: 'call_seller',
+              targetPhone: phoneE164);
+      await launchUrl(telUri);
     } else {
-      _showErrorSnackBar('Could not launch phone dialer');
+      _showErrorSnackBar(
+          isUrdu ? 'فون ڈائلر نہیں کھل سکا' : 'Could not launch phone dialer');
     }
   }
 
-  void _shareItem() {
+  void _shareItem() async {
     HapticFeedback.lightImpact();
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
     final dbService = Provider.of<DatabaseService>(context, listen: false);
 
     // Modernized link format for DeepLinkService
     final String url = 'https://accountapp.page.link/item/${widget.item.id}';
+    final sanitizedTitle = Formatters.sanitizeText(widget.item.name);
     final String message = isUrdu
-        ? "بازار پر یہ اشتہار دیکھیں: ${widget.item.name}\n$url"
-        : "Check out this ad on Bazaar: ${widget.item.name}\n$url";
+        ? "بازار پر یہ اشتہار دیکھیں: $sanitizedTitle\n$url"
+        : "Check out this ad on Bazaar: $sanitizedTitle\n$url";
 
     Share.share(message);
+    await dbService.logContactEvent(
+        itemId: widget.item.id, action: 'share_item');
     dbService.incrementShare(widget.item.id);
   }
 
@@ -334,6 +392,12 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
     final screenHeight = MediaQuery.of(context).size.height;
+
+    final itemName = Formatters.sanitizeText(widget.item.name);
+    final itemBrand = Formatters.sanitizeText(widget.item.brand ?? '');
+    final itemLocation = Formatters.sanitizeText(widget.item.location ?? '');
+    final itemDescription =
+        Formatters.sanitizeText(widget.item.description ?? '');
 
     return Scaffold(
       backgroundColor: AppTheme.darkColor,
@@ -368,17 +432,15 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    widget.item.name,
+                                    itemName,
                                     style: TextStyle(
                                       fontSize: isUrdu ? 30 : 24,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.white,
-                                      fontFamily:
-                                          _getFont(widget.item.name, isUrdu),
+                                      fontFamily: _getFont(itemName, isUrdu),
                                     ),
                                   ),
-                                  if (widget.item.brand != null &&
-                                      widget.item.brand!.isNotEmpty)
+                                  if (itemBrand.isNotEmpty)
                                     Container(
                                       margin: const EdgeInsets.only(top: 6),
                                       padding: const EdgeInsets.symmetric(
@@ -392,14 +454,14 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                                 .withValues(alpha: 0.1)),
                                       ),
                                       child: Text(
-                                        widget.item.brand!,
+                                        itemBrand,
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
                                           color: AppTheme.themeColor
                                               .withValues(alpha: 0.9),
-                                          fontFamily: _getFont(
-                                              widget.item.brand, isUrdu),
+                                          fontFamily:
+                                              _getFont(itemBrand, isUrdu),
                                         ),
                                       ),
                                     ),
@@ -507,12 +569,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                   value:
                                       '${widget.item.stockQuantity.toStringAsFixed(0)}${widget.item.unit.isNotEmpty ? " ${widget.item.unit}" : ""}',
                                   fontFamily: fontFamily),
-                            if (widget.item.location != null &&
-                                widget.item.location!.isNotEmpty)
+                            if (itemLocation.isNotEmpty)
                               _buildDetailChip(
                                   icon: PhosphorIcons.mapPin(),
                                   label: isUrdu ? 'جگہ: ' : 'Location: ',
-                                  value: widget.item.location!,
+                                  value: itemLocation,
                                   fontFamily: fontFamily),
                           ],
                         ),
@@ -536,12 +597,15 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                               border: Border.all(
                                   color: Colors.white.withValues(alpha: 0.1))),
                           child: Text(
-                            widget.item.description ?? '',
+                            Formatters.sanitizeText(
+                                widget.item.description ?? ''),
                             style: TextStyle(
                                 fontSize: isUrdu ? 18 : 15,
                                 color: Colors.white70,
-                                fontFamily:
-                                    _getFont(widget.item.description, isUrdu),
+                                fontFamily: _getFont(
+                                    Formatters.sanitizeText(
+                                        widget.item.description ?? ''),
+                                    isUrdu),
                                 height: 1.6),
                           ),
                         ),
@@ -1134,10 +1198,38 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                 icon: Icon(
                                     PhosphorIcons.phoneCall(
                                         PhosphorIconsStyle.fill),
-                                    color: Colors.white,
                                     size: 20),
-                                padding: const EdgeInsets.all(12)))
-                      ]))
+                                padding: const EdgeInsets.all(12))),
+                      ])),
+                  if (widget.item.accountId != FirebaseAuth.instance.currentUser?.uid) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          if (_sellerInfo != null) {
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => ChatScreen(
+                              otherUserId: _sellerInfo!['uid']!, 
+                              otherUserName: _sellerInfo!['name']!,
+                              otherUserImage: _sellerInfo!['photoUrl'],
+                            )));
+                          }
+                        },
+                        icon: Icon(PhosphorIcons.chatCircleDots(PhosphorIconsStyle.fill), size: 18),
+                        label: Text(
+                          isUrdu ? 'چیٹ کریں' : 'Chat Now',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.verifiedGold,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1158,6 +1250,31 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           child: const Center(
               child: CircularProgressIndicator(color: Colors.white)));
     if (_sellerInfo == null) return const SizedBox.shrink();
+
+    final phone = _sellerInfo!['phone'] ?? '';
+    final displayPhone = _showFullContact ? phone : Formatters.maskPhoneNumber(phone);
+    
+    // ================= ENTERPRISE REPUTATION LOGIC =================
+    String? reputation;
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    
+    final createdAtStr = _sellerInfo!['createdAt'] ?? '';
+    if (createdAtStr.isNotEmpty) {
+      final createdAt = DateTime.parse(createdAtStr);
+      final ageDays = DateTime.now().difference(createdAt).inDays;
+      
+      if (_isSellerVerified) {
+        reputation = isUrdu ? 'اعلیٰ درجے کا سیلر' : 'Top Rated Seller';
+      } else if (ageDays > 180) {
+        reputation = isUrdu ? 'پرانا اور قابل اعتماد' : 'Trusted Veteran';
+      } else if (ageDays > 30) {
+        reputation = isUrdu ? 'تجربہ کار سیلر' : 'Experienced Seller';
+      } else {
+        reputation = isUrdu ? 'نیا ممبر' : 'New Member';
+      }
+    }
+    // ==============================================================
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1169,28 +1286,39 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           Expanded(
             child: ProfileInfoWidget(
               name: _sellerInfo!['name'] ?? '',
-              phone: '',
+              phone: displayPhone,
               profileImage: _sellerInfo!['photoUrl'],
               isVerified: _isSellerVerified,
+              reputationLabel: reputation, // Display the Trust Level
               topLabel: isUrdu ? 'فروخت کنندہ' : 'Seller',
               isLarge: false,
               textColor: Colors.white,
               subtitleColor: Colors.white54,
             ),
           ),
-          TextButton(
-              onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => SellerItemsScreen(
-                          sellerUid: _sellerInfo!['uid']!,
-                          sellerName: _sellerInfo!['name']!,
-                          initialProfile: _sellerInfo))),
-              child: Text(isUrdu ? 'مصنوعات' : 'Products',
+          if (!_showFullContact)
+            TextButton(
+              onPressed: () => setState(() => _showFullContact = true),
+              child: Text(isUrdu ? 'نمبر دیکھیں' : 'Show Number',
                   style: TextStyle(
-                      color: AppTheme.themeColor,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: fontFamily))),
+                      color: AppTheme.verifiedGold,
+                      fontFamily: fontFamily,
+                      fontSize: 12)),
+            )
+          else
+            TextButton(
+                onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => SellerItemsScreen(
+                            sellerUid: _sellerInfo!['uid']!,
+                            sellerName: _sellerInfo!['name']!,
+                            initialProfile: _sellerInfo))),
+                child: Text(isUrdu ? 'مصنوعات' : 'Products',
+                    style: TextStyle(
+                        color: AppTheme.themeColor,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: fontFamily))),
         ],
       ),
     );

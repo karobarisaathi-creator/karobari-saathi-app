@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img_lib;
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:path_provider/path_provider.dart';
@@ -13,6 +14,7 @@ import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/ai_visual_service.dart';
+import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_filter_chip.dart';
@@ -63,6 +65,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
   bool _isUploading = false;
   double _uploadProgress = 0.0;
   bool _isAnalyzing = false;
+  bool _agreeToPrivacy = true; // Default true for now or force user to check
   final ImagePicker _picker = ImagePicker();
   final List<AppCategory> _categories = AppFilterChip.productCategories;
 
@@ -102,9 +105,12 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
           uiSettings: [AndroidUiSettings(toolbarTitle: isUrdu ? 'تصویر تراشیں' : 'Crop Image', toolbarColor: AppTheme.darkColor, toolbarWidgetColor: Colors.white)],
         );
         if (croppedFile != null) {
+          // ENTERPRISE: Strip Metadata/EXIF for Privacy
+          final cleanedFile = await _stripMetadata(File(croppedFile.path));
+          
           final directory = await getApplicationDocumentsDirectory();
           final fileName = 'item_${DateTime.now().millisecondsSinceEpoch}.jpg';
-          final permanentFile = await File(croppedFile.path).copy('${directory.path}/$fileName');
+          final permanentFile = await cleanedFile.copy('${directory.path}/$fileName');
           setState(() => _currentImages.add(permanentFile.path));
           
           // Trigger AI Analysis for the first image
@@ -113,6 +119,24 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
           }
         }
       }
+    }
+  }
+
+  /// Re-encodes the image to ensure all EXIF/GPS metadata is stripped.
+  Future<File> _stripMetadata(File file) async {
+    try {
+      final bytes = await file.readAsBytes();
+      final image = img_lib.decodeImage(bytes);
+      if (image == null) return file;
+
+      // Re-encode to JPG (this process discards old EXIF/GPS tags)
+      final strippedBytes = img_lib.encodeJpg(image, quality: 80);
+      final directory = await getTemporaryDirectory();
+      final tempFile = File('${directory.path}/clean_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      return await tempFile.writeAsBytes(strippedBytes);
+    } catch (e) {
+      debugPrint("Metadata strip error: $e");
+      return file; // Fallback to original on error
     }
   }
 
@@ -205,10 +229,29 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
   }
 
   Future<void> _handleSave() async {
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    
     if (_currentImages.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please add images')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isUrdu ? 'براہ کرم تصاویر شامل کریں' : 'Please add images')));
       return;
     }
+
+    if (!_agreeToPrivacy) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isUrdu ? 'براہ کرم پرائیویسی پالیسی سے اتفاق کریں' : 'Please agree to privacy policy')));
+      return;
+    }
+
+    final name = Formatters.sanitizeText(_formData['model'] ?? _formData['name'] ?? _formData['title'] ?? 'Untitled Item');
+    final desc = Formatters.sanitizeText(_commonDescController.text);
+
+    if (Formatters.containsProhibitedContent(name) || Formatters.containsProhibitedContent(desc)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(isUrdu ? 'اشتہار میں ممنوع الفاظ شامل ہیں۔ براہ کرم درست کریں۔' : 'Prohibited words detected. Please correct your ad.'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+
     setState(() => _isUploading = true);
     try {
       final dbService = Provider.of<DatabaseService>(context, listen: false);
@@ -226,10 +269,10 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
       
       final newItem = InventoryItem(
         id: widget.itemToEdit?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-        name: _formData['model'] ?? _formData['name'] ?? _formData['title'] ?? 'Untitled Item',
+        name: name,
         unit: _formData['unit'] ?? _formData['areaUnit'] ?? 'pcs',
         defaultRate: double.tryParse(_formData['price']?.toString() ?? '0') ?? 0,
-        description: _commonDescController.text,
+        description: desc,
         imagePaths: finalImagePaths,
         createdAt: widget.itemToEdit?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
@@ -389,10 +432,40 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
               _buildCategorySpecificForm(isUrdu, fontFamily),
               const SizedBox(height: 16),
               _buildCommonFields(isUrdu, fontFamily),
+              const SizedBox(height: 16),
+              _buildPrivacyConsent(isUrdu, fontFamily),
               const SizedBox(height: 100),
             ]))),
             _buildSaveButton(isUrdu, fontFamily),
           ]),
+    );
+  }
+
+  Widget _buildPrivacyConsent(bool isUrdu, String fontFamily) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _agreeToPrivacy ? Colors.transparent : Colors.red.withOpacity(0.5)),
+      ),
+      child: Row(
+        children: [
+          Checkbox(
+            value: _agreeToPrivacy,
+            onChanged: (v) => setState(() => _agreeToPrivacy = v ?? false),
+            activeColor: AppTheme.themeColor,
+          ),
+          Expanded(
+            child: Text(
+              isUrdu 
+                ? 'میں اس اشتہار کے لیے اپنا رابطہ نمبر شیئر کرنے سے اتفاق کرتا ہوں۔ (نمبر محفوظ طریقے سے صرف خریدار کو دکھایا جائے گا)'
+                : 'I agree to share my contact number for this ad. (Number will be securely shown only to buyers)',
+              style: TextStyle(fontFamily: isUrdu ? fontFamily : '', fontSize: 11, color: Colors.grey.shade700),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

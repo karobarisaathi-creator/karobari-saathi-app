@@ -27,6 +27,7 @@ import 'package:account_app/features/visual_finder/visual_finder_screen.dart';
 import 'item_detail_screen.dart';
 import 'add_inventory_item_screen.dart';
 import 'seller_items_screen.dart';
+import 'chat_list_screen.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
 
 class MarketplaceScreen extends StatefulWidget {
@@ -650,9 +651,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
       showBackButton: false,
       centerTitle: true,
       leading: IconButton(
-        icon: Icon(PhosphorIcons.shoppingBag(), color: Colors.white),
-        onPressed: () => _showCartDialog(isUrdu, fontFamily),
-        tooltip: isUrdu ? 'میری پسندیدہ مصنوعات' : 'My Favorites',
+        icon: Icon(PhosphorIcons.chatCircleDots(), color: Colors.white),
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ChatListScreen())),
+        tooltip: isUrdu ? 'میسجز' : 'Messages',
       ),
       actions: [
         // "My Ads" Button

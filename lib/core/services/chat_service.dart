@@ -1,220 +1,105 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:account_app/core/models/chat_model.dart';
+import '../models/chat_message_model.dart';
+import 'security_service.dart';
 
 class ChatService with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final SecurityService _securityService = SecurityService();
 
-  // Send message
-  Future<void> sendMessage(
-    ChatMessage message,
-    String targetPhoneNumber,
-  ) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
+  // Get current user ID
+  String get currentUserId => _auth.currentUser?.uid ?? '';
 
-    await _firestore
-        .collection('chats')
-        .doc(message.chatId)
-        .collection('messages')
-        .doc(message.id)
-        .set(message.toMap());
-
-    // Update last message in chat document
-    await _firestore.collection('chats').doc(message.chatId).set({
-      'lastMessage': message.message,
-      'lastMessageTime': message.timestamp,
-      'lastSenderId': message.senderId,
-      'participants': [user.uid, targetPhoneNumber],
-      'updatedAt': DateTime.now(),
-    }, SetOptions(merge: true));
-
-    // Send push notification to target user
-    await _sendPushNotification(message, targetPhoneNumber);
-    notifyListeners();
+  // Get or Create Chat Room ID (Deterministic)
+  String getChatRoomId(String otherUserId) {
+    List<String> ids = [currentUserId, otherUserId];
+    ids.sort(); // Ensure same ID regardless of who starts the chat
+    return ids.join('_');
   }
 
-  // Get chat messages
-  Stream<List<ChatMessage>> getChatMessagesStream(String chatId) {
+  // Send Message with End-to-End Encryption (simplified)
+  Future<void> sendMessage(String receiverId, String message) async {
+    if (message.trim().isEmpty) return;
+
+    final String chatRoomId = getChatRoomId(receiverId);
+    final timestamp = FieldValue.serverTimestamp();
+
+    // ENTERPRISE: Encrypt message content before sending to cloud
+    final encryptedMessage = _securityService.encryptData(message.trim());
+
+    // 1. Add message to the sub-collection
+    await _firestore
+        .collection('chat_rooms')
+        .doc(chatRoomId)
+        .collection('messages')
+        .add({
+      'senderId': currentUserId,
+      'receiverId': receiverId,
+      'message': encryptedMessage, // Encrypted content
+      'isEncrypted': true,
+      'timestamp': timestamp,
+      'isRead': false,
+    });
+
+    // 2. Update chat room metadata for the inbox list
+    await _firestore.collection('chat_rooms').doc(chatRoomId).set({
+      'lastMessage': '[Encrypted Message]', // Masked for list view
+      'lastMessageTime': timestamp,
+      'participants': [currentUserId, receiverId],
+      'unreadCount_$receiverId': FieldValue.increment(1),
+    }, SetOptions(merge: true));
+  }
+
+  // Stream Messages for a specific chat with Decryption
+  Stream<List<ChatMessage>> getMessages(String otherUserId) {
+    final String chatRoomId = getChatRoomId(otherUserId);
     return _firestore
-        .collection('chats')
-        .doc(chatId)
+        .collection('chat_rooms')
+        .doc(chatRoomId)
         .collection('messages')
         .orderBy('timestamp', descending: true)
         .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => ChatMessage.fromMap(doc.data()))
-              .toList(),
-        );
+        .map((snapshot) => snapshot.docs.map((doc) {
+              final data = doc.data();
+              String content = data['message'] ?? '';
+              
+              // ENTERPRISE: Decrypt if the flag is present
+              if (data['isEncrypted'] == true && content.isNotEmpty) {
+                try {
+                  content = _securityService.decryptData(content);
+                } catch (e) {
+                  content = '[Decryption Failed]';
+                }
+              }
+              
+              final decryptedData = Map<String, dynamic>.from(data);
+              decryptedData['message'] = content;
+              
+              return ChatMessage.fromMap(decryptedData, doc.id);
+            }).toList());
   }
 
-  Future<List<ChatMessage>> getChatMessages(String chatId) async {
-    final snapshot = await _firestore
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .orderBy('timestamp', descending: true)
-        .get();
-
-    return snapshot.docs.map((doc) => ChatMessage.fromMap(doc.data())).toList();
+  // Stream all active chats for the current user (Inbox)
+  Stream<List<Map<String, dynamic>>> getChatRooms() {
+    return _firestore
+        .collection('chat_rooms')
+        .where('participants', arrayContains: currentUserId)
+        .orderBy('lastMessageTime', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) {
+              final data = doc.data();
+              data['id'] = doc.id;
+              return data;
+            }).toList());
   }
 
   // Mark messages as read
-  Future<void> markMessagesAsRead(String chatId) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-
-    final snapshot = await _firestore
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .where('senderId', isNotEqualTo: user.uid)
-        .where('isRead', isEqualTo: false)
-        .get();
-
-    final batch = _firestore.batch();
-    for (var doc in snapshot.docs) {
-      batch.update(doc.reference, {'isRead': true});
-    }
-    await batch.commit();
-    notifyListeners();
-  }
-
-  // Get all chats for current user
-  Stream<List<Chat>> getChatsStream() {
-    final user = _auth.currentUser;
-    if (user == null) return const Stream.empty();
-
-    return _firestore
-        .collection('chats')
-        .where('participants', arrayContains: user.uid)
-        .orderBy('updatedAt', descending: true)
-        .snapshots()
-        .map(
-          (snapshot) =>
-              snapshot.docs.map((doc) => Chat.fromMap(doc.data())).toList(),
-        );
-  }
-
-  // Create new chat
-  Future<void> createChat(Chat chat) async {
-    await _firestore.collection('chats').doc(chat.id).set(chat.toMap());
-    notifyListeners();
-  }
-
-  // Delete chat
-  Future<void> deleteChat(String chatId) async {
-    // Delete all messages first
-    final messagesSnapshot = await _firestore
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .get();
-
-    final batch = _firestore.batch();
-    for (var doc in messagesSnapshot.docs) {
-      batch.delete(doc.reference);
-    }
-
-    // Delete chat document
-    batch.delete(_firestore.collection('chats').doc(chatId));
-
-    await batch.commit();
-    notifyListeners();
-  }
-
-  // Send push notification for new message
-  Future<void> _sendPushNotification(
-    ChatMessage message,
-    String targetPhoneNumber,
-  ) async {
-    // Find target user's FCM token
-    final usersSnapshot = await _firestore
-        .collection('users')
-        .where('phoneNumber', isEqualTo: targetPhoneNumber)
-        .get();
-
-    if (usersSnapshot.docs.isNotEmpty) {
-      final targetUser = usersSnapshot.docs.first;
-      final fcmToken = targetUser.data()['fcmToken'];
-
-      if (fcmToken != null) {
-        // Send notification via FCM
-        await _firestore.collection('notifications').add({
-          'to': fcmToken,
-          'notification': {'title': 'نیا پیغام', 'body': message.message},
-          'data': {
-            'type': 'chat_message',
-            'chatId': message.chatId,
-            'messageId': message.id,
-          },
-        });
-      }
-    }
-  }
-
-  // Get unread message count
-  Stream<int> getUnreadMessageCount(String chatId) {
-    final user = _auth.currentUser;
-    if (user == null) return Stream.value(0);
-
-    return _firestore
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .where('senderId', isNotEqualTo: user.uid)
-        .where('isRead', isEqualTo: false)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.length);
-  }
-
-  // Search messages
-  Future<List<ChatMessage>> searchMessages(String chatId, String query) async {
-    final snapshot = await _firestore
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .get();
-
-    return snapshot.docs
-        .map((doc) => ChatMessage.fromMap(doc.data()))
-        .where(
-          (message) =>
-              message.message.toLowerCase().contains(query.toLowerCase()),
-        )
-        .toList();
-  }
-
-  // Delete message
-  Future<void> deleteMessage(String chatId, String messageId) async {
-    await _firestore
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .doc(messageId)
-        .delete();
-    notifyListeners();
-  }
-
-  // Update message
-  Future<void> updateMessage(
-    String chatId,
-    String messageId,
-    String newText,
-  ) async {
-    await _firestore
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .doc(messageId)
-        .update({
-          'message': newText,
-          'isEdited': true,
-          'updatedAt': DateTime.now(),
-        });
-    notifyListeners();
+  Future<void> markAsRead(String otherUserId) async {
+    final String chatRoomId = getChatRoomId(otherUserId);
+    await _firestore.collection('chat_rooms').doc(chatRoomId).update({
+      'unreadCount_$currentUserId': 0,
+    });
   }
 }

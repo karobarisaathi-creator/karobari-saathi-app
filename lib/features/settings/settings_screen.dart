@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'admin_verification_screen.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/services/theme_service.dart';
 import 'package:account_app/core/services/language_service.dart';
@@ -46,6 +47,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _slogan;
   String? _storeName;
   String? _storeImage;
+  bool _isAdmin = false;
 
   @override
   void initState() {
@@ -54,12 +56,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadSettingsData() async {
-    final securityService = Provider.of<SecurityService>(context, listen: false);
+    final securityService =
+        Provider.of<SecurityService>(context, listen: false);
     final isEnabled = await securityService.isAppLockEnabled();
     final isBioEnabled = await securityService.isBiometricEnabled();
     final isHardwareAvailable = await securityService.isBiometricsAvailable();
     final packageInfo = await PackageInfo.fromPlatform();
-    
+
     // Fetch user profile extra data from Firestore
     String? address;
     String? slogan;
@@ -67,12 +70,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String? storeImage;
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       if (doc.exists) {
         address = doc.data()?['address'];
         slogan = doc.data()?['slogan'];
         storeName = doc.data()?['storeName'];
         storeImage = doc.data()?['storeImage'];
+        _isAdmin = VerificationService.canAccessAdminPanel(
+          userData: doc.data(),
+          uid: user.uid,
+          email: user.email,
+          phone: user.phoneNumber,
+        );
       }
     }
 
@@ -105,22 +117,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final dbService = Provider.of<DatabaseService>(context);
 
     final myAccount = dbService.getAccounts().firstWhere(
-      (a) => a.phone == (user?.phoneNumber ?? ''),
-      orElse: () => Account(
-        id: 'me',
-        name: user?.displayName ?? (isUrdu ? 'صارف' : 'User'),
-        phone: user?.phoneNumber ?? '',
-        profileImage: photoUrl,
-        category: isUrdu ? 'دکاندار' : 'Shopkeeper',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        initialBalance: 0,
-        balanceType: 'credit',
-        balance: 0,
-        isShared: false,
-        isActive: true,
-      ),
-    );
+          (a) => a.phone == (user?.phoneNumber ?? ''),
+          orElse: () => Account(
+            id: 'me',
+            name: user?.displayName ?? (isUrdu ? 'صارف' : 'User'),
+            phone: user?.phoneNumber ?? '',
+            profileImage: photoUrl,
+            category: isUrdu ? 'دکاندار' : 'Shopkeeper',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+            initialBalance: 0,
+            balanceType: 'credit',
+            balance: 0,
+            isShared: false,
+            isActive: true,
+          ),
+        );
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -140,7 +152,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.12), width: 1),
+                border: Border.all(
+                    color: Theme.of(context).dividerColor.withOpacity(0.12),
+                    width: 1),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.02),
@@ -153,8 +167,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   Expanded(
                     child: ProfileInfoWidget(
-                      name: user?.displayName ?? (isUrdu ? 'صارف کا نام' : 'User Name'),
-                      phone: user?.phoneNumber ?? (isUrdu ? 'معلومات دستیاب نہیں' : 'Info not available'),
+                      name: user?.displayName ??
+                          (isUrdu ? 'صارف کا نام' : 'User Name'),
+                      phone: user?.phoneNumber ??
+                          (isUrdu
+                              ? 'معلومات دستیاب نہیں'
+                              : 'Info not available'),
                       profileImage: photoUrl,
                       isLarge: true,
                       isVerified: myAccount.isVerified,
@@ -168,7 +186,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: Theme.of(context).dividerColor.withOpacity(0.05),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(PhosphorIcons.pencilSimple(PhosphorIconsStyle.bold), color: Theme.of(context).iconTheme.color, size: 14),
+                    child: Icon(
+                        PhosphorIcons.pencilSimple(PhosphorIconsStyle.bold),
+                        color: Theme.of(context).iconTheme.color,
+                        size: 14),
                   ),
                 ],
               ),
@@ -176,7 +197,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
 
           const SizedBox(height: 12),
-          
+
+          // Admin Panel
+          if (_isAdmin) _buildAdminTile(isUrdu, fontFamily),
+
+          const SizedBox(height: 12),
+
           // Verification Status Button
           Consumer<VerificationService>(
             builder: (context, vService, _) {
@@ -187,12 +213,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 12),
 
           // General Settings Section
-          _buildSectionHeader(isUrdu ? 'عمومی ترتیبات' : 'General Settings', fontFamily, isUrdu),
+          _buildSectionHeader(isUrdu ? 'عمومی ترتیبات' : 'General Settings',
+              fontFamily, isUrdu),
           Container(
             decoration: BoxDecoration(
               color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.12), width: 1),
+              border: Border.all(
+                  color: Theme.of(context).dividerColor.withOpacity(0.12),
+                  width: 1),
             ),
             child: Column(
               children: [
@@ -205,8 +234,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   trailing: Text(
                     isUrdu ? 'اردو' : 'English',
                     style: TextStyle(
-                      color: AppTheme.themeColor, 
-                      fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal, 
+                      color: AppTheme.themeColor,
+                      fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
                       fontFamily: fontFamily,
                       fontSize: 16, // سائز مزید بڑھا دیا گیا
                     ),
@@ -296,7 +325,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     builder: (context, dbService, child) {
                       final count = dbService.getInventoryItems().length;
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: AppTheme.themeColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
@@ -331,12 +361,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 24),
 
           // Data Management Section
-          _buildSectionHeader(isUrdu ? 'ڈیٹا مینجمنٹ' : 'Data Management', fontFamily, isUrdu),
+          _buildSectionHeader(
+              isUrdu ? 'ڈیٹا مینجمنٹ' : 'Data Management', fontFamily, isUrdu),
           Container(
             decoration: BoxDecoration(
               color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.12), width: 1),
+              border: Border.all(
+                  color: Theme.of(context).dividerColor.withOpacity(0.12),
+                  width: 1),
             ),
             child: Column(
               children: [
@@ -364,12 +397,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 24),
 
           // Application Section
-          _buildSectionHeader(isUrdu ? 'ایپلی کیشن' : 'Application', fontFamily, isUrdu),
+          _buildSectionHeader(
+              isUrdu ? 'ایپلی کیشن' : 'Application', fontFamily, isUrdu),
           Container(
             decoration: BoxDecoration(
               color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.12), width: 1),
+              border: Border.all(
+                  color: Theme.of(context).dividerColor.withOpacity(0.12),
+                  width: 1),
             ),
             child: Column(
               children: [
@@ -392,9 +428,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 _buildDivider(context),
                 _buildSettingItem(
-                  icon: PhosphorIcons.star(),
-                  title: isUrdu ? 'ایپ کو ریٹ کریں' : 'Rate App',
-                  onTap: () => _rateApp(context, isUrdu),
+                  icon: PhosphorIcons.shieldCheck(),
+                  title: isUrdu ? 'پرائیویسی اور شرائط' : 'Privacy & Terms',
+                  onTap: () => _showPrivacyPolicy(context, isUrdu, fontFamily),
                   fontFamily: fontFamily,
                   isUrdu: isUrdu,
                   context: context,
@@ -418,14 +454,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(PhosphorIcons.headset(), size: 32, color: Colors.green.shade700),
+                  Icon(PhosphorIcons.headset(),
+                      size: 32, color: Colors.green.shade700),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Text(
-                      isUrdu ? 'ہم آپ کی کیسے مدد کر سکتے ہیں؟' : 'How can we help you?',
+                      isUrdu
+                          ? 'ہم آپ کی کیسے مدد کر سکتے ہیں؟'
+                          : 'How can we help you?',
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
+                        fontWeight:
+                            isUrdu ? FontWeight.bold : FontWeight.normal,
                         color: Colors.green.shade900,
                         fontFamily: fontFamily,
                       ),
@@ -444,22 +484,110 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icon(PhosphorIcons.signOut(), color: Colors.red),
             label: Text(
               isUrdu ? 'لاگ آؤٹ' : 'Logout',
-              style: TextStyle(color: Colors.red, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal, fontFamily: fontFamily),
+              style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
+                  fontFamily: fontFamily),
             ),
           ),
           const SizedBox(height: 8),
           TextButton.icon(
             onPressed: () => _showDeactivateDialog(context, isUrdu),
-            icon: Icon(PhosphorIcons.userMinus(), color: Colors.red.withOpacity(0.7)),
+            icon: Icon(PhosphorIcons.userMinus(),
+                color: Colors.red.withOpacity(0.7)),
             label: Text(
               isUrdu ? 'اکاؤنٹ ختم کریں' : 'Deactivate Account',
-              style: TextStyle(color: Colors.red.withOpacity(0.7), fontSize: 13, fontFamily: fontFamily),
+              style: TextStyle(
+                  color: Colors.red.withOpacity(0.7),
+                  fontSize: 13,
+                  fontFamily: fontFamily),
             ),
           ),
           const SizedBox(height: 30),
         ],
       ),
     );
+  }
+
+  Widget _buildAdminTile(bool isUrdu, String fontFamily) {
+    final vService = Provider.of<VerificationService>(context, listen: false);
+
+    return StreamBuilder<List<Map<String, dynamic>>>(
+        stream: vService.getPendingRequests(),
+        builder: (context, snapshot) {
+          final int count = snapshot.data?.length ?? 0;
+
+          return Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [
+                AppTheme.darkColor,
+                AppTheme.darkColor.withOpacity(0.8)
+              ]),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                    color: AppTheme.darkColor.withOpacity(0.2), blurRadius: 8)
+              ],
+            ),
+            child: ListTile(
+              leading: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.admin_panel_settings,
+                      color: AppTheme.verifiedGold, size: 28),
+                  if (count > 0)
+                    Positioned(
+                      right: -4,
+                      top: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                            color: Colors.red, shape: BoxShape.circle),
+                        constraints:
+                            const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          '$count',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              title: Row(
+                children: [
+                  Text(
+                    isUrdu ? 'ایڈمن کنٹرول پینل' : 'Admin Control Panel',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: fontFamily),
+                  ),
+                ],
+              ),
+              subtitle: Text(
+                isUrdu
+                    ? 'تصدیق کی درخواستیں ہینڈل کریں'
+                    : 'Manage verification requests',
+                style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                    fontFamily: fontFamily),
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios,
+                  color: Colors.white, size: 14),
+              onTap: () {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const AdminVerificationScreen()));
+              },
+            ),
+          );
+        });
   }
 
   Widget _buildSectionHeader(String title, String fontFamily, bool isUrdu) {
@@ -477,7 +605,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildVerificationBadge(VerificationService service, bool isUrdu, String fontFamily) {
+  Widget _buildVerificationBadge(
+      VerificationService service, bool isUrdu, String fontFamily) {
     Color bgColor;
     String statusText;
     IconData icon;
@@ -486,7 +615,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     switch (service.currentStatus) {
       case VerificationStatus.approved:
         bgColor = Colors.green.shade50;
-        statusText = isUrdu ? 'آپ کا اکاؤنٹ تصدیق شدہ ہے' : 'Your account is verified';
+        statusText =
+            isUrdu ? 'آپ کا اکاؤنٹ تصدیق شدہ ہے' : 'Your account is verified';
         icon = Icons.verified;
         break;
       case VerificationStatus.pending:
@@ -496,35 +626,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
         break;
       case VerificationStatus.rejected:
         bgColor = Colors.red.shade50;
-        statusText = isUrdu ? 'درخواست مسترد کر دی گئی' : 'Verification rejected';
+        statusText = isUrdu
+            ? 'درخواست مسترد کر دی گئی${service.adminNote != null ? ': ${service.adminNote}' : ''}'
+            : 'Verification rejected${service.adminNote != null ? ': ${service.adminNote}' : ''}';
         icon = Icons.error_outline;
         showButton = true;
         break;
       default:
-        bgColor = AppTheme.themeColor.withOpacity(0.05);
-        statusText = isUrdu ? 'اکاؤنٹ تصدیق کروائیں' : 'Get your account verified';
-        icon = Icons.security;
+        bgColor = AppTheme.verifiedGold.withOpacity(0.05);
+        statusText =
+            isUrdu ? 'اکاؤنٹ تصدیق کروائیں' : 'Get your account verified';
+        icon = Icons.verified_user_outlined;
         showButton = true;
     }
 
     return InkWell(
-      onTap: showButton ? () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const VerificationRequestScreen()),
-        );
-      } : null,
+      onTap: showButton
+          ? () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const VerificationRequestScreen()),
+              );
+            }
+          : null,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.black.withOpacity(0.05)),
+          border: Border.all(color: AppTheme.verifiedGold.withOpacity(0.1)),
         ),
         child: Row(
           children: [
-            Icon(icon, color: bgColor == Colors.green.shade50 ? Colors.green : (bgColor == Colors.orange.shade50 ? Colors.orange : AppTheme.themeColor), size: 20),
+            Icon(icon,
+                color: service.currentStatus == VerificationStatus.approved
+                    ? Colors.green
+                    : (service.currentStatus == VerificationStatus.pending
+                        ? Colors.orange
+                        : AppTheme.verifiedGold),
+                size: 20),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -538,7 +680,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             if (showButton)
-              Icon(PhosphorIcons.caretRight(), size: 16, color: AppTheme.textSecondary),
+              Icon(PhosphorIcons.caretRight(),
+                  size: 16, color: AppTheme.textSecondary),
           ],
         ),
       ),
@@ -565,13 +708,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
         ),
       ),
-      trailing: trailing ?? Icon(PhosphorIcons.caretRight(), color: Theme.of(context).textTheme.bodySmall?.color, size: 18),
+      trailing: trailing ??
+          Icon(PhosphorIcons.caretRight(),
+              color: Theme.of(context).textTheme.bodySmall?.color, size: 18),
       onTap: onTap,
     );
   }
 
   Widget _buildDivider(BuildContext context) {
-    return Divider(height: 1, thickness: 0.5, color: Theme.of(context).dividerColor.withOpacity(0.12), indent: 50);
+    return Divider(
+        height: 1,
+        thickness: 0.5,
+        color: Theme.of(context).dividerColor.withOpacity(0.12),
+        indent: 50);
   }
 
   void _showEditProfileDialog(BuildContext context, bool isUrdu, User? user) {
@@ -594,12 +743,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           final currentUser = FirebaseAuth.instance.currentUser;
           return Container(
             padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom, 
-              left: 20, right: 20, top: 20
-            ),
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 20,
+                right: 20,
+                top: 20),
             decoration: BoxDecoration(
               color: Theme.of(context).cardColor,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(20)),
             ),
             child: SingleChildScrollView(
               child: Column(
@@ -620,16 +771,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                color: activeTab == 0 ? Colors.white : Colors.transparent,
+                                color: activeTab == 0
+                                    ? Colors.white
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(8),
-                                boxShadow: activeTab == 0 ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)] : null,
+                                boxShadow: activeTab == 0
+                                    ? [
+                                        BoxShadow(
+                                            color:
+                                                Colors.black.withOpacity(0.05),
+                                            blurRadius: 4)
+                                      ]
+                                    : null,
                               ),
                               child: Text(
                                 isUrdu ? 'ذاتی معلومات' : 'Personal',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: activeTab == 0 ? AppTheme.themeColor : Colors.grey,
+                                  color: activeTab == 0
+                                      ? AppTheme.themeColor
+                                      : Colors.grey,
                                   fontFamily: fontFamily,
                                 ),
                               ),
@@ -642,16 +804,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                color: activeTab == 1 ? Colors.white : Colors.transparent,
+                                color: activeTab == 1
+                                    ? Colors.white
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(8),
-                                boxShadow: activeTab == 1 ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)] : null,
+                                boxShadow: activeTab == 1
+                                    ? [
+                                        BoxShadow(
+                                            color:
+                                                Colors.black.withOpacity(0.05),
+                                            blurRadius: 4)
+                                      ]
+                                    : null,
                               ),
                               child: Text(
                                 isUrdu ? 'دکان کی معلومات' : 'Shop Info',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: activeTab == 1 ? AppTheme.themeColor : Colors.grey,
+                                  color: activeTab == 1
+                                      ? AppTheme.themeColor
+                                      : Colors.grey,
                                   fontFamily: fontFamily,
                                 ),
                               ),
@@ -675,7 +848,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                     const SizedBox(height: 20),
-                    _buildTextField(nameController, isUrdu ? 'آپ کا نام' : 'Full Name', PhosphorIcons.user()),
+                    _buildTextField(
+                        nameController,
+                        isUrdu ? 'آپ کا نام' : 'Full Name',
+                        PhosphorIcons.user()),
                   ] else ...[
                     // Shop Info Fields
                     _buildProfileImagePicker(
@@ -684,65 +860,98 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       isUrdu: isUrdu,
                       onTap: () async {
                         final img = await _pickAndCropImage(isUrdu);
-                        if (img != null) setModalState(() => localStoreImage = img);
+                        if (img != null)
+                          setModalState(() => localStoreImage = img);
                       },
                       icon: PhosphorIcons.storefront(),
                     ),
                     const SizedBox(height: 20),
-                    _buildTextField(storeNameController, isUrdu ? 'دکان کا نام' : 'Shop Name', PhosphorIcons.storefront()),
+                    _buildTextField(
+                        storeNameController,
+                        isUrdu ? 'دکان کا نام' : 'Shop Name',
+                        PhosphorIcons.storefront()),
                     const SizedBox(height: 16),
-                    _buildTextField(sloganController, isUrdu ? 'سلوگن' : 'Shop Slogan', PhosphorIcons.tag()),
+                    _buildTextField(sloganController,
+                        isUrdu ? 'سلوگن' : 'Shop Slogan', PhosphorIcons.tag()),
                     const SizedBox(height: 16),
-                    _buildTextField(addressController, isUrdu ? 'دکان کا پتہ' : 'Shop Address', PhosphorIcons.mapPin(), maxLines: 2),
+                    _buildTextField(
+                        addressController,
+                        isUrdu ? 'دکان کا پتہ' : 'Shop Address',
+                        PhosphorIcons.mapPin(),
+                        maxLines: 2),
                   ],
 
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: isUpdating ? null : () async {
-                        setModalState(() => isUpdating = true);
-                        try {
-                          String? finalPhotoUrl;
-                          String? finalStoreImageUrl;
+                      onPressed: isUpdating
+                          ? null
+                          : () async {
+                              setModalState(() => isUpdating = true);
+                              try {
+                                String? finalPhotoUrl;
+                                String? finalStoreImageUrl;
 
-                          if (localImage != null) {
-                            finalPhotoUrl = await _uploadToStorage(currentUser!.uid, localImage!, 'profile');
-                          }
-                          if (localStoreImage != null) {
-                            finalStoreImageUrl = await _uploadToStorage(currentUser!.uid, localStoreImage!, 'store');
-                          }
+                                if (localImage != null) {
+                                  finalPhotoUrl = await _uploadToStorage(
+                                      currentUser!.uid, localImage!, 'profile');
+                                }
+                                if (localStoreImage != null) {
+                                  finalStoreImageUrl = await _uploadToStorage(
+                                      currentUser!.uid,
+                                      localStoreImage!,
+                                      'store');
+                                }
 
-                          await Provider.of<AuthService>(context, listen: false).updateProfile(
-                            displayName: nameController.text.trim(),
-                            photoUrl: finalPhotoUrl,
-                            address: addressController.text.trim(),
-                            slogan: sloganController.text.trim(),
-                            storeName: storeNameController.text.trim(),
-                            storeImage: finalStoreImageUrl,
-                          );
+                                await Provider.of<AuthService>(context,
+                                        listen: false)
+                                    .updateProfile(
+                                  displayName: nameController.text.trim(),
+                                  photoUrl: finalPhotoUrl,
+                                  address: addressController.text.trim(),
+                                  slogan: sloganController.text.trim(),
+                                  storeName: storeNameController.text.trim(),
+                                  storeImage: finalStoreImageUrl,
+                                );
 
-                          await currentUser?.reload();
-                          if (mounted) {
-                            _loadSettingsData();
-                            Navigator.pop(context);
-                            _showSnackBar(context, isUrdu ? 'پروفائل اپڈیٹ ہوگئی' : 'Profile updated successfully', isUrdu);
-                          }
-                        } catch (e) {
-                          if (mounted) _showSnackBar(context, 'Error: $e', isUrdu, isError: true);
-                        } finally {
-                          if (mounted) setModalState(() => isUpdating = false);
-                        }
-                      },
+                                await currentUser?.reload();
+                                if (mounted) {
+                                  _loadSettingsData();
+                                  Navigator.pop(context);
+                                  _showSnackBar(
+                                      context,
+                                      isUrdu
+                                          ? 'پروفائل اپڈیٹ ہوگئی'
+                                          : 'Profile updated successfully',
+                                      isUrdu);
+                                }
+                              } catch (e) {
+                                if (mounted)
+                                  _showSnackBar(context, 'Error: $e', isUrdu,
+                                      isError: true);
+                              } finally {
+                                if (mounted)
+                                  setModalState(() => isUpdating = false);
+                              }
+                            },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.themeColor,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: isUpdating 
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : Text(isUrdu ? 'محفوظ کریں' : 'Save Changes', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold)),
+                      child: isUpdating
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2))
+                          : Text(isUrdu ? 'محفوظ کریں' : 'Save Changes',
+                              style: TextStyle(
+                                  fontFamily: fontFamily,
+                                  fontWeight: FontWeight.bold)),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -755,7 +964,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildProfileImagePicker({File? localImage, String? currentUrl, required bool isUrdu, required VoidCallback onTap, IconData? icon}) {
+  Widget _buildProfileImagePicker(
+      {File? localImage,
+      String? currentUrl,
+      required bool isUrdu,
+      required VoidCallback onTap,
+      IconData? icon}) {
     return GestureDetector(
       onTap: onTap,
       child: Stack(
@@ -765,7 +979,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.themeColor.withOpacity(0.2), width: 1),
+              border: Border.all(
+                  color: AppTheme.themeColor.withOpacity(0.2), width: 1),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(14),
@@ -779,10 +994,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ? CachedNetworkImage(
                             imageUrl: currentUrl,
                             fit: BoxFit.cover,
-                            placeholder: (context, url) => const _ShimmerBox(width: 100, height: 100),
-                            errorWidget: (context, url, error) => Icon(icon ?? PhosphorIcons.user(), size: 40, color: Colors.grey),
+                            placeholder: (context, url) =>
+                                const _ShimmerBox(width: 100, height: 100),
+                            errorWidget: (context, url, error) => Icon(
+                                icon ?? PhosphorIcons.user(),
+                                size: 40,
+                                color: Colors.grey),
                           )
-                        : Icon(icon ?? PhosphorIcons.user(), size: 40, color: Colors.grey)),
+                        : Icon(icon ?? PhosphorIcons.user(),
+                            size: 40, color: Colors.grey)),
               ),
             ),
           ),
@@ -796,7 +1016,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
               ),
-              child: Icon(PhosphorIcons.camera(PhosphorIconsStyle.bold), color: Colors.white, size: 16),
+              child: Icon(PhosphorIcons.camera(PhosphorIconsStyle.bold),
+                  color: Colors.white, size: 16),
             ),
           ),
         ],
@@ -804,7 +1025,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {int maxLines = 1}) {
+  Widget _buildTextField(
+      TextEditingController controller, String label, IconData icon,
+      {int maxLines = 1}) {
     return TextField(
       controller: controller,
       maxLines: maxLines,
@@ -812,14 +1035,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         labelText: label,
         prefixIcon: Icon(icon, size: 20),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
     );
   }
 
   Future<File?> _pickAndCropImage(bool isUrdu) async {
     final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    final image =
+        await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
     if (image == null) return null;
 
     final croppedFile = await ImageCropper().cropImage(
@@ -840,7 +1065,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<String?> _uploadToStorage(String uid, File file, String type) async {
     try {
-      final ref = FirebaseStorage.instance.ref().child('user_uploads').child('${uid}_$type.jpg');
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('user_uploads')
+          .child('${uid}_$type.jpg');
       await ref.putFile(file);
       return await ref.getDownloadURL();
     } catch (e) {
@@ -858,28 +1086,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Text(
           isUrdu ? 'لاگ آؤٹ کریں؟' : 'Logout?',
-          style: TextStyle(fontFamily: fontFamily, color: AppTheme.expenseColor, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
+          style: TextStyle(
+              fontFamily: fontFamily,
+              color: AppTheme.expenseColor,
+              fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
         ),
         content: Text(
-          isUrdu ? 'کیا آپ واقعی لاگ آؤٹ کرنا چاہتے ہیں؟' : 'Are you sure you want to logout?',
-          style: TextStyle(fontFamily: fontFamily, color: AppTheme.darkColor, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
+          isUrdu
+              ? 'کیا آپ واقعی لاگ آؤٹ کرنا چاہتے ہیں؟'
+              : 'Are you sure you want to logout?',
+          style: TextStyle(
+              fontFamily: fontFamily,
+              color: AppTheme.darkColor,
+              fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: Text(isUrdu ? 'منسوخ' : 'Cancel', style: TextStyle(fontFamily: fontFamily, color: AppTheme.textSecondary, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+            child: Text(isUrdu ? 'منسوخ' : 'Cancel',
+                style: TextStyle(
+                    fontFamily: fontFamily,
+                    color: AppTheme.textSecondary,
+                    fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
           ),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
               try {
-                await Provider.of<AuthService>(context, listen: false).signOut(context);
+                await Provider.of<AuthService>(context, listen: false)
+                    .signOut(context);
               } catch (e) {
-                if (mounted) _showSnackBar(context, '${isUrdu ? 'خرابی:' : 'Error:'} $e', isUrdu, isError: true);
+                if (mounted)
+                  _showSnackBar(
+                      context, '${isUrdu ? 'خرابی:' : 'Error:'} $e', isUrdu,
+                      isError: true);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.expenseColor, foregroundColor: Colors.white),
-            child: Text(isUrdu ? 'لاگ آؤٹ' : 'Logout', style: TextStyle(fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.expenseColor,
+                foregroundColor: Colors.white),
+            child: Text(isUrdu ? 'لاگ آؤٹ' : 'Logout',
+                style: TextStyle(
+                    fontFamily: fontFamily,
+                    fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
           ),
         ],
       ),
@@ -895,38 +1144,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Text(
           isUrdu ? 'اکاؤنٹ غیر فعال کریں؟' : 'Deactivate Account?',
-          style: TextStyle(fontFamily: fontFamily, color: AppTheme.expenseColor, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
+          style: TextStyle(
+              fontFamily: fontFamily,
+              color: AppTheme.expenseColor,
+              fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
         ),
         content: Text(
-          isUrdu 
-            ? 'اس سے آپ کا اکاؤنٹ اور ڈیٹا عارضی طور پر غیر فعال ہو جائے گا۔ آپ دوبارہ لاگ ان کر کے اسے بحال کر سکتے ہیں۔'
-            : 'This will temporarily disable your account and data. You can reactivate it by logging in again.',
-          style: TextStyle(fontFamily: fontFamily, color: AppTheme.darkColor, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
+          isUrdu
+              ? 'اس سے آپ کا اکاؤنٹ اور ڈیٹا عارضی طور پر غیر فعال ہو جائے گا۔ آپ دوبارہ لاگ ان کر کے اسے بحال کر سکتے ہیں۔'
+              : 'This will temporarily disable your account and data. You can reactivate it by logging in again.',
+          style: TextStyle(
+              fontFamily: fontFamily,
+              color: AppTheme.darkColor,
+              fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: Text(isUrdu ? 'منسوخ' : 'Cancel', style: TextStyle(fontFamily: fontFamily, color: AppTheme.textSecondary, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+            child: Text(isUrdu ? 'منسوخ' : 'Cancel',
+                style: TextStyle(
+                    fontFamily: fontFamily,
+                    color: AppTheme.textSecondary,
+                    fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
           ),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
               try {
-                  final authService = Provider.of<AuthService>(parentContext, listen: false);
-                  await authService.deactivateAccount(parentContext);
+                final authService =
+                    Provider.of<AuthService>(parentContext, listen: false);
+                await authService.deactivateAccount(parentContext);
               } catch (e) {
-                  if (mounted) _showSnackBar(parentContext, '${isUrdu ? 'خرابی:' : 'Error:'} $e', isUrdu, isError: true);
+                if (mounted)
+                  _showSnackBar(parentContext,
+                      '${isUrdu ? 'خرابی:' : 'Error:'} $e', isUrdu,
+                      isError: true);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.expenseColor, foregroundColor: Colors.white),
-            child: Text(isUrdu ? 'تصدیق' : 'Confirm', style: TextStyle(fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.expenseColor,
+                foregroundColor: Colors.white),
+            child: Text(isUrdu ? 'تصدیق' : 'Confirm',
+                style: TextStyle(
+                    fontFamily: fontFamily,
+                    fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
           ),
         ],
       ),
     );
   }
 
-  void _showLanguageDialog(BuildContext context, LanguageService languageService) {
+  void _showLanguageDialog(
+      BuildContext context, LanguageService languageService) {
     final isUrdu = languageService.isUrdu;
 
     showDialog(
@@ -936,13 +1205,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Text(
           isUrdu ? 'زبان منتخب کریں' : 'Select Language',
-          style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '', color: AppTheme.darkColor, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
+          style: TextStyle(
+              fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+              color: AppTheme.darkColor,
+              fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             RadioListTile<String>(
-              title: const Text('اردو', style: TextStyle(fontFamily: 'NooriNastaleeq', fontSize: 18)),
+              title: const Text('اردو',
+                  style: TextStyle(fontFamily: 'NooriNastaleeq', fontSize: 18)),
               value: 'ur',
               groupValue: languageService.currentLocale.languageCode,
               activeColor: AppTheme.themeColor,
@@ -968,12 +1241,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _toggleAppLock(BuildContext context, bool isUrdu) async {
-    final securityService = Provider.of<SecurityService>(context, listen: false);
+    final securityService =
+        Provider.of<SecurityService>(context, listen: false);
 
     if (_isAppLockEnabled) {
       await securityService.setAppLockEnabled(false);
       setState(() => _isAppLockEnabled = false);
-      if (mounted) _showSnackBar(context, isUrdu ? 'ایپ لاک غیر فعال کر دیا گیا' : 'App Lock disabled', isUrdu);
+      if (mounted)
+        _showSnackBar(
+            context,
+            isUrdu ? 'ایپ لاک غیر فعال کر دیا گیا' : 'App Lock disabled',
+            isUrdu);
     } else {
       final result = await Navigator.push(
         context,
@@ -987,7 +1265,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         setState(() => _isAppLockEnabled = isEnabled);
 
         if (isEnabled && mounted) {
-          _showSnackBar(context, isUrdu ? 'ایپ لاک فعال کر دیا گیا' : 'App Lock enabled', isUrdu);
+          _showSnackBar(context,
+              isUrdu ? 'ایپ لاک فعال کر دیا گیا' : 'App Lock enabled', isUrdu);
         }
       }
     }
@@ -1002,12 +1281,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     if (result == true && mounted) {
-      _showSnackBar(context, isUrdu ? 'پن کوڈ کامیابی سے تبدیل ہو گیا' : 'PIN changed successfully', isUrdu);
+      _showSnackBar(
+          context,
+          isUrdu
+              ? 'پن کوڈ کامیابی سے تبدیل ہو گیا'
+              : 'PIN changed successfully',
+          isUrdu);
     }
   }
 
   Future<void> _toggleBiometric(BuildContext context, bool isUrdu) async {
-    final securityService = Provider.of<SecurityService>(context, listen: false);
+    final securityService =
+        Provider.of<SecurityService>(context, listen: false);
 
     if (!_isBiometricEnabled) {
       final available = await securityService.isBiometricsAvailable();
@@ -1015,7 +1300,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (mounted) {
           _showSnackBar(
             context,
-            isUrdu ? 'اس ڈیوائس پر بائیو میٹرک دستیاب نہیں' : 'Biometrics not available',
+            isUrdu
+                ? 'اس ڈیوائس پر بائیو میٹرک دستیاب نہیں'
+                : 'Biometrics not available',
             isUrdu,
             isError: true,
           );
@@ -1035,11 +1322,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       await syncService.syncAllDataToCloud();
       if (mounted) {
-        _showSnackBar(context, isUrdu ? 'ڈیٹا سینک ہوگیا' : 'Data synced successfully', isUrdu);
+        _showSnackBar(context,
+            isUrdu ? 'ڈیٹا سینک ہوگیا' : 'Data synced successfully', isUrdu);
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar(context, '${isUrdu ? 'خرابی:' : 'Error:'} $e', isUrdu, isError: true);
+        _showSnackBar(context, '${isUrdu ? 'خرابی:' : 'Error:'} $e', isUrdu,
+            isError: true);
       }
     }
   }
@@ -1052,7 +1341,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Text(
           isUrdu ? 'ڈیٹا ایکسپورٹ کریں' : 'Export Data',
-          style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '', color: AppTheme.darkColor, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
+          style: TextStyle(
+              fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+              color: AppTheme.darkColor,
+              fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1062,10 +1354,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: PhosphorIcons.filePdf(),
               onPressed: () async {
                 Navigator.pop(dialogContext);
-                _showSnackBar(context, isUrdu ? 'پی ڈی ایف بن رہی ہے...' : 'Generating PDF...', isUrdu);
-                final pdfService = Provider.of<PdfService>(context, listen: false);
-                final databaseService = Provider.of<DatabaseService>(context, listen: false);
-                await pdfService.generateAllAccountsReport(databaseService.accounts, databaseService.transactions, isUrdu);
+                _showSnackBar(
+                    context,
+                    isUrdu ? 'پی ڈی ایف بن رہی ہے...' : 'Generating PDF...',
+                    isUrdu);
+                final pdfService =
+                    Provider.of<PdfService>(context, listen: false);
+                final databaseService =
+                    Provider.of<DatabaseService>(context, listen: false);
+                await pdfService.generateAllAccountsReport(
+                    databaseService.accounts,
+                    databaseService.transactions,
+                    isUrdu);
               },
             ),
             const SizedBox(height: 12),
@@ -1074,10 +1374,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: PhosphorIcons.fileCsv(),
               onPressed: () async {
                 Navigator.pop(dialogContext);
-                _showSnackBar(context, isUrdu ? 'ایکسل فائل بن رہی ہے...' : 'Generating Excel/CSV...', isUrdu);
-                final excelService = Provider.of<ExcelService>(context, listen: false);
-                final databaseService = Provider.of<DatabaseService>(context, listen: false);
-                await excelService.generateAndShareAllAccountsCsv(databaseService.accounts, isUrdu);
+                _showSnackBar(
+                    context,
+                    isUrdu
+                        ? 'ایکسل فائل بن رہی ہے...'
+                        : 'Generating Excel/CSV...',
+                    isUrdu);
+                final excelService =
+                    Provider.of<ExcelService>(context, listen: false);
+                final databaseService =
+                    Provider.of<DatabaseService>(context, listen: false);
+                await excelService.generateAndShareAllAccountsCsv(
+                    databaseService.accounts, isUrdu);
               },
             ),
           ],
@@ -1086,7 +1394,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildExportButton({required String title, required IconData icon, required VoidCallback onPressed}) {
+  Widget _buildExportButton(
+      {required String title,
+      required IconData icon,
+      required VoidCallback onPressed}) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
@@ -1097,7 +1408,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           backgroundColor: AppTheme.darkColor,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
     );
@@ -1109,7 +1421,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (dialogContext) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(isUrdu ? 'بیک اپ اور بحالی' : 'Backup & Restore', style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '', fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+        title: Text(isUrdu ? 'بیک اپ اور بحالی' : 'Backup & Restore',
+            style: TextStyle(
+                fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+                fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1118,8 +1433,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: PhosphorIcons.cloudArrowUp(),
               onPressed: () async {
                 Navigator.pop(dialogContext);
-                await Provider.of<BackupService>(context, listen: false).createBackup();
-                if (mounted) _showSnackBar(context, isUrdu ? 'بیک اپ مکمل ہو گیا' : 'Backup completed successfully', isUrdu);
+                await Provider.of<BackupService>(context, listen: false)
+                    .createBackup();
+                if (mounted)
+                  _showSnackBar(
+                      context,
+                      isUrdu
+                          ? 'بیک اپ مکمل ہو گیا'
+                          : 'Backup completed successfully',
+                      isUrdu);
               },
             ),
             const SizedBox(height: 12),
@@ -1128,8 +1450,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: PhosphorIcons.cloudArrowDown(),
               onPressed: () async {
                 Navigator.pop(dialogContext);
-                await Provider.of<BackupService>(context, listen: false).restoreBackup();
-                if (mounted) _showSnackBar(context, isUrdu ? 'ڈیٹا کامیابی سے بحال ہو گیا' : 'Data restored successfully', isUrdu);
+                await Provider.of<BackupService>(context, listen: false)
+                    .restoreBackup();
+                if (mounted)
+                  _showSnackBar(
+                      context,
+                      isUrdu
+                          ? 'ڈیٹا کامیابی سے بحال ہو گیا'
+                          : 'Data restored successfully',
+                      isUrdu);
               },
             ),
           ],
@@ -1138,7 +1467,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showAboutAppDialog(BuildContext context, bool isUrdu, String fontFamily) {
+  void _showAboutAppDialog(
+      BuildContext context, bool isUrdu, String fontFamily) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -1153,7 +1483,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.symmetric(vertical: 24),
               decoration: BoxDecoration(
                 color: AppTheme.themeColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(12)),
               ),
               child: Center(
                 child: Column(
@@ -1161,7 +1492,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2), // ہلکا تھیم کلر بیک گراؤنڈ کے لیے
+                        color: Colors.white.withOpacity(
+                            0.2), // ہلکا تھیم کلر بیک گراؤنڈ کے لیے
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
@@ -1173,14 +1505,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       child: ClipOval(
                         child: Container(
-                          color: AppTheme.darkColor, // سفید لوگو کے لیے گہرا بیک گراؤنڈ
+                          color: AppTheme
+                              .darkColor, // سفید لوگو کے لیے گہرا بیک گراؤنڈ
                           padding: const EdgeInsets.all(8),
                           child: Image.asset(
                             'assets/images/icons/zalooq.png',
                             width: 80,
                             height: 80,
                             fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => Icon(PhosphorIcons.wallet(PhosphorIconsStyle.fill), color: Colors.white, size: 48),
+                            errorBuilder: (context, error, stackTrace) => Icon(
+                                PhosphorIcons.wallet(PhosphorIconsStyle.fill),
+                                color: Colors.white,
+                                size: 48),
                           ),
                         ),
                       ),
@@ -1214,7 +1550,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildAboutItem(
                     icon: PhosphorIcons.shieldCheck(),
                     title: isUrdu ? 'محفوظ ڈیٹا' : 'Secure Data',
-                    subtitle: isUrdu ? 'آپ کا ڈیٹا مکمل طور پر محفوظ ہے' : 'Your data is completely secure',
+                    subtitle: isUrdu
+                        ? 'آپ کا ڈیٹا مکمل طور پر محفوظ ہے'
+                        : 'Your data is completely secure',
                     isUrdu: isUrdu,
                     fontFamily: fontFamily,
                   ),
@@ -1222,7 +1560,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildAboutItem(
                     icon: PhosphorIcons.cloudArrowUp(),
                     title: isUrdu ? 'آٹو کلاؤڈ سنک' : 'Auto Cloud Sync',
-                    subtitle: isUrdu ? 'آن لائن بیک اپ کی سہولت' : 'Online backup facility',
+                    subtitle: isUrdu
+                        ? 'آن لائن بیک اپ کی سہولت'
+                        : 'Online backup facility',
                     isUrdu: isUrdu,
                     fontFamily: fontFamily,
                   ),
@@ -1246,9 +1586,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onPressed: () => Navigator.pop(dialogContext),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.themeColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: Text(isUrdu ? 'بند کریں' : 'Close', style: TextStyle(fontFamily: fontFamily, color: Colors.white)),
+                  child: Text(isUrdu ? 'بند کریں' : 'Close',
+                      style: TextStyle(
+                          fontFamily: fontFamily, color: Colors.white)),
                 ),
               ),
             ),
@@ -1296,10 +1639,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showPrivacyPolicy(BuildContext context, bool isUrdu, String fontFamily) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(isUrdu ? 'پرائیویسی پالیسی' : 'Privacy Policy', style: TextStyle(fontFamily: fontFamily)),
+        content: SingleChildScrollView(
+          child: Text(
+            isUrdu 
+              ? 'ہم آپ کی پرائیویسی کا احترام کرتے ہیں۔ آپ کا فون نمبر صرف تصدیق شدہ خریداروں کو دکھایا جائے گا اور آپ کا ڈیٹا محفوظ رہے گا۔\n\n1. ڈیٹا کا استعمال: صرف اشتہار کی سہولت کے لیے۔\n2. نمبر ماسکنگ: عوامی طور پر آپ کا مکمل نمبر نہیں دکھایا جائے گا۔\n3. رضامندی: اشتہار پوسٹ کر کے آپ نمبر شیئر کرنے کی اجازت دیتے ہیں۔'
+              : 'We respect your privacy. Your phone number will only be shown to verified buyers and your data remains secure.\n\n1. Data Usage: Only for advertisement purposes.\n2. Number Masking: Your full number will not be shown publicly.\n3. Consent: By posting an ad, you agree to share your contact info.',
+            style: TextStyle(fontFamily: isUrdu ? fontFamily : '', fontSize: 14),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(isUrdu ? 'بند کریں' : 'Close', style: TextStyle(fontFamily: fontFamily))),
+        ],
+      ),
+    );
+  }
+
   void _contactUs(BuildContext context, bool isUrdu) async {
     final Uri emailLaunchUri = Uri(
       scheme: 'mailto',
-      path: 'zalooq.tech@gmail.com',
+      path: 'karobarisaathi@gmail.com',
       query: 'subject=Support Request&body=Hello Support Team,',
     );
     try {
@@ -1307,12 +1671,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         await launchUrl(emailLaunchUri, mode: LaunchMode.externalApplication);
       } else {
         if (mounted) {
-          _showSnackBar(
-            context, 
-            isUrdu ? 'ای میل ایپ نہیں ملی' : 'No email app found', 
-            isUrdu, 
-            isError: true
-          );
+          _showSnackBar(context,
+              isUrdu ? 'ای میل ایپ نہیں ملی' : 'No email app found', isUrdu,
+              isError: true);
         }
       }
     } catch (e) {
@@ -1324,8 +1685,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _shareApp(BuildContext context, bool isUrdu) {
     Share.share(isUrdu
-      ? 'کاروباری ساتھی ایپ استعمال کریں: https://play.google.com/store/apps/details?id=com.accountapp'
-      : 'Use Karobari Saathi app: https://play.google.com/store/apps/details?id=com.accountapp');
+        ? 'کاروباری ساتھی ایپ استعمال کریں: https://play.google.com/store/apps/details?id=com.accountapp'
+        : 'Use Karobari Saathi app: https://play.google.com/store/apps/details?id=com.accountapp');
   }
 
   void _rateApp(BuildContext context, bool isUrdu) async {
@@ -1335,10 +1696,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  void _showSnackBar(BuildContext context, String message, bool isUrdu, {bool isError = false}) {
+  void _showSnackBar(BuildContext context, String message, bool isUrdu,
+      {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '', fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+        content: Text(message,
+            style: TextStyle(
+                fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+                fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
         backgroundColor: isError ? AppTheme.expenseColor : AppTheme.darkColor,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1357,7 +1722,8 @@ class _ShimmerBox extends StatefulWidget {
   _ShimmerBoxState createState() => _ShimmerBoxState();
 }
 
-class _ShimmerBoxState extends State<_ShimmerBox> with SingleTickerProviderStateMixin {
+class _ShimmerBoxState extends State<_ShimmerBox>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override

@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/database_service.dart';
+import 'package:account_app/core/utils/formatters.dart';
 
 enum ProductCardView { grid, list, horizontal }
 
@@ -65,13 +66,14 @@ class _ProductCardState extends State<ProductCard> {
   Future<void> _loadSellerStats() async {
     if (widget.item.accountId == null) return;
     final dbService = Provider.of<DatabaseService>(context, listen: false);
-    final profile = await dbService.findPublicProfileByUid(widget.item.accountId!);
+    final profile =
+        await dbService.findPublicProfileByUid(widget.item.accountId!);
     if (profile != null && mounted) {
       setState(() {
         _sellerProfileName = profile['storeName']?.isNotEmpty == true
             ? profile['storeName']
             : profile['name'];
-        _isSellerVerified = profile['isVerified'] == true || profile['isVerified'] == 'true';
+        // Note: isSellerVerified is now used directly from the item model for performance
         if (profile['createdAt'] != null && profile['createdAt']!.isNotEmpty) {
           final date = DateTime.parse(profile['createdAt']!);
           final diff = DateTime.now().difference(date).inDays;
@@ -97,11 +99,11 @@ class _ProductCardState extends State<ProductCard> {
 
   Future<void> _extractColor() async {
     if (widget.item.imagePaths.isEmpty) return;
-    
+
     try {
       final String path = widget.item.imagePaths.first;
       ImageProvider imageProvider;
-      
+
       if (path.startsWith('http')) {
         imageProvider = CachedNetworkImageProvider(path);
       } else {
@@ -115,7 +117,8 @@ class _ProductCardState extends State<ProductCard> {
 
       if (mounted) {
         setState(() {
-          _dynamicColor = palette.vibrantColor?.color ?? palette.dominantColor?.color;
+          _dynamicColor =
+              palette.vibrantColor?.color ?? palette.dominantColor?.color;
         });
       }
     } catch (e) {
@@ -124,17 +127,19 @@ class _ProductCardState extends State<ProductCard> {
   }
 
   String? _calculateDistance() {
-    if (widget.userPosition == null || widget.item.latitude == null || widget.item.longitude == null) {
+    if (widget.userPosition == null ||
+        widget.item.latitude == null ||
+        widget.item.longitude == null) {
       return null;
     }
-    
+
     final double distanceInMeters = Geolocator.distanceBetween(
       widget.userPosition!.latitude,
       widget.userPosition!.longitude,
       widget.item.latitude!,
       widget.item.longitude!,
     );
-    
+
     if (distanceInMeters < 1000) {
       return "${distanceInMeters.toStringAsFixed(0)}m";
     } else {
@@ -173,10 +178,9 @@ class _ProductCardState extends State<ProductCard> {
           border: Border.all(color: borderColor, width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.4), 
-              blurRadius: 10, 
-              offset: const Offset(0, 4)
-            ),
+                color: Colors.black.withOpacity(0.4),
+                blurRadius: 10,
+                offset: const Offset(0, 4)),
           ],
         ),
         child: Column(
@@ -185,11 +189,14 @@ class _ProductCardState extends State<ProductCard> {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(11)),
                   child: SizedBox(
                     height: 125,
                     width: double.infinity,
-                    child: _buildImage(widget.item.imagePaths.isNotEmpty ? widget.item.imagePaths.first : null),
+                    child: _buildImage(widget.item.imagePaths.isNotEmpty
+                        ? widget.item.imagePaths.first
+                        : null),
                   ),
                 ),
                 if (widget.isMyItem && widget.onDelete != null)
@@ -200,8 +207,11 @@ class _ProductCardState extends State<ProductCard> {
                       onTap: widget.onDelete,
                       child: Container(
                         padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(color: Colors.red.withOpacity(0.8), shape: BoxShape.circle),
-                        child: Icon(PhosphorIcons.trash(), size: 16, color: Colors.white),
+                        decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.8),
+                            shape: BoxShape.circle),
+                        child: Icon(PhosphorIcons.trash(),
+                            size: 16, color: Colors.white),
                       ),
                     ),
                   ),
@@ -213,8 +223,11 @@ class _ProductCardState extends State<ProductCard> {
                       onTap: widget.onEdit,
                       child: Container(
                         padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(color: AppTheme.themeColor.withOpacity(0.8), shape: BoxShape.circle),
-                        child: Icon(PhosphorIcons.pencilSimple(), size: 16, color: Colors.white),
+                        decoration: BoxDecoration(
+                            color: AppTheme.themeColor.withOpacity(0.8),
+                            shape: BoxShape.circle),
+                        child: Icon(PhosphorIcons.pencilSimple(),
+                            size: 16, color: Colors.white),
                       ),
                     ),
                   ),
@@ -222,18 +235,30 @@ class _ProductCardState extends State<ProductCard> {
                   Positioned(
                     top: 8,
                     left: 8,
-                    child: _buildBadge(widget.isUrdu ? 'میری' : 'Mine', AppTheme.themeColor.withOpacity(0.8)),
+                    child: _buildBadge(widget.isUrdu ? 'میری' : 'Mine',
+                        AppTheme.themeColor.withOpacity(0.8)),
                   ),
                 Positioned(
                   bottom: 8,
                   left: 8,
                   child: _buildBadge(
-                    widget.isUrdu 
-                      ? (widget.item.condition == 'New' ? 'نیا' : 'استعمال شدہ')
-                      : (widget.item.condition ?? 'New'),
+                    widget.isUrdu
+                        ? (widget.item.condition == 'New'
+                            ? 'نیا'
+                            : 'استعمال شدہ')
+                        : (widget.item.condition ?? 'New'),
                     Colors.black.withOpacity(0.6),
                   ),
                 ),
+                if (widget.item.adExpiryDate != null && widget.item.adExpiryDate!.isBefore(DateTime.now()))
+                  Positioned(
+                    bottom: 8,
+                    right: 8,
+                    child: _buildBadge(
+                      widget.isUrdu ? 'ایکسپائرڈ' : 'Expired',
+                      Colors.red.withOpacity(0.8),
+                    ),
+                  ),
               ],
             ),
             Expanded(
@@ -243,13 +268,12 @@ class _ProductCardState extends State<ProductCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.item.name,
+                      Formatters.sanitizeText(widget.item.name),
                       style: TextStyle(
-                        fontSize: 14, 
-                        fontWeight: FontWeight.bold, 
-                        color: AppTheme.darkColor, 
-                        fontFamily: widget.fontFamily
-                      ),
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkColor,
+                          fontFamily: widget.fontFamily),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -259,26 +283,28 @@ class _ProductCardState extends State<ProductCard> {
                     Text(
                       'Rs ${NumberFormat('#,###').format(widget.item.defaultRate)}',
                       style: const TextStyle(
-                        fontSize: 16, 
-                        fontWeight: FontWeight.w900, 
-                        color: AppTheme.darkColor, 
-                        fontFamily: ''
-                      ),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.darkColor,
+                          fontFamily: ''),
                     ),
                     const Spacer(),
-                    if (distance != null || (widget.item.location != null && widget.item.location!.isNotEmpty))
+                    if (distance != null ||
+                        (widget.item.location != null &&
+                            widget.item.location!.isNotEmpty))
                       Row(
                         children: [
-                          const Icon(Icons.location_on, size: 10, color: AppTheme.darkColor),
+                          const Icon(Icons.location_on,
+                              size: 10, color: AppTheme.darkColor),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              distance != null 
-                                ? "$distance ${widget.isUrdu ? 'دور' : 'away'}${widget.item.location != null ? ' • ${widget.item.location}' : ''}"
-                                : widget.item.location!,
+                              distance != null
+                                  ? "$distance ${widget.isUrdu ? 'دور' : 'away'}${widget.item.location != null ? ' • ${widget.item.location}' : ''}"
+                                  : widget.item.location!,
                               style: TextStyle(
-                                fontSize: 10, 
-                                color: AppTheme.darkColor.withOpacity(0.6), 
+                                fontSize: 10,
+                                color: AppTheme.darkColor.withOpacity(0.6),
                                 fontFamily: widget.fontFamily,
                               ),
                               maxLines: 1,
@@ -293,23 +319,37 @@ class _ProductCardState extends State<ProductCard> {
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.star, size: 11, color: AppTheme.darkColor),
+                            const Icon(Icons.star,
+                                size: 11, color: AppTheme.darkColor),
                             const SizedBox(width: 3),
-                            Text('${widget.item.rating}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.darkColor)),
+                            Text('${widget.item.rating}',
+                                style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.darkColor)),
                           ],
                         ),
                         Row(
                           children: [
-                            Icon(PhosphorIcons.eye(), size: 11, color: AppTheme.darkColor.withOpacity(0.6)),
+                            Icon(PhosphorIcons.eye(),
+                                size: 11,
+                                color: AppTheme.darkColor.withOpacity(0.6)),
                             const SizedBox(width: 3),
-                            Text('${widget.item.views}', style: const TextStyle(fontSize: 11, color: AppTheme.darkColor)),
+                            Text('${widget.item.views}',
+                                style: const TextStyle(
+                                    fontSize: 11, color: AppTheme.darkColor)),
                           ],
                         ),
                         Row(
                           children: [
-                            Icon(PhosphorIcons.heart(PhosphorIconsStyle.fill), size: 11, color: AppTheme.darkColor),
+                            Icon(PhosphorIcons.heart(PhosphorIconsStyle.fill),
+                                size: 11, color: AppTheme.darkColor),
                             const SizedBox(width: 3),
-                            Text('${widget.item.likes}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.darkColor)),
+                            Text('${widget.item.likes}',
+                                style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.darkColor)),
                           ],
                         ),
                       ],
@@ -341,7 +381,10 @@ class _ProductCardState extends State<ProductCard> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: borderColor, width: 1),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2)),
+            BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2)),
           ],
         ),
         child: Row(
@@ -349,23 +392,37 @@ class _ProductCardState extends State<ProductCard> {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
+                  borderRadius:
+                      const BorderRadius.horizontal(left: Radius.circular(12)),
                   child: SizedBox(
                     width: 110,
                     height: 110,
-                    child: _buildImage(widget.item.imagePaths.isNotEmpty ? widget.item.imagePaths.first : null),
+                    child: _buildImage(widget.item.imagePaths.isNotEmpty
+                        ? widget.item.imagePaths.first
+                        : null),
                   ),
                 ),
                 Positioned(
                   bottom: 6,
                   left: 6,
                   child: _buildBadge(
-                    widget.isUrdu 
-                      ? (widget.item.condition == 'New' ? 'نیا' : 'استعمال شدہ')
-                      : (widget.item.condition ?? 'New'),
+                    widget.isUrdu
+                        ? (widget.item.condition == 'New'
+                            ? 'نیا'
+                            : 'استعمال شدہ')
+                        : (widget.item.condition ?? 'New'),
                     Colors.black.withOpacity(0.6),
                   ),
                 ),
+                if (widget.item.adExpiryDate != null && widget.item.adExpiryDate!.isBefore(DateTime.now()))
+                  Positioned(
+                    bottom: 6,
+                    right: 6,
+                    child: _buildBadge(
+                      widget.isUrdu ? 'ایکسپائرڈ' : 'Expired',
+                      Colors.red.withOpacity(0.8),
+                    ),
+                  ),
               ],
             ),
             Expanded(
@@ -379,8 +436,12 @@ class _ProductCardState extends State<ProductCard> {
                       children: [
                         Expanded(
                           child: Text(
-                            widget.item.name,
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.darkColor, fontFamily: widget.fontFamily),
+                            Formatters.sanitizeText(widget.item.name),
+                            style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.darkColor,
+                                fontFamily: widget.fontFamily),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -391,19 +452,29 @@ class _ProductCardState extends State<ProductCard> {
                               onTap: widget.onEdit,
                               child: Container(
                                 padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(color: AppTheme.themeColor.withOpacity(0.1), shape: BoxShape.circle),
-                                child: Icon(PhosphorIcons.pencilSimple(), size: 16, color: AppTheme.themeColor),
+                                decoration: BoxDecoration(
+                                    color: AppTheme.themeColor.withOpacity(0.1),
+                                    shape: BoxShape.circle),
+                                child: Icon(PhosphorIcons.pencilSimple(),
+                                    size: 16, color: AppTheme.themeColor),
                               ),
                             ),
                           const SizedBox(width: 8),
-                          _buildBadge(widget.isUrdu ? 'میری' : 'Mine', AppTheme.themeColor.withOpacity(0.8)),
+                          _buildBadge(widget.isUrdu ? 'میری' : 'Mine',
+                              AppTheme.themeColor.withOpacity(0.8)),
                         ],
                       ],
                     ),
+                    const SizedBox(height: 4),
+                    _buildSellerName(fontSize: 12),
                     const SizedBox(height: 8),
                     Text(
                       'Rs ${NumberFormat('#,###').format(widget.item.defaultRate)}',
-                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppTheme.darkColor, fontFamily: ''),
+                      style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkColor,
+                          fontFamily: ''),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -411,29 +482,47 @@ class _ProductCardState extends State<ProductCard> {
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.location_on, size: 10, color: AppTheme.darkColor),
+                            const Icon(Icons.location_on,
+                                size: 10, color: AppTheme.darkColor),
                             const SizedBox(width: 4),
                             Text(
-                              distance != null 
-                                ? "$distance ${widget.isUrdu ? 'دور' : 'away'}${widget.item.location != null ? ' • ${widget.item.location}' : ''}"
-                                : (widget.item.location ?? ''),
-                              style: TextStyle(fontSize: 10, color: AppTheme.darkColor.withOpacity(0.6), fontFamily: widget.fontFamily),
+                              distance != null
+                                  ? "$distance ${widget.isUrdu ? 'دور' : 'away'}${widget.item.location != null ? ' • ${widget.item.location}' : ''}"
+                                  : (widget.item.location ?? ''),
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppTheme.darkColor.withOpacity(0.6),
+                                  fontFamily: widget.fontFamily),
                             ),
                           ],
                         ),
                         Row(
                           children: [
-                            Icon(PhosphorIcons.eye(), size: 11, color: AppTheme.darkColor.withOpacity(0.6)),
+                            Icon(PhosphorIcons.eye(),
+                                size: 11,
+                                color: AppTheme.darkColor.withOpacity(0.6)),
                             const SizedBox(width: 4),
-                            Text('${widget.item.views}', style: const TextStyle(fontSize: 11, color: AppTheme.darkColor)),
+                            Text('${widget.item.views}',
+                                style: const TextStyle(
+                                    fontSize: 11, color: AppTheme.darkColor)),
                             const SizedBox(width: 12),
-                            Icon(PhosphorIcons.heart(PhosphorIconsStyle.fill), size: 11, color: AppTheme.darkColor),
+                            Icon(PhosphorIcons.heart(PhosphorIconsStyle.fill),
+                                size: 11, color: AppTheme.darkColor),
                             const SizedBox(width: 4),
-                            Text('${widget.item.likes}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.darkColor)),
+                            Text('${widget.item.likes}',
+                                style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.darkColor)),
                             const SizedBox(width: 12),
-                            const Icon(Icons.star, size: 12, color: AppTheme.darkColor),
+                            const Icon(Icons.star,
+                                size: 12, color: AppTheme.darkColor),
                             const SizedBox(width: 4),
-                            Text('${widget.item.rating}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.darkColor)),
+                            Text('${widget.item.rating}',
+                                style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.darkColor)),
                           ],
                         ),
                       ],
@@ -455,11 +544,15 @@ class _ProductCardState extends State<ProductCard> {
     );
   }
 
-  Widget _buildBadge(String label, Color bgColor, {Color textColor = Colors.white}) {
+  Widget _buildBadge(String label, Color bgColor,
+      {Color textColor = Colors.white}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(12)),
-      child: Text(label, style: TextStyle(color: textColor, fontSize: 9, fontWeight: FontWeight.bold)),
+      decoration: BoxDecoration(
+          color: bgColor, borderRadius: BorderRadius.circular(12)),
+      child: Text(label,
+          style: TextStyle(
+              color: textColor, fontSize: 9, fontWeight: FontWeight.bold)),
     );
   }
 
@@ -468,7 +561,8 @@ class _ProductCardState extends State<ProductCard> {
       onTap: widget.onSellerTap,
       child: Row(
         children: [
-          Icon(PhosphorIcons.storefront(), size: fontSize, color: color ?? AppTheme.textSecondary),
+          Icon(PhosphorIcons.storefront(),
+              size: fontSize, color: color ?? AppTheme.textSecondary),
           const SizedBox(width: 4),
           Expanded(
             child: Row(
@@ -476,12 +570,15 @@ class _ProductCardState extends State<ProductCard> {
                 Flexible(
                   child: Text(
                     widget.sellerName ?? _sellerProfileName ?? '',
-                    style: TextStyle(fontSize: fontSize, color: color ?? AppTheme.textSecondary, fontFamily: widget.fontFamily),
+                    style: TextStyle(
+                        fontSize: fontSize,
+                        color: color ?? AppTheme.textSecondary,
+                        fontFamily: widget.fontFamily),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (_isSellerVerified) ...[
+                if (widget.item.isSellerVerified) ...[
                   const SizedBox(width: 4),
                   Icon(
                     PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
@@ -492,14 +589,18 @@ class _ProductCardState extends State<ProductCard> {
                 if (_sellerTenure != null) ...[
                   const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                     decoration: BoxDecoration(
                       color: AppTheme.darkColor.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       _sellerTenure!,
-                      style: TextStyle(fontSize: fontSize - 2, fontWeight: FontWeight.bold, color: AppTheme.darkColor.withOpacity(0.5)),
+                      style: TextStyle(
+                          fontSize: fontSize - 2,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkColor.withOpacity(0.5)),
                     ),
                   ),
                 ],
@@ -524,14 +625,15 @@ class _ProductCardState extends State<ProductCard> {
         fit: BoxFit.cover,
         fadeInDuration: const Duration(milliseconds: 300),
         fadeOutDuration: const Duration(milliseconds: 300),
-        memCacheWidth: 400, 
+        memCacheWidth: 400,
         placeholder: (context, url) => Container(
           color: Colors.grey[100],
           child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
         ),
         errorWidget: (context, url, error) => Container(
           color: Colors.grey[100],
-          child: Icon(PhosphorIcons.imageBroken(), size: 24, color: Colors.grey[400]),
+          child: Icon(PhosphorIcons.imageBroken(),
+              size: 24, color: Colors.grey[400]),
         ),
       );
     } else {
@@ -542,13 +644,15 @@ class _ProductCardState extends State<ProductCard> {
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) => Container(
             color: Colors.grey[100],
-            child: Icon(PhosphorIcons.image(), size: 32, color: Colors.grey[400]),
+            child:
+                Icon(PhosphorIcons.image(), size: 32, color: Colors.grey[400]),
           ),
         );
       } else {
         return Container(
           color: Colors.grey[100],
-          child: Icon(PhosphorIcons.package(), size: 32, color: Colors.grey[400]),
+          child:
+              Icon(PhosphorIcons.package(), size: 32, color: Colors.grey[400]),
         );
       }
     }

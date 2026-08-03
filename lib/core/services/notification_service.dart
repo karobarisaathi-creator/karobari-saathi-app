@@ -466,6 +466,10 @@ class NotificationService with ChangeNotifier {
          final targetUserId = querySnapshot.docs.first.id;
          if (targetUserId == currentUser.uid) return;
 
+         // Check if current user is verified
+         final dbService = DatabaseService();
+         bool isVerified = await dbService.isSellerVerified(currentUser.uid);
+
          String typeText = transactionType == 'income' ? 'رقم لی' : 'رقم دی';
          String messageBody = '$myName نے آپ کے ساتھ Rs. $amount کا لین دین درج کیا ہے ($typeText)۔';
 
@@ -484,6 +488,7 @@ class NotificationService with ChangeNotifier {
               'senderPhone': currentUser.phoneNumber,
               'senderUid': currentUser.uid,
               'senderPhotoUrl': currentUser.photoURL,
+              'isSenderVerified': isVerified, // Add verification status
               'description': description ?? '',
               'items': items ?? [],
             },

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'database_service.dart';
+import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/features/settings/login_screen.dart'; // For navigation
 
 class AuthService with ChangeNotifier {
@@ -22,8 +23,13 @@ class AuthService with ChangeNotifier {
     if (user == null) return;
 
     try {
-      if (displayName != null) {
-        await user.updateDisplayName(displayName);
+      final sanitizedName = displayName != null ? Formatters.sanitizeText(displayName) : null;
+      final sanitizedAddress = address != null ? Formatters.sanitizeText(address) : null;
+      final sanitizedSlogan = slogan != null ? Formatters.sanitizeText(slogan) : null;
+      final sanitizedStoreName = storeName != null ? Formatters.sanitizeText(storeName) : null;
+
+      if (sanitizedName != null) {
+        await user.updateDisplayName(sanitizedName);
       }
       if (photoUrl != null) {
         await user.updatePhotoURL(photoUrl);
@@ -31,14 +37,14 @@ class AuthService with ChangeNotifier {
       
       // Update Firestore as well
       Map<String, dynamic> updateData = {
-        'displayName': displayName ?? user.displayName,
+        'displayName': sanitizedName ?? user.displayName,
         'photoURL': photoUrl ?? user.photoURL,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      if (address != null) updateData['address'] = address;
-      if (slogan != null) updateData['slogan'] = slogan;
-      if (storeName != null) updateData['storeName'] = storeName;
+      if (sanitizedAddress != null) updateData['address'] = sanitizedAddress;
+      if (sanitizedSlogan != null) updateData['slogan'] = sanitizedSlogan;
+      if (sanitizedStoreName != null) updateData['storeName'] = sanitizedStoreName;
       if (storeImage != null) updateData['storeImage'] = storeImage;
 
       await _firestore.collection('users').doc(user.uid).set(updateData, SetOptions(merge: true));
