@@ -26,9 +26,11 @@ import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'app_lock_screen.dart';
 import 'verification_request_screen.dart';
+import 'package:account_app/features/artisans/artisan_profile_screen.dart';
 import 'package:account_app/features/inventory/seller_items_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/utils/image_utils.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -145,7 +147,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           // User Profile Card
           InkWell(
-            onTap: () => _showEditProfileDialog(context, isUrdu, user),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ArtisanProfileScreen(),
+                ),
+              ).then((_) => _loadSettingsData());
+            },
             borderRadius: BorderRadius.circular(12),
             child: Container(
               padding: const EdgeInsets.all(16),
@@ -179,18 +188,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Edit Action Icon
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).dividerColor.withOpacity(0.05),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                        PhosphorIcons.pencilSimple(PhosphorIconsStyle.bold),
-                        color: Theme.of(context).iconTheme.color,
-                        size: 14),
-                  ),
+                  // More Icon
+                  Icon(PhosphorIcons.caretRight(), color: Colors.grey, size: 20),
                 ],
               ),
             ),
@@ -1065,11 +1064,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<String?> _uploadToStorage(String uid, File file, String type) async {
     try {
+      // Compress image before upload
+      final compressedFile = await ImageUtils.compressImage(file, quality: 60, maxWidth: 800);
+      
       final ref = FirebaseStorage.instance
           .ref()
           .child('user_uploads')
           .child('${uid}_$type.jpg');
-      await ref.putFile(file);
+      await ref.putFile(compressedFile);
       return await ref.getDownloadURL();
     } catch (e) {
       debugPrint("Storage upload error: $e");

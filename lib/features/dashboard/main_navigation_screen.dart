@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'dashboard_screen.dart';
-import 'smart_diary_screen.dart';
+import 'package:account_app/features/artisans/artisan_home_screen.dart';
 import 'package:account_app/features/professions/professions_screen.dart';
 import 'package:account_app/features/settings/settings_screen.dart';
 import 'package:account_app/features/inventory/marketplace_screen.dart';
@@ -26,7 +26,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   final List<Widget> _screens = [
     DashboardScreen(),
     ProfessionsScreen(),
-    const SmartDiaryScreen(),
+    const ArtisanHomeScreen(),
     MarketplaceScreen(),
     SettingsScreen(),
   ];
@@ -91,9 +91,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   label: 'Professions',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(PhosphorIcons.notebook(), size: 24),
-                  activeIcon: Icon(PhosphorIcons.notebook(PhosphorIconsStyle.fill), size: 24),
-                  label: isUrdu ? 'روزنامچہ' : 'Diary',
+                  icon: Icon(PhosphorIcons.hammer(), size: 24),
+                  activeIcon: Icon(PhosphorIcons.hammer(PhosphorIconsStyle.fill), size: 24),
+                  label: isUrdu ? 'ماہرین' : 'Experts',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(PhosphorIcons.storefront(), size: 24),

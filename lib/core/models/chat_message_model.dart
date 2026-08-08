@@ -7,6 +7,7 @@ class ChatMessage {
   final String message;
   final DateTime timestamp;
   final bool isRead;
+  final String status; // sent, delivered, read
 
   ChatMessage({
     required this.id,
@@ -15,6 +16,7 @@ class ChatMessage {
     required this.message,
     required this.timestamp,
     this.isRead = false,
+    this.status = 'sent',
   });
 
   Map<String, dynamic> toMap() {
@@ -25,6 +27,7 @@ class ChatMessage {
       'message': message,
       'timestamp': FieldValue.serverTimestamp(),
       'isRead': isRead,
+      'status': status,
     };
   }
 
@@ -36,6 +39,7 @@ class ChatMessage {
       message: map['message'] ?? '',
       timestamp: (map['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isRead: map['isRead'] ?? false,
+      status: map['status'] ?? 'sent',
     );
   }
 }

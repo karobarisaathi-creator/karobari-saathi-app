@@ -102,13 +102,16 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
       views: fields[82] == null ? 0 : fields[82] as int,
       shares: fields[83] == null ? 0 : fields[83] as int,
       adExpiryDate: fields[84] as DateTime?,
+      isSellerVerified: fields[85] == null ? false : fields[85] as bool,
+      contacts: fields[86] == null ? 0 : fields[86] as int,
+      reviewCount: fields[87] == null ? 0 : fields[87] as int,
     );
   }
 
   @override
   void write(BinaryWriter writer, InventoryItem obj) {
     writer
-      ..writeByte(85)
+      ..writeByte(88)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -278,7 +281,13 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
       ..writeByte(83)
       ..write(obj.shares)
       ..writeByte(84)
-      ..write(obj.adExpiryDate);
+      ..write(obj.adExpiryDate)
+      ..writeByte(85)
+      ..write(obj.isSellerVerified)
+      ..writeByte(86)
+      ..write(obj.contacts)
+      ..writeByte(87)
+      ..write(obj.reviewCount);
   }
 
   @override

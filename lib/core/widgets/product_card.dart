@@ -162,8 +162,8 @@ class _ProductCardState extends State<ProductCard> {
   }
 
   Widget _buildGridItem(BuildContext context) {
-    final cardColor = AppTheme.goldColor;
-    final borderColor = Colors.white.withOpacity(0.15);
+    final cardColor = AppTheme.darkColor; // Reverted to darkColor
+    final borderColor = Colors.white.withOpacity(0.1);
     final String? distance = _calculateDistance();
 
     return GestureDetector(
@@ -174,13 +174,13 @@ class _ProductCardState extends State<ProductCard> {
       child: Container(
         decoration: BoxDecoration(
           color: cardColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: borderColor, width: 1),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.4),
-                blurRadius: 10,
-                offset: const Offset(0, 4)),
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 6)),
           ],
         ),
         child: Column(
@@ -189,71 +189,73 @@ class _ProductCardState extends State<ProductCard> {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(11)),
+                  borderRadius: BorderRadius.circular(16),
                   child: SizedBox(
-                    height: 125,
+                    height: 180, // Increased image height as requested
                     width: double.infinity,
                     child: _buildImage(widget.item.imagePaths.isNotEmpty
                         ? widget.item.imagePaths.first
                         : null),
                   ),
                 ),
-                if (widget.isMyItem && widget.onDelete != null)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: GestureDetector(
-                      onTap: widget.onDelete,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.8),
-                            shape: BoxShape.circle),
-                        child: Icon(PhosphorIcons.trash(),
-                            size: 16, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                if (widget.isMyItem && widget.onEdit != null)
-                  Positioned(
-                    top: 8,
-                    right: widget.onDelete != null ? 40 : 8,
-                    child: GestureDetector(
-                      onTap: widget.onEdit,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                            color: AppTheme.themeColor.withOpacity(0.8),
-                            shape: BoxShape.circle),
-                        child: Icon(PhosphorIcons.pencilSimple(),
-                            size: 16, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                if (widget.isMyItem)
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: _buildBadge(widget.isUrdu ? 'میری' : 'Mine',
-                        AppTheme.themeColor.withOpacity(0.8)),
-                  ),
+                // Badges at top left
                 Positioned(
-                  bottom: 8,
-                  left: 8,
-                  child: _buildBadge(
-                    widget.isUrdu
-                        ? (widget.item.condition == 'New'
-                            ? 'نیا'
-                            : 'استعمال شدہ')
-                        : (widget.item.condition ?? 'New'),
-                    Colors.black.withOpacity(0.6),
+                  top: 10,
+                  left: 10,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (widget.item.isFeatured)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: _buildBadge(widget.isUrdu ? 'نمایاں' : 'Featured',
+                              AppTheme.incomeColor.withOpacity(0.9)),
+                        ),
+                      _buildBadge(
+                        widget.isUrdu
+                            ? (widget.item.condition == 'New'
+                                ? 'نیا'
+                                : 'استعمال شدہ')
+                            : (widget.item.condition ?? 'New'),
+                        Colors.black.withOpacity(0.5),
+                      ),
+                    ],
                   ),
                 ),
+                // Action buttons at top right
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Column(
+                    children: [
+                      if (widget.onFavoriteToggle != null && !widget.isMyItem)
+                        GestureDetector(
+                          onTap: widget.onFavoriteToggle,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                                color: AppTheme.goldColor.withOpacity(0.9),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white24)),
+                            child: Icon(
+                              widget.isFavorite
+                                  ? PhosphorIcons.heart(PhosphorIconsStyle.fill)
+                                  : PhosphorIcons.heart(),
+                              size: 18,
+                              color: widget.isFavorite ? Colors.red : Colors.white,
+                            ),
+                          ),
+                        ),
+                      if (widget.isMyItem)
+                        _buildOwnerMenu(isGrid: true),
+                    ],
+                  ),
+                ),
+                // Expiry Badge at bottom right of image
                 if (widget.item.adExpiryDate != null && widget.item.adExpiryDate!.isBefore(DateTime.now()))
                   Positioned(
-                    bottom: 8,
-                    right: 8,
+                    bottom: 10,
+                    right: 10,
                     child: _buildBadge(
                       widget.isUrdu ? 'ایکسپائرڈ' : 'Expired',
                       Colors.red.withOpacity(0.8),
@@ -263,48 +265,51 @@ class _ProductCardState extends State<ProductCard> {
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       Formatters.sanitizeText(widget.item.name),
                       style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
-                          color: AppTheme.darkColor,
+                          color: Colors.white,
                           fontFamily: widget.fontFamily),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
-                    _buildSellerName(fontSize: 11),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 1), // Reduced line spacing
                     Text(
-                      'Rs ${NumberFormat('#,###').format(widget.item.defaultRate)}',
-                      style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: AppTheme.darkColor,
-                          fontFamily: ''),
+                      widget.item.category ?? (widget.isUrdu ? 'دیگر' : 'Other'),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white.withOpacity(0.7),
+                        fontFamily: widget.fontFamily,
+                      ),
+                      maxLines: 1,
                     ),
-                    const Spacer(),
-                    if (distance != null ||
-                        (widget.item.location != null &&
-                            widget.item.location!.isNotEmpty))
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on,
-                              size: 10, color: AppTheme.darkColor),
+                    const SizedBox(height: 4), // Reduced spacing
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          'Rs ${NumberFormat('#,###').format(widget.item.defaultRate)}',
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.goldColor, // Reverted to gold for better look on dark
+                              fontFamily: ''),
+                        ),
+                        if (widget.item.unit.isNotEmpty) ...[
                           const SizedBox(width: 4),
-                          Expanded(
+                          Flexible(
                             child: Text(
-                              distance != null
-                                  ? "$distance ${widget.isUrdu ? 'دور' : 'away'}${widget.item.location != null ? ' • ${widget.item.location}' : ''}"
-                                  : widget.item.location!,
+                              '/ ${widget.item.unit}',
                               style: TextStyle(
-                                fontSize: 10,
-                                color: AppTheme.darkColor.withOpacity(0.6),
+                                fontSize: 9,
+                                color: Colors.white.withOpacity(0.6),
                                 fontFamily: widget.fontFamily,
                               ),
                               maxLines: 1,
@@ -312,45 +317,50 @@ class _ProductCardState extends State<ProductCard> {
                             ),
                           ),
                         ],
-                      ),
-                    const SizedBox(height: 2),
+                      ],
+                    ),
+                    const SizedBox(height: 4), // Reduced spacing
+                    // Rating & Reviews row
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.star,
-                                size: 11, color: AppTheme.darkColor),
-                            const SizedBox(width: 3),
-                            Text('${widget.item.rating}',
-                                style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.darkColor)),
-                          ],
+                        const Icon(Icons.star, size: 14, color: AppTheme.goldColor), 
+                        const SizedBox(width: 4),
+                        Text(
+                          '${widget.item.rating}',
+                          style: const TextStyle(
+                              fontSize: 13, 
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white),
                         ),
-                        Row(
-                          children: [
-                            Icon(PhosphorIcons.eye(),
-                                size: 11,
-                                color: AppTheme.darkColor.withOpacity(0.6)),
-                            const SizedBox(width: 3),
-                            Text('${widget.item.views}',
-                                style: const TextStyle(
-                                    fontSize: 11, color: AppTheme.darkColor)),
-                          ],
+                        const SizedBox(width: 6),
+                        Text(
+                          '(${widget.item.reviewCount})',
+                          style: TextStyle(
+                              fontSize: 11, 
+                              color: Colors.white.withOpacity(0.7)),
                         ),
-                        Row(
-                          children: [
-                            Icon(PhosphorIcons.heart(PhosphorIconsStyle.fill),
-                                size: 11, color: AppTheme.darkColor),
-                            const SizedBox(width: 3),
-                            Text('${widget.item.likes}',
-                                style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.darkColor)),
-                          ],
+                      ],
+                    ),
+                    const SizedBox(height: 2), // Reduced spacing
+                    // Location/Distance
+                    Row(
+                      children: [
+                        Icon(PhosphorIcons.mapPin(),
+                            size: 11, color: Colors.white.withOpacity(0.6)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            distance != null
+                                ? "$distance ${widget.isUrdu ? 'دور' : 'away'}"
+                                : (widget.item.location ?? ''),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.white.withOpacity(0.6),
+                              fontFamily: widget.fontFamily,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
@@ -365,8 +375,8 @@ class _ProductCardState extends State<ProductCard> {
   }
 
   Widget _buildListItem(BuildContext context) {
-    final cardColor = AppTheme.goldColor;
-    final borderColor = Colors.white.withOpacity(0.15);
+    final cardColor = AppTheme.darkColor; // Reverted
+    final borderColor = Colors.white.withOpacity(0.1);
     final String? distance = _calculateDistance();
 
     return GestureDetector(
@@ -378,7 +388,7 @@ class _ProductCardState extends State<ProductCard> {
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: cardColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: borderColor, width: 1),
           boxShadow: [
             BoxShadow(
@@ -393,10 +403,10 @@ class _ProductCardState extends State<ProductCard> {
               children: [
                 ClipRRect(
                   borderRadius:
-                      const BorderRadius.horizontal(left: Radius.circular(12)),
+                      const BorderRadius.horizontal(left: Radius.circular(16)),
                   child: SizedBox(
-                    width: 110,
-                    height: 110,
+                    width: 120,
+                    height: 120,
                     child: _buildImage(widget.item.imagePaths.isNotEmpty
                         ? widget.item.imagePaths.first
                         : null),
@@ -438,91 +448,68 @@ class _ProductCardState extends State<ProductCard> {
                           child: Text(
                             Formatters.sanitizeText(widget.item.name),
                             style: TextStyle(
-                                fontSize: 15,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: AppTheme.darkColor,
+                                color: Colors.white,
                                 fontFamily: widget.fontFamily),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (widget.isMyItem) ...[
-                          if (widget.onEdit != null)
-                            GestureDetector(
-                              onTap: widget.onEdit,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                    color: AppTheme.themeColor.withOpacity(0.1),
-                                    shape: BoxShape.circle),
-                                child: Icon(PhosphorIcons.pencilSimple(),
-                                    size: 16, color: AppTheme.themeColor),
-                              ),
-                            ),
-                          const SizedBox(width: 8),
-                          _buildBadge(widget.isUrdu ? 'میری' : 'Mine',
-                              AppTheme.themeColor.withOpacity(0.8)),
-                        ],
+                        if (widget.isFavorite && !widget.isMyItem)
+                           Icon(PhosphorIcons.heart(PhosphorIconsStyle.fill),
+                                size: 16, color: Colors.red),
+                        if (widget.isMyItem)
+                           _buildOwnerMenu(isGrid: false),
                       ],
                     ),
                     const SizedBox(height: 4),
-                    _buildSellerName(fontSize: 12),
+                    Text(
+                      widget.item.category ?? (widget.isUrdu ? 'دیگر' : 'Other'),
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withOpacity(0.5),
+                          fontFamily: widget.fontFamily),
+                    ),
                     const SizedBox(height: 8),
                     Text(
                       'Rs ${NumberFormat('#,###').format(widget.item.defaultRate)}',
                       style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.darkColor,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.goldColor,
                           fontFamily: ''),
                     ),
-                    const SizedBox(height: 8),
+                    const Spacer(),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.location_on,
-                                size: 10, color: AppTheme.darkColor),
+                            Icon(PhosphorIcons.mapPin(),
+                                size: 10, color: Colors.white.withOpacity(0.4)),
                             const SizedBox(width: 4),
                             Text(
                               distance != null
-                                  ? "$distance ${widget.isUrdu ? 'دور' : 'away'}${widget.item.location != null ? ' • ${widget.item.location}' : ''}"
+                                  ? "$distance ${widget.isUrdu ? 'دور' : 'away'}"
                                   : (widget.item.location ?? ''),
                               style: TextStyle(
                                   fontSize: 10,
-                                  color: AppTheme.darkColor.withOpacity(0.6),
+                                  color: Colors.white.withOpacity(0.4),
                                   fontFamily: widget.fontFamily),
                             ),
                           ],
                         ),
                         Row(
                           children: [
-                            Icon(PhosphorIcons.eye(),
-                                size: 11,
-                                color: AppTheme.darkColor.withOpacity(0.6)),
-                            const SizedBox(width: 4),
-                            Text('${widget.item.views}',
-                                style: const TextStyle(
-                                    fontSize: 11, color: AppTheme.darkColor)),
-                            const SizedBox(width: 12),
-                            Icon(PhosphorIcons.heart(PhosphorIconsStyle.fill),
-                                size: 11, color: AppTheme.darkColor),
-                            const SizedBox(width: 4),
-                            Text('${widget.item.likes}',
-                                style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.darkColor)),
-                            const SizedBox(width: 12),
                             const Icon(Icons.star,
-                                size: 12, color: AppTheme.darkColor),
+                                size: 12, color: AppTheme.goldColor),
                             const SizedBox(width: 4),
                             Text('${widget.item.rating}',
                                 style: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
-                                    color: AppTheme.darkColor)),
+                                    color: Colors.white)),
                           ],
                         ),
                       ],
@@ -553,6 +540,62 @@ class _ProductCardState extends State<ProductCard> {
       child: Text(label,
           style: TextStyle(
               color: textColor, fontSize: 9, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  Widget _buildOwnerMenu({required bool isGrid}) {
+    return PopupMenuButton<String>(
+      padding: EdgeInsets.zero,
+      icon: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: isGrid ? BoxDecoration(
+          color: Colors.black.withOpacity(0.5),
+          shape: BoxShape.circle,
+        ) : null,
+        child: Icon(
+          Icons.more_vert,
+          color: isGrid ? Colors.white : Colors.white.withOpacity(0.7),
+          size: isGrid ? 20 : 24,
+        ),
+      ),
+      onSelected: (value) {
+        if (value == 'edit') {
+          widget.onEdit?.call();
+        } else if (value == 'delete') {
+          widget.onDelete?.call();
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'edit',
+          child: Row(
+            children: [
+              Icon(PhosphorIcons.pencilSimple(), size: 20, color: AppTheme.darkColor),
+              const SizedBox(width: 12),
+              Text(
+                widget.isUrdu ? 'تبدیل کریں' : 'Edit',
+                style: TextStyle(fontFamily: widget.fontFamily, color: AppTheme.darkColor),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(PhosphorIcons.trash(), size: 20, color: Colors.red),
+              const SizedBox(width: 12),
+              Text(
+                widget.isUrdu ? 'ختم کریں' : 'Delete',
+                style: TextStyle(
+                  fontFamily: widget.fontFamily,
+                  color: Colors.red,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

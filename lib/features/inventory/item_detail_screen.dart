@@ -7,16 +7,17 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/models/review_model.dart';
 import 'package:account_app/core/models/ad_report_model.dart';
-import 'package:account_app/core/models/order_model.dart';
 import 'package:account_app/features/inventory/chat_screen.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
+import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/app_filter_chip.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
@@ -45,6 +46,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   late bool _isFavorite;
   int _selectedImageIndex = 0;
   Map<String, String>? _sellerInfo;
+  int _sellerTotalAds = 0;
+  double _sellerAvgRating = 0.0;
   bool _isSellerVerified = false;
   bool _isLoadingSeller = false;
   bool _showFullContact = false;
@@ -243,12 +246,66 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     }
     final profile =
         await dbService.findPublicProfileByUid(widget.item.accountId!);
+    
+    // Load Seller Stats (Total Ads & Avg Rating)
+    final stats = await _fetchSellerStats(widget.item.accountId!);
+
     if (mounted) {
       setState(() {
         _sellerInfo = profile;
         _isSellerVerified = profile?['isVerified'] == 'true';
+        _sellerTotalAds = stats['totalAds'] as int;
+        _sellerAvgRating = stats['avgRating'] as double;
         _isLoadingSeller = false;
       });
+    }
+  }
+
+  Future<Map<String, dynamic>> _fetchSellerStats(String uid) async {
+    try {
+      final q = await FirebaseFirestore.instance.collectionGroup('inventory_items')
+          .where('accountId', isEqualTo: uid).get();
+      
+      int totalAds = q.docs.length;
+      double totalRating = 0;
+      for (var doc in q.docs) {
+        totalRating += (doc.data()['rating'] as num?)?.toDouble() ?? 0.0;
+      }
+      double avgRating = totalAds > 0 ? totalRating / totalAds : 0.0;
+      
+      return {'totalAds': totalAds, 'avgRating': avgRating};
+    } catch (e) {
+      return {'totalAds': 0, 'avgRating': 0.0};
+    }
+  }
+
+  Future<void> _renewAd() async {
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    final dbService = Provider.of<DatabaseService>(context, listen: false);
+    
+    setState(() => _isLoadingSeller = true);
+    try {
+      final newExpiry = DateTime.now().add(const Duration(days: 30));
+      final updatedItem = widget.item.copyWith(
+        adExpiryDate: newExpiry,
+        updatedAt: DateTime.now(),
+      );
+      
+      await dbService.updateInventoryItem(updatedItem);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isUrdu ? 'اشتہار کی مدت 30 دن بڑھا دی گئی ہے!' : 'Ad renewed for 30 more days!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context); // Go back to refresh
+      }
+    } catch (e) {
+      _showErrorSnackBar('Renew failed: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingSeller = false);
     }
   }
 
@@ -630,8 +687,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         _buildReviewsSection(isUrdu, fontFamily),
                         const SizedBox(height: 32),
                         if (widget.item.accountId ==
-                            FirebaseAuth.instance.currentUser?.uid)
+                            FirebaseAuth.instance.currentUser?.uid) ...[
                           _buildSellerInsights(isUrdu, fontFamily),
+                          const SizedBox(height: 16),
+                          _buildRenewSection(isUrdu, fontFamily),
+                        ],
                         const SizedBox(height: 32),
                         _buildSellerCard(isUrdu, fontFamily),
                         const SizedBox(height: 140),
@@ -841,13 +901,42 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           child: ClipRRect(
             borderRadius:
                 const BorderRadius.vertical(bottom: Radius.circular(32)),
-            child: widget.item.imagePaths.isNotEmpty
-                ? _buildImage(
-                    widget.item.imagePaths[_selectedImageIndex], BoxFit.cover)
-                : Container(
-                    color: Colors.black12,
-                    child: Icon(PhosphorIcons.package(),
-                        size: 80, color: Colors.white)),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: widget.item.imagePaths.isNotEmpty
+                      ? _buildImage(
+                          widget.item.imagePaths[_selectedImageIndex], BoxFit.cover)
+                      : Container(
+                          color: Colors.black12,
+                          child: Icon(PhosphorIcons.package(),
+                              size: 80, color: Colors.white)),
+                ),
+                // Indicator
+                if (widget.item.imagePaths.length > 1)
+                  Positioned(
+                    bottom: 20,
+                    right: 20,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${_selectedImageIndex + 1} / ${widget.item.imagePaths.length}',
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                // Zoom Hint
+                Positioned(
+                  top: 20,
+                  right: 20,
+                  child: Icon(PhosphorIcons.magnifyingGlassPlus(), color: Colors.white.withOpacity(0.5), size: 20),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1239,6 +1328,53 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     );
   }
 
+  Widget _buildRenewSection(bool isUrdu, String fontFamily) {
+    final bool isExpired = widget.item.adExpiryDate != null && widget.item.adExpiryDate!.isBefore(DateTime.now());
+    final bool isNearExpiry = widget.item.adExpiryDate != null && widget.item.adExpiryDate!.difference(DateTime.now()).inDays < 5;
+
+    if (!isExpired && !isNearExpiry) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isExpired ? Colors.red.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isExpired ? Colors.red.withOpacity(0.3) : Colors.orange.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(isExpired ? PhosphorIcons.clockCounterClockwise() : PhosphorIcons.warning(), 
+               color: isExpired ? Colors.red : Colors.orange),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isExpired ? (isUrdu ? 'اشتہار ختم ہو چکا ہے' : 'Ad Expired') : (isUrdu ? 'اشتہار ختم ہونے والا ہے' : 'Expiring Soon'),
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+                ),
+                Text(
+                  isUrdu ? 'مزید 30 دن کے لیے اسے تازہ کریں' : 'Renew it for 30 more days',
+                  style: TextStyle(color: Colors.white70, fontSize: 11, fontFamily: fontFamily),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: _renewAd,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.themeColor,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(isUrdu ? 'تازہ کریں' : 'Renew', style: TextStyle(fontFamily: fontFamily, color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSellerCard(bool isUrdu, String fontFamily) {
     if (_isLoadingSeller)
       return Container(
@@ -1284,16 +1420,32 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       child: Row(
         children: [
           Expanded(
-            child: ProfileInfoWidget(
-              name: _sellerInfo!['name'] ?? '',
-              phone: displayPhone,
-              profileImage: _sellerInfo!['photoUrl'],
-              isVerified: _isSellerVerified,
-              reputationLabel: reputation, // Display the Trust Level
-              topLabel: isUrdu ? 'فروخت کنندہ' : 'Seller',
-              isLarge: false,
-              textColor: Colors.white,
-              subtitleColor: Colors.white54,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ProfileInfoWidget(
+                  name: _sellerInfo!['name'] ?? '',
+                  phone: displayPhone,
+                  profileImage: _sellerInfo!['photoUrl'],
+                  isVerified: _isSellerVerified,
+                  reputationLabel: reputation, // Display the Trust Level
+                  topLabel: isUrdu ? 'فروخت کنندہ' : 'Seller',
+                  isLarge: false,
+                  textColor: Colors.white,
+                  subtitleColor: Colors.white54,
+                ),
+                if (_sellerTotalAds > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8, left: 48),
+                    child: Row(
+                      children: [
+                        _buildSmallStat(PhosphorIcons.package(), '$_sellerTotalAds ${isUrdu ? 'اشتہارات' : 'Ads'}'),
+                        const SizedBox(width: 12),
+                        _buildSmallStat(PhosphorIcons.star(PhosphorIconsStyle.fill), _sellerAvgRating.toStringAsFixed(1), color: Colors.amber),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ),
           if (!_showFullContact)
@@ -1321,6 +1473,17 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         fontFamily: fontFamily))),
         ],
       ),
+    );
+  }
+
+  Widget _buildSmallStat(IconData icon, String label, {Color color = Colors.white54}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 10, color: color),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(color: color.withOpacity(0.8), fontSize: 10, fontWeight: FontWeight.bold)),
+      ],
     );
   }
 
@@ -1362,9 +1525,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
               _buildStatItem(PhosphorIcons.eye(), widget.item.views.toString(),
                   isUrdu ? 'ویوز' : 'Views', fontFamily),
               _buildStatItem(
-                  PhosphorIcons.shareNetwork(),
-                  widget.item.shares.toString(),
-                  isUrdu ? 'شیئرز' : 'Shares',
+                  PhosphorIcons.phoneCall(),
+                  widget.item.contacts.toString(),
+                  isUrdu ? 'رابطے' : 'Contacts',
                   fontFamily),
               _buildStatItem(
                   PhosphorIcons.heart(),

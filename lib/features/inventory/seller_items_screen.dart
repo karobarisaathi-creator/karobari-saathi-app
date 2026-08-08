@@ -44,6 +44,8 @@ class _SellerItemsScreenState extends State<SellerItemsScreen> {
   bool _isLoading = true;
   ViewMode _viewMode = ViewMode.grid;
   Map<String, String>? _sellerProfile;
+  double _avgRating = 0.0;
+  String _tenureLabel = "";
   String? _storeName;
   String? _storeImage;
   final TextEditingController _searchController = TextEditingController();
@@ -112,6 +114,36 @@ class _SellerItemsScreenState extends State<SellerItemsScreen> {
           _storeImage = profile?['storeImage'];
         }
         _items = fetchedItems;
+        
+        // Calculate Average Rating
+        if (_items.isNotEmpty) {
+          double total = 0;
+          for (var item in _items) { total += item.rating; }
+          _avgRating = total / _items.length;
+        }
+
+        // Calculate Tenure
+        final createdAtStr = profile?['createdAt'];
+        if (createdAtStr != null && createdAtStr.isNotEmpty) {
+          try {
+            final date = DateTime.parse(createdAtStr);
+            final diff = DateTime.now().difference(date).inDays;
+            final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+            
+            if (diff > 365) {
+              int years = (diff / 365).floor();
+              _tenureLabel = isUrdu ? "$years سال سے ممبر" : "Member for $years years";
+            } else if (diff > 30) {
+              int months = (diff / 30).floor();
+              _tenureLabel = isUrdu ? "$months ماہ سے ممبر" : "Member for $months months";
+            } else {
+              _tenureLabel = isUrdu ? "نیا ممبر" : "New Member";
+            }
+          } catch (e) {
+            _tenureLabel = "";
+          }
+        }
+
         _applyFilters();
         _isLoading = false;
       });
@@ -254,6 +286,9 @@ class _SellerItemsScreenState extends State<SellerItemsScreen> {
             phone: '',
             profileImage: photoUrl,
             isVerified: isVerified,
+            reputationLabel: _tenureLabel.isNotEmpty ? _tenureLabel : null,
+            reputationColor: Colors.white, // ممبرشپ لیبل اب سفید نظر آئے گا
+            reputationBgColor: Colors.white.withOpacity(0.1),
             topLabel: isUrdu ? 'خوش آمدید' : 'Welcome Back 👋',
             isLarge: false,
             textColor: Colors.white,
@@ -262,6 +297,30 @@ class _SellerItemsScreenState extends State<SellerItemsScreen> {
             suffix: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (_avgRating > 0)
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.1), // سفید کلر کا ہلکا بیک گراونڈ
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.star, color: Colors.white, size: 12), // اسٹار بھی سفید
+                        const SizedBox(width: 4),
+                        Text(
+                          _avgRating.toStringAsFixed(1),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
                 if (isVerified)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -271,7 +330,7 @@ class _SellerItemsScreenState extends State<SellerItemsScreen> {
                       border: Border.all(color: AppTheme.verifiedGold.withOpacity(0.4)),
                     ),
                     child: Text(
-                      isUrdu ? 'تصدیق شدہ سیلر' : 'Verified Seller',
+                      isUrdu ? 'تصدیق شدہ' : 'Verified',
                       style: TextStyle(
                         color: AppTheme.verifiedGold,
                         fontSize: 9,
@@ -563,7 +622,7 @@ class _SellerItemsScreenState extends State<SellerItemsScreen> {
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          childAspectRatio: 0.75,
+          childAspectRatio: 0.52, // Balanced to remove empty space
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
         ),

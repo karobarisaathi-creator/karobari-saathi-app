@@ -11,6 +11,8 @@ import 'package:account_app/core/models/profession_model.dart';
 
 // GroupActivity کو ہٹا دیں کیونکہ اب Partnership استعمال ہو رہا ہے
 
+import 'package:account_app/core/utils/image_utils.dart';
+
 class FirebaseService with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -134,8 +136,16 @@ class FirebaseService with ChangeNotifier {
   // File Storage
   Future<String> uploadFile(String filePath, String fileName) async {
     try {
+      File fileToUpload = File(filePath);
+      
+      // If it's an image, compress it
+      final ext = filePath.split('.').last.toLowerCase();
+      if (['jpg', 'jpeg', 'png'].contains(ext)) {
+        fileToUpload = await ImageUtils.compressImage(fileToUpload);
+      }
+
       final ref = _storage.ref().child('files/$fileName');
-      await ref.putFile(File(filePath));
+      await ref.putFile(fileToUpload);
       return await ref.getDownloadURL();
     } catch (e) {
       throw Exception('File upload failed: $e');

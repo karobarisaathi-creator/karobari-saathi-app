@@ -460,13 +460,26 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
                 _buildInfoRow('کاروبار:', req['businessName'] ?? ''),
                 _buildInfoRow('قسم:', req['businessType'] ?? ''),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _buildImageThumb(req['shopImageUrl'], 'دکان'),
-                    const SizedBox(width: 12),
-                    _buildImageThumb(req['idImageUrl'], 'شناختی کارڈ'),
+                if (req['isArtisanRequest'] == true) ...[
+                  Row(
+                    children: [
+                      _buildImageThumb(req['cnicFront'], 'CNIC Front'),
+                      const SizedBox(width: 12),
+                      _buildImageThumb(req['cnicBack'], 'CNIC Back'),
+                    ],
+                  ),
+                  if (req['shopImageUrl'] != null) ...[
+                    const SizedBox(height: 12),
+                    Row(children: [_buildImageThumb(req['shopImageUrl'], 'Workplace')]),
                   ],
-                ),
+                ] else
+                  Row(
+                    children: [
+                      _buildImageThumb(req['shopImageUrl'], 'دکان'),
+                      const SizedBox(width: 12),
+                      _buildImageThumb(req['idImageUrl'], 'شناختی کارڈ'),
+                    ],
+                  ),
               ],
             ),
           ),

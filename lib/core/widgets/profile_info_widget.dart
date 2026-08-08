@@ -30,7 +30,10 @@ class ProfileInfoWidget extends StatefulWidget {
   final bool hasUpdate;
   final bool isVerified;
   final Widget? suffix;
+  final double? customSize;
   final String? reputationLabel;
+  final Color? reputationColor;
+  final Color? reputationBgColor;
 
   const ProfileInfoWidget({
     super.key,
@@ -52,7 +55,10 @@ class ProfileInfoWidget extends StatefulWidget {
     this.hasUpdate = false,
     this.isVerified = false,
     this.suffix,
+    this.customSize,
     this.reputationLabel,
+    this.reputationColor,
+    this.reputationBgColor,
   });
 
   @override
@@ -98,8 +104,8 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
         : widget.name;
     String? displayImage = widget.profileImage;
 
-    final double size = widget.isLarge ? 50 : 36;
-    final double radius = 6.0; // Fixed radius as requested
+    final double size = widget.customSize ?? (widget.isLarge ? 50 : 36);
+    final double radius = widget.customSize != null ? 12.0 : 6.0; // Larger radius for larger images
 
     // Check if the phone field actually contains Urdu text (like 'Verified Profile')
     bool phoneHasUrdu = RegExp(r'[\u0600-\u06FF]').hasMatch(widget.phone);
@@ -266,16 +272,16 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.1),
+                              color: widget.reputationBgColor ?? Colors.blue.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                              border: Border.all(color: widget.reputationColor?.withOpacity(0.2) ?? Colors.blue.withOpacity(0.2)),
                             ),
                             child: Text(
                               widget.reputationLabel!,
                               style: TextStyle(
                                 fontSize: 8,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.blue[700],
+                                color: widget.reputationColor ?? Colors.blue[700],
                                 fontFamily: fontFamily,
                               ),
                             ),

@@ -14,6 +14,7 @@ import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/ai_visual_service.dart';
+import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
@@ -38,6 +39,7 @@ import 'widgets/transport_sell_form.dart';
 import 'widgets/raw_material_sell_form.dart';
 import 'widgets/assets_sell_form.dart';
 import 'widgets/other_sell_form.dart';
+import 'package:account_app/core/utils/image_utils.dart';
 import 'widgets/general_sell_form.dart';
 
 class AddInventoryItemScreen extends StatefulWidget {
@@ -63,6 +65,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
   double? _lng;
   
   bool _isUploading = false;
+  bool _isModerating = false;
   double _uploadProgress = 0.0;
   bool _isAnalyzing = false;
   bool _agreeToPrivacy = true; // Default true for now or force user to check
@@ -122,22 +125,9 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
     }
   }
 
-  /// Re-encodes the image to ensure all EXIF/GPS metadata is stripped.
+  /// Re-encodes and compresses the image to save storage and strip EXIF.
   Future<File> _stripMetadata(File file) async {
-    try {
-      final bytes = await file.readAsBytes();
-      final image = img_lib.decodeImage(bytes);
-      if (image == null) return file;
-
-      // Re-encode to JPG (this process discards old EXIF/GPS tags)
-      final strippedBytes = img_lib.encodeJpg(image, quality: 80);
-      final directory = await getTemporaryDirectory();
-      final tempFile = File('${directory.path}/clean_${DateTime.now().millisecondsSinceEpoch}.jpg');
-      return await tempFile.writeAsBytes(strippedBytes);
-    } catch (e) {
-      debugPrint("Metadata strip error: $e");
-      return file; // Fallback to original on error
-    }
+    return await ImageUtils.compressImage(file, quality: 70, maxWidth: 1024);
   }
 
   Future<void> _analyzeImageWithAI(File image) async {
@@ -230,6 +220,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
 
   Future<void> _handleSave() async {
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
     
     if (_currentImages.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isUrdu ? 'براہ کرم تصاویر شامل کریں' : 'Please add images')));
@@ -252,10 +243,47 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
       return;
     }
 
+    // AI MODERATION STEP
+    setState(() => _isModerating = true);
+    try {
+      final aiService = AIVisualService();
+      final safetyResult = await aiService.checkContentSafety(name, desc);
+      
+      if (safetyResult.isSuccess && safetyResult.data != null) {
+        final isSafe = safetyResult.data!['isSafe'] == 'true';
+        if (!isSafe) {
+          if (mounted) {
+            setState(() => _isModerating = false);
+            _showModerationAlert(safetyResult.data!['reason'] ?? 'Content policy violation', isUrdu, fontFamily);
+          }
+          return;
+        }
+
+        // Professionalism Suggestion
+        final score = int.tryParse(safetyResult.data!['professionalismScore'] ?? '10') ?? 10;
+        final suggestion = safetyResult.data!['suggestion'];
+        if (score < 7 && suggestion != null && mounted) {
+          final proceed = await _showProfessionalismTip(suggestion, score, isUrdu, fontFamily);
+          if (!proceed) {
+            setState(() => _isModerating = false);
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Moderation error: $e");
+    } finally {
+      if (mounted) setState(() => _isModerating = false);
+    }
+
     setState(() => _isUploading = true);
     try {
       final dbService = Provider.of<DatabaseService>(context, listen: false);
+      final vService = Provider.of<VerificationService>(context, listen: false);
       final user = FirebaseAuth.instance.currentUser;
+      
+      final bool isVerified = vService.currentStatus == VerificationStatus.approved;
+      
       List<String> finalImagePaths = [];
       for (String path in _currentImages) {
         if (path.startsWith('http')) {
@@ -377,6 +405,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
         assetModel: _formData['model'],
         serialNumber: _formData['serial'],
         depreciation: _formData['depreciation'],
+        isSellerVerified: isVerified,
       );
 
       if (widget.itemToEdit == null) { await dbService.addInventoryItem(newItem); } else { await dbService.updateInventoryItem(newItem); }
@@ -384,6 +413,69 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
     } catch (e) {
       debugPrint("Save error: $e");
     } finally { if (mounted) setState(() => _isUploading = false); }
+  }
+
+  Future<bool> _showProfessionalismTip(String suggestion, int score, bool isUrdu, String fontFamily) async {
+    return await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(PhosphorIcons.sparkle(PhosphorIconsStyle.fill), color: Colors.amber, size: 20),
+            const SizedBox(width: 8),
+            Text(isUrdu ? 'AI مشورہ' : 'AI Suggestion', style: TextStyle(fontFamily: fontFamily)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isUrdu 
+                ? 'آپ کے اشتہار کا معیار بہتر بنایا جا سکتا ہے۔' 
+                : 'Your ad quality can be improved.',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Text(suggestion, style: TextStyle(fontFamily: isUrdu ? fontFamily : '')),
+            const SizedBox(height: 12),
+            Text(
+              isUrdu ? 'کیا آپ اس کے بغیر ہی پوسٹ کرنا چاہتے ہیں؟' : 'Do you want to post anyway?',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(isUrdu ? 'تبدیلی کریں' : 'Edit Ad', style: TextStyle(fontFamily: fontFamily)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.darkColor),
+            child: Text(isUrdu ? 'ہاں، پوسٹ کریں' : 'Yes, Post Now', style: TextStyle(fontFamily: fontFamily, color: Colors.white)),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
+
+  void _showModerationAlert(String reason, bool isUrdu, String fontFamily) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(isUrdu ? 'پالیسی کی خلاف ورزی' : 'Policy Violation', style: TextStyle(fontFamily: fontFamily)),
+        content: Text(
+          isUrdu 
+            ? 'آپ کے اشتہار میں کچھ ایسا مواد ہے جو ہماری پالیسی کے خلاف ہے۔\n\nوجہ: $reason'
+            : 'Your ad contains content that violates our policy.\n\nReason: $reason',
+          style: TextStyle(fontFamily: isUrdu ? fontFamily : ''),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(isUrdu ? 'ٹھیک ہے' : 'OK')),
+        ],
+      ),
+    );
   }
 
   @override
@@ -394,32 +486,44 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: CustomAppBar(title: isUrdu ? 'اشتہار پوسٹ کریں' : 'Post Ad'),
-      body: _isUploading 
+      body: _isUploading || _isModerating
         ? Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 SimpleSpinningRing(size: 60),
                 const SizedBox(height: 24),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
-                  child: LinearProgressIndicator(
-                    value: _uploadProgress,
-                    backgroundColor: Colors.grey[200],
-                    valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.themeColor),
-                    borderRadius: BorderRadius.circular(10),
-                    minHeight: 8,
+                if (_isUploading) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    child: LinearProgressIndicator(
+                      value: _uploadProgress,
+                      backgroundColor: Colors.grey[200],
+                      valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.themeColor),
+                      borderRadius: BorderRadius.circular(10),
+                      minHeight: 8,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  '${(_uploadProgress * 100).toInt()}%',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                ),
-                Text(
-                  isUrdu ? 'تصویریں اپ لوڈ ہو رہی ہیں...' : 'Uploading images...',
-                  style: TextStyle(fontFamily: fontFamily),
-                ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '${(_uploadProgress * 100).toInt()}%',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  Text(
+                    isUrdu ? 'تصویریں اپ لوڈ ہو رہی ہیں...' : 'Uploading images...',
+                    style: TextStyle(fontFamily: fontFamily),
+                  ),
+                ] else if (_isModerating) ...[
+                  Text(
+                    isUrdu ? 'اشتہار کا جائزہ لیا جا رہا ہے...' : 'Moderating ad content...',
+                    style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    isUrdu ? 'AI پالیسی کے مطابق چیک کر رہا ہے' : 'AI is checking policy compliance',
+                    style: TextStyle(fontFamily: fontFamily, fontSize: 12, color: Colors.grey),
+                  ),
+                ],
               ],
             ),
           )

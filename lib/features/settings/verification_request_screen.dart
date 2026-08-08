@@ -12,7 +12,8 @@ import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 
 class VerificationRequestScreen extends StatefulWidget {
-  const VerificationRequestScreen({super.key});
+  final bool isArtisanMode; // To customize labels if opened from Artisan profile
+  const VerificationRequestScreen({super.key, this.isArtisanMode = false});
 
   @override
   State<VerificationRequestScreen> createState() =>
@@ -24,9 +25,19 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   final TextEditingController _businessNameController = TextEditingController();
   final TextEditingController _businessTypeController = TextEditingController();
 
+  File? _cnicFront;
+  File? _cnicBack;
   File? _shopImage;
-  File? _idImage;
   final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && widget.isArtisanMode) {
+      _businessNameController.text = user.displayName ?? '';
+    }
+  }
 
   @override
   void dispose() {
@@ -35,7 +46,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImage(bool isShopImage) async {
+  Future<void> _pickImage(String type) async {
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
@@ -64,7 +75,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
       if (pickedFile != null) {
         final croppedFile = await ImageCropper().cropImage(
           sourcePath: pickedFile.path,
-          aspectRatio: isShopImage
+          aspectRatio: type == 'shop' 
               ? const CropAspectRatio(ratioX: 16, ratioY: 9)
               : const CropAspectRatio(ratioX: 3, ratioY: 2),
           uiSettings: [
@@ -78,11 +89,9 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
 
         if (croppedFile != null) {
           setState(() {
-            if (isShopImage) {
-              _shopImage = File(croppedFile.path);
-            } else {
-              _idImage = File(croppedFile.path);
-            }
+            if (type == 'front') _cnicFront = File(croppedFile.path);
+            if (type == 'back') _cnicBack = File(croppedFile.path);
+            if (type == 'shop') _shopImage = File(croppedFile.path);
           });
         }
       }
@@ -93,38 +102,34 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     if (!_formKey.currentState!.validate()) return;
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
 
-    if (_shopImage == null || _idImage == null) {
+    if (_cnicFront == null || _cnicBack == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(isUrdu
-                ? 'براہ کرم تمام تصویریں اپ لوڈ کریں'
-                : 'Please upload all images')),
+                ? 'براہ کرم شناختی کارڈ کی دونوں تصویریں اپ لوڈ کریں'
+                : 'Please upload both sides of CNIC')),
       );
       return;
     }
 
     try {
       final service = Provider.of<VerificationService>(context, listen: false);
-      if (service.currentStatus == VerificationStatus.approved) {
-        if (mounted) {
-          final isUrduCurrent = Provider.of<LanguageService>(context, listen: false).isUrdu;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(isUrduCurrent
-                    ? 'آپ پہلے ہی تصدیق شدہ ہیں'
-                    : 'You are already verified')),
-          );
-        }
-        return;
-      }
-
+      
       await service.submitRequest(
-        shopImage: _shopImage!,
-        idImage: _idImage!,
+        cnicFront: _cnicFront!,
+        cnicBack: _cnicBack!,
+        shopImage: _shopImage,
         businessName: _businessNameController.text.trim(),
         businessType: _businessTypeController.text.trim(),
+        isArtisan: widget.isArtisanMode,
       );
-      if (mounted) Navigator.pop(context);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(isUrdu ? 'آپ کی درخواست جمع کر دی گئی ہے' : 'Your request has been submitted')),
+        );
+        Navigator.pop(context);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -163,7 +168,8 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     final service = Provider.of<VerificationService>(context);
 
     return Scaffold(
-      appBar: CustomAppBar(title: isUrdu ? 'تصدیق کی درخواست' : 'Get Verified'),
+      backgroundColor: Colors.white,
+      appBar: CustomAppBar(title: isUrdu ? 'پروفائل کی تصدیق' : 'Profile Verification'),
       body: service.isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -176,14 +182,11 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                     _buildHeader(isUrdu, fontFamily),
                     const SizedBox(height: 24),
 
-                    _buildProfilePreview(isUrdu, fontFamily),
-                    const SizedBox(height: 24),
-
                     if (service.currentStatus == VerificationStatus.pending)
                       _buildStatusBanner(
                         isUrdu
-                            ? 'آپ کی درخواست زیر التوا ہے۔ ہمیں جائزے کا انتظار رہتا ہے۔'
-                            : 'Your request is pending. Please wait for review.',
+                            ? 'آپ کی درخواست زیر التوا ہے۔ ہم 24 سے 48 گھنٹوں میں جائزہ لیں گے۔'
+                            : 'Your request is pending. We will review it within 24-48 hours.',
                         Colors.orange.shade50,
                         Colors.orange.shade800,
                         fontFamily,
@@ -204,10 +207,8 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                       _buildRejectionNote(
                           service.adminNote!, isUrdu, fontFamily),
 
-                    if (service.currentStatus != VerificationStatus.none)
-                      const SizedBox(height: 20),
                     _buildSectionTitle(
-                        isUrdu ? 'کاروبار کی معلومات' : 'Business Information',
+                        isUrdu ? 'بنیادی معلومات' : 'Basic Information',
                         isUrdu,
                         fontFamily),
                     const SizedBox(height: 15),
@@ -215,18 +216,18 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                     // Business Info
                     _buildTextField(
                       controller: _businessNameController,
-                      label: isUrdu ? 'کاروبار کا نام' : 'Business Name',
-                      icon: PhosphorIcons.storefront(),
+                      label: isUrdu ? 'کاروبار یا اپنا مکمل نام' : 'Business or Full Name',
+                      icon: PhosphorIcons.user(),
                       isUrdu: isUrdu,
                       fontFamily: fontFamily,
                     ),
                     const SizedBox(height: 20),
                     _buildTextField(
                       controller: _businessTypeController,
-                      label: isUrdu ? 'کاروبار کی قسم' : 'Business Type',
+                      label: isUrdu ? 'کاروبار یا ہنر کی قسم' : 'Business or Skill Type',
                       hint: isUrdu
-                          ? 'مثلاً: کریانہ، گارمنٹس'
-                          : 'e.g. Grocery, Garments',
+                          ? 'مثلاً: کریانہ، الیکٹریشن، درزی'
+                          : 'e.g. Grocery, Electrician, Tailor',
                       icon: PhosphorIcons.tag(),
                       isUrdu: isUrdu,
                       fontFamily: fontFamily,
@@ -234,30 +235,38 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
 
                     const SizedBox(height: 30),
                     _buildSectionTitle(
-                        isUrdu ? 'تصویریں اپ لوڈ کریں' : 'Upload Images',
+                        isUrdu ? 'دستاویزات کی تصاویر' : 'Document Images',
                         isUrdu,
                         fontFamily),
                     const SizedBox(height: 15),
 
-                    // Shop Image
+                    // CNIC Front
                     _buildImagePicker(
-                      image: _shopImage,
-                      label: isUrdu
-                          ? 'دکان یا دفتر کی تصویر'
-                          : 'Shop or Office Photo',
-                      onTap: () => _pickImage(true),
+                      image: _cnicFront,
+                      label: isUrdu ? 'شناختی کارڈ (سامنے کی تصویر)' : 'CNIC Front Side',
+                      onTap: () => _pickImage('front'),
                       isUrdu: isUrdu,
                       fontFamily: fontFamily,
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
 
-                    // ID Card Image
+                    // CNIC Back
                     _buildImagePicker(
-                      image: _idImage,
+                      image: _cnicBack,
+                      label: isUrdu ? 'شناختی کارڈ (پیچھے کی تصویر)' : 'CNIC Back Side',
+                      onTap: () => _pickImage('back'),
+                      isUrdu: isUrdu,
+                      fontFamily: fontFamily,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Shop Image (Optional for some, but good to have)
+                    _buildImagePicker(
+                      image: _shopImage,
                       label: isUrdu
-                          ? 'شناختی کارڈ یا بزنس کارڈ'
-                          : 'CNIC or Business Card',
-                      onTap: () => _pickImage(false),
+                          ? 'دکان یا کام کی جگہ (اختیاری)'
+                          : 'Shop or Workplace (Optional)',
+                      onTap: () => _pickImage('shop'),
                       isUrdu: isUrdu,
                       fontFamily: fontFamily,
                     ),
@@ -272,7 +281,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                                 ? null
                                 : _submit,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.verifiedGold,
+                          backgroundColor: AppTheme.darkColor,
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
                           elevation: 0,
@@ -316,63 +325,11 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                           ),
                         ),
                       ),
-                    if (service.currentStatus == VerificationStatus.pending ||
-                        service.currentStatus == VerificationStatus.rejected)
-                      const SizedBox(height: 20),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
             ),
-    );
-  }
-
-  Widget _buildProfilePreview(bool isUrdu, String fontFamily) {
-    final user = FirebaseAuth.instance.currentUser;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withAlpha(5),
-              blurRadius: 10,
-              offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            isUrdu ? 'پروفائل کا نمونہ' : 'Profile Preview',
-            style: TextStyle(
-                fontSize: 12,
-                color: AppTheme.textSecondary,
-                fontFamily: fontFamily,
-                fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-          ProfileInfoWidget(
-            name: user?.displayName ?? (isUrdu ? 'آپ کا نام' : 'Your Name'),
-            phone: user?.phoneNumber ?? '',
-            profileImage: user?.photoURL,
-            isLarge: true,
-            isVerified: true, // Show how it WILL look
-          ),
-          const SizedBox(height: 8),
-          Text(
-            isUrdu
-                ? '* تصدیق کے بعد آپ کا نام اس طرح نظر آئے گا'
-                : '* This is how your name will appear after verification',
-            style: TextStyle(
-                fontSize: 10,
-                color: AppTheme.verifiedGold,
-                fontFamily: fontFamily,
-                fontStyle: FontStyle.italic),
-          ),
-        ],
-      ),
     );
   }
 
@@ -403,8 +360,8 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                 ),
                 Text(
                   isUrdu
-                      ? 'اپنے گاہکوں کا اعتماد بڑھائیں'
-                      : 'Increase customer trust with a verified profile.',
+                      ? 'تصدیق شدہ اکاؤنٹ سے گاہکوں کا آپ پر اعتماد بڑھتا ہے۔'
+                      : 'Verified profiles build more trust with customers.',
                   style: TextStyle(
                       fontSize: 12,
                       fontFamily: fontFamily,
@@ -422,6 +379,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
         color: Colors.red.shade50,
         borderRadius: BorderRadius.circular(12),
@@ -472,7 +430,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(12),
@@ -505,16 +463,16 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        labelStyle: TextStyle(fontFamily: fontFamily),
-        prefixIcon: Icon(icon, color: AppTheme.verifiedGold),
+        labelStyle: TextStyle(fontFamily: fontFamily, color: Colors.grey[600]),
+        prefixIcon: Icon(icon, color: AppTheme.themeColor),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppTheme.verifiedGold.withAlpha(77)),
+          borderSide: BorderSide(color: Colors.grey[300]!),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppTheme.verifiedGold, width: 2),
+          borderSide: const BorderSide(color: AppTheme.themeColor, width: 2),
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -553,11 +511,11 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
             : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_a_photo, size: 40, color: Colors.grey[400]),
+                  Icon(PhosphorIcons.cameraPlus(), size: 40, color: Colors.grey[400]),
                   const SizedBox(height: 10),
                   Text(label,
                       style: TextStyle(
-                          color: Colors.grey[600], fontFamily: fontFamily)),
+                          color: Colors.grey[600], fontFamily: fontFamily, fontSize: 12)),
                 ],
               ),
       ),

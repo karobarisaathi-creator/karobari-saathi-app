@@ -20,7 +20,8 @@ import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/models/shared_account_model.dart';
 import 'package:account_app/core/models/chat_model.dart';
 import 'package:account_app/core/models/inventory_item_model.dart';
-import 'package:account_app/core/models/work_log_model.dart';
+import 'package:account_app/core/models/artisan_profile_model.dart';
+import 'package:account_app/core/models/artisan_work_order_model.dart';
 
 // Services
 import 'package:account_app/core/services/database_service.dart';
@@ -99,7 +100,8 @@ void main() async {
     Hive.registerAdapter(SharedAccountAdapter());
     Hive.registerAdapter(ChatAdapter());
     Hive.registerAdapter(ChatMessageAdapter());
-    Hive.registerAdapter(WorkLogAdapter());
+    Hive.registerAdapter(ArtisanProfileAdapter());
+    Hive.registerAdapter(ArtisanWorkOrderAdapter());
 
     // Initialize Firebase using DefaultFirebaseOptions
     try {

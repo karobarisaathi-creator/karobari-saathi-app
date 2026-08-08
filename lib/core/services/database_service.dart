@@ -9,7 +9,9 @@ import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/models/review_model.dart';
 import 'package:account_app/core/models/ad_report_model.dart';
-import 'package:account_app/core/models/work_log_model.dart';
+import 'package:account_app/core/models/artisan_profile_model.dart';
+import 'package:account_app/core/models/artisan_work_order_model.dart';
+import 'package:account_app/core/models/artisan_review_model.dart';
 
 import 'database/account_service.dart';
 import 'database/transaction_service.dart';
@@ -18,8 +20,9 @@ import 'database/inventory_service.dart';
 import 'database/sync_service.dart';
 import 'database/category_service.dart';
 import 'database/settings_service.dart';
-import 'database/worklog_service.dart';
 import 'database/profile_service.dart';
+import 'artisan_service.dart';
+import 'artisan_work_order_service.dart';
 
 class DatabaseService extends ChangeNotifier {
   final AccountService _accountService = AccountService();
@@ -29,8 +32,9 @@ class DatabaseService extends ChangeNotifier {
   final SyncService _syncService = SyncService();
   final CategoryService _categoryService = CategoryService();
   final SettingsService _settingsService = SettingsService();
-  final WorkLogService _workLogService = WorkLogService();
   final ProfileService _profileService = ProfileService();
+  final ArtisanService _artisanService = ArtisanService();
+  final ArtisanWorkOrderService _artisanWorkOrderService = ArtisanWorkOrderService();
 
   // پراپرٹیز
   bool get isInitialized => true; 
@@ -107,16 +111,26 @@ class DatabaseService extends ChangeNotifier {
   Future<void> deleteCategory(String id) async { await _categoryService.deleteCategory(id); notifyListeners(); _triggerSync(); }
   List<Category> getCategories() => _categoryService.getCategories();
 
-  // WORK LOG OPERATIONS
-  Future<void> addWorkLog(WorkLog log, {bool syncToKhata = true}) async { await _workLogService.addWorkLog(log, syncToKhata: syncToKhata); notifyListeners(); _triggerSync(); }
-  List<WorkLog> getWorkLogs() => _workLogService.getWorkLogs();
-  Future<void> deleteWorkLog(String id) async { await _workLogService.deleteWorkLog(id); notifyListeners(); _triggerSync(); }
-
   // GLOBAL LOOKUP & STATUS
   Future<void> markUserAsDeactivated(String uid) async { await _profileService.markUserAsDeactivated(uid); }
   Future<void> markUserAsActivated(String uid) async { await _profileService.markUserAsActivated(uid); }
   Future<Map<String, String>?> findPublicProfileByPhone(String p) => _profileService.findPublicProfileByPhone(p);
   Future<Map<String, String>?> findPublicProfileByUid(String uid) => _profileService.findPublicProfileByUid(uid);
+
+  // ARTISAN OPERATIONS
+  Future<void> saveArtisanProfile(ArtisanProfile p) async { await _artisanService.saveProfile(p); notifyListeners(); }
+  Future<ArtisanProfile?> getArtisanProfile(String id) => _artisanService.getProfile(id);
+  Stream<ArtisanProfile?> streamArtisanProfile(String id) => _artisanService.streamProfile(id);
+  Future<List<ArtisanProfile>> getAllArtisans() => _artisanService.getAllArtisans();
+  Stream<List<ArtisanProfile>> streamAllArtisans() => _artisanService.streamAllArtisans();
+  Future<void> addArtisanReview({required String artisanId, required String workOrderId, required double rating, required String comment}) async { await _artisanService.addReview(artisanId: artisanId, workOrderId: workOrderId, rating: rating, comment: comment); notifyListeners(); }
+  Stream<List<ArtisanReview>> getArtisanReviews(String artisanId) => _artisanService.getReviews(artisanId);
+
+  // ARTISAN WORK ORDER OPERATIONS
+  Future<void> addArtisanWorkOrder(ArtisanWorkOrder o) async { await _artisanWorkOrderService.addWorkOrder(o); notifyListeners(); }
+  Stream<List<ArtisanWorkOrder>> getArtisanWorkOrders(String id) => _artisanWorkOrderService.getArtisanWorkOrders(id);
+  Future<List<ArtisanWorkOrder>> getCustomerWorkOrders(String id) => _artisanWorkOrderService.getCustomerWorkOrders(id);
+  Future<void> updateArtisanWorkStatus(String aId, String oId, String s) async { await _artisanWorkOrderService.updateStatus(aId, oId, s); notifyListeners(); }
 
   // SYNC OPERATIONS
   void startRealtimeSync() => _syncService.startRealtimeSync();

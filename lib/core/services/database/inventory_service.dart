@@ -143,6 +143,36 @@ class InventoryService extends BaseService {
 
   Future<void> addReview(Review r) async {
     await firestore.collection('reviews').doc(r.id).set(r.toMap());
+    
+    // Recalculate average rating for the item
+    final reviews = await getItemReviews(r.itemId);
+    if (reviews.isNotEmpty) {
+      double totalRating = 0;
+      for (var review in reviews) {
+        totalRating += review.rating;
+      }
+      double avgRating = double.parse((totalRating / reviews.length).toStringAsFixed(1));
+      int reviewCount = reviews.length;
+      
+      // 1. Update Firestore
+      final q = await firestore.collectionGroup('inventory_items').where('id', isEqualTo: r.itemId).limit(1).get();
+      if (q.docs.isNotEmpty) {
+        await q.docs.first.reference.update({
+          'rating': avgRating,
+          'reviewCount': reviewCount,
+        });
+      }
+
+      // 2. Update Local Hive Box (for immediate UI response)
+      final localItem = itemsBox?.get(r.itemId);
+      if (localItem != null) {
+        await itemsBox?.put(r.itemId, localItem.copyWith(
+          rating: avgRating,
+          reviewCount: reviewCount,
+        ));
+      }
+      notifyListeners();
+    }
   }
 
   Future<List<Review>> getItemReviews(String id) async {
@@ -156,6 +186,9 @@ class InventoryService extends BaseService {
 
   Future<void> logContactEvent({required String itemId, required String action, String? targetPhone}) async {
     await firestore.collection('contact_logs').add({'itemId': itemId, 'action': action, 'targetPhone': targetPhone, 'userId': auth.currentUser?.uid, 'timestamp': FieldValue.serverTimestamp()});
+    // Increment contacts count on the item
+    final q = await firestore.collectionGroup('inventory_items').where('id', isEqualTo: itemId).limit(1).get();
+    if (q.docs.isNotEmpty) await q.docs.first.reference.update({'contacts': FieldValue.increment(1)});
   }
 
   Future<void> incrementView(String id) async {

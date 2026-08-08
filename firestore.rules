@@ -98,6 +98,19 @@ service cloud.firestore {
       allow delete: if isSignedIn() && request.auth.uid == resource.data.userId;
     }
 
+    // --- چیٹ سسٹم (Chat System) ---
+    match /chat_rooms/{chatId} {
+      allow read, write: if isSignedIn() && request.auth.uid in request.resource.data.participants;
+      // Allow read/update if the user is a participant
+      allow read, update: if isSignedIn() && (resource == null || request.auth.uid in resource.data.participants);
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid;
+        allow update: if isSignedIn() && (request.auth.uid == resource.data.receiverId); // For marking as read
+      }
+    }
+
     // --- ویریفیکیشن سسٹم (سخت سیکیورٹی کے ساتھ) ---
     match /verification_requests/{userId} {
       allow read: if isOwner(userId) || isAdmin();

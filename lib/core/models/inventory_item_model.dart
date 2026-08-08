@@ -114,6 +114,8 @@ class InventoryItem extends HiveObject {
   @HiveField(83, defaultValue: 0) int shares;
   @HiveField(84) final DateTime? adExpiryDate;
   @HiveField(85, defaultValue: false) final bool isSellerVerified;
+  @HiveField(86, defaultValue: 0) int contacts;
+  @HiveField(87, defaultValue: 0) int reviewCount;
 
   InventoryItem({
     required this.id, required this.name, required this.unit, required this.defaultRate,
@@ -144,8 +146,10 @@ class InventoryItem extends HiveObject {
     this.isFeatured = false,
     this.views = 0,
     this.shares = 0,
-    this.adExpiryDate, // Fix: Added back to constructor
+    this.adExpiryDate, 
     this.isSellerVerified = false,
+    this.contacts = 0,
+    this.reviewCount = 0,
   });
 
   InventoryItem copyWith({
@@ -172,8 +176,8 @@ class InventoryItem extends HiveObject {
     String? constructionUnit, String? capacity, String? routes,
     String? origin, String? specifications, String? assetModel,
     String? serialNumber, String? depreciation, double? latitude,
-    double? longitude, bool? isFeatured, int? views, int? shares,
-    DateTime? adExpiryDate, bool? isSellerVerified,
+    double? longitude,    bool? isFeatured, int? views, int? shares,
+    DateTime? adExpiryDate, bool? isSellerVerified, int? contacts, int? reviewCount,
   }) {
     return InventoryItem(
       id: id ?? this.id, name: name ?? this.name, unit: unit ?? this.unit,
@@ -217,6 +221,8 @@ class InventoryItem extends HiveObject {
       longitude: longitude ?? this.longitude, isFeatured: isFeatured ?? this.isFeatured,
       views: views ?? this.views, shares: shares ?? this.shares,
       adExpiryDate: adExpiryDate ?? this.adExpiryDate, isSellerVerified: isSellerVerified ?? this.isSellerVerified,
+      contacts: contacts ?? this.contacts,
+      reviewCount: reviewCount ?? this.reviewCount,
     );
   }
 
@@ -252,6 +258,7 @@ class InventoryItem extends HiveObject {
       'latitude': latitude, 'longitude': longitude,
       'isFeatured': isFeatured, 'views': views, 'shares': shares,
       'adExpiryDate': adExpiryDate?.toIso8601String(), 'isSellerVerified': isSellerVerified,
+      'contacts': contacts, 'reviewCount': reviewCount,
     };
   }
 
@@ -293,6 +300,8 @@ class InventoryItem extends HiveObject {
       isFeatured: map['isFeatured'] ?? false, views: map['views']?.toInt() ?? 0, shares: map['shares']?.toInt() ?? 0,
       adExpiryDate: map['adExpiryDate'] != null ? parseDate(map['adExpiryDate']) : null,
       isSellerVerified: map['isSellerVerified'] == true || map['isSellerVerified'] == 'true',
+      contacts: map['contacts']?.toInt() ?? 0,
+      reviewCount: map['reviewCount']?.toInt() ?? 0,
     );
   }
 }

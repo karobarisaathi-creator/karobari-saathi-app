@@ -276,36 +276,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final parties = allAccounts.where((p) => p.isActive && p.category != 'Partner').toList();
           final professions = databaseService.getProfessions();
 
-          // Calculate Totals from Transactions for Parties (Sum of Taken/Given)
-          double totalTaken = 0;
-          double totalGiven = 0;
+          // Calculate aggregate balances from Parties (Receivables and Payables)
+          double totalReceivable = 0; // لینے ہیں
+          double totalPayable = 0;    // دینے ہیں
 
-          final partyTransactions = databaseService.getAllTransactions().where((t) {
-             // 1. Exclude partnership transactions
-             if (t.partnershipId != null) return false;
+          for (var party in parties) {
+            final partyTransactions = databaseService.getAllTransactions()
+                .where((t) => t.accountId == party.id && t.partnershipId == null)
+                .toList();
 
-             final account = databaseService.getAccount(t.accountId);
-             if (account == null) return false;
-
-             // Filter by account criteria
-             if (!account.isActive) return false;
-             if (account.category == 'Shared') return false;
-             if (account.category == 'Partner') return false;
-
-             return true;
-          }).toList();
-
-          for (var t in partyTransactions) {
-             if (t.type == 'income') {
-                totalTaken += t.amount;
-             } else {
-                totalGiven += t.amount; // expense
-             }
+            double partyTaken = 0;
+            double partyGiven = 0;
+            for (var t in partyTransactions) {
+              if (t.type == 'income') {
+                partyTaken += t.amount;
+              } else {
+                partyGiven += t.amount;
+              }
+            }
+            final liveBalance = partyTaken - partyGiven;
+            if (liveBalance > 0) {
+              totalPayable += liveBalance;
+            } else if (liveBalance < 0) {
+              totalReceivable += liveBalance.abs();
+            }
           }
-          double netBalance = totalTaken - totalGiven;
-          final bool isPayable = netBalance >= 0;
+
+          double netBalance = totalPayable - totalReceivable;
           final Color balanceCardColor = AppTheme.darkColor;
-          final Color balanceTextColor = Colors.white;
 
           double profIncome = 0;
           double profExpense = 0;
@@ -340,8 +338,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               children: [
                                 Expanded(
                                   child: _buildBalanceItem(
-                                    title: isUrdu ? 'کل جمع' : 'Total In',
-                                    amount: totalTaken,
+                                    title: isUrdu ? 'لینے ہیں' : 'To Receive',
+                                    amount: totalReceivable,
                                     color: Colors.white,
                                     valueColor: Colors.white,
                                     icon: PhosphorIcons.arrowDownLeft(),
@@ -351,8 +349,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                                 Expanded(
                                   child: _buildBalanceItem(
-                                    title: isUrdu ? 'کل بنام' : 'Total Out',
-                                    amount: totalGiven,
+                                    title: isUrdu ? 'دینے ہیں' : 'To Pay',
+                                    amount: totalPayable,
                                     color: Colors.white,
                                     valueColor: Colors.white,
                                     icon: PhosphorIcons.arrowUpRight(),
@@ -363,8 +361,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 Expanded(
                                   child: _buildBalanceItem(
                                     title: isUrdu 
-                                        ? (netBalance >= 0 ? 'کل بنام' : 'کل جمع')
-                                        : (netBalance >= 0 ? 'Total Debit' : 'Total Credit'),
+                                        ? (netBalance >= 0 ? 'باقی دینے' : 'باقی لینے')
+                                        : (netBalance >= 0 ? 'Net Payable' : 'Net Receivable'),
                                     amount: netBalance.abs(),
                                     color: Colors.white,
                                     valueColor: Colors.white,

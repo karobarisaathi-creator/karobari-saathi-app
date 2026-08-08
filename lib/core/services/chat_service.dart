@@ -9,50 +9,90 @@ class ChatService with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final SecurityService _securityService = SecurityService();
 
-  // Get current user ID
+  // Rate Limiting Map (Memory based for session)
+  final Map<String, List<DateTime>> _messageTimestamps = {};
+
   String get currentUserId => _auth.currentUser?.uid ?? '';
 
-  // Get or Create Chat Room ID (Deterministic)
   String getChatRoomId(String otherUserId) {
     List<String> ids = [currentUserId, otherUserId];
-    ids.sort(); // Ensure same ID regardless of who starts the chat
+    ids.sort();
     return ids.join('_');
   }
 
-  // Send Message with End-to-End Encryption (simplified)
+  Future<void> setTypingStatus(String otherUserId, bool isTyping) async {
+    final String chatRoomId = getChatRoomId(otherUserId);
+    await _firestore.collection('chat_rooms').doc(chatRoomId).set({
+      'typing_$currentUserId': isTyping,
+    }, SetOptions(merge: true));
+  }
+
+  Stream<bool> getTypingStatus(String otherUserId) {
+    final String chatRoomId = getChatRoomId(otherUserId);
+    return _firestore.collection('chat_rooms').doc(chatRoomId).snapshots().map((snapshot) {
+      if (!snapshot.exists) return false;
+      return snapshot.data()?['typing_$otherUserId'] ?? false;
+    });
+  }
+
+  Stream<bool> getOnlineStatus(String userId) {
+    return _firestore.collection('users').doc(userId).snapshots().map((snapshot) {
+      if (!snapshot.exists) return false;
+      final data = snapshot.data();
+      if (data == null) return false;
+      
+      final lastActive = data['lastActive'];
+      if (lastActive == null) return false;
+      
+      final DateTime lastActiveTime = (lastActive as Timestamp).toDate();
+      return DateTime.now().difference(lastActiveTime).inMinutes < 5;
+    });
+  }
+
+  Future<void> updateLastActive() async {
+    if (currentUserId.isEmpty) return;
+    await _firestore.collection('users').doc(currentUserId).set({
+      'lastActive': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   Future<void> sendMessage(String receiverId, String message) async {
     if (message.trim().isEmpty) return;
+
+    // --- ENTERPRISE RATE LIMITING ---
+    final now = DateTime.now();
+    _messageTimestamps.putIfAbsent(currentUserId, () => []);
+    _messageTimestamps[currentUserId]!.removeWhere((t) => now.difference(t).inMinutes > 1);
+    
+    if (_messageTimestamps[currentUserId]!.length >= 10) {
+      throw Exception("Slow down! You are sending messages too fast.");
+    }
+    _messageTimestamps[currentUserId]!.add(now);
 
     final String chatRoomId = getChatRoomId(receiverId);
     final timestamp = FieldValue.serverTimestamp();
 
-    // ENTERPRISE: Encrypt message content before sending to cloud
+    // --- END-TO-END ENCRYPTION ---
     final encryptedMessage = _securityService.encryptData(message.trim());
 
-    // 1. Add message to the sub-collection
-    await _firestore
-        .collection('chat_rooms')
-        .doc(chatRoomId)
-        .collection('messages')
-        .add({
+    await _firestore.collection('chat_rooms').doc(chatRoomId).collection('messages').add({
       'senderId': currentUserId,
       'receiverId': receiverId,
-      'message': encryptedMessage, // Encrypted content
+      'message': encryptedMessage,
       'isEncrypted': true,
       'timestamp': timestamp,
       'isRead': false,
+      'status': 'sent', // sent, delivered, read
     });
 
-    // 2. Update chat room metadata for the inbox list
     await _firestore.collection('chat_rooms').doc(chatRoomId).set({
-      'lastMessage': '[Encrypted Message]', // Masked for list view
+      'lastMessage': '[Encrypted Message]',
       'lastMessageTime': timestamp,
       'participants': [currentUserId, receiverId],
       'unreadCount_$receiverId': FieldValue.increment(1),
     }, SetOptions(merge: true));
   }
 
-  // Stream Messages for a specific chat with Decryption
   Stream<List<ChatMessage>> getMessages(String otherUserId) {
     final String chatRoomId = getChatRoomId(otherUserId);
     return _firestore
@@ -65,23 +105,16 @@ class ChatService with ChangeNotifier {
               final data = doc.data();
               String content = data['message'] ?? '';
               
-              // ENTERPRISE: Decrypt if the flag is present
               if (data['isEncrypted'] == true && content.isNotEmpty) {
-                try {
-                  content = _securityService.decryptData(content);
-                } catch (e) {
-                  content = '[Decryption Failed]';
-                }
+                try { content = _securityService.decryptData(content); } catch (_) { content = '[Decryption Failed]'; }
               }
               
               final decryptedData = Map<String, dynamic>.from(data);
               decryptedData['message'] = content;
-              
               return ChatMessage.fromMap(decryptedData, doc.id);
             }).toList());
   }
 
-  // Stream all active chats for the current user (Inbox)
   Stream<List<Map<String, dynamic>>> getChatRooms() {
     return _firestore
         .collection('chat_rooms')
@@ -95,9 +128,19 @@ class ChatService with ChangeNotifier {
             }).toList());
   }
 
-  // Mark messages as read
   Future<void> markAsRead(String otherUserId) async {
     final String chatRoomId = getChatRoomId(otherUserId);
+    
+    // Update individual messages
+    final messages = await _firestore.collection('chat_rooms').doc(chatRoomId).collection('messages')
+        .where('receiverId', isEqualTo: currentUserId)
+        .where('isRead', isEqualTo: false)
+        .get();
+        
+    for (var doc in messages.docs) {
+      await doc.reference.update({'isRead': true, 'status': 'read'});
+    }
+
     await _firestore.collection('chat_rooms').doc(chatRoomId).update({
       'unreadCount_$currentUserId': 0,
     });

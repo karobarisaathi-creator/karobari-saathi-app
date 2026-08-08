@@ -145,6 +145,45 @@ class AIVisualService {
   }
 
   /// ============================================================
+  /// CONTENT MODERATION (AI MODERATOR)
+  /// ============================================================
+
+  Future<AIResult> checkContentSafety(String title, String description) async {
+    if (_geminiApiKey.isEmpty) {
+      return AIResult.failure(AIErrorType.auth);
+    }
+
+    final prompt = """
+      Act as a professional marketplace moderator. Analyze the following ad content for safety and professionalism.
+      
+      Title: $title
+      Description: $description
+      
+      Return a JSON object with:
+      1. "isSafe": boolean (true if no prohibited items like weapons, drugs, fraud, or inappropriate language).
+      2. "reason": string (if unsafe, explain why in simple English).
+      3. "professionalismScore": integer (1-10).
+      4. "suggestion": string (how to make the ad more professional in one short sentence).
+      
+      JSON Only.
+    """;
+
+    for (final modelName in _geminiModels) {
+      try {
+        final model = GenerativeModel(model: modelName, apiKey: _geminiApiKey);
+        final response = await model.generateContent([Content.text(prompt)]).timeout(const Duration(seconds: 10));
+
+        if (response.text == null) continue;
+        final parsed = _parseJsonResponse(response.text!);
+        if (parsed != null) return AIResult.success(parsed);
+      } catch (e) {
+        debugPrint('Moderation Error: $e');
+      }
+    }
+    return AIResult.failure(AIErrorType.unknown);
+  }
+
+  /// ============================================================
   /// IMAGE ANALYSIS
   /// ============================================================
 
@@ -235,53 +274,6 @@ class AIVisualService {
 
     /// 2. FALLBACK TO GEMINI
     return _searchWithGemini(query);
-  }
-
-  /// ============================================================
-  /// WORK LOG PARSING
-  /// ============================================================
-
-  Future<AIResult> parseWorkLog(String text) async {
-    if (text.trim().isEmpty) {
-      return AIResult.failure(AIErrorType.parsing);
-    }
-
-    final prompt = AIPrompts.buildPrompt(
-      AIPrompts.workLogParsingPrompt,
-      query: text,
-    );
-
-    for (final modelName in _geminiModels) {
-      try {
-        debugPrint('Trying Gemini Model for Work Log: $modelName');
-
-        final model = GenerativeModel(
-          model: modelName,
-          apiKey: _geminiApiKey,
-        );
-
-        final response = await model
-            .generateContent([Content.text(prompt)])
-            .timeout(const Duration(seconds: 10));
-
-        if (response.text == null) {
-          continue;
-        }
-
-        final parsed = _parseJsonResponse(response.text!);
-
-        if (parsed != null) {
-          return AIResult.success(parsed);
-        }
-      } catch (e) {
-        debugPrint('Gemini Work Log Error with $modelName: $e');
-        if (e.toString().contains('quota')) {
-          return AIResult.failure(AIErrorType.quota);
-        }
-      }
-    }
-
-    return AIResult.failure(AIErrorType.unknown);
   }
 
   /// ============================================================
