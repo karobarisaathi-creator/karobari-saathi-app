@@ -17,28 +17,31 @@ class ArtisanRatingStars extends StatelessWidget {
   Widget build(BuildContext context) {
     final starColor = color ?? Colors.amber;
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(5, (index) {
-        final starValue = index + 1;
-        final isFullStar = rating >= starValue;
-        final isPartialStar = rating > index && rating < starValue;
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(5, (index) {
+          final starValue = index + 1;
+          final isFullStar = rating >= starValue;
+          final isPartialStar = rating > index && rating < starValue;
 
-        IconData icon;
-        if (isFullStar) {
-          icon = Icons.star_rounded;
-        } else if (isPartialStar) {
-          icon = Icons.star_half_rounded;
-        } else {
-          icon = Icons.star_outline_rounded;
-        }
+          IconData icon;
+          if (isFullStar) {
+            icon = Icons.star_rounded;
+          } else if (isPartialStar) {
+            icon = Icons.star_half_rounded;
+          } else {
+            icon = Icons.star_outline_rounded;
+          }
 
-        return Icon(
-          icon,
-          size: size,
-          color: starColor,
-        );
-      }),
+          return Icon(
+            icon,
+            size: size,
+            color: starColor,
+          );
+        }),
+      ),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 part 'notification_model.g.dart';
 
@@ -58,19 +59,26 @@ class AppNotification {
   }
 
   factory AppNotification.fromMap(Map<String, dynamic> map) {
+    DateTime parseDate(dynamic d) {
+      if (d == null) return DateTime.now();
+      if (d is Timestamp) return d.toDate();
+      if (d is String) return DateTime.tryParse(d) ?? DateTime.now();
+      return DateTime.now();
+    }
+
     return AppNotification(
-      id: map['id'],
-      title: map['title'],
-      message: map['message'],
+      id: map['id']?.toString() ?? '',
+      title: map['title']?.toString() ?? '',
+      message: map['message']?.toString() ?? '',
       type: NotificationType.values.firstWhere(
-        (e) => e.toString() == map['type'],
+        (e) => e.toString() == map['type'] || e.name == map['type'],
         orElse: () => NotificationType.general,
       ),
-      isRead: map['isRead'],
-      timestamp: DateTime.parse(map['timestamp']),
-      data: map['data'],
-      relatedAccountId: map['relatedAccountId'],
-      relatedTransactionId: map['relatedTransactionId'],
+      isRead: map['isRead'] ?? false,
+      timestamp: parseDate(map['timestamp']),
+      data: map['data'] != null ? Map<String, dynamic>.from(map['data']) : null,
+      relatedAccountId: map['relatedAccountId']?.toString(),
+      relatedTransactionId: map['relatedTransactionId']?.toString(),
     );
   }
 

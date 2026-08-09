@@ -18,6 +18,7 @@ class PartyCard extends StatefulWidget {
   final VoidCallback onMessage;
 
   const PartyCard({
+    super.key,
     required this.party,
     required this.onView,
     required this.onMessage,
@@ -28,7 +29,8 @@ class PartyCard extends StatefulWidget {
 }
 
 class _PartyCardState extends State<PartyCard> {
-  bool _hasUpdate = false;
+  Map<String, String>? _remoteProfileMap;
+  String? _remoteProfession;
 
   @override
   void initState() {
@@ -36,19 +38,26 @@ class _PartyCardState extends State<PartyCard> {
     _checkForUpdate();
   }
 
+  @override
+  void didUpdateWidget(PartyCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // اگر فون نمبر بدل جائے تو دوبارہ چیک کریں
+    if (oldWidget.party.phone != widget.party.phone) {
+      _checkForUpdate();
+    }
+  }
+
   Future<void> _checkForUpdate() async {
     if (widget.party.phone.length < 10) return;
     
-    // Check if we have a remote profile that differs from local
     final dbService = Provider.of<DatabaseService>(context, listen: false);
     final profile = await dbService.findPublicProfileByPhone(widget.party.phone);
     
     if (mounted && profile != null) {
-      if (profile['name'] != widget.party.name || profile['photoUrl'] != widget.party.profileImage) {
-        setState(() {
-          _hasUpdate = true;
-        });
-      }
+      setState(() {
+        _remoteProfession = profile['profession'];
+        _remoteProfileMap = profile;
+      });
     }
   }
 
@@ -89,8 +98,29 @@ class _PartyCardState extends State<PartyCard> {
         ? PhosphorIcons.checkCircle() 
         : (isPayable ? PhosphorIcons.arrowUpRight() : PhosphorIcons.arrowDownLeft());
 
+    final String displayCategory = _remoteProfession != null && _remoteProfession!.isNotEmpty
+        ? _remoteProfession!
+        : (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account');
+
+    final String displayName = widget.party.name.trim().isEmpty
+        ? (isUrdu ? 'نامعلوم' : 'Unknown')
+        : widget.party.name;
+
+    // Standardized Update Comparison Logic (Name, Photo, or Profession)
+    final remoteName = _remoteProfileMap?['name']?.trim() ?? '';
+    final localName = widget.party.name.trim();
+    final remotePhoto = _remoteProfileMap?['photoUrl']?.trim() ?? '';
+    final localPhoto = widget.party.profileImage?.trim() ?? '';
+    final remoteProf = _remoteProfileMap?['profession']?.trim() ?? '';
+    final localProf = (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account').trim(); // Default local comparison
+
+    final bool hasUpdate = _remoteProfileMap != null && 
+        ((remoteName.isNotEmpty && remoteName != localName) || 
+         (remotePhoto.isNotEmpty && remotePhoto != localPhoto) ||
+         (remoteProf.isNotEmpty && remoteProf != widget.party.category && remoteProf != localProf));
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: isSettled 
             ? Colors.white 
@@ -118,123 +148,144 @@ class _PartyCardState extends State<PartyCard> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Expanded(
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          ProfileInfoWidget(
-                            name: widget.party.name,
-                            phone: widget.party.phone,
-                            profileImage: widget.party.profileImage,
-                            category: widget.party.category,
-                            date: widget.party.createdAt,
-                            showDate: false,
-                            hasUpdate: _hasUpdate,
-                            isVerified: widget.party.isVerified,
-                          ),
-                          Consumer<NotificationService>(
-                            builder: (context, notificationService, _) {
-                              final unreadCount = notificationService.notifications.where((n) {
-                                if (n.isRead) return false;
-                                if (n.relatedAccountId == widget.party.id) return true;
-                                final data = n.data;
-                                if (data != null) {
-                                  if (data['accountId'] == widget.party.id) return true;
-                                  final senderPhone = data['senderPhone']?.toString().replaceAll(RegExp(r'\D'), '');
-                                  final partyPhone = widget.party.phone.replaceAll(RegExp(r'\D'), '');
-                                  if (senderPhone != null && senderPhone.isNotEmpty && partyPhone.isNotEmpty) {
-                                    if (senderPhone.endsWith(partyPhone.length > 10 ? partyPhone.substring(partyPhone.length - 10) : partyPhone)) {
-                                      return true;
-                                    }
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        ProfileInfoWidget(
+                          name: widget.party.name,
+                          phone: widget.party.phone,
+                          profileImage: widget.party.profileImage,
+                          showText: false,
+                          customSize: 42,
+                          borderRadius: 6,
+                          hasUpdate: hasUpdate,
+                        ),
+                        Consumer<NotificationService>(
+                          builder: (context, notificationService, _) {
+                            final unreadCount = notificationService.notifications.where((n) {
+                              if (n.isRead) return false;
+                              if (n.relatedAccountId == widget.party.id) return true;
+                              final data = n.data;
+                              if (data != null) {
+                                if (data['accountId'] == widget.party.id) return true;
+                                final senderPhone = data['senderPhone']?.toString().replaceAll(RegExp(r'\D'), '');
+                                final partyPhone = widget.party.phone.replaceAll(RegExp(r'\D'), '');
+                                if (senderPhone != null && senderPhone.isNotEmpty && partyPhone.isNotEmpty) {
+                                  if (senderPhone.endsWith(partyPhone.length > 10 ? partyPhone.substring(partyPhone.length - 10) : partyPhone)) {
+                                    return true;
                                   }
                                 }
-                                return false;
-                              }).length;
+                              }
+                              return false;
+                            }).length;
 
-                              if (unreadCount == 0) return const SizedBox.shrink();
+                            if (unreadCount == 0) return const SizedBox.shrink();
 
-                              return Positioned(
-                                left: 24, // Image is 36x36, placing badge at bottom-right of image
-                                top: 22,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.expenseColor,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: Colors.white, width: 1.5),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.2),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
+                            return Positioned(
+                              left: 28, 
+                              top: 26,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.expenseColor,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.white, width: 1.5),
+                                  boxShadow: [
+                                    BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4),
+                                  ],
+                                ),
+                                child: Text(
+                                  unreadCount.toString(),
+                                  style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold, fontFamily: ''),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  displayName,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: fontWeight,
+                                    color: AppTheme.darkColor,
+                                    fontFamily: fontFamily,
                                   ),
-                                  child: Text(
-                                    unreadCount.toString(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 9,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (widget.party.isVerified) ...[
+                                const SizedBox(width: 4),
+                                Icon(
+                                  PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
+                                  size: 16,
+                                  color: AppTheme.verifiedGold,
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  displayCategory,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: AppTheme.themeColor,
+                                    fontFamily: fontFamily,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    balanceText,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: balanceColor,
                                       fontWeight: FontWeight.bold,
-                                      fontFamily: '', // Ensure numbers look good
+                                      fontFamily: fontFamily,
                                     ),
                                   ),
-                                ),
-                              );
-                            },
+                                  if (!isSettled) ...[
+                                    const SizedBox(width: 4),
+                                    Icon(balanceIcon, size: 14, color: balanceColor),
+                                  ],
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Rs ${widget.party.balance.abs().toStringAsFixed(0)}',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: balanceColor,
+                                      fontFamily: '', 
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  balanceText,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: balanceColor,
-                                    fontWeight: FontWeight.bold,
-                                    fontFamily: fontFamily,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            if (!isSettled) ...[
-                              const SizedBox(width: 4),
-                              Icon(
-                                balanceIcon,
-                                size: 14,
-                                color: balanceColor,
-                                weight: 3,
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            'Rs ${widget.party.balance.abs().toStringAsFixed(0)}',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              color: balanceColor,
-                              fontFamily: '', 
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
@@ -258,7 +309,7 @@ class _PartyCardState extends State<PartyCard> {
                       child: InkWell(
                         onTap: () => _makePhoneCall(widget.party.phone),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -286,7 +337,7 @@ class _PartyCardState extends State<PartyCard> {
                       child: InkWell(
                         onTap: widget.onMessage,
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [

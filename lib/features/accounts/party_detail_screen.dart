@@ -92,19 +92,13 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
   Future<void> _checkRemoteProfile() async {
     if (widget.party.phone.length < 10) return;
     
-    // اگر پہلے ہی اپ ڈیٹ ہو چکا ہے یا تصویر موجود ہے تو بار بار چیک نہ کریں
-    if (_remoteProfile != null) return;
-
     final dbService = Provider.of<DatabaseService>(context, listen: false);
     final profile = await dbService.findPublicProfileByPhone(widget.party.phone);
     
     if (mounted && profile != null) {
-      // صرف اس صورت میں شو کریں اگر نام یا تصویر مختلف ہو
-      if (profile['name'] != widget.party.name || profile['photoUrl'] != widget.party.profileImage) {
-        setState(() {
-          _remoteProfile = profile;
-        });
-      }
+      setState(() {
+        _remoteProfile = profile;
+      });
     }
   }
 
@@ -256,6 +250,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
       final updatedAccount = widget.party.copyWith(
         name: _remoteProfile!['name']?.isNotEmpty == true ? _remoteProfile!['name'] : widget.party.name,
         profileImage: _remoteProfile!['photoUrl']?.isNotEmpty == true ? _remoteProfile!['photoUrl'] : widget.party.profileImage,
+        category: _remoteProfile!['profession']?.isNotEmpty == true ? _remoteProfile!['profession'] : widget.party.category,
       );
       await dbService.updateAccount(updatedAccount);
       if (mounted) {
@@ -447,50 +442,42 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     final Color accentColor = isPayable ? _expenseColor : _incomeColor;
 
     return Scaffold(
-      backgroundColor: AppTheme.lightColor,
-      appBar: CustomAppBar(
+      backgroundColor: AppTheme.scaffoldBackground,
+      extendBodyBehindAppBar: true, // ہیڈر کو اوپر تک لے جانے کے لیے
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const SizedBox.shrink(),
         actions: [
-          Center(
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => PartyHistoryScreen(party: currentParty),
-                  ),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white30),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(PhosphorIcons.chartBar(), color: Colors.white, size: 14),
-                    const SizedBox(width: 6),
-                    Text(
-                      isUrdu ? 'تجزیہ و ریکارڈ' : 'Analysis',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: fontFamily,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          // پیج انٹری بٹن
+          _buildHeaderActionButton(
+            isUrdu ? 'پیج انٹری' : 'Entry', 
+            PhosphorIcons.listBullets(), 
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => BulkPartyTransactionScreen(party: currentParty)),
+            ).then((_) => _loadTransactions()),
+            fontFamily,
+          ),
+          const SizedBox(width: 8),
+          // تجزیہ بٹن
+          _buildHeaderActionButton(
+            isUrdu ? 'تجزیہ' : 'Analysis', 
+            PhosphorIcons.chartBar(), 
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => PartyHistoryScreen(party: currentParty)),
             ),
+            fontFamily,
           ),
           const SizedBox(width: 8),
           PopupMenuButton<String>(
-            icon: Icon(PhosphorIcons.dotsThreeVertical()),
+            icon: const Icon(Icons.more_vert, color: Colors.white),
             onSelected: (value) async {
               if (value == 'history') {
                 Navigator.push(
@@ -528,7 +515,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                 );
                 if (confirm == true) {
                   await Provider.of<DatabaseService>(context, listen: false).deleteAccount(currentParty.id);
-                  Navigator.pop(context);
+                  if (mounted) Navigator.pop(context);
                 }
               }
             },
@@ -572,47 +559,40 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               ),
             ],
           ),
+          const SizedBox(width: 8),
         ],
       ),
-      body: Container(
-        color: AppTheme.lightColor,
-        child: Column(
-          children: [
-            // Paid/Received Summary Card (Updated Layout based on your image)
-            _buildSummaryCard(currentParty, currentCycleOut, currentCycleIn, isUrdu, fontFamily, accentColor),
+      body: Column(
+        children: [
+          // نیا بڑا ڈارک ہیڈر
+          _buildLargeDarkHeader(currentParty, currentCycleOut, currentCycleIn, isUrdu, fontFamily, accentColor),
 
-            // Search & Filter Bar
-            SearchSortBar(
-              controller: _searchController,
-              onSearchChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
-              onSortToggled: () {
-                setState(() {
-                  _isAscending = !_isAscending;
-                });
-              },
-              isAscending: _isAscending,
+          // باقی سکرین
+          Expanded(
+            child: Container(
+              color: AppTheme.scaffoldBackground,
+              child: Column(
+                children: [
+                  SearchSortBar(
+                    controller: _searchController,
+                    onSearchChanged: (value) => setState(() => _searchQuery = value),
+                    onSortToggled: () => setState(() => _isAscending = !_isAscending),
+                    isAscending: _isAscending,
+                  ),
+                  _buildFilterChips(isUrdu, fontFamily),
+                  _buildListLabels(isUrdu, fontFamily),
+                  Expanded(
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator(color: AppTheme.themeColor))
+                        : filteredTransactions.isEmpty
+                            ? _buildEmptyState(isUrdu, fontFamily)
+                            : _buildTransactionList(filteredTransactions, isUrdu, fontFamily),
+                  ),
+                ],
+              ),
             ),
-
-            // Filter Chips (All, Payables, Receivables)
-            _buildFilterChips(isUrdu, fontFamily),
-
-            // Transaction List Header (Labels)
-            _buildListLabels(isUrdu, fontFamily),
-
-            // Transactions List
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: AppTheme.themeColor))
-                  : filteredTransactions.isEmpty
-                      ? _buildEmptyState(isUrdu, fontFamily)
-                      : _buildTransactionList(filteredTransactions, isUrdu, fontFamily),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
       floatingActionButton: AnimatedScale(
         scale: _isFabVisible ? 1.0 : 0.0,
@@ -660,83 +640,115 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     );
   }
 
-  Widget _buildSummaryCard(Account party, double paid, double received, bool isUrdu, String fontFamily, Color accentColor) {
+  Widget _buildLargeDarkHeader(Account party, double paid, double received, bool isUrdu, String fontFamily, Color accentColor) {
     final netBalance = party.balance;
     final isPayable = netBalance >= 0;
-    
-    // Labels and Arrows
-    final receivedLabel = isUrdu ? "لیا / جمع" : "Received / In";
-    final paidLabel = isUrdu ? "دیا / بنام" : "Paid / Out";
-    final balanceText = isUrdu
-        ? (isPayable ? "کل دینا" : "کل لینا")
-        : (isPayable ? "Payable" : "Receivable");
+    final balanceLabel = isUrdu ? (isPayable ? "کل دینا" : "کل لینا") : (isPayable ? "Payable" : "Receivable");
+
+    final String displayCategory = (_remoteProfile != null && _remoteProfile!['profession'] != null && _remoteProfile!['profession']!.isNotEmpty)
+        ? _remoteProfile!['profession']!
+        : (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account');
+
+    // Standardized Update Comparison Logic (Sync with PartyCard: Name, Photo, or Profession)
+    final remoteName = _remoteProfile?['name']?.trim() ?? '';
+    final localName = party.name.trim();
+    final remotePhoto = _remoteProfile?['photoUrl']?.trim() ?? '';
+    final localPhoto = (party.profileImage ?? '').trim();
+    final remoteProf = _remoteProfile?['profession']?.trim() ?? '';
+    final localProf = (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account').trim();
+
+    final bool hasUpdate = _remoteProfile != null && 
+        ((remoteName.isNotEmpty && remoteName != localName) || 
+         (remotePhoto.isNotEmpty && remotePhoto != localPhoto) ||
+         (remoteProf.isNotEmpty && remoteProf != party.category && remoteProf != localProf));
 
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: accentColor.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 4)),
-        ],
-        border: Border.all(color: accentColor.withOpacity(0.5), width: 1),
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 50,
+        bottom: 16,
+        left: 20,
+        right: 20,
+      ),
+      decoration: const BoxDecoration(
+        color: AppTheme.darkColor,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
+          // Profile Info (Wrapped in GestureDetector to trigger update)
+          GestureDetector(
+            onTap: hasUpdate ? _syncRemoteProfile : null,
+            child: ProfileInfoWidget(
+              name: party.name,
+              phone: '',
+              profileImage: party.profileImage,
+              category: displayCategory,
+              address: party.address, 
+              isLarge: true,
+              isVerticalCategory: true,
+              textColor: Colors.white,
+              subtitleColor: Colors.white70,
+              categoryColor: Colors.white,
+              customSize: 55,
+              borderRadius: 8,
+              isVerified: party.isVerified,
+              hasUpdate: hasUpdate, 
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Stats Row
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Profile Info (Matching the image)
-              Expanded(
-                flex: 4,
-                child: GestureDetector(
-                  onTap: _remoteProfile != null ? _syncRemoteProfile : null,
-                  child: ProfileInfoWidget(
-                    name: party.name,
-                    phone: party.phone,
-                    profileImage: party.profileImage,
-                    category: party.category,
-                    isLarge: false,
-                    isVerticalCategory: true,
-                    hasUpdate: _remoteProfile != null,
-                    isVerified: party.isVerified,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              // Transaction Summary
-              Expanded(
-                flex: 5,
-                child: Column(
-                  children: [
-                    _buildSummaryRow(receivedLabel, received, _incomeColor, fontFamily, PhosphorIcons.arrowDownLeft()),
-                    const SizedBox(height: 12),
-                    _buildSummaryRow(paidLabel, paid, _expenseColor, fontFamily, PhosphorIcons.arrowUpRight()),
-                  ],
-                ),
-              ),
+              _buildHeaderStatItem(isUrdu ? "جمع" : "In", received, Colors.white, fontFamily, PhosphorIcons.arrowDownLeft()),
+              _buildStatDivider(),
+              _buildHeaderStatItem(isUrdu ? "بنام" : "Out", paid, Colors.white, fontFamily, PhosphorIcons.arrowUpRight()),
+              _buildStatDivider(),
+              _buildHeaderStatItem(balanceLabel, netBalance.abs(), Colors.white, fontFamily, isPayable ? PhosphorIcons.arrowUpRight() : PhosphorIcons.arrowDownLeft(), isBold: true),
             ],
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Divider(height: 1, thickness: 1, color: Colors.black12),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatDivider() {
+    return Container(
+      height: 20,
+      width: 1,
+      color: Colors.white12,
+    );
+  }
+
+  Widget _buildHeaderStatItem(String label, double amount, Color color, String fontFamily, IconData icon, {bool isBold = false}) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(color: Colors.white70, fontSize: 11, fontFamily: fontFamily),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
+          const SizedBox(height: 4),
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Expanded(
-                flex: 4,
-                child: Align(
-                  alignment: isUrdu ? Alignment.centerRight : Alignment.centerLeft,
-                  child: _buildPageEntryButton(isUrdu, fontFamily, party),
+              Icon(icon, size: 12, color: isBold ? Colors.white : (label.contains('In') || label.contains('جمع') ? _incomeColor : _expenseColor)),
+              const SizedBox(width: 4),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    "Rs ${amount.toStringAsFixed(0)}",
+                    style: TextStyle(
+                      color: color,
+                      fontSize: isBold ? 16 : 14,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: '',
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 5,
-                child: _buildSummaryRow(balanceText, netBalance.abs(), accentColor, fontFamily,
-                  isPayable ? PhosphorIcons.arrowUpRight() : PhosphorIcons.arrowDownLeft(),
-                  isTotal: true),
               ),
             ],
           ),
@@ -745,37 +757,33 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     );
   }
 
-  Widget _buildPageEntryButton(bool isUrdu, String fontFamily, Account party) {
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => BulkPartyTransactionScreen(party: party),
+  Widget _buildHeaderActionButton(String label, IconData icon, VoidCallback onTap, String fontFamily) {
+    return Center(
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white24),
           ),
-        ).then((_) => _loadTransactions());
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: _goldColor,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(PhosphorIcons.listBullets(), color: Colors.white, size: 14),
-            const SizedBox(width: 6),
-            Text(
-              isUrdu ? 'پیج انٹری' : 'Page Entry',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                fontFamily: fontFamily,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: Colors.white, size: 14),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: fontFamily,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

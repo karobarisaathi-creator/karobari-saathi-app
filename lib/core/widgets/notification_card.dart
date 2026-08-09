@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/models/notification_model.dart';
+import 'package:account_app/core/services/notification_service.dart';
+import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:intl/intl.dart';
@@ -30,6 +34,9 @@ class NotificationCard extends StatelessWidget {
     final bool isPriceDrop = notification.type == NotificationType.price_drop;
     final data = notification.data;
     final bool isAdded = data?['isAdded'] == true;
+    final bool isArtisanRequest = data?['type'] == 'artisan_request';
+    final bool isResponded = data?['responded'] == true;
+    final bool isAccepted = data?['accepted'] == true;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -187,6 +194,74 @@ class NotificationCard extends StatelessWidget {
                         elevation: 0,
                       ),
                     ),
+                  if (isArtisanRequest) ...[
+                    if (!isResponded)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => _respondToRequest(context, true),
+                                icon: Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill), size: 18),
+                                label: Text(isUrdu ? 'ہاں' : 'Yes', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.incomeColor,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => _respondToRequest(context, false),
+                                icon: Icon(PhosphorIcons.xCircle(PhosphorIconsStyle.fill), size: 18),
+                                label: Text(isUrdu ? 'ناں' : 'No', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.expenseColor,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isAccepted ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                isAccepted ? PhosphorIcons.checkCircle() : PhosphorIcons.xCircle(),
+                                color: isAccepted ? Colors.green : Colors.red,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                isAccepted 
+                                    ? (isUrdu ? 'آپ نے کام کی حامی بھر لی ہے' : 'You accepted this work')
+                                    : (isUrdu ? 'آپ نے معذرت کر لی ہے' : 'You declined this work'),
+                                style: TextStyle(
+                                  color: isAccepted ? Colors.green : Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  fontFamily: fontFamily,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
                   const Spacer(),
                   IconButton(
                     onPressed: onDeletePressed,
@@ -267,5 +342,28 @@ class NotificationCard extends StatelessWidget {
     if (difference.inHours < 1) return '${difference.inMinutes}m ago';
     if (difference.inDays < 1) return DateFormat('hh:mm a').format(timestamp);
     return DateFormat('dd MMM').format(timestamp);
+  }
+
+  void _respondToRequest(BuildContext context, bool accepted) async {
+    final nService = Provider.of<NotificationService>(context, listen: false);
+    final user = FirebaseAuth.instance.currentUser;
+    final data = notification.data;
+    
+    if (data == null || user == null) return;
+
+    await nService.respondToArtisanRequest(
+      customerUid: data['senderUid'],
+      artisanName: user.displayName ?? 'Artisan',
+      accepted: accepted,
+      notificationId: notification.id,
+    );
+
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(isUrdu ? 'جواب بھیج دیا گیا!' : 'Response sent!'),
+        backgroundColor: accepted ? Colors.green : Colors.red,
+      ),
+    );
   }
 }

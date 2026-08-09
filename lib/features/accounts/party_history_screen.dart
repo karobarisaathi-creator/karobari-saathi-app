@@ -31,6 +31,8 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
   Map<String, InventoryItem> _managedItemsMap = {};
   bool _isLoadingRemoteItems = false;
   late AnimationController _shimmerController;
+  String? _remoteProfession;
+  String? _remoteAddress;
   
   double _totalIn = 0;
   double _totalOut = 0;
@@ -69,32 +71,43 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
     
     // 1. Find the party's UID via their phone number
     final profile = await db.findPublicProfileByPhone(widget.party.phone);
-    if (profile != null && profile['uid'] != null) {
-      final uid = profile['uid']!;
-
-      // 2. Load from local cache first (Immediate)
-      final cachedItems = db.getRemoteCachedItems(uid);
-      if (cachedItems.isNotEmpty && mounted) {
-        setState(() {
-          for (var item in cachedItems) {
-            _managedItemsMap[item.name.trim().toLowerCase()] = item;
-          }
-          _isLoadingRemoteItems = false; // Stop spinner as we have cached data
-        });
-      }
-
-      // 3. Fetch fresh items from Firebase in background
-      final remoteItems = await db.getRemoteInventoryItems(uid);
-      
+    if (profile != null) {
       if (mounted) {
         setState(() {
-          // Filter to ensure only items belonging to this specific party are shown
-          final filteredItems = remoteItems.where((item) => item.accountId == uid).toList();
-          for (var item in filteredItems) {
-            _managedItemsMap[item.name.trim().toLowerCase()] = item;
-          }
-          _isLoadingRemoteItems = false;
+          _remoteProfession = profile['profession'];
+          _remoteAddress = profile['address'];
         });
+      }
+      
+      if (profile['uid'] != null) {
+        final uid = profile['uid']!;
+
+        // 2. Load from local cache first (Immediate)
+        final cachedItems = db.getRemoteCachedItems(uid);
+        if (cachedItems.isNotEmpty && mounted) {
+          setState(() {
+            for (var item in cachedItems) {
+              _managedItemsMap[item.name.trim().toLowerCase()] = item;
+            }
+            _isLoadingRemoteItems = false; // Stop spinner as we have cached data
+          });
+        }
+
+        // 3. Fetch fresh items from Firebase in background
+        final remoteItems = await db.getRemoteInventoryItems(uid);
+        
+        if (mounted) {
+          setState(() {
+            // Filter to ensure only items belonging to this specific party are shown
+            final filteredItems = remoteItems.where((item) => item.accountId == uid).toList();
+            for (var item in filteredItems) {
+              _managedItemsMap[item.name.trim().toLowerCase()] = item;
+            }
+            _isLoadingRemoteItems = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _isLoadingRemoteItems = false);
       }
     } else {
       if (mounted) setState(() => _isLoadingRemoteItems = false);
@@ -167,13 +180,35 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
       _avgPaymentDays = (days / allTx.length).toStringAsFixed(1);
     }
 
-    // Simple Trust Score Logic (1-5)
-    double score = 1.0;
-    if (allTx.length > 5) score += 1.0;
-    if (allTx.length > 15) score += 1.0;
-    if (_totalIn + _totalOut > 50000) score += 1.0;
-    if (_totalIn + _totalOut > 200000) score += 1.0;
-    _trustScore = score;
+    // --- Improved Trust Score Logic (5 Pillars) ---
+    double score = 0;
+
+    // 1. Verification Pillar (1.0)
+    if (widget.party.isVerified) score += 1.0;
+
+    // 2. Loyalty Pillar (1.0) - How old is the relationship?
+    final daysSinceFirstDeal = DateTime.now().difference(_firstDeal ?? DateTime.now()).inDays;
+    if (daysSinceFirstDeal > 180) score += 1.0; // 6+ months
+    else if (daysSinceFirstDeal > 30) score += 0.5; // 1+ month
+
+    // 3. Frequency Pillar (1.0) - Number of deals
+    if (_totalDeals > 25) score += 1.0;
+    else if (_totalDeals > 10) score += 0.5;
+
+    // 4. Volume Pillar (1.0) - Total money moved
+    if (_totalVolume > 100000) score += 1.0;
+    else if (_totalVolume > 20000) score += 0.5;
+
+    // 5. Reliability Pillar (1.0) - How much of the total business is cleared?
+    // If they move a lot of money but keep a small balance, they are reliable.
+    if (_totalVolume > 0) {
+      final clearedRatio = 1 - (widget.party.balance.abs() / _totalVolume);
+      if (clearedRatio > 0.9) score += 1.0; // 90% cleared
+      else if (clearedRatio > 0.7) score += 0.5; // 70% cleared
+    }
+
+    // Ensure score is between 1 and 5
+    _trustScore = score.clamp(1.0, 5.0);
 
     _transactions = List.from(allTx)..sort((a, b) => b.date.compareTo(a.date));
     _totalDeals = allTx.length;
@@ -227,10 +262,29 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
             // Business Relationship Section - Removed outer container for better edge-to-edge look
             Column(
               children: [
-                if (widget.party.address != null && widget.party.address!.isNotEmpty)
+                _buildInfoTile(
+                  isUrdu ? 'فون نمبر' : 'Phone Number',
+                  widget.party.phone.replaceAll('+92', '0'),
+                  PhosphorIcons.phone(),
+                  isUrdu, fontFamily
+                ),
+                if ((_remoteProfession != null && _remoteProfession!.isNotEmpty) || 
+                    (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account').isNotEmpty)
+                  _buildInfoTile(
+                    isUrdu ? 'پیشہ / نوعیت' : 'Profession / Type',
+                    (_remoteProfession != null && _remoteProfession!.isNotEmpty)
+                        ? _remoteProfession!
+                        : (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account'),
+                    PhosphorIcons.briefcase(),
+                    isUrdu, fontFamily
+                  ),
+                if ((widget.party.address != null && widget.party.address!.isNotEmpty) || 
+                    (_remoteAddress != null && _remoteAddress!.isNotEmpty))
                   _buildInfoTile(
                     isUrdu ? 'پتہ' : 'Address',
-                    widget.party.address!,
+                    (_remoteAddress != null && _remoteAddress!.isNotEmpty)
+                        ? _remoteAddress!
+                        : widget.party.address!,
                     PhosphorIcons.mapPin(),
                     isUrdu, fontFamily
                   ),

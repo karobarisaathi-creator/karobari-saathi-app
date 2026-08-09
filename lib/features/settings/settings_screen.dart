@@ -33,6 +33,9 @@ import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/utils/image_utils.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 
+import 'package:account_app/features/artisans/customer_orders_screen.dart';
+import 'package:account_app/features/settings/login_screen.dart'; // For navigation
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -302,6 +305,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ],
                 ],
+                _buildDivider(context),
+                _buildSettingItem(
+                  icon: PhosphorIcons.clockCounterClockwise(),
+                  title: isUrdu ? 'میرے کام کی ہسٹری' : 'My Job History',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CustomerOrdersScreen(),
+                      ),
+                    );
+                  },
+                  fontFamily: fontFamily,
+                  isUrdu: isUrdu,
+                  context: context,
+                ),
                 _buildDivider(context),
                 _buildSettingItem(
                   icon: PhosphorIcons.package(),

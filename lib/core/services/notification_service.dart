@@ -332,10 +332,149 @@ class NotificationService with ChangeNotifier {
       case 'account_share': return NotificationType.share;
       case 'reminder': return NotificationType.reminder;
       case 'report': return NotificationType.report;
-      case 'price_drop': return NotificationType.report; // Use report or add new type
+      case 'price_drop': return NotificationType.report;
+      case 'artisan_request': return NotificationType.general;
       case 'system': return NotificationType.system;
       default: return NotificationType.general;
     }
+  }
+
+  Future<void> sendArtisanWorkRequest({
+    required String artisanUid,
+    required String customerName,
+  }) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    try {
+      final String requestId = "${currentUser.uid}_$artisanUid";
+      
+      // 1. Create a persistent request record for tracking status
+      await _firestore.collection('artisan_requests').doc(requestId).set({
+        'customerUid': currentUser.uid,
+        'artisanUid': artisanUid,
+        'status': 'pending',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      // 2. Send the notification to the artisan
+      final notifId = "artisan_req_${DateTime.now().millisecondsSinceEpoch}";
+      final notification = AppNotification(
+        id: notifId,
+        title: 'کام کی درخواست (New Work Request)',
+        message: '$customerName آپ سے کام کے بارے میں پوچھ رہے ہیں۔ کیا آپ دستیاب ہیں؟',
+        type: NotificationType.general,
+        isRead: false,
+        timestamp: DateTime.now(),
+        data: {
+          'type': 'artisan_request',
+          'senderName': customerName,
+          'senderUid': currentUser.uid,
+          'senderPhone': currentUser.phoneNumber,
+          'requestId': requestId,
+          'needsAction': true,
+        },
+      );
+
+      await _firestore
+          .collection('users')
+          .doc(artisanUid)
+          .collection('notifications')
+          .doc(notifId)
+          .set(notification.toMap());
+    } catch (e) {
+      debugPrint('Error sending artisan request: $e');
+    }
+  }
+
+  Future<void> respondToArtisanRequest({
+    required String customerUid,
+    required String artisanName,
+    required bool accepted,
+    required String notificationId,
+  }) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    try {
+      final String requestId = "${customerUid}_${currentUser.uid}";
+
+      // 1. Update the persistent request record
+      await _firestore.collection('artisan_requests').doc(requestId).set({
+        'status': accepted ? 'accepted' : 'rejected',
+        'respondedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // 2. Mark the notification as acted upon
+      updateNotificationData(notificationId, {'responded': true, 'accepted': accepted});
+
+      // 3. Send response back to customer
+      final notifId = "artisan_res_${DateTime.now().millisecondsSinceEpoch}";
+      final notification = AppNotification(
+        id: notifId,
+        title: accepted ? 'کام کی منظوری! ✅' : 'معذرت ❌',
+        message: accepted 
+            ? '$artisanName نے آپ کی کام کی درخواست قبول کر لی ہے۔ اب آپ رابطہ کر سکتے ہیں۔' 
+            : '$artisanName اس وقت کام کے لیے دستیاب نہیں ہیں۔',
+        type: NotificationType.general,
+        isRead: false,
+        timestamp: DateTime.now(),
+        data: {
+          'type': 'artisan_response',
+          'artisanName': artisanName,
+          'artisanUid': currentUser.uid,
+          'accepted': accepted,
+        },
+      );
+
+      await _firestore
+          .collection('users')
+          .doc(customerUid)
+          .collection('notifications')
+          .doc(notifId)
+          .set(notification.toMap());
+    } catch (e) {
+      debugPrint('Error responding to artisan request: $e');
+    }
+  }
+
+  // Helper to check current request status with auto-expiry logic
+  Future<String?> getArtisanRequestStatus(String artisanUid) async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+
+    try {
+      final doc = await _firestore.collection('artisan_requests').doc("${user.uid}_$artisanUid").get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        final String status = data['status'] as String;
+        final Timestamp? timestamp = data['respondedAt'] as Timestamp? ?? data['timestamp'] as Timestamp?;
+
+        if (timestamp != null) {
+          final DateTime lastAction = timestamp.toDate();
+          final DateTime now = DateTime.now();
+          final difference = now.difference(lastAction);
+
+          // AUTO-RESET LOGIC:
+          // 1. If accepted, reset after 24 hours
+          if (status == 'accepted' && difference.inHours >= 24) {
+            return null; 
+          }
+          // 2. If rejected, reset after 12 hours
+          if (status == 'rejected' && difference.inHours >= 12) {
+            return null;
+          }
+          // 3. If still pending, reset after 48 hours
+          if (status == 'pending' && difference.inHours >= 48) {
+            return null;
+          }
+        }
+        return status;
+      }
+    } catch (e) {
+      debugPrint('Error checking request status: $e');
+    }
+    return null;
   }
 
   // --- Notification Actions with Persistence ---

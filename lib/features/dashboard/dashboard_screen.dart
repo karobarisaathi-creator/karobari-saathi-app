@@ -1,32 +1,29 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:account_app/core/services/version_check_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/services/auth_service.dart';
-import 'package:account_app/core/services/alert_service.dart'; // Import AlertService
+import 'package:account_app/core/services/alert_service.dart'; 
 import 'package:account_app/core/models/account_model.dart';
+import 'package:account_app/core/models/artisan_profile_model.dart';
 // Screens
-import 'package:account_app/features/settings/settings_screen.dart';
 import 'package:account_app/features/notifications/notifications_screen.dart';
-import 'package:account_app/features/accounts/sms_invitation_screen.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
-import 'package:account_app/features/accounts/add_party_screen.dart'; // Import AddPartyScreen
-import 'main_navigation_screen.dart'; // Import MainNavigationScreen
+import 'package:account_app/features/accounts/add_party_screen.dart'; 
+import 'package:account_app/features/accounts/party_history_screen.dart';
+import 'package:account_app/features/artisans/artisan_detail_screen.dart';
+import 'package:account_app/features/artisans/artisan_work_orders_screen.dart';
+import 'package:account_app/features/inventory/chat_list_screen.dart';
+import 'main_navigation_screen.dart'; 
 import 'package:account_app/core/widgets/party_card.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-
 import 'package:account_app/core/widgets/profile_info_widget.dart';
-
 import 'package:account_app/core/widgets/simple_spinning_ring.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -37,34 +34,71 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = false;
   bool _isAscending = true;
+  bool _isSearchVisible = false; // سرچ بار کو کنٹرول کرنے کے لیے
   String _searchQuery = "";
-  List<AlertAnalysis> _dashboardAlerts = [];
   Map<String, dynamic>? _updateData;
+  StreamSubscription<ArtisanProfile?>? _artisanSub;
+  ArtisanProfile? _myArtisanProfile;
 
   @override
   void initState() {
     super.initState();
-    // Ensure database is initialized
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final dbService = Provider.of<DatabaseService>(context, listen: false);
-      
-      // Check for app updates
       _checkVersion();
+      _setupArtisanListener();
 
       if (!dbService.isInitialized) {
         setState(() => _isLoading = true);
         dbService.init().then((_) {
-          if (mounted) {
-            _loadAlerts(); // Load alerts after init
-            setState(() => _isLoading = false);
-          }
+          if (mounted) setState(() => _isLoading = false);
         }).catchError((e) {
           if (mounted) setState(() => _isLoading = false);
         });
-      } else {
-        _loadAlerts(); // Load alerts if already initialized
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _artisanSub?.cancel();
+    super.dispose();
+  }
+
+  void _setupArtisanListener() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final dbService = Provider.of<DatabaseService>(context, listen: false);
+    _artisanSub = dbService.streamArtisanProfile(user.uid).listen((profile) {
+      if (mounted) {
+        setState(() {
+          _myArtisanProfile = profile;
+        });
+      }
+    });
+  }
+
+  Future<void> _toggleAvailability() async {
+    if (_myArtisanProfile == null) return;
+
+    final dbService = Provider.of<DatabaseService>(context, listen: false);
+    final newStatus = _myArtisanProfile!.availability == 'available' ? 'busy' : 'available';
+    
+    final updatedProfile = _myArtisanProfile!.copyWith(
+      availability: newStatus,
+      updatedAt: DateTime.now(),
+    );
+
+    try {
+      await dbService.saveArtisanProfile(updatedProfile);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    }
   }
 
   void _checkVersion() async {
@@ -76,100 +110,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _loadAlerts() {
-    // بوجھ کم کرنے کے لیے الرٹس کو فیوچر میں منتقل کر دیا گیا ہے
-    Future.microtask(() {
-      final dbService = Provider.of<DatabaseService>(context, listen: false);
-      final professions = dbService.getProfessions();
-      final transactions = dbService.getAllTransactions();
-      List<AlertAnalysis> professionAlerts = [];
-
-      for (var prof in professions) {
-        final profTransactions = transactions.where((t) => t.professionId == prof.id).toList();
-        final previousSeasons = professions.where((p) => p.name == prof.name && p.id != prof.id).toList();
-
-        final analysis = AlertService.analyzeProfessionAlerts(
-          prof,
-          profTransactions,
-          previousSeasons: previousSeasons,
-        );
-
-        if (analysis.hasAlerts) {
-          professionAlerts.add(analysis);
-        }
-      }
-      
-      // Sort alerts by risk level
-      professionAlerts.sort((a, b) => b.riskLevel.index.compareTo(a.riskLevel.index));
-
-      if (mounted) {
-        setState(() {
-          _dashboardAlerts = professionAlerts;
-        });
-      }
-    });
-  }
-
-
   Future<void> _refreshData() async {
     final dbService = Provider.of<DatabaseService>(context, listen: false);
     await dbService.fetchFromFirebase();
-    _loadAlerts(); // Reload alerts on refresh
-  }
-
-
-  Widget _buildOptionItem(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String fontFamily,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppTheme.themeColor.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: AppTheme.themeColor, size: 30),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontFamily: fontFamily,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final languageService = Provider.of<LanguageService>(context);
-    final authService = Provider.of<AuthService>(context); // Listen to auth changes
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
     final user = FirebaseAuth.instance.currentUser;
     final dbService = Provider.of<DatabaseService>(context);
     
-    // Get updated photo URL from user (after reload)
     final profilePhoto = user?.photoURL;
-
     final myAccount = dbService.getAccounts().firstWhere(
       (a) => a.phone == (user?.phoneNumber ?? ''),
       orElse: () => Account(
         id: 'me',
         name: user?.displayName ?? (isUrdu ? 'میرا پروفائل' : 'My Profile'),
         phone: user?.phoneNumber ?? '',
-        profileImage: profilePhoto, // Use refreshed photo
+        profileImage: profilePhoto,
         category: isUrdu ? 'دکاندار' : 'Shopkeeper',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
@@ -181,104 +142,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
 
-    // If account exists but profile image is old, use the one from FirebaseAuth
     final String? effectivePhoto = (myAccount.id != 'me' && myAccount.profileImage != null) 
         ? myAccount.profileImage 
         : profilePhoto;
 
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBackground,
-      appBar: CustomAppBar(
-        backgroundColor: AppTheme.darkColor,
-        foregroundColor: Colors.white,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         centerTitle: true,
-        title: isUrdu ? 'کاروباری ساتھی' : 'Karobari Saathi',
-        showBackButton: false,
-        leading: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: GestureDetector(
-            onTap: () {
-              MainNavigationScreen.of(context)?.onItemTapped(4);
-            },
-            child: Center(
-              child: FittedBox(
-                child: ProfileInfoWidget(
-                  name: '', 
-                  phone: myAccount.phone,
-                  profileImage: effectivePhoto,
-                  isLarge: false,
-                  showText: false, 
-                  textColor: Colors.white,
-                  isVerified: myAccount.isVerified,
-                ),
-              ),
-            ),
+        title: Text(
+          isUrdu ? 'کاروباری ساتھی' : 'Karobari Saathi',
+          style: TextStyle(
+            color: Colors.white,
+            fontFamily: fontFamily,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
           ),
         ),
+        leading: const SizedBox.shrink(), // Remove the menu icon
         actions: [
-          Consumer<NotificationService>(
-            builder: (context, notificationService, child) {
-              return Stack(
-                children: [
-                  IconButton(
-                    icon: Icon(PhosphorIcons.bell()),
-                    tooltip: isUrdu ? 'نوٹیفیکیشنز' : 'Notifications',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => NotificationsScreen()),
-                      );
-                    },
-                  ),
-                  if (notificationService.unreadCount > 0)
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.expenseColor,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
-                        ),
-                        child: Text(
-                          notificationService.unreadCount > 99
-                              ? '99+'
-                              : notificationService.unreadCount.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
+          if (_myArtisanProfile != null)
+            _buildAvailabilityToggle(isUrdu, fontFamily),
+          _buildNotificationAction(),
+          const SizedBox(width: 8),
         ],
       ),
       body: _isLoading
-          ? const Center(
-              child: SimpleSpinningRing(
-                size: 60,
-                duration: Duration(seconds: 2),
-              ),
-            )
+          ? const Center(child: SimpleSpinningRing(size: 60, duration: Duration(seconds: 2)))
           : Consumer<DatabaseService>(
         builder: (context, databaseService, child) {
           final allAccounts = databaseService.getAccounts();
           final parties = allAccounts.where((p) => p.isActive && p.category != 'Partner').toList();
           final professions = databaseService.getProfessions();
-
-          // Calculate aggregate balances from Parties (Receivables and Payables)
-          double totalReceivable = 0; // لینے ہیں
-          double totalPayable = 0;    // دینے ہیں
+          
+          double totalReceivable = 0; 
+          double totalPayable = 0;    
 
           for (var party in parties) {
             final partyTransactions = databaseService.getAllTransactions()
@@ -303,8 +204,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
 
           double netBalance = totalPayable - totalReceivable;
-          final Color balanceCardColor = AppTheme.darkColor;
 
+          // --- Professions Logic ---
           double profIncome = 0;
           double profExpense = 0;
           for (var p in professions) {
@@ -317,217 +218,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           return Column(
             children: [
-              // Fixed Header Section (Balance Card + Search Bar)
-              Container(
-                color: AppTheme.lightColor,
-                child: Column(
-                  children: [
-                    Card(
-                      elevation: 0,
-                      color: balanceCardColor,
-                      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12.0),
-                        side: BorderSide(color: AppTheme.darkColor.withOpacity(0.2)),
-                      ),
-                      child: Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(10),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: _buildBalanceItem(
-                                    title: isUrdu ? 'لینے ہیں' : 'To Receive',
-                                    amount: totalReceivable,
-                                    color: Colors.white,
-                                    valueColor: Colors.white,
-                                    icon: PhosphorIcons.arrowDownLeft(),
-                                    fontFamily: fontFamily,
-                                    isUrdu: isUrdu,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _buildBalanceItem(
-                                    title: isUrdu ? 'دینے ہیں' : 'To Pay',
-                                    amount: totalPayable,
-                                    color: Colors.white,
-                                    valueColor: Colors.white,
-                                    icon: PhosphorIcons.arrowUpRight(),
-                                    fontFamily: fontFamily,
-                                    isUrdu: isUrdu,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _buildBalanceItem(
-                                    title: isUrdu 
-                                        ? (netBalance >= 0 ? 'باقی دینے' : 'باقی لینے')
-                                        : (netBalance >= 0 ? 'Net Payable' : 'Net Receivable'),
-                                    amount: netBalance.abs(),
-                                    color: Colors.white,
-                                    valueColor: Colors.white,
-                                    icon: PhosphorIcons.wallet(),
-                                    fontFamily: fontFamily,
-                                    isUrdu: isUrdu,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const Divider(height: 1, thickness: 0.5, color: Colors.white10),
-
-                          Padding(
-                            padding: const EdgeInsets.all(10),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: _buildBalanceItem(
-                                    title: isUrdu ? 'پیشہ آمدن' : 'Prof. Income',
-                                    amount: profIncome,
-                                    color: Colors.white,
-                                    valueColor: Colors.white,
-                                    icon: PhosphorIcons.arrowDownLeft(),
-                                    fontFamily: fontFamily,
-                                    isUrdu: isUrdu,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _buildBalanceItem(
-                                    title: isUrdu ? 'پیشہ خرچ' : 'Prof. Expense',
-                                    amount: profExpense,
-                                    color: Colors.white,
-                                    valueColor: Colors.white,
-                                    icon: PhosphorIcons.arrowUpRight(),
-                                    fontFamily: fontFamily,
-                                    isUrdu: isUrdu,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _buildBalanceItem(
-                                    title: isUrdu ? 'پیشہ منافع' : 'Prof. Profit',
-                                    amount: profProfit,
-                                    color: Colors.white,
-                                    valueColor: Colors.white,
-                                    icon: PhosphorIcons.trendUp(),
-                                    fontFamily: fontFamily,
-                                    isUrdu: isUrdu,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Search Bar
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6.0),
-                      child: SearchSortBar(
-                        hintText: isUrdu ? 'پارٹی تلاش کریں...' : 'Search Party...',
-                        onSearchChanged: (value) {
-                          setState(() {
-                            _searchQuery = value;
-                          });
-                        },
-                        onSortToggled: () {
-                          setState(() {
-                            _isAscending = !_isAscending;
-                          });
-                        },
-                        isAscending: _isAscending,
-                      ),
-                    ),
-                  ],
-                ),
+              _buildLargeDarkHeader(
+                myAccount: myAccount,
+                photo: effectivePhoto,
+                receivable: totalReceivable,
+                payable: totalPayable,
+                netBalance: netBalance,
+                profIncome: profIncome,
+                profExpense: profExpense,
+                profProfit: profProfit,
+                isUrdu: isUrdu,
+                fontFamily: fontFamily,
               ),
 
-              // Scrollable Party List
               Expanded(
-                child: RefreshIndicator(
-                  onRefresh: _refreshData,
-                  color: Colors.white,
-                  backgroundColor: AppTheme.themeColor,
-                  child: Builder(
-                    builder: (context) {
-                      final filteredParties = parties.where((p) {
-                        return p.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                               p.phone.contains(_searchQuery);
-                      }).toList();
-
-                      // Sort parties by name
-                      filteredParties.sort((a, b) => _isAscending 
-                          ? a.name.toLowerCase().compareTo(b.name.toLowerCase())
-                          : b.name.toLowerCase().compareTo(a.name.toLowerCase()));
-
-                      if (filteredParties.isEmpty) {
-                        return ListView(
-                          children: [
-                            Center(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 40),
-                                child: Column(
-                                  children: [
-                                    Icon(PhosphorIcons.users(), size: 64, color: Colors.grey[400]),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      isUrdu ? 'کوئی پارٹی نہیں ملی' : 'No Parties Found',
-                                      style: TextStyle(fontSize: 18, color: AppTheme.darkColor, fontFamily: fontFamily),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      }
-
-                      return ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 80),
-                        itemCount: filteredParties.length,
-                        itemBuilder: (context, index) {
-                          final party = filteredParties[index];
-                          
-                          // Calculate live balance for this party
-                          final partyTransactions = databaseService.getAllTransactions()
-                              .where((t) => t.accountId == party.id && t.partnershipId == null)
-                              .toList();
-                          
-                          double totalTaken = 0;
-                          double totalGiven = 0;
-                          for (var t in partyTransactions) {
-                            if (t.type == 'income') {
-                              totalTaken += t.amount;
-                            } else {
-                              totalGiven += t.amount;
-                            }
-                          }
-                          final liveBalance = totalTaken - totalGiven;
-                          final updatedParty = party.copyWith(balance: liveBalance);
-
-                          return PartyCard(
-                            party: updatedParty,
-                            onView: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => PartyDetailScreen(party: updatedParty),
-                                ),
-                              );
-                            },
-                            onMessage: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => BalanceAlertScreen(party: updatedParty),
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
+                child: Container(
+                  color: AppTheme.scaffoldBackground,
+                  child: RefreshIndicator(
+                    onRefresh: _refreshData,
+                    color: Colors.white,
+                    backgroundColor: AppTheme.themeColor,
+                    child: _buildPartyList(parties, databaseService, isUrdu, fontFamily),
                   ),
                 ),
               ),
@@ -550,112 +261,227 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildBalanceItem({
-    required String title,
-    required double amount,
-    required Color color,
-    required Color valueColor,
-    required IconData icon,
+  Widget _buildLargeDarkHeader({
+    required Account myAccount,
+    required String? photo,
+    required double receivable,
+    required double payable,
+    required double netBalance,
+    required double profIncome,
+    required double profExpense,
+    required double profProfit,
+    required bool isUrdu,
     required String fontFamily,
-    required bool isUrdu
   }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: valueColor, size: 12),
-            const SizedBox(width: 4),
-            Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    color: color.withOpacity(0.8),
-                    fontSize: isUrdu ? 15 : 12,
-                    fontFamily: fontFamily,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 2),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            'Rs ${amount.toStringAsFixed(0)}',
-            style: TextStyle(
-              color: valueColor,
-              fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
-              fontSize: 14,
-              fontFamily: ''
-            ),
+    final balanceLabel = isUrdu 
+        ? (netBalance >= 0 ? 'باقی دینے' : 'باقی لینے')
+        : (netBalance >= 0 ? 'Net Payable' : 'Net Receivable');
+
+    return Container(
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 55,
+        bottom: 10, // فاصلہ کم کر دیا گیا
+        left: 20,
+        right: 20,
+      ),
+      decoration: const BoxDecoration(
+        color: AppTheme.darkColor,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          ProfileInfoWidget(
+            name: myAccount.name,
+            phone: '', 
+            profileImage: photo,
+            category: (_myArtisanProfile != null && _myArtisanProfile!.professionUrdu.isNotEmpty) 
+                ? _myArtisanProfile!.professionUrdu 
+                : (isUrdu ? 'پرسنل اکاؤنٹ' : 'Personal Account'),
+            address: (_myArtisanProfile != null && _myArtisanProfile!.location.isNotEmpty)
+                ? _myArtisanProfile!.location
+                : (myAccount.address?.isNotEmpty == true ? myAccount.address : null),
+            isLarge: true,
+            isVerticalCategory: true,
+            textColor: Colors.white,
+            subtitleColor: Colors.white70,
+            categoryColor: Colors.white,
+            customSize: 55,
+            borderRadius: 8,
+            isVerified: myAccount.isVerified || (_myArtisanProfile?.isVerified ?? false),
           ),
-        ),
-      ],
+          const SizedBox(height: 16),
+          // Party Stats
+          Row(
+            children: [
+              _buildHeaderStatItem(isUrdu ? 'لینے ہیں' : 'To Receive', receivable, AppTheme.incomeColor, fontFamily, PhosphorIcons.arrowDownLeft()),
+              _buildStatDivider(),
+              _buildHeaderStatItem(isUrdu ? 'دینے ہیں' : 'To Pay', payable, AppTheme.expenseColor, fontFamily, PhosphorIcons.arrowUpRight()),
+              _buildStatDivider(),
+              _buildHeaderStatItem(balanceLabel, netBalance.abs(), Colors.white, fontFamily, PhosphorIcons.wallet(), isBold: true),
+            ],
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Divider(height: 1, thickness: 0.5, color: Colors.white10),
+          ),
+          // Profession Stats
+          Row(
+            children: [
+              _buildHeaderStatItem(isUrdu ? 'پیشہ آمدن' : 'Prof. Income', profIncome, AppTheme.incomeColor, fontFamily, PhosphorIcons.arrowDownLeft()),
+              _buildStatDivider(),
+              _buildHeaderStatItem(isUrdu ? 'پیشہ خرچ' : 'Prof. Expense', profExpense, AppTheme.expenseColor, fontFamily, PhosphorIcons.arrowUpRight()),
+              _buildStatDivider(),
+              _buildHeaderStatItem(isUrdu ? 'پیشہ منافع' : 'Prof. Profit', profProfit.abs(), Colors.white, fontFamily, PhosphorIcons.trendUp(), isBold: true),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildDashboardButton(
-      BuildContext context,
-      IconData icon,
-      String title,
-      String fontFamily,
-      bool isUrdu,
-      Widget screen, {
-        int? count,
-      }) {
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => screen),
-        );
-      },
-      child: Card(
-        elevation: 2,
-        color: AppTheme.themeColor, // Theme Color
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(4.0), // Reduced padding to prevent overflow
-          child: Column(
+  Widget _buildHeaderStatItem(String label, double amount, Color iconColor, String fontFamily, IconData icon, {bool isBold = false}) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(color: Colors.white70, fontSize: 11, fontFamily: fontFamily),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (count != null)
-                Align(
-                  alignment: Alignment.topRight,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
+              Icon(icon, size: 12, color: iconColor),
+              const SizedBox(width: 4),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    "Rs ${amount.toStringAsFixed(0)}",
+                    style: TextStyle(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(12.0),
-                    ),
-                    child: Text(
-                      '$count',
-                      style: const TextStyle(color: AppTheme.darkColor, fontSize: 10, fontWeight: FontWeight.bold),
+                      fontSize: isBold ? 16 : 14,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: '',
                     ),
                   ),
-                )
-              else
-                const SizedBox(height: 10),
-
-              Icon(icon, size: 24, color: Colors.white),
-              const SizedBox(height: 4),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 11, // Reduced font size from 12
-                  fontFamily: fontFamily,
-                  color: Colors.white,
-                  fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatDivider() {
+    return Container(height: 20, width: 1, color: Colors.white12);
+  }
+
+  Widget _buildBusinessCommandCenter(bool isUrdu, String fontFamily) {
+    return Container(
+      height: 55, 
+      margin: const EdgeInsets.only(top: 4), // فاصلہ مزید کم کر دیا گیا
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: [
+          // 0. Search Toggle Button
+          _buildCommandCard(
+            label: isUrdu ? 'تلاش کریں' : 'Search',
+            icon: PhosphorIcons.magnifyingGlass(),
+            color: _isSearchVisible ? AppTheme.themeColor : Colors.grey,
+            onTap: () => setState(() => _isSearchVisible = !_isSearchVisible),
+            fontFamily: fontFamily,
+          ),
+
+          // 1. Public Profile Preview
+          _buildCommandCard(
+            label: isUrdu ? 'پروفائل' : 'Profile',
+            icon: PhosphorIcons.userFocus(),
+            color: Colors.blue,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ArtisanDetailScreen(
+                    artisanId: _myArtisanProfile!.id,
+                    initialArtisan: _myArtisanProfile,
+                  ),
+                ),
+              );
+            },
+            fontFamily: fontFamily,
+          ),
+          
+          // 2. Active Orders
+          _buildCommandCard(
+            label: isUrdu ? 'آرڈرز' : 'Orders',
+            icon: PhosphorIcons.briefcase(),
+            color: Colors.orange,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ArtisanWorkOrdersScreen(artisanId: _myArtisanProfile!.id),
+                ),
+              );
+            },
+            fontFamily: fontFamily,
+          ),
+
+          // 3. Chat List
+          _buildCommandCard(
+            label: isUrdu ? 'چیٹ لسٹ' : 'Chat List',
+            icon: PhosphorIcons.chatCircleDots(),
+            color: Colors.teal,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ChatListScreen()),
+              );
+            },
+            fontFamily: fontFamily,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommandCard({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    required String fontFamily,
+  }) {
+    return Center(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8), // سائز بڑا کر دیا گیا
+          margin: const EdgeInsets.only(right: 8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: color.withOpacity(0.4), width: 1.5),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 18), // آئی کن بڑا کر دیا گیا
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: AppTheme.darkColor,
+                  fontSize: 12, // فونٹ تھوڑا بڑا
+                  fontWeight: FontWeight.bold,
+                  fontFamily: fontFamily,
+                ),
               ),
             ],
           ),
@@ -663,257 +489,208 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
-}
 
-class _ShimmerBox extends StatefulWidget {
-  final double width;
-  final double height;
+  Widget _buildAvailabilityToggle(bool isUrdu, String fontFamily) {
+    final isAvailable = _myArtisanProfile?.availability == 'available';
+    final color = isAvailable ? Colors.greenAccent : AppTheme.expenseColor;
+    final label = isAvailable 
+        ? (isUrdu ? 'دستیاب' : 'Available') 
+        : (isUrdu ? 'مصروف' : 'Busy');
 
-  const _ShimmerBox({required this.width, required this.height});
-
-  @override
-  _ShimmerBoxState createState() => _ShimmerBoxState();
-}
-
-class _ShimmerBoxState extends State<_ShimmerBox> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-
-  Widget _buildOptionItem(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String fontFamily,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppTheme.themeColor.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: AppTheme.themeColor, size: 30),
+    return Center(
+      child: InkWell(
+        onTap: _toggleAvailability,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          margin: const EdgeInsets.only(right: 4),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: color.withOpacity(0.5)),
           ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontFamily: fontFamily,
-              fontWeight: FontWeight.bold,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(color: color.withOpacity(0.5), blurRadius: 4, spreadRadius: 1),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: fontFamily,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Container(
-          width: widget.width,
-          height: widget.height,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(6),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              stops: [
-                _controller.value - 0.3,
-                _controller.value,
-                _controller.value + 0.3,
-              ],
-              colors: [
-                Colors.grey[300]!,
-                Colors.grey[100]!,
-                Colors.grey[300]!,
-              ],
+  Widget _buildNotificationAction() {
+    return Consumer<NotificationService>(
+      builder: (context, notificationService, child) {
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.notifications_none, color: Colors.white, size: 28),
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => NotificationsScreen()));
+              },
             ),
-          ),
+            if (notificationService.unreadCount > 0)
+              Positioned(
+                right: 8,
+                top: 10,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: AppTheme.expenseColor,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.darkColor, width: 1.5),
+                  ),
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  child: Text(
+                    notificationService.unreadCount > 99 ? '99+' : notificationService.unreadCount.toString(),
+                    style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );
   }
-}
 
-class InfoTickerWidget extends StatefulWidget {
-  @override
-  _InfoTickerWidgetState createState() => _InfoTickerWidgetState();
-}
+  Widget _buildPartyList(List<Account> parties, DatabaseService databaseService, bool isUrdu, String fontFamily) {
+    final filteredParties = parties.where((p) {
+      return p.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+             p.phone.contains(_searchQuery);
+    }).toList();
 
-class _InfoTickerWidgetState extends State<InfoTickerWidget> {
-  int _currentIndex = 0;
-  Timer? _timer;
+    filteredParties.sort((a, b) => _isAscending 
+        ? a.name.toLowerCase().compareTo(b.name.toLowerCase())
+        : b.name.toLowerCase().compareTo(a.name.toLowerCase()));
 
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
-      if (mounted) {
-        setState(() {
-          _currentIndex++;
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-
-  @override
-  Widget build(BuildContext context) {
-    final notificationService = Provider.of<NotificationService>(context);
-    final databaseService = Provider.of<DatabaseService>(context);
-    final languageService = Provider.of<LanguageService>(context);
-    final isUrdu = languageService.isUrdu;
-    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-
-    List<Widget> items = [];
-
-    // 1. Notifications Content
-    if (notificationService.notifications.isNotEmpty) {
-        // Show top 3 recent unread or read notifications
-        for (var i = 0; i < 3 && i < notificationService.notifications.length; i++) {
-            final notif = notificationService.notifications[i];
-            items.add(_buildInfoCard(
-              isUrdu ? 'نوٹیفیکیشن' : 'Notification',
-              notif.message, // Showing message instead of count
-              PhosphorIcons.bell(),
-              Colors.orangeAccent,
-              fontFamily
-            ));
-        }
-    } else {
-        // If no notifications, show general message
-        items.add(_buildInfoCard(
-          isUrdu ? 'نوٹیفیکیشنز' : 'Notifications',
-          isUrdu ? 'کوئی نیا نوٹیفیکیشن نہیں' : 'No new notifications',
-          PhosphorIcons.bell(),
-          Colors.white70,
-          fontFamily // Applied Urdu font to the message text
-        ));
+    // Define scrolling headers
+    final List<Widget> headers = [];
+    if (_myArtisanProfile != null) {
+      headers.add(_buildBusinessCommandCenter(isUrdu, fontFamily));
     }
-
-    // 2. Top Receivable
-    final parties = databaseService.getAccounts();
-    final receivables = parties.where((p) => p.balance > 0).toList();
-    receivables.sort((a, b) => b.balance.compareTo(a.balance));
-
-    if (receivables.isNotEmpty) {
-       final topReceiver = receivables.first;
-       items.add(_buildInfoCard(
-         isUrdu ? 'جمع (${topReceiver.name})' : 'Credit (${topReceiver.name})',
-         'Rs ${topReceiver.balance.toStringAsFixed(0)}',
-         PhosphorIcons.arrowDownLeft(),
-         Colors.greenAccent,
-         fontFamily
-       ));
-    }
-
-    // 3. Top Payable
-    final payables = parties.where((p) => p.balance < 0).toList();
-    payables.sort((a, b) => a.balance.compareTo(b.balance));
-
-    if (payables.isNotEmpty) {
-       final topPayer = payables.first;
-       items.add(_buildInfoCard(
-         isUrdu ? 'بنام (${topPayer.name})' : 'Debit (${topPayer.name})',
-         'Rs ${topPayer.balance.abs().toStringAsFixed(0)}',
-         PhosphorIcons.arrowUpRight(),
-         const Color(0xFFDAAD51), // Gold
-         fontFamily
-       ));
-    }
-
-    final index = items.isEmpty ? 0 : _currentIndex % items.length;
-
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 500),
-      transitionBuilder: (Widget child, Animation<double> animation) {
-        return FadeTransition(opacity: animation, child: child);
-      },
-      child: KeyedSubtree(
-        key: ValueKey<int>(index),
-        child: items.isNotEmpty ? items[index] : Container(),
-      ),
-    );
-  }
-
-  Widget _buildInfoCard(String title, String value, IconData icon, Color iconColor, String fontFamily) {
-    bool isNumeric = value.startsWith('Rs') || double.tryParse(value) != null;
-    String valueFont = isNumeric ? '' : fontFamily;
-    final isUrdu = fontFamily == 'NooriNastaleeq';
-
-    return Card(
-      elevation: 2,
-      color: AppTheme.themeColor, // Theme Color
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(4.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, color: iconColor, size: 16),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(title,
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontFamily: fontFamily,
-                      fontSize: 16,
-                      fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 2),
-            Text(
-              value,
-              style: TextStyle(
-                color: Colors.white,
-                fontFamily: valueFont,
-                fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
-                fontSize: 14
-              ), // Applied font
-              textAlign: TextAlign.center,
-              maxLines: 2, // Allow 2 lines for message
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+    if (_isSearchVisible) {
+      headers.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: SearchSortBar(
+            hintText: isUrdu ? 'پارٹی تلاش کریں...' : 'Search Party...',
+            onSearchChanged: (value) => setState(() => _searchQuery = value),
+            onSortToggled: () => setState(() => _isAscending = !_isAscending),
+            isAscending: _isAscending,
+          ),
         ),
-      ),
+      );
+    }
+
+    if (filteredParties.isEmpty && headers.isEmpty) {
+      return ListView(
+        children: [
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Column(
+                children: [
+                  Icon(PhosphorIcons.users(), size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    isUrdu ? 'کوئی پارٹی نہیں ملی' : 'No Parties Found',
+                    style: TextStyle(fontSize: 18, color: AppTheme.darkColor, fontFamily: fontFamily),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 80),
+      itemCount: headers.length + filteredParties.length + (filteredParties.isEmpty ? 1 : 0),
+      itemBuilder: (context, index) {
+        // Render headers first
+        if (index < headers.length) {
+          return headers[index];
+        }
+
+        // Render empty state if no parties after headers
+        final partyIndex = index - headers.length;
+        if (filteredParties.isEmpty && partyIndex == 0) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Column(
+                children: [
+                  Icon(PhosphorIcons.users(), size: 48, color: Colors.grey[400]),
+                  const SizedBox(height: 12),
+                  Text(
+                    isUrdu ? 'کوئی پارٹی نہیں ملی' : 'No Parties Found',
+                    style: TextStyle(fontSize: 16, color: AppTheme.darkColor, fontFamily: fontFamily),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (partyIndex >= filteredParties.length) return const SizedBox.shrink();
+
+        final party = filteredParties[partyIndex];
+        
+        final partyTransactions = databaseService.getAllTransactions()
+            .where((t) => t.accountId == party.id && t.partnershipId == null)
+            .toList();
+        
+        double partyTaken = 0;
+        double partyGiven = 0;
+        for (var t in partyTransactions) {
+          if (t.type == 'income') {
+            partyTaken += t.amount;
+          } else {
+            partyGiven += t.amount;
+          }
+        }
+        final liveBalance = partyTaken - partyGiven;
+        final updatedParty = party.copyWith(balance: liveBalance);
+
+        return PartyCard(
+          key: ValueKey(party.id), // یونیک کی شامل کر دی گئی تاکہ اسٹیٹ مکس نہ ہو
+          party: updatedParty,
+          onView: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => PartyDetailScreen(party: updatedParty)),
+            );
+          },
+          onMessage: () {
+            // Navigator.push(context, MaterialPageRoute(builder: (context) => BalanceAlertScreen(party: updatedParty)));
+          },
+        );
+      },
     );
   }
 }

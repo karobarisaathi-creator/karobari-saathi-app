@@ -1,5 +1,6 @@
 // lib/features/artisans/screens/artisan_home_screen.dart
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,8 +13,10 @@ import 'package:account_app/core/services/artisan_service.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/widgets/artisan_card.dart';
 import 'package:account_app/core/widgets/artisan_filter_bar.dart';
+import 'package:geolocator/geolocator.dart';
 import 'artisan_profile_screen.dart';
 import 'artisan_detail_screen.dart';
+import 'customer_orders_screen.dart';
 
 class ArtisanHomeScreen extends StatefulWidget {
   const ArtisanHomeScreen({super.key});
@@ -29,41 +32,93 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   String _sortBy = 'rating';
   List<ArtisanProfile> _artisans = [];
   ArtisanProfile? _myArtisanProfile;
+  StreamSubscription<ArtisanProfile?>? _artisanSub;
+  Position? _currentPosition;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _loadArtisans();
-    _loadMyProfile();
+    _setupArtisanListener();
+    _getCurrentLocation();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _artisanSub?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadMyProfile() async {
+  void _setupArtisanListener() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+
     final service = ArtisanService();
-    final profile = await service.getProfile(user.uid);
-    if (mounted) {
-      setState(() {
-        _myArtisanProfile = profile;
-      });
+    _artisanSub = service.streamProfile(user.uid).listen((profile) {
+      if (mounted) {
+        setState(() {
+          _myArtisanProfile = profile;
+        });
+      }
+    });
+  }
+
+  Future<void> _toggleMyAvailability() async {
+    if (_myArtisanProfile == null) return;
+    
+    final newStatus = _myArtisanProfile!.availability == 'available' ? 'busy' : 'available';
+    final updated = _myArtisanProfile!.copyWith(
+      availability: newStatus,
+      updatedAt: DateTime.now(),
+    );
+    
+    final service = ArtisanService();
+    try {
+      await service.saveProfile(updated);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
     }
   }
 
-  Future<void> _toggleMyAvailability(String status) async {
-    if (_myArtisanProfile == null) return;
-    final updated = _myArtisanProfile!.copyWith(availability: status);
-    final service = ArtisanService();
-    await service.saveProfile(updated);
-    setState(() {
-      _myArtisanProfile = updated;
-    });
+  Future<void> _getCurrentLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return;
+      }
+      
+      if (permission == LocationPermission.deniedForever) return;
+
+      final position = await Geolocator.getCurrentPosition();
+      if (mounted) {
+        setState(() {
+          _currentPosition = position;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error getting location: $e");
+    }
+  }
+
+  double? _calculateDistance(double? lat, double? lng) {
+    if (_currentPosition == null || lat == null || lng == null) return null;
+    final distanceInMeters = Geolocator.distanceBetween(
+      _currentPosition!.latitude,
+      _currentPosition!.longitude,
+      lat,
+      lng,
+    );
+    return distanceInMeters / 1000; // Convert to KM
   }
 
   Future<void> _loadArtisans() async {
@@ -83,63 +138,135 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
     }
   }
 
-  List<ArtisanProfile> get _filteredArtisans {
-    // Start with dummy data so something is always visible
-    var filtered = [
-      ArtisanProfile(
-        id: 'dummy_1',
-        name: 'محمد زکریا',
-        profession: 'electrician',
-        professionUrdu: 'الیکٹریشن',
-        location: 'لاہور، پاکستان',
-        experience: 5,
-        rate: '800/گھنٹہ',
-        availability: 'available',
-        phone: '03001234567',
-        profileImage: 'https://img.freepik.com/free-photo/portrait-handsome-young-man-with-crossed-arms_176420-15569.jpg',
-      description: 'گھر اور دکان کی وائرنگ کا ماہر۔ ہر قسم کے بجلی کے کام کے لیے رابطہ کریں۔',
-        rating: 4.8,
-        totalReviews: 24,
-        isVerified: true,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      )
-    ];
-
-    // Add real artisans from database
-    filtered.addAll(_artisans);
-
-    // پیشے کے حساب سے فلٹر
-    if (_selectedProfession != 'all') {
-      filtered = filtered
-          .where((a) => a.profession == _selectedProfession)
-          .toList();
+  void _showAllProfessionsPicker(bool isUrdu, String fontFamily) {
+    final professions = ArtisanService.getProfessions();
+    
+    // Group professions by category
+    final Map<String, List<Map<String, dynamic>>> groupedProfessions = {};
+    for (var p in professions) {
+      final cat = isUrdu ? p['categoryUrdu'] : p['category'];
+      if (!groupedProfessions.containsKey(cat)) {
+        groupedProfessions[cat] = [];
+      }
+      groupedProfessions[cat]!.add(p);
     }
 
-    // سرچ کے حساب سے فلٹر
-    if (_searchQuery.isNotEmpty) {
-      final query = _searchQuery.toLowerCase();
-      filtered = filtered.where((a) {
-        return a.name.toLowerCase().contains(query) ||
-            a.profession.toLowerCase().contains(query) ||
-            a.description.toLowerCase().contains(query);
-      }).toList();
-    }
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.8,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+              ),
+              Text(
+                isUrdu ? 'تمام شعبہ جات' : 'All Categories',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: groupedProfessions.keys.length,
+                  itemBuilder: (context, index) {
+                    final category = groupedProfessions.keys.elementAt(index);
+                    final categoryItems = groupedProfessions[category]!;
 
-    // ترتیب
-    switch (_sortBy) {
-      case 'rating':
-        filtered.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
-      case 'experience':
-        filtered.sort((a, b) => b.experience.compareTo(a.experience));
-        break;
-      case 'reviews':
-        filtered.sort((a, b) => b.totalReviews.compareTo(a.totalReviews));
-        break;
-    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                          child: Text(
+                            category,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.themeColor,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                        ),
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            childAspectRatio: 0.85,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                          ),
+                          itemCount: categoryItems.length,
+                          itemBuilder: (context, idx) {
+                            final p = categoryItems[idx];
+                            final isSelected = _selectedProfession == p['id'];
+                            return InkWell(
+                              onTap: () {
+                                _onProfessionSelected(p['id']!);
+                                Navigator.pop(context);
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: isSelected ? AppTheme.themeColor.withOpacity(0.1) : Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: isSelected ? AppTheme.themeColor : Colors.grey[200]!,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(p['icon'], color: isSelected ? AppTheme.themeColor : Colors.grey[700], size: 28),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      isUrdu ? p['name']! : p['id']!,
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                        fontFamily: fontFamily,
+                                        color: isSelected ? AppTheme.themeColor : Colors.black87,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        const Divider(),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-    return filtered;
+  void _onProfessionSelected(String id) {
+    setState(() => _selectedProfession = id);
   }
 
   @override
@@ -153,6 +280,16 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
         title: isUrdu ? 'ماہرین کی فہرست' : 'Experts Directory',
         showBackButton: false,
         actions: [
+          IconButton(
+            icon: Icon(PhosphorIcons.clockCounterClockwise(), color: Colors.white),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CustomerOrdersScreen()),
+              );
+            },
+            tooltip: isUrdu ? 'تاریخچہ' : 'History',
+          ),
           _buildAvailabilityToggle(isUrdu, fontFamily),
           const SizedBox(width: 12),
         ],
@@ -161,25 +298,24 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
         children: [
           // سرچ بار
           Padding(
-            padding: const EdgeInsets.all(16),
-            child: SearchSortBar(
-              controller: _searchController,
-              hintText: isUrdu ? 'کاریگر تلاش کریں...' : 'Search artisans...',
-              onSearchChanged: (value) {
-                setState(() => _searchQuery = value);
-              },
-              showVoiceSearch: true,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SearchSortBar(
+                    controller: _searchController,
+                    padding: EdgeInsets.zero,
+                    hintText: isUrdu ? 'کاریگر تلاش کریں...' : 'Search artisans...',
+                    onSearchChanged: (value) {
+                      setState(() => _searchQuery = value);
+                    },
+                    showVoiceSearch: true,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildProfessionPickerButton(isUrdu, fontFamily),
+              ],
             ),
-          ),
-
-          // فلٹر بار
-          ArtisanFilterBar(
-            selectedProfession: _selectedProfession,
-            onProfessionSelected: (profession) {
-              setState(() => _selectedProfession = profession);
-            },
-            isUrdu: isUrdu,
-            fontFamily: fontFamily,
           ),
 
           // سورٹ آپشنز
@@ -205,34 +341,126 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
 
           // نتائج
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredArtisans.isEmpty
-                    ? _buildEmptyState(isUrdu, fontFamily)
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _filteredArtisans.length,
-                        itemBuilder: (context, index) {
-                          final artisan = _filteredArtisans[index];
-                          return ArtisanCard(
-                            artisan: artisan,
-                            isUrdu: isUrdu,
-                            fontFamily: fontFamily,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      ArtisanDetailScreen(
-                                        artisanId: artisan.id,
-                                        initialArtisan: artisan,
-                                      ),
+            child: StreamBuilder<List<ArtisanProfile>>(
+              stream: ArtisanService().streamAllArtisans(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      isUrdu ? 'ڈیٹا لوڈ کرنے میں غلطی ہوئی' : 'Error loading data',
+                      style: TextStyle(fontFamily: fontFamily),
+                    ),
+                  );
+                }
+
+                final allArtisans = snapshot.data ?? [];
+                
+                // Filtering logic
+                var filtered = List<ArtisanProfile>.from(allArtisans);
+
+                if (_selectedProfession != 'all') {
+                  filtered = filtered.where((a) => a.profession == _selectedProfession).toList();
+                }
+
+                if (_searchQuery.isNotEmpty) {
+                  final query = _searchQuery.toLowerCase();
+                  filtered = filtered.where((a) {
+                    return a.name.toLowerCase().contains(query) ||
+                        a.profession.toLowerCase().contains(query) ||
+                        a.description.toLowerCase().contains(query);
+                  }).toList();
+                }
+
+                // Sorting logic
+                switch (_sortBy) {
+                  case 'rating':
+                    filtered.sort((a, b) => b.rating.compareTo(a.rating));
+                    break;
+                  case 'experience':
+                    filtered.sort((a, b) => b.experience.compareTo(a.experience));
+                    break;
+                  case 'reviews':
+                    filtered.sort((a, b) => b.totalReviews.compareTo(a.totalReviews));
+                    break;
+                }
+
+                // Ensure current user is at the top
+                final myId = FirebaseAuth.instance.currentUser?.uid;
+                if (myId != null) {
+                  final myIndex = filtered.indexWhere((a) => a.id == myId);
+                  if (myIndex != -1) {
+                    final myProfile = filtered.removeAt(myIndex);
+                    filtered.insert(0, myProfile);
+                  }
+                }
+
+                if (filtered.isEmpty) {
+                  return _buildEmptyState(isUrdu, fontFamily);
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final artisan = filtered[index];
+                    final distance = _calculateDistance(artisan.latitude, artisan.longitude);
+                    final isMe = artisan.id == myId;
+
+                    return Stack(
+                      children: [
+                        ArtisanCard(
+                          artisan: artisan,
+                          isUrdu: isUrdu,
+                          fontFamily: fontFamily,
+                          distanceKm: distance,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ArtisanDetailScreen(
+                                  artisanId: artisan.id,
+                                  initialArtisan: artisan,
+                                  distanceKm: distance,
                                 ),
-                              );
-                            },
-                          );
-                        },
-                      ),
+                              ),
+                            );
+                          },
+                        ),
+                        if (isMe)
+                          Positioned.directional(
+                            textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
+                            top: 0,
+                            end: 0,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppTheme.themeColor,
+                                borderRadius: BorderRadius.only(
+                                  topRight: isUrdu ? Radius.zero : const Radius.circular(16),
+                                  bottomLeft: isUrdu ? Radius.zero : const Radius.circular(16),
+                                  topLeft: isUrdu ? const Radius.circular(16) : Radius.zero,
+                                  bottomRight: isUrdu ? const Radius.circular(16) : Radius.zero,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)
+                                ],
+                              ),
+                              child: Text(
+                                isUrdu ? 'میرا پروفائل' : 'My Profile',
+                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -240,22 +468,24 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   }
 
   Widget _buildAvailabilityToggle(bool isUrdu, String fontFamily) {
-    // If not an artisan, don't show the toggle or show a "Become Expert" hint
     if (_myArtisanProfile == null) return const SizedBox.shrink();
 
     final isAvailable = _myArtisanProfile?.availability == 'available';
+    final color = isAvailable ? Colors.greenAccent : AppTheme.expenseColor;
+    final label = isAvailable 
+        ? (isUrdu ? 'دستیاب' : 'Available') 
+        : (isUrdu ? 'مصروف' : 'Busy');
+
     return Center(
       child: InkWell(
-        onTap: () {
-          _toggleMyAvailability(isAvailable ? 'busy' : 'available');
-        },
+        onTap: _toggleMyAvailability,
         borderRadius: BorderRadius.circular(20),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: isAvailable ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
+            color: color.withOpacity(0.2),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: isAvailable ? Colors.green : Colors.red, width: 1),
+            border: Border.all(color: color.withOpacity(0.5), width: 1),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -264,13 +494,16 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: isAvailable ? Colors.green : Colors.red,
+                  color: color,
                   shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(color: color.withOpacity(0.5), blurRadius: 4, spreadRadius: 1),
+                  ],
                 ),
               ),
               const SizedBox(width: 6),
               Text(
-                isAvailable ? (isUrdu ? 'دستیاب' : 'Available') : (isUrdu ? 'مصروف' : 'Busy'),
+                label,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
@@ -280,6 +513,56 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfessionPickerButton(bool isUrdu, String fontFamily) {
+    String professionName = isUrdu ? 'سب' : 'All';
+    if (_selectedProfession != 'all') {
+      final professions = ArtisanService.getProfessions();
+      final found = professions.firstWhere(
+        (p) => p['id'] == _selectedProfession,
+        orElse: () => {},
+      );
+      if (found.isNotEmpty) {
+        professionName = isUrdu ? found['name'] : found['id'];
+      }
+    }
+
+    return GestureDetector(
+      onTap: () => _showAllProfessionsPicker(isUrdu, fontFamily),
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.darkColor.withOpacity(0.15), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              professionName,
+              style: TextStyle(
+                color: AppTheme.themeColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                fontFamily: fontFamily,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(PhosphorIcons.caretDown(), size: 14, color: AppTheme.themeColor),
+          ],
         ),
       ),
     );

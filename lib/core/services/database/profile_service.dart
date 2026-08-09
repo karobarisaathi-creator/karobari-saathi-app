@@ -48,13 +48,26 @@ class ProfileService extends BaseService {
           .get();
       if (query.docs.isNotEmpty) {
         final data = query.docs.first.data();
+        final uid = query.docs.first.id;
+        
+        String profession = '';
+        try {
+          // Check if this user is also an artisan
+          final artisanDoc = await firestore.collection('artisans').doc(uid).get();
+          if (artisanDoc.exists) {
+            profession = artisanDoc.data()?['professionUrdu'] ?? artisanDoc.data()?['profession'] ?? '';
+          }
+        } catch (_) {}
+
         return {
-          'uid': query.docs.first.id,
+          'uid': uid,
           'name': data['displayName'] ?? data['name'] ?? '',
           'photoUrl': data['photoURL'] ??
               data['photoUrl'] ??
               data['profileImage'] ??
               '',
+          'profession': profession,
+          'isVerified': (data['isVerified'] ?? false).toString(),
         };
       }
     }
@@ -77,12 +90,22 @@ class ProfileService extends BaseService {
     final doc = await firestore.collection('users').doc(uid).get();
     if (doc.exists) {
       final data = doc.data()!;
+      
+      String profession = '';
+      try {
+        final artisanDoc = await firestore.collection('artisans').doc(uid).get();
+        if (artisanDoc.exists) {
+          profession = artisanDoc.data()?['professionUrdu'] ?? artisanDoc.data()?['profession'] ?? '';
+        }
+      } catch (_) {}
+
       return {
         'uid': uid,
         'name': data['displayName'] ?? data['name'] ?? '',
         'photoUrl':
             data['photoURL'] ?? data['photoUrl'] ?? data['profileImage'] ?? '',
         'phone': data['phoneNumber'] ?? '',
+        'profession': profession,
         'isVerified': (data['isVerified'] ?? false).toString(),
       };
     }

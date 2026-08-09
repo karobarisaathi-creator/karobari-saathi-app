@@ -33,7 +33,6 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _addressController = TextEditingController();
 
   late String _selectedCategory;
   File? _profileImage;
@@ -51,12 +50,10 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
     super.initState();
     _nameController.addListener(_updatePreview);
     _phoneController.addListener(_onPhoneChanged);
-    _addressController.addListener(_updatePreview);
     
     if (widget.partyToEdit != null) {
       _nameController.text = widget.partyToEdit!.name;
       _phoneController.text = widget.partyToEdit!.phone;
-      _addressController.text = widget.partyToEdit!.address ?? '';
       
       _selectedCategory = widget.partyToEdit!.category;
 
@@ -252,90 +249,105 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                     const SizedBox(height: 24),
 
                     // Modern Live Preview / Found Profile Card
-                    Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.darkColor.withOpacity(0.04),
-                            blurRadius: 24,
-                            offset: const Offset(0, 12),
-                          ),
-                        ],
-                        border: Border.all(
-                          color: _foundProfile != null 
-                              ? AppTheme.themeColor.withOpacity(0.3) 
-                              : AppTheme.darkColor.withOpacity(0.08),
-                          width: _foundProfile != null ? 1.5 : 1,
-                        ),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: Stack(
-                          children: [
-                            if (_foundProfile != null)
-                              Positioned(
-                                right: -20,
-                                top: -20,
-                                child: Icon(
-                                  PhosphorIcons.sparkle(PhosphorIconsStyle.fill),
-                                  size: 100,
-                                  color: AppTheme.themeColor.withOpacity(0.05),
-                                ),
+                    Stack(
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: _foundProfile != null 
+                                  ? Colors.green.withOpacity(0.5) 
+                                  : AppTheme.themeColor.withOpacity(0.3),
+                              width: 1.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
-                            Padding(
-                              padding: const EdgeInsets.all(20),
-                              child: Column(
-                                children: [
-                                  ProfileInfoWidget(
-                                    name: (_foundProfile != null && _nameController.text.isEmpty)
-                                        ? (_foundProfile!['name'] ?? l10n.partyName)
-                                        : (_nameController.text.isEmpty ? l10n.partyName : _nameController.text),
-                                    phone: _phoneController.text.isEmpty ? '03000000000' : _phoneController.text,
-                                    profileImage: _remoteImageUrl ?? (_foundProfile != null && _profileImage == null ? _foundProfile!['photoUrl'] : null) ?? _profileImage?.path,
-                                    category: _foundProfile == null ? _selectedCategory : null,
-                                    isLarge: true,
-                                    isVerified: (_foundProfile != null && _foundProfile!['isVerified'] == 'true') || (widget.partyToEdit?.isVerified ?? false),
-                                  ),
-                                  if (_foundProfile != null) ...[
-                                    const SizedBox(height: 20),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      height: 48,
-                                      child: ElevatedButton(
-                                        onPressed: _useFoundProfile,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppTheme.themeColor,
-                                          foregroundColor: Colors.white,
-                                          elevation: 0,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill), size: 18),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              isUrdu ? 'یہ معلومات استعمال کریں' : 'Use this information',
-                                              style: TextStyle(
-                                                fontFamily: fontFamily,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                          ],
+                            ],
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                ProfileInfoWidget(
+                                  name: (_foundProfile != null && _nameController.text.isEmpty)
+                                      ? (_foundProfile!['name'] ?? l10n.partyName)
+                                      : (_nameController.text.isEmpty ? l10n.partyName : _nameController.text),
+                                  phone: _phoneController.text.isEmpty ? '03000000000' : _phoneController.text,
+                                  profileImage: _remoteImageUrl ?? (_foundProfile != null && _profileImage == null ? _foundProfile!['photoUrl'] : null) ?? _profileImage?.path,
+                                  category: _foundProfile != null 
+                                      ? (_foundProfile!['profession']?.isNotEmpty == true 
+                                          ? _foundProfile!['profession'] 
+                                          : (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account'))
+                                      : (isUrdu ? 'نیا کھاتہ' : 'New Account'),
+                                  address: _foundProfile != null 
+                                      ? (isUrdu ? 'پہلے سے موجود اکاؤنٹ' : 'Existing Account') 
+                                      : null,
+                                  isLarge: true,
+                                  isVerticalCategory: true,
+                                  customSize: 90, // تصویر کا سائز بڑھا دیا گیا
+                                  isVerified: (_foundProfile != null && _foundProfile!['isVerified'] == 'true') || (widget.partyToEdit?.isVerified ?? false),
+                                ),
+                                if (_foundProfile != null) ...[
+                                  const Divider(height: 24, thickness: 0.5),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 48,
+                                    child: ElevatedButton.icon(
+                                      onPressed: _useFoundProfile,
+                                      icon: Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill), size: 20),
+                                      label: Text(
+                                        isUrdu ? 'یہ معلومات استعمال کریں' : 'Use this information',
+                                        style: TextStyle(
+                                          fontFamily: fontFamily,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
                                         ),
                                       ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green,
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      ),
                                     ),
-                                  ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (_foundProfile != null)
+                          Positioned.directional(
+                            textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
+                            top: 0,
+                            end: 0,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                borderRadius: BorderRadius.only(
+                                  topRight: isUrdu ? Radius.zero : const Radius.circular(16),
+                                  bottomLeft: isUrdu ? Radius.zero : const Radius.circular(16),
+                                  topLeft: isUrdu ? const Radius.circular(16) : Radius.zero,
+                                  bottomRight: isUrdu ? const Radius.circular(16) : Radius.zero,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)
                                 ],
                               ),
+                              child: Text(
+                                isUrdu ? 'اکاؤنٹ ملا' : 'Account Found',
+                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 32),
               
@@ -386,37 +398,6 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                       fontFamily: fontFamily,
                       fontWeight: fontWeight,
                       validator: (value) => value == null || value.isEmpty ? l10n.invalidName : null,
-                    ),
-                    const SizedBox(height: 20),
-              
-                    // Address Field
-                    _buildTextField(
-                      controller: _addressController,
-                      label: l10n.address,
-                      icon: PhosphorIcons.mapPin(),
-                      maxLines: 2,
-                      fontFamily: fontFamily,
-                      fontWeight: fontWeight,
-                    ),
-                    const SizedBox(height: 20),
-              
-                    // Category Selection
-                    _buildSectionLabel(l10n.category, isUrdu, fontFamily),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 50,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _partyCategories.length,
-                        itemBuilder: (context, index) {
-                          final cat = _partyCategories[index];
-                          return CategoryChip(
-                            categoryData: cat,
-                            isSelected: _selectedCategory == cat.id,
-                            onTap: () => setState(() => _selectedCategory = cat.id),
-                          );
-                        },
-                      ),
                     ),
                     const SizedBox(height: 40),
               
@@ -615,7 +596,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
         final updatedParty = widget.partyToEdit!.copyWith(
           name: _nameController.text,
           phone: _phoneController.text,
-          address: _addressController.text.isEmpty ? null : _addressController.text,
+          address: null,
           category: _selectedCategory,
           profileImage: finalImagePath,
           updatedAt: DateTime.now(),
@@ -640,7 +621,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           name: _nameController.text,
           phone: _phoneController.text,
-          address: _addressController.text.isEmpty ? null : _addressController.text,
+          address: null,
           category: _selectedCategory,
           initialBalance: 0.0,
           balanceType: 'credit',
@@ -696,7 +677,6 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
     _searchTimer?.cancel();
     _nameController.dispose();
     _phoneController.dispose();
-    _addressController.dispose();
     super.dispose();
   }
 }

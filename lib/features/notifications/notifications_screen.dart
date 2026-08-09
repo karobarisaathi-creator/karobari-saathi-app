@@ -77,7 +77,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     final notificationService = Provider.of<NotificationService>(context, listen: false);
     await notificationService.loadFromCloud();
-    final standardNotifications = notificationService.notifications;
+    final standardNotifications = List<AppNotification>.from(notificationService.notifications);
+
+    // Dummy Artisan Request for Preview
+    standardNotifications.insert(0, AppNotification(
+      id: 'dummy_artisan_req',
+      title: 'کام کی درخواست (Work Request)',
+      message: 'محمد احمد آپ سے کام کے بارے میں پوچھ رہے ہیں۔ کیا آپ دستیاب ہیں؟',
+      type: NotificationType.general,
+      isRead: false,
+      timestamp: DateTime.now(),
+      data: {
+        'type': 'artisan_request',
+        'senderName': 'محمد احمد',
+        'senderPhone': '03123456789',
+        'needsAction': true,
+      },
+    ));
 
     if (mounted) {
       setState(() {

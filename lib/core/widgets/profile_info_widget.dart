@@ -27,10 +27,12 @@ class ProfileInfoWidget extends StatefulWidget {
   final bool isStore;
   final Color? textColor;
   final Color? subtitleColor;
+  final Color? categoryColor;
   final bool hasUpdate;
   final bool isVerified;
   final Widget? suffix;
   final double? customSize;
+  final double? borderRadius;
   final String? reputationLabel;
   final Color? reputationColor;
   final Color? reputationBgColor;
@@ -52,10 +54,12 @@ class ProfileInfoWidget extends StatefulWidget {
     this.isStore = false,
     this.textColor,
     this.subtitleColor,
+    this.categoryColor,
     this.hasUpdate = false,
     this.isVerified = false,
     this.suffix,
     this.customSize,
+    this.borderRadius,
     this.reputationLabel,
     this.reputationColor,
     this.reputationBgColor,
@@ -105,7 +109,7 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
     String? displayImage = widget.profileImage;
 
     final double size = widget.customSize ?? (widget.isLarge ? 50 : 36);
-    final double radius = widget.customSize != null ? 12.0 : 6.0; // Larger radius for larger images
+    final double radius = widget.borderRadius ?? 12.0; // Enforced 12 radius as requested
 
     // Check if the phone field actually contains Urdu text (like 'Verified Profile')
     bool phoneHasUrdu = RegExp(r'[\u0600-\u06FF]').hasMatch(widget.phone);
@@ -220,7 +224,7 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
 
     // Default Row Layout
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center, 
       mainAxisSize: widget.suffix != null ? MainAxisSize.max : MainAxisSize.min,
       children: [
         imagePart,
@@ -228,158 +232,86 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min, // Allow to grow if needed
             children: [
-              if (widget.topLabel != null && widget.topLabel!.isNotEmpty)
-                Text(
-                  widget.topLabel!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: effectiveSubtitleColor.withOpacity(0.7),
-                    fontFamily: fontFamily,
-                  ),
-                ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            displayName,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: widget.isLarge ? 20 : 16,
-                              fontWeight: fontWeight,
-                              color: effectiveTextColor,
-                              fontFamily: fontFamily,
-                              height: 1.2,
-                            ),
-                          ),
-                        ),
-                        if (widget.isVerified) ...[
-                          const SizedBox(width: 4),
-                          Icon(
-                            PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
-                            size: widget.isLarge ? 18 : 14,
-                            color: AppTheme.verifiedGold,
-                          ),
-                        ],
-                        if (widget.reputationLabel != null) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: widget.reputationBgColor ?? Colors.blue.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: widget.reputationColor?.withOpacity(0.2) ?? Colors.blue.withOpacity(0.2)),
-                            ),
-                            child: Text(
-                              widget.reputationLabel!,
-                              style: TextStyle(
-                                fontSize: 8,
-                                fontWeight: FontWeight.bold,
-                                color: widget.reputationColor ?? Colors.blue[700],
-                                fontFamily: fontFamily,
+                  if (widget.topLabel != null && widget.topLabel!.isNotEmpty)
+                    Text(
+                      widget.topLabel!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: effectiveSubtitleColor.withOpacity(0.7),
+                        fontFamily: fontFamily,
+                      ),
+                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                displayName,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: widget.isLarge ? 20 : 16,
+                                  fontWeight: fontWeight,
+                                  color: effectiveTextColor,
+                                  fontFamily: fontFamily,
+                                  height: 1.0,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                            if (widget.isVerified) ...[
+                              const SizedBox(width: 4),
+                              Icon(
+                                PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
+                                size: widget.isLarge ? 18 : 14,
+                                color: AppTheme.verifiedGold,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      if (widget.suffix != null) ...[
+                        const SizedBox(width: 8),
+                        widget.suffix!,
                       ],
-                    ),
+                    ],
                   ),
-                  if (widget.suffix != null) ...[
-                    const SizedBox(width: 8),
-                    widget.suffix!,
-                  ],
                 ],
               ),
-              const SizedBox(height: 2),
-              if (widget.isVerticalCategory) ...[
+              if (widget.isVerticalCategory && displayCategory.isNotEmpty) ...[
+                const SizedBox(height: 2),
                 Text(
-                  Formatters.formatPhoneNumber(widget.phone),
+                  displayCategory,
                   style: TextStyle(
-                    fontSize: widget.isLarge ? 14 : 12,
-                    color: AppTheme.textSecondary,
-                    fontFamily: phoneHasUrdu ? fontFamily : '',
-                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: widget.categoryColor ?? AppTheme.themeColor,
+                    fontFamily: fontFamily,
+                    fontWeight: fontWeight,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (displayCategory.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    displayCategory,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppTheme.themeColor,
-                      fontFamily: fontFamily,
-                      fontWeight: fontWeight,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ] else
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        Formatters.formatPhoneNumber(widget.phone),
-                        style: TextStyle(
-                          fontSize: widget.isLarge ? 14 : 12,
-                          color: AppTheme.textSecondary,
-                          fontFamily: phoneHasUrdu ? fontFamily : '',
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (displayCategory.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          displayCategory,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppTheme.themeColor,
-                            fontFamily: fontFamily,
-                            fontWeight: fontWeight,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+              ],
               if (widget.address != null && widget.address!.isNotEmpty) ...[
-                const SizedBox(height: 2),
+                const SizedBox(height: 1),
                 Text(
                   widget.address!,
                   style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 13,
                       color: effectiveSubtitleColor,
                       fontFamily: fontFamily,
                       fontWeight: fontWeight),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                ),
-              ],
-              if (widget.showDate && widget.date != null) ...[
-                const SizedBox(height: 2),
-                Text(
-                  Formatters.formatDate(widget.date!),
-                  style: const TextStyle(
-                      fontSize: 10,
-                      color: AppTheme.textSecondary,
-                      fontFamily: '',
-                      fontWeight: FontWeight.bold),
                 ),
               ],
             ],

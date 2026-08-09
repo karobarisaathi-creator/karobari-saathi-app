@@ -1,12 +1,13 @@
-// lib/features/artisans/widgets/artisan_filter_bar.dart
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/artisan_service.dart';
+import 'package:account_app/core/widgets/app_filter_chip.dart';
 
 class ArtisanFilterBar extends StatelessWidget {
   final String selectedProfession;
   final Function(String) onProfessionSelected;
+  final VoidCallback onViewAllTap;
   final bool isUrdu;
   final String fontFamily;
 
@@ -14,79 +15,58 @@ class ArtisanFilterBar extends StatelessWidget {
     super.key,
     required this.selectedProfession,
     required this.onProfessionSelected,
+    required this.onViewAllTap,
     required this.isUrdu,
     required this.fontFamily,
   });
 
   @override
   Widget build(BuildContext context) {
-    final professions = ArtisanService.getProfessions();
+    final allProfessions = ArtisanService.getProfessions();
+    
+    // Select top 6 most popular professions
+    final topProfessions = allProfessions.take(6).toList();
 
     return Container(
-      height: 44,
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListView.builder(
+      height: 40,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: professions.length + 1,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return _buildFilterChip(
-              id: 'all',
-              label: isUrdu ? 'سب' : 'All',
-              icon: PhosphorIcons.gridFour(),
-            );
-          }
-
-          final profession = professions[index - 1];
-          return _buildFilterChip(
-            id: profession['id']!,
-            label: isUrdu ? profession['name']! : profession['id']!,
-            icon: profession['icon']!,
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildFilterChip({
-    required String id,
-    required String label,
-    required dynamic icon,
-  }) {
-    final isSelected = selectedProfession == id;
-
-    return GestureDetector(
-      onTap: () => onProfessionSelected(id),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        margin: const EdgeInsets.only(right: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.themeColor : Colors.grey[100],
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? AppTheme.themeColor : Colors.grey[300]!,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        children: [
+          // "All" Chip
+          AppFilterChip(
+            labelEn: 'All',
+            labelUr: 'سب',
+            icon: PhosphorIcons.gridFour(),
+            isSelected: selectedProfession == 'all',
+            activeColor: AppTheme.goldColor,
+            onTap: () => onProfessionSelected('all'),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              icon is String ? icon : '',
-              style: const TextStyle(fontSize: 16),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: isSelected ? Colors.white : Colors.grey[700],
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                fontFamily: fontFamily,
-              ),
-            ),
-          ],
-        ),
+
+          // Top 6 Professions
+          ...topProfessions.map((p) {
+            final icon = p['icon'];
+            return AppFilterChip(
+              labelEn: p['id']!,
+              labelUr: p['name']!,
+              icon: icon is IconData ? icon : null,
+              isSelected: selectedProfession == p['id'],
+              activeColor: AppTheme.goldColor,
+              onTap: () => onProfessionSelected(p['id']!),
+            );
+          }),
+
+          // "View All" Chip Style
+          AppFilterChip(
+            labelEn: 'More...',
+            labelUr: 'مزید...',
+            icon: PhosphorIcons.dotsThreeCircle(),
+            isSelected: false,
+            activeColor: AppTheme.goldColor,
+            onTap: onViewAllTap,
+          ),
+        ],
       ),
     );
   }
