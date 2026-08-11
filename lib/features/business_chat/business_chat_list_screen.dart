@@ -23,6 +23,7 @@ class BusinessChatListScreen extends StatefulWidget {
 class _BusinessChatListScreenState extends State<BusinessChatListScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _isAscending = true;
   final BusinessChatService _chatService = BusinessChatService();
 
   @override
@@ -40,15 +41,7 @@ class _BusinessChatListScreenState extends State<BusinessChatListScreen> {
       backgroundColor: Colors.white,
       appBar: CustomAppBar(
         title: isUrdu ? '💼 کاروباری رابطے' : '💼 Business Connect',
-        showBackButton: false,
-        actions: [
-          IconButton(
-            icon: Icon(PhosphorIcons.magnifyingGlass(), color: Colors.white),
-            onPressed: () {
-              // سرچ فوکس کریں
-            },
-          ),
-        ],
+        showBackButton: true,
       ),
       body: Column(
         children: [
@@ -60,6 +53,8 @@ class _BusinessChatListScreenState extends State<BusinessChatListScreen> {
               hintText: isUrdu ? 'رابطہ تلاش کریں...' : 'Search contacts...',
               padding: EdgeInsets.zero,
               onSearchChanged: (val) => setState(() => _searchQuery = val),
+              onSortToggled: () => setState(() => _isAscending = !_isAscending),
+              isAscending: _isAscending,
             ),
           ),
 

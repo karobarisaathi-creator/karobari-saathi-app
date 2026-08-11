@@ -216,46 +216,53 @@ class _BusinessChatScreenState extends State<BusinessChatScreen> {
   }
 
   Widget _buildInputArea(bool isUrdu, String fontFamily) {
+    final bool isFocused = _focusNode.hasFocus;
+
     return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).padding.bottom + 12,
-        left: 12,
-        right: 12,
-        top: 8,
-      ),
+      margin: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 16),
       decoration: BoxDecoration(
         color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: isFocused ? AppTheme.themeColor : Colors.transparent,
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
+            color: Colors.black.withValues(alpha: isFocused ? 0.12 : 0.08),
+            blurRadius: isFocused ? 16 : 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
-        children: [
-          // اٹیچمنٹ بٹن
-          IconButton(
-            onPressed: _pickImage,
-            icon: Icon(PhosphorIcons.paperclip(),
-                color: AppTheme.themeColor, size: 24),
-          ),
-
-          // ٹیکسٹ فیلڈ
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(24),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // اٹیچمنٹ بٹن (اندر ہی)
+            Material(
+              color: Colors.transparent,
+              child: IconButton(
+                onPressed: _pickImage,
+                icon: Icon(PhosphorIcons.paperclip(),
+                    color: isFocused ? AppTheme.themeColor : Colors.grey[600],
+                    size: 22),
+                padding: const EdgeInsets.all(12),
+                constraints: const BoxConstraints(),
               ),
+            ),
+
+            // ٹیکسٹ فیلڈ
+            Expanded(
               child: TextField(
                 controller: _messageController,
                 focusNode: _focusNode,
-                maxLines: null,
+                maxLines: 4,
+                minLines: 1,
                 textAlignVertical: TextAlignVertical.center,
                 style: const TextStyle(fontSize: 15),
+                onChanged: (val) => setState(() {}),
                 decoration: InputDecoration(
                   hintText: isUrdu ? 'پیغام لکھیں...' : 'Type a message...',
                   hintStyle: TextStyle(
@@ -263,23 +270,44 @@ class _BusinessChatScreenState extends State<BusinessChatScreen> {
                       fontSize: 14,
                       color: Colors.grey[400]),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),
-          ),
 
-          // بھیجیں بٹن
-          if (_messageController.text.isNotEmpty)
-            IconButton(
-              onPressed: _isSending ? null : () => _sendMessage(),
-              icon: Icon(
-                PhosphorIcons.paperPlaneRight(PhosphorIconsStyle.fill),
-                color: _isSending ? Colors.grey : AppTheme.themeColor,
-                size: 24,
+            // بھیجیں بٹن (اندر ہی)
+            Padding(
+              padding: const EdgeInsets.only(right: 8, left: 4),
+              child: GestureDetector(
+                onTap: (_isSending || _messageController.text.trim().isEmpty)
+                    ? null
+                    : () => _sendMessage(),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: _messageController.text.trim().isEmpty
+                        ? Colors.grey[100]
+                        : AppTheme.themeColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    PhosphorIcons.arrowUp(PhosphorIconsStyle.bold),
+                    color: _messageController.text.trim().isEmpty
+                        ? Colors.grey[400]
+                        : Colors.white,
+                    size: 20,
+                  ),
+                ),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
