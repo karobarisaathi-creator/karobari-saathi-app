@@ -49,9 +49,9 @@ class AppNotification {
       'id': id,
       'title': title,
       'message': message,
-      'type': type.toString(),
+      'type': type.name, // Use .name for cleaner storage
       'isRead': isRead,
-      'timestamp': timestamp.toIso8601String(),
+      'timestamp': Timestamp.fromDate(timestamp), // Use Firestore Timestamp
       'data': data,
       'relatedAccountId': relatedAccountId,
       'relatedTransactionId': relatedTransactionId,

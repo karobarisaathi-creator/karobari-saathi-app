@@ -19,37 +19,38 @@ class NotificationCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const NotificationCard({
-    Key? key,
+    super.key,
     required this.notification,
     required this.isUrdu,
     required this.fontFamily,
     required this.onAddPressed,
     required this.onDeletePressed,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final bool isTransaction = notification.type == NotificationType.transaction && notification.data != null;
     final bool isPriceDrop = notification.type == NotificationType.price_drop;
+    final bool isSystem = notification.type == NotificationType.system;
     final data = notification.data;
     final bool isAdded = data?['isAdded'] == true;
-    final bool isArtisanRequest = data?['type'] == 'artisan_request';
+    final bool isArtisanRequest = data?['type'] == 'artisan_request' || data?['type'] == 'artisan_response';
     final bool isResponded = data?['responded'] == true;
     final bool isAccepted = data?['accepted'] == true;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: notification.isRead ? const Color(0xFFF8F9FA) : const Color(0xFFEDF0F2),
+        color: notification.isRead ? const Color(0xFFF8F9FA) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isPriceDrop ? AppTheme.incomeColor.withOpacity(0.2) : AppTheme.darkColor.withOpacity(0.05), 
-          width: isPriceDrop ? 2 : 1
+          color: isPriceDrop || isSystem ? AppTheme.themeColor.withOpacity(0.2) : AppTheme.darkColor.withOpacity(0.05), 
+          width: isPriceDrop || isSystem ? 1.5 : 1
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -62,8 +63,10 @@ class NotificationCard extends StatelessWidget {
           children: [
             if (isPriceDrop)
               _buildPriceDropHeader(isUrdu, fontFamily),
+            if (isSystem && !isPriceDrop)
+              _buildSystemHeader(isUrdu, fontFamily),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -72,10 +75,10 @@ class NotificationCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: isPriceDrop 
+                        child: (isPriceDrop || isSystem)
                           ? _buildSystemIdentity(isUrdu)
                           : ProfileInfoWidget(
-                              name: data?['senderName'] ?? (isUrdu ? 'نامعلوم یوزر' : 'Unknown User'),
+                              name: data?['senderName'] ?? data?['artisanName'] ?? (isUrdu ? 'صارف' : 'User'),
                               phone: data?['senderPhone'] ?? '',
                               profileImage: data?['senderPhotoUrl'],
                               isVerified: data?['isSenderVerified'] == true || data?['isSenderVerified'] == 'true',
@@ -89,9 +92,8 @@ class NotificationCard extends StatelessWidget {
                             _formatTime(notification.timestamp),
                             style: const TextStyle(
                               color: AppTheme.textSecondary,
-                              fontSize: 11,
+                              fontSize: 10,
                               fontFamily: '',
-                              fontWeight: FontWeight.bold,
                             ),
                           ),
                           if (!notification.isRead)
@@ -105,13 +107,24 @@ class NotificationCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   // 2. تحریر / عنوان
                   Padding(
-                    padding: EdgeInsets.only(left: isPriceDrop ? 0 : 56), 
+                    padding: EdgeInsets.only(left: (isPriceDrop || isSystem) ? 0 : 52), 
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (notification.title.isNotEmpty && !isPriceDrop)
+                          Text(
+                            notification.title,
+                            style: TextStyle(
+                              fontFamily: fontFamily,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.darkColor,
+                            ),
+                          ),
+                        const SizedBox(height: 4),
                         if (isTransaction) ...[
                           Text(
                             (data?['description'] != null && data!['description'].toString().trim().isNotEmpty)
@@ -119,32 +132,17 @@ class NotificationCard extends StatelessWidget {
                                 : _getTransactionMessage(data!, isUrdu),
                             style: TextStyle(
                               fontFamily: fontFamily,
-                              fontSize: 14,
-                              height: 1.4,
+                              fontSize: 13,
                               color: AppTheme.darkColor,
-                              fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
                             ),
                           ),
-                          if (data?['description'] != null && data!['description'].toString().trim().isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(
-                                _getTransactionMessage(data, isUrdu),
-                                style: TextStyle(
-                                  fontFamily: fontFamily,
-                                  fontSize: 14,
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                            ),
                         ] else ...[
                           Text(
                             notification.message,
                             style: TextStyle(
                               fontFamily: fontFamily,
-                              fontSize: isPriceDrop ? 15 : 13,
-                              color: AppTheme.darkColor,
-                              fontWeight: isPriceDrop ? FontWeight.bold : FontWeight.normal,
+                              fontSize: 13,
+                              color: AppTheme.textSecondary,
                             ),
                           ),
                         ],
@@ -156,126 +154,126 @@ class NotificationCard extends StatelessWidget {
             ),
             
             // 3. بٹن بار
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Row(
-                children: [
-                  if (isTransaction)
-                    ElevatedButton(
-                      onPressed: isAdded ? null : onAddPressed,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isAdded ? Colors.grey.shade400 : AppTheme.themeColor,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      ),
-                      child: Text(
-                        isAdded 
-                            ? (isUrdu ? 'کھاتے میں شامل ہے' : 'Added to Ledger')
-                            : (isUrdu ? 'کھاتے میں شامل کریں' : 'Add to Ledger'),
-                        style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                    ),
-                  if (isPriceDrop)
-                    ElevatedButton.icon(
-                      onPressed: onTap,
-                      icon: Icon(PhosphorIcons.tag(PhosphorIconsStyle.fill), size: 16),
-                      label: Text(
-                        isUrdu ? 'آئٹم دیکھیں' : 'View Deal',
-                        style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.incomeColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        elevation: 0,
-                      ),
-                    ),
-                  if (isArtisanRequest) ...[
-                    if (!isResponded)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () => _respondToRequest(context, true),
-                                icon: Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill), size: 18),
-                                label: Text(isUrdu ? 'ہاں' : 'Yes', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.incomeColor,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () => _respondToRequest(context, false),
-                                icon: Icon(PhosphorIcons.xCircle(PhosphorIconsStyle.fill), size: 18),
-                                label: Text(isUrdu ? 'ناں' : 'No', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.expenseColor,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                ),
-                              ),
-                            ),
-                          ],
+            if (isTransaction || isArtisanRequest)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Row(
+                  children: [
+                    if (isTransaction)
+                      ElevatedButton(
+                        onPressed: isAdded ? null : onAddPressed,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isAdded ? Colors.grey.shade400 : AppTheme.themeColor,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                      )
-                    else
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: isAccepted ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                        child: Text(
+                          isAdded 
+                              ? (isUrdu ? 'کھاتے میں شامل ہے' : 'Added')
+                              : (isUrdu ? 'کھاتے میں شامل کریں' : 'Add to Ledger'),
+                          style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ),
+                    if (data?['type'] == 'artisan_request') ...[
+                      if (!isResponded)
+                        Expanded(
                           child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                isAccepted ? PhosphorIcons.checkCircle() : PhosphorIcons.xCircle(),
-                                color: isAccepted ? Colors.green : Colors.red,
-                                size: 16,
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () => _respondToRequest(context, true),
+                                  icon: const Icon(Icons.check, size: 16),
+                                  label: Text(isUrdu ? 'ہاں' : 'Yes', style: TextStyle(fontFamily: fontFamily)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.incomeColor,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                ),
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                isAccepted 
-                                    ? (isUrdu ? 'آپ نے کام کی حامی بھر لی ہے' : 'You accepted this work')
-                                    : (isUrdu ? 'آپ نے معذرت کر لی ہے' : 'You declined this work'),
-                                style: TextStyle(
-                                  color: isAccepted ? Colors.green : Colors.red,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                  fontFamily: fontFamily,
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () => _respondToRequest(context, false),
+                                  icon: const Icon(Icons.close, size: 16),
+                                  label: Text(isUrdu ? 'ناں' : 'No', style: TextStyle(fontFamily: fontFamily)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.expenseColor,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ),
-                  ],
-                  const Spacer(),
-                  IconButton(
-                    onPressed: onDeletePressed,
-                    icon: Icon(PhosphorIcons.trash(), color: Colors.red.shade400, size: 20),
-                    style: IconButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: EdgeInsets.zero,
+                        )
+                      else
+                        _buildStatusIndicator(isAccepted, isUrdu, fontFamily),
+                    ],
+                    const Spacer(),
+                    IconButton(
+                      onPressed: onDeletePressed,
+                      icon: Icon(PhosphorIcons.trash(), color: Colors.red.shade300, size: 20),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildStatusIndicator(bool isAccepted, bool isUrdu, String fontFamily) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: isAccepted ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isAccepted ? Icons.check_circle : Icons.cancel,
+            color: isAccepted ? Colors.green : Colors.red,
+            size: 14,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            isAccepted 
+                ? (isUrdu ? 'منظور شدہ' : 'Accepted')
+                : (isUrdu ? 'معذرت کی گئی' : 'Declined'),
+            style: TextStyle(
+              color: isAccepted ? Colors.green : Colors.red,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+              fontFamily: fontFamily,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSystemHeader(bool isUrdu, String fontFamily) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+      decoration: BoxDecoration(
+        color: AppTheme.darkColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+      ),
+      child: Row(
+        children: [
+          Icon(PhosphorIcons.info(PhosphorIconsStyle.bold), color: Colors.white, size: 14),
+          const SizedBox(width: 8),
+          Text(
+            isUrdu ? 'اہم پیغام' : 'Important Notice',
+            style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+          ),
+        ],
       ),
     );
   }
@@ -311,7 +309,7 @@ class NotificationCard extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Text(
-          isUrdu ? 'مارکیٹ الرٹ' : 'Market Alert',
+          isUrdu ? 'سسٹم پیغام' : 'System Message',
           style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.darkColor, fontSize: 14),
         ),
       ],
@@ -358,12 +356,14 @@ class NotificationCard extends StatelessWidget {
       notificationId: notification.id,
     );
 
-    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(isUrdu ? 'جواب بھیج دیا گیا!' : 'Response sent!'),
-        backgroundColor: accepted ? Colors.green : Colors.red,
-      ),
-    );
+    if (context.mounted) {
+      final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isUrdu ? 'جواب بھیج دیا گیا!' : 'Response sent!'),
+          backgroundColor: accepted ? Colors.green : Colors.red,
+        ),
+      );
+    }
   }
 }

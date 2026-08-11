@@ -35,16 +35,17 @@ class ArtisanProfileAdapter extends TypeAdapter<ArtisanProfile> {
       rating: fields[15] as double,
       totalReviews: fields[16] as int,
       isVerified: fields[17] as bool,
-      isActive: fields[18] as bool,
-      createdAt: fields[19] as DateTime,
-      updatedAt: fields[20] as DateTime,
+      verificationStatus: fields[18] as String,
+      isActive: fields[19] as bool,
+      createdAt: fields[20] as DateTime,
+      updatedAt: fields[21] as DateTime,
     );
   }
 
   @override
   void write(BinaryWriter writer, ArtisanProfile obj) {
     writer
-      ..writeByte(21)
+      ..writeByte(22)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -82,10 +83,12 @@ class ArtisanProfileAdapter extends TypeAdapter<ArtisanProfile> {
       ..writeByte(17)
       ..write(obj.isVerified)
       ..writeByte(18)
-      ..write(obj.isActive)
+      ..write(obj.verificationStatus)
       ..writeByte(19)
-      ..write(obj.createdAt)
+      ..write(obj.isActive)
       ..writeByte(20)
+      ..write(obj.createdAt)
+      ..writeByte(21)
       ..write(obj.updatedAt);
   }
 

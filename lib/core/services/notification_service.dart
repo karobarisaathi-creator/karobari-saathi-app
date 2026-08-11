@@ -23,7 +23,7 @@ class NotificationService with ChangeNotifier {
   List<AppNotification> _notifications = [];
   int _unreadCount = 0;
   StreamSubscription<QuerySnapshot>? _firestoreSubscription;
-  
+
   GlobalKey<NavigatorState>? _navigatorKey;
 
   List<AppNotification> get notifications => _notifications;
@@ -39,7 +39,7 @@ class NotificationService with ChangeNotifier {
       }
     });
   }
-  
+
   void setNavigatorKey(GlobalKey<NavigatorState> key) {
     _navigatorKey = key;
   }
@@ -48,7 +48,7 @@ class NotificationService with ChangeNotifier {
     await _setupLocalNotifications();
     await _setupFirebaseMessaging();
     await _loadStoredNotifications();
-    
+
     if (_auth.currentUser != null) {
       _startFirestoreListener();
     }
@@ -64,49 +64,64 @@ class NotificationService with ChangeNotifier {
         .doc(user.uid)
         .collection('notifications')
         .orderBy('timestamp', descending: true)
-        .limit(20)
         .snapshots()
         .listen((snapshot) {
-      
+      debugPrint(
+          'Notification snapshot received with ${snapshot.docs.length} docs');
       List<AppNotification> newNotifications = [];
       for (var doc in snapshot.docs) {
-         try {
-           var data = doc.data();
-           // Ensure ID matches document ID so deletion works
-           data['id'] = doc.id;
-           var notification = AppNotification.fromMap(data);
-           newNotifications.add(notification);
-         } catch (e) {
-           print('Error parsing notification: $e');
-         }
+        try {
+          var data = doc.data();
+          data['id'] = doc.id;
+          var notification = AppNotification.fromMap(data);
+          newNotifications.add(notification);
+        } catch (e) {
+          debugPrint('Error parsing notification ${doc.id}: $e');
+        }
       }
-      
+
       _notifications = newNotifications;
       _updateUnreadCount();
       notifyListeners();
-      
+
+      // Trigger local notification for NEW arrivals while app is foreground
       for (var change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.added) {
-           final data = change.doc.data();
-           if (data != null) {
-             final notification = AppNotification.fromMap(data);
-             if (DateTime.now().difference(notification.timestamp).inMinutes < 2) {
-                 _showLocalNotificationRaw(
-                   title: notification.title,
-                   body: notification.message,
-                   payload: notification.type.toString().split('.').last,
-                   dataPayload: notification.data,
-                 );
-             }
-           }
+          final data = change.doc.data() as Map<String, dynamic>?;
+          if (data != null) {
+            final notification = AppNotification.fromMap(data);
+            // Only show if it's less than 1 minute old (avoids old data triggering on load)
+            if (DateTime.now().difference(notification.timestamp).inMinutes <
+                1) {
+              _showLocalNotificationRaw(
+                title: notification.title,
+                body: notification.message,
+                payload: notification.type.name,
+                dataPayload: notification.data,
+              );
+            }
+          }
         }
       }
+    }, onError: (e) {
+      debugPrint('Firestore Notification Listener Error: $e');
     });
   }
 
   void _stopFirestoreListener() {
     _firestoreSubscription?.cancel();
     _firestoreSubscription = null;
+  }
+
+  void refreshListener() {
+    _stopFirestoreListener();
+    _startFirestoreListener();
+  }
+
+  Future<void> loadFromCloud() async {
+    if (_auth.currentUser != null) {
+      refreshListener();
+    }
   }
 
   Future<void> _setupLocalNotifications() async {
@@ -124,7 +139,7 @@ class NotificationService with ChangeNotifier {
     await _localNotifications.initialize(
       settings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-         _handleNotificationTap(response.payload);
+        _handleNotificationTap(response.payload);
       },
     );
 
@@ -132,7 +147,7 @@ class NotificationService with ChangeNotifier {
       'account_channel',
       'Account Notifications',
       description: 'Notifications for account activities',
-      importance: Importance.max, // Changed to max for heads-up
+      importance: Importance.max,
       playSound: true,
       enableVibration: true,
     );
@@ -153,127 +168,119 @@ class NotificationService with ChangeNotifier {
     try {
       final String? fcmToken = await _firebaseMessaging.getToken();
       if (_auth.currentUser != null && fcmToken != null) {
-        // Check if document exists before updating to avoid NOT_FOUND error
-        final userDocRef = _firestore.collection('users').doc(_auth.currentUser!.uid);
+        final userDocRef =
+            _firestore.collection('users').doc(_auth.currentUser!.uid);
         final userDoc = await userDocRef.get();
         if (userDoc.exists) {
-           await userDocRef.update({
-             'fcmToken': fcmToken,
-           });
+          await userDocRef.update({
+            'fcmToken': fcmToken,
+          });
         } else {
-           await userDocRef.set({
-             'fcmToken': fcmToken,
-           }, SetOptions(merge: true));
+          await userDocRef.set({
+            'fcmToken': fcmToken,
+          }, SetOptions(merge: true));
         }
       }
     } catch (e) {
-      print("Error setting up FCM: $e");
+      debugPrint("Error setting up FCM: $e");
     }
 
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-    
+
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-       _handleBackgroundMessage(message);
-       _handleNotificationTap(message.data['type'], message.data);
+      _handleBackgroundMessage(message);
+      _handleNotificationTap(message.data['type'], message.data);
     });
 
-    FirebaseMessaging.instance.getInitialMessage().then(
-      (message) {
-        if (message != null) {
-           _handleTerminatedMessage(message);
-           _handleNotificationTap(message.data['type'], message.data);
-        }
+    FirebaseMessaging.instance.getInitialMessage().then((message) {
+      if (message != null) {
+        _handleTerminatedMessage(message);
+        _handleNotificationTap(message.data['type'], message.data);
       }
-    );
+    });
   }
-  
-  void _handleNotificationTap(String? type, [Map<String, dynamic>? data]) async {
+
+  void _handleNotificationTap(String? type,
+      [Map<String, dynamic>? data]) async {
     if (_navigatorKey == null) return;
-    
+
     String? accountId = data?['accountId'] ?? data?['relatedAccountId'];
     String? productId = data?['productId'] ?? data?['itemId'];
-    
+
     if (productId != null) {
-      // Find the item first or navigate to detail directly if we have it
-      // For price drop, we likely want to see the item detail
       _navigateToProductDetail(productId);
       return;
     }
 
     if (accountId != null) {
-       try {
-         final context = _navigatorKey!.currentState!.context;
-         await Future.delayed(Duration(milliseconds: 500));
-         
-         _navigatorKey!.currentState!.push(
-           MaterialPageRoute(
-             builder: (context) => _buildDestinationScreen(accountId),
-           ),
-         );
-       } catch (e) {
-         print('Navigation error: $e');
-       }
+      try {
+        final context = _navigatorKey!.currentState!.context;
+        await Future.delayed(Duration(milliseconds: 500));
+
+        _navigatorKey!.currentState!.push(
+          MaterialPageRoute(
+            builder: (context) => _buildDestinationScreen(accountId),
+          ),
+        );
+      } catch (e) {
+        debugPrint('Navigation error: $e');
+      }
     }
   }
-  
+
   Widget _buildDestinationScreen(String? accountId) {
-     return Scaffold(
-       body: FutureBuilder<Account?>(
-         future: _fetchAccountForNavigation(accountId),
-         builder: (context, snapshot) {
-           if (snapshot.connectionState == ConnectionState.done) {
-             if (snapshot.data != null) {
-               return PartyDetailScreen(party: snapshot.data!);
-             } else {
-               return Scaffold(
-                 appBar: AppBar(title: Text('Details')),
-                 body: Center(child: Text('Account details not found.')),
-               );
-             }
-           }
-           return Center(child: CircularProgressIndicator());
-         },
-       ),
-     );
-  }
-  
-  Future<Account?> _fetchAccountForNavigation(String? accountId) async {
-     if (accountId == null) return null;
-     try {
-       final user = _auth.currentUser;
-       if (user != null) {
-          final doc = await _firestore.collection('users').doc(user.uid).collection('accounts').doc(accountId).get();
-          if (doc.exists) {
-            return Account.fromMap(doc.data()!);
+    return Scaffold(
+      body: FutureBuilder<Account?>(
+        future: _fetchAccountForNavigation(accountId),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            if (snapshot.data != null) {
+              return PartyDetailScreen(party: snapshot.data!);
+            } else {
+              return Scaffold(
+                appBar: AppBar(title: Text('Details')),
+                body: Center(child: Text('Account details not found.')),
+              );
+            }
           }
-       }
-     } catch (e) {
-       print('Error fetching account: $e');
-     }
-     return null;
+          return Center(child: CircularProgressIndicator());
+        },
+      ),
+    );
+  }
+
+  Future<Account?> _fetchAccountForNavigation(String? accountId) async {
+    if (accountId == null) return null;
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        final doc = await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .collection('accounts')
+            .doc(accountId)
+            .get();
+        if (doc.exists) {
+          return Account.fromMap(doc.data()!);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching account: $e');
+    }
+    return null;
   }
 
   Future<void> _loadStoredNotifications() async {
     // Implementation handled by Listener
   }
 
-  // Compatibility method to fix error in NotificationsScreen
-  Future<void> loadFromCloud() async {
-    if (_auth.currentUser != null) {
-      // Simply restart listener if needed or just let it be
-      _startFirestoreListener();
-    }
-  }
-
   void _handleForegroundMessage(RemoteMessage message) {
     _showLocalNotification(message);
   }
 
-  void _handleBackgroundMessage(RemoteMessage message) {
-  }
+  void _handleBackgroundMessage(RemoteMessage message) {}
 
-  void _handleTerminatedMessage(RemoteMessage? message) {
-  }
+  void _handleTerminatedMessage(RemoteMessage? message) {}
 
   Future<void> _showLocalNotification(RemoteMessage message) async {
     await _showLocalNotificationRaw(
@@ -292,15 +299,15 @@ class NotificationService with ChangeNotifier {
   }) async {
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
-          'account_channel',
-          'Account Notifications',
-          channelDescription: 'Notifications for account activities',
-          importance: Importance.max, // Increased to Max
-          priority: Priority.max,     // Increased to Max
-          playSound: true,
-          enableVibration: true,
-          fullScreenIntent: true,     // Added to wake screen
-        );
+      'account_channel',
+      'Account Notifications',
+      channelDescription: 'Notifications for account activities',
+      importance: Importance.max,
+      priority: Priority.max,
+      playSound: true,
+      enableVibration: true,
+      fullScreenIntent: true,
+    );
 
     const NotificationDetails details = NotificationDetails(
       android: androidDetails,
@@ -309,8 +316,9 @@ class NotificationService with ChangeNotifier {
 
     String fullPayload = payload;
     if (dataPayload != null) {
-       String accId = dataPayload['accountId'] ?? dataPayload['relatedAccountId'] ?? '';
-       if (accId.isNotEmpty) fullPayload = "$payload|$accId";
+      String accId =
+          dataPayload['accountId'] ?? dataPayload['relatedAccountId'] ?? '';
+      if (accId.isNotEmpty) fullPayload = "$payload|$accId";
     }
 
     await _localNotifications.show(
@@ -322,20 +330,28 @@ class NotificationService with ChangeNotifier {
     );
   }
 
-  void _addNotificationFromMessage(RemoteMessage message) {
-  }
+  void _addNotificationFromMessage(RemoteMessage message) {}
 
   NotificationType _getNotificationTypeFromString(String type) {
     switch (type) {
-      case 'transaction': return NotificationType.transaction;
-      case 'share': return NotificationType.share;
-      case 'account_share': return NotificationType.share;
-      case 'reminder': return NotificationType.reminder;
-      case 'report': return NotificationType.report;
-      case 'price_drop': return NotificationType.report;
-      case 'artisan_request': return NotificationType.general;
-      case 'system': return NotificationType.system;
-      default: return NotificationType.general;
+      case 'transaction':
+        return NotificationType.transaction;
+      case 'share':
+        return NotificationType.share;
+      case 'account_share':
+        return NotificationType.share;
+      case 'reminder':
+        return NotificationType.reminder;
+      case 'report':
+        return NotificationType.report;
+      case 'price_drop':
+        return NotificationType.report;
+      case 'artisan_request':
+        return NotificationType.general;
+      case 'system':
+        return NotificationType.system;
+      default:
+        return NotificationType.general;
     }
   }
 
@@ -348,8 +364,7 @@ class NotificationService with ChangeNotifier {
 
     try {
       final String requestId = "${currentUser.uid}_$artisanUid";
-      
-      // 1. Create a persistent request record for tracking status
+
       await _firestore.collection('artisan_requests').doc(requestId).set({
         'customerUid': currentUser.uid,
         'artisanUid': artisanUid,
@@ -357,12 +372,12 @@ class NotificationService with ChangeNotifier {
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      // 2. Send the notification to the artisan
       final notifId = "artisan_req_${DateTime.now().millisecondsSinceEpoch}";
       final notification = AppNotification(
         id: notifId,
         title: 'کام کی درخواست (New Work Request)',
-        message: '$customerName آپ سے کام کے بارے میں پوچھ رہے ہیں۔ کیا آپ دستیاب ہیں؟',
+        message:
+            '$customerName آپ سے کام کے بارے میں پوچھ رہے ہیں۔ کیا آپ دستیاب ہیں؟',
         type: NotificationType.general,
         isRead: false,
         timestamp: DateTime.now(),
@@ -371,7 +386,12 @@ class NotificationService with ChangeNotifier {
           'senderName': customerName,
           'senderUid': currentUser.uid,
           'senderPhone': currentUser.phoneNumber,
+          'senderPhotoUrl': currentUser.photoURL,
+          'isSenderVerified': currentUser.emailVerified,
+          'artisanUid': artisanUid,
+          'customerUid': currentUser.uid,
           'requestId': requestId,
+          'status': 'pending',
           'needsAction': true,
         },
       );
@@ -399,22 +419,20 @@ class NotificationService with ChangeNotifier {
     try {
       final String requestId = "${customerUid}_${currentUser.uid}";
 
-      // 1. Update the persistent request record
       await _firestore.collection('artisan_requests').doc(requestId).set({
         'status': accepted ? 'accepted' : 'rejected',
         'respondedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      // 2. Mark the notification as acted upon
-      updateNotificationData(notificationId, {'responded': true, 'accepted': accepted});
+      updateNotificationData(
+          notificationId, {'responded': true, 'accepted': accepted});
 
-      // 3. Send response back to customer
       final notifId = "artisan_res_${DateTime.now().millisecondsSinceEpoch}";
       final notification = AppNotification(
         id: notifId,
         title: accepted ? 'کام کی منظوری! ✅' : 'معذرت ❌',
-        message: accepted 
-            ? '$artisanName نے آپ کی کام کی درخواست قبول کر لی ہے۔ اب آپ رابطہ کر سکتے ہیں۔' 
+        message: accepted
+            ? '$artisanName نے آپ کی کام کی درخواست قبول کر لی ہے۔ اب آپ رابطہ کر سکتے ہیں۔'
             : '$artisanName اس وقت کام کے لیے دستیاب نہیں ہیں۔',
         type: NotificationType.general,
         isRead: false,
@@ -423,7 +441,9 @@ class NotificationService with ChangeNotifier {
           'type': 'artisan_response',
           'artisanName': artisanName,
           'artisanUid': currentUser.uid,
+          'customerUid': customerUid,
           'accepted': accepted,
+          'requestId': requestId,
         },
       );
 
@@ -438,33 +458,32 @@ class NotificationService with ChangeNotifier {
     }
   }
 
-  // Helper to check current request status with auto-expiry logic
   Future<String?> getArtisanRequestStatus(String artisanUid) async {
     final user = _auth.currentUser;
     if (user == null) return null;
 
     try {
-      final doc = await _firestore.collection('artisan_requests').doc("${user.uid}_$artisanUid").get();
+      final doc = await _firestore
+          .collection('artisan_requests')
+          .doc("${user.uid}_$artisanUid")
+          .get();
       if (doc.exists) {
         final data = doc.data()!;
         final String status = data['status'] as String;
-        final Timestamp? timestamp = data['respondedAt'] as Timestamp? ?? data['timestamp'] as Timestamp?;
+        final Timestamp? timestamp = data['respondedAt'] as Timestamp? ??
+            data['timestamp'] as Timestamp?;
 
         if (timestamp != null) {
           final DateTime lastAction = timestamp.toDate();
           final DateTime now = DateTime.now();
-          final difference = now.difference(lastAction);
+          final Duration difference = now.difference(lastAction);
 
-          // AUTO-RESET LOGIC:
-          // 1. If accepted, reset after 24 hours
           if (status == 'accepted' && difference.inHours >= 24) {
-            return null; 
+            return null;
           }
-          // 2. If rejected, reset after 12 hours
           if (status == 'rejected' && difference.inHours >= 12) {
             return null;
           }
-          // 3. If still pending, reset after 48 hours
           if (status == 'pending' && difference.inHours >= 48) {
             return null;
           }
@@ -477,7 +496,44 @@ class NotificationService with ChangeNotifier {
     return null;
   }
 
-  // --- Notification Actions with Persistence ---
+  Stream<String?> artisanRequestStatusStream(String artisanUid) {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return Stream<String?>.value(null);
+    }
+
+    return _firestore
+        .collection('artisan_requests')
+        .doc("${user.uid}_$artisanUid")
+        .snapshots()
+        .map((doc) {
+      if (!doc.exists) return null;
+      final data = doc.data();
+      if (data == null) return null;
+      final String status = data['status'] as String? ?? '';
+      final Timestamp? timestamp =
+          data['respondedAt'] as Timestamp? ?? data['timestamp'] as Timestamp?;
+
+      if (timestamp != null) {
+        final DateTime lastAction = timestamp.toDate();
+        final DateTime now = DateTime.now();
+        final Duration difference = now.difference(lastAction);
+
+        if (status == 'accepted' && difference.inHours >= 24) {
+          return null;
+        }
+        if (status == 'rejected' && difference.inHours >= 12) {
+          return null;
+        }
+        if (status == 'pending' && difference.inHours >= 48) {
+          return null;
+        }
+      }
+      return status.isEmpty ? null : status;
+    }).handleError((e) {
+      debugPrint('Error listening artisan request status: $e');
+    });
+  }
 
   void markAsRead(String notificationId) {
     final index = _notifications.indexWhere((n) => n.id == notificationId);
@@ -485,11 +541,15 @@ class NotificationService with ChangeNotifier {
       _notifications[index].isRead = true;
       _updateUnreadCount();
       notifyListeners();
-      
+
       if (_auth.currentUser != null) {
-        _firestore.collection('users').doc(_auth.currentUser!.uid)
-            .collection('notifications').doc(notificationId).update({'isRead': true})
-            .catchError((e) => print("Error marking read: $e"));
+        _firestore
+            .collection('users')
+            .doc(_auth.currentUser!.uid)
+            .collection('notifications')
+            .doc(notificationId)
+            .update({'isRead': true}).catchError(
+                (e) => debugPrint("Error marking read: $e"));
       }
     }
   }
@@ -500,15 +560,20 @@ class NotificationService with ChangeNotifier {
     }
     _unreadCount = 0;
     notifyListeners();
-    
+
     if (_auth.currentUser != null) {
       final batch = _firestore.batch();
       for (var n in _notifications) {
-         final ref = _firestore.collection('users').doc(_auth.currentUser!.uid)
-             .collection('notifications').doc(n.id);
-         batch.update(ref, {'isRead': true});
+        final ref = _firestore
+            .collection('users')
+            .doc(_auth.currentUser!.uid)
+            .collection('notifications')
+            .doc(n.id);
+        batch.update(ref, {'isRead': true});
       }
-      batch.commit().catchError((e) => print("Error marking all read: $e"));
+      batch
+          .commit()
+          .catchError((e) => debugPrint("Error marking all read: $e"));
     }
   }
 
@@ -516,21 +581,25 @@ class NotificationService with ChangeNotifier {
     _notifications.removeWhere((n) => n.id == notificationId);
     _updateUnreadCount();
     notifyListeners();
-    
+
     if (_auth.currentUser != null) {
-      _firestore.collection('users').doc(_auth.currentUser!.uid)
-          .collection('notifications').doc(notificationId).delete()
-          .catchError((e) => print("Error deleting notification: $e"));
+      _firestore
+          .collection('users')
+          .doc(_auth.currentUser!.uid)
+          .collection('notifications')
+          .doc(notificationId)
+          .delete()
+          .catchError((e) => debugPrint("Error deleting notification: $e"));
     }
   }
 
-  void updateNotificationData(String notificationId, Map<String, dynamic> newData) {
+  void updateNotificationData(
+      String notificationId, Map<String, dynamic> newData) {
     final index = _notifications.indexWhere((n) => n.id == notificationId);
     if (index != -1) {
       final oldData = _notifications[index].data ?? {};
       final mergedData = {...oldData, ...newData};
-      
-      // Update local state
+
       _notifications[index] = AppNotification(
         id: _notifications[index].id,
         title: _notifications[index].title,
@@ -542,15 +611,17 @@ class NotificationService with ChangeNotifier {
         relatedAccountId: _notifications[index].relatedAccountId,
         relatedTransactionId: _notifications[index].relatedTransactionId,
       );
-      
+
       notifyListeners();
-      
-      // Update Firestore
+
       if (_auth.currentUser != null) {
-        _firestore.collection('users').doc(_auth.currentUser!.uid)
-            .collection('notifications').doc(notificationId)
-            .update({'data': mergedData})
-            .catchError((e) => print("Error updating notification data: $e"));
+        _firestore
+            .collection('users')
+            .doc(_auth.currentUser!.uid)
+            .collection('notifications')
+            .doc(notificationId)
+            .update({'data': mergedData}).catchError(
+                (e) => debugPrint("Error updating notification data: $e"));
       }
     }
   }
@@ -558,14 +629,17 @@ class NotificationService with ChangeNotifier {
   void clearAll() {
     if (_auth.currentUser != null && _notifications.isNotEmpty) {
       final batch = _firestore.batch();
-      final collectionRef = _firestore.collection('users').doc(_auth.currentUser!.uid)
+      final collectionRef = _firestore
+          .collection('users')
+          .doc(_auth.currentUser!.uid)
           .collection('notifications');
-      
+
       for (var n in _notifications) {
         batch.delete(collectionRef.doc(n.id));
       }
-      
-      batch.commit().catchError((e) => print("Error clearing all notifications from Firestore: $e"));
+
+      batch.commit().catchError((e) =>
+          debugPrint("Error clearing all notifications from Firestore: $e"));
     }
 
     _notifications.clear();
@@ -577,8 +651,6 @@ class NotificationService with ChangeNotifier {
     _unreadCount = _notifications.where((n) => !n.isRead).length;
   }
 
-  // --- Sending Logic ---
-
   Future<void> notifyPartyByPhone({
     required String partyPhoneNumber,
     required double amount,
@@ -588,56 +660,65 @@ class NotificationService with ChangeNotifier {
   }) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
-    
+
     String myName = currentUser.displayName ?? '';
     if (myName.isEmpty) myName = currentUser.phoneNumber ?? 'ایک صارف';
 
     String targetPhone = partyPhoneNumber.replaceAll(RegExp(r'[\s-]+'), '');
-    if (targetPhone.startsWith('03')) targetPhone = '+92${targetPhone.substring(1)}';
-    else if (targetPhone.startsWith('3')) targetPhone = '+92$targetPhone';
+    if (targetPhone.startsWith('03'))
+      targetPhone = '+92${targetPhone.substring(1)}';
+    else if (targetPhone.startsWith('3'))
+      targetPhone = '+92$targetPhone';
     else if (targetPhone.startsWith('92')) targetPhone = '+$targetPhone';
-    
+
     try {
-       final querySnapshot = await _firestore.collection('users')
-           .where('phoneNumber', isEqualTo: targetPhone).limit(1).get();
+      final querySnapshot = await _firestore
+          .collection('users')
+          .where('phoneNumber', isEqualTo: targetPhone)
+          .limit(1)
+          .get();
 
-       if (querySnapshot.docs.isNotEmpty) {
-         final targetUserId = querySnapshot.docs.first.id;
-         if (targetUserId == currentUser.uid) return;
+      if (querySnapshot.docs.isNotEmpty) {
+        final targetUserId = querySnapshot.docs.first.id;
+        if (targetUserId == currentUser.uid) return;
 
-         // Check if current user is verified
-         final dbService = DatabaseService();
-         bool isVerified = await dbService.isSellerVerified(currentUser.uid);
+        final dbService = DatabaseService();
+        bool isVerified = await dbService.isSellerVerified(currentUser.uid);
 
-         String typeText = transactionType == 'income' ? 'رقم لی' : 'رقم دی';
-         String messageBody = '$myName نے آپ کے ساتھ Rs. $amount کا لین دین درج کیا ہے ($typeText)۔';
+        String typeText = transactionType == 'income' ? 'رقم لی' : 'رقم دی';
+        String messageBody =
+            '$myName نے آپ کے ساتھ Rs. $amount کا لین دین درج کیا ہے ($typeText)۔';
 
-         final notifId = DateTime.now().millisecondsSinceEpoch.toString();
-         final notification = AppNotification(
-            id: notifId,
-            title: 'نیا لین دین (Karobari Saathi)',
-            message: messageBody,
-            type: NotificationType.transaction,
-            isRead: false,
-            timestamp: DateTime.now(),
-            data: {
-              'amount': amount.toString(),
-              'transactionType': transactionType,
-              'senderName': myName,
-              'senderPhone': currentUser.phoneNumber,
-              'senderUid': currentUser.uid,
-              'senderPhotoUrl': currentUser.photoURL,
-              'isSenderVerified': isVerified, // Add verification status
-              'description': description ?? '',
-              'items': items ?? [],
-            },
-         );
+        final notifId = DateTime.now().millisecondsSinceEpoch.toString();
+        final notification = AppNotification(
+          id: notifId,
+          title: 'نیا لین دین (Karobari Saathi)',
+          message: messageBody,
+          type: NotificationType.transaction,
+          isRead: false,
+          timestamp: DateTime.now(),
+          data: {
+            'amount': amount.toString(),
+            'transactionType': transactionType,
+            'senderName': myName,
+            'senderPhone': currentUser.phoneNumber,
+            'senderUid': currentUser.uid,
+            'senderPhotoUrl': currentUser.photoURL,
+            'isSenderVerified': isVerified,
+            'description': description ?? '',
+            'items': items ?? [],
+          },
+        );
 
-         await _firestore.collection('users').doc(targetUserId)
-             .collection('notifications').doc(notifId).set(notification.toMap());
-       }
+        await _firestore
+            .collection('users')
+            .doc(targetUserId)
+            .collection('notifications')
+            .doc(notifId)
+            .set(notification.toMap());
+      }
     } catch (e) {
-      print('Error notifying party: $e');
+      debugPrint('Error notifying party: $e');
     }
   }
 
@@ -645,37 +726,35 @@ class NotificationService with ChangeNotifier {
     required String accountId,
     required String accountName,
     required String sharedWithPhone,
-  }) async {
-  }
-  
+  }) async {}
+
   Future<void> sendReminderNotification({
     required String accountId,
     required String accountName,
     required double pendingAmount,
-  }) async {
-  }
+  }) async {}
 
-  Future<void> sendReportNotification(String period) async {
-  }
+  Future<void> sendReportNotification(String period) async {}
 
   void _navigateToProductDetail(String itemId) async {
     if (_navigatorKey == null) return;
-    
-    // We need to fetch the item first
+
     try {
-      final db = DatabaseService(); // This is a bit hacky, better use provider if possible
-      // Actually, we can fetch from Firestore directly here or use a helper
-      final doc = await FirebaseFirestore.instance.collectionGroup('inventory_items')
-          .where('id', isEqualTo: itemId).limit(1).get();
-          
+      final doc = await FirebaseFirestore.instance
+          .collectionGroup('inventory_items')
+          .where('id', isEqualTo: itemId)
+          .limit(1)
+          .get();
+
       if (doc.docs.isNotEmpty) {
-        final item = InventoryItem.fromMap({...doc.docs.first.data(), 'id': doc.docs.first.id});
+        final item = InventoryItem.fromMap(
+            {...doc.docs.first.data(), 'id': doc.docs.first.id});
         _navigatorKey!.currentState!.push(
           MaterialPageRoute(builder: (context) => ItemDetailScreen(item: item)),
         );
       }
     } catch (e) {
-      print("Navigation to item error: $e");
+      debugPrint("Navigation to item error: $e");
     }
   }
 }

@@ -22,8 +22,7 @@ class ArtisanWorkOrdersScreen extends StatefulWidget {
 
 class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
   final ArtisanWorkOrderService _service = ArtisanWorkOrderService();
-  final TextEditingController _customerNameController =
-      TextEditingController();
+  final TextEditingController _customerNameController = TextEditingController();
   final TextEditingController _customerPhoneController =
       TextEditingController();
   final TextEditingController _workDescriptionController =
@@ -79,7 +78,8 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
     );
   }
 
-  Widget _buildOrderCard(ArtisanWorkOrder order, bool isUrdu, String fontFamily) {
+  Widget _buildOrderCard(
+      ArtisanWorkOrder order, bool isUrdu, String fontFamily) {
     final statusColors = {
       'pending': Colors.orange,
       'in_progress': Colors.blue,
@@ -116,7 +116,8 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: statusColors[order.status]?.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
@@ -256,6 +257,8 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
   }
 
   void _showAddWorkDialog(bool isUrdu, String fontFamily) {
+    final _dialogFormKey = GlobalKey<FormState>();
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -270,44 +273,47 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
           ),
         ),
         content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildDialogTextField(
-                controller: _customerNameController,
-                label: isUrdu ? 'گاہک کا نام' : 'Customer Name',
-                icon: PhosphorIcons.user(),
-                fontFamily: fontFamily,
-                isUrdu: isUrdu,
-              ),
-              const SizedBox(height: 12),
-              _buildDialogTextField(
-                controller: _customerPhoneController,
-                label: isUrdu ? 'گاہک کا فون' : 'Customer Phone',
-                icon: PhosphorIcons.phone(),
-                fontFamily: fontFamily,
-                isUrdu: isUrdu,
-                isPhone: true,
-              ),
-              const SizedBox(height: 12),
-              _buildDialogTextField(
-                controller: _workDescriptionController,
-                label: isUrdu ? 'کام کی تفصیل' : 'Work Description',
-                icon: PhosphorIcons.note(),
-                fontFamily: fontFamily,
-                isUrdu: isUrdu,
-                maxLines: 3,
-              ),
-              const SizedBox(height: 12),
-              _buildDialogTextField(
-                controller: _amountController,
-                label: isUrdu ? 'رقم (اختیاری)' : 'Amount (Optional)',
-                icon: PhosphorIcons.money(),
-                fontFamily: fontFamily,
-                isUrdu: isUrdu,
-                isNumber: true,
-              ),
-            ],
+          child: Form(
+            key: _dialogFormKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildDialogTextField(
+                  controller: _customerNameController,
+                  label: isUrdu ? 'گاہک کا نام' : 'Customer Name',
+                  icon: PhosphorIcons.user(),
+                  fontFamily: fontFamily,
+                  isUrdu: isUrdu,
+                ),
+                const SizedBox(height: 12),
+                _buildDialogTextField(
+                  controller: _customerPhoneController,
+                  label: isUrdu ? 'گاہک کا فون' : 'Customer Phone',
+                  icon: PhosphorIcons.phone(),
+                  fontFamily: fontFamily,
+                  isUrdu: isUrdu,
+                  isPhone: true,
+                ),
+                const SizedBox(height: 12),
+                _buildDialogTextField(
+                  controller: _workDescriptionController,
+                  label: isUrdu ? 'کام کی تفصیل' : 'Work Description',
+                  icon: PhosphorIcons.note(),
+                  fontFamily: fontFamily,
+                  isUrdu: isUrdu,
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 12),
+                _buildDialogTextField(
+                  controller: _amountController,
+                  label: isUrdu ? 'رقم (اختیاری)' : 'Amount (Optional)',
+                  icon: PhosphorIcons.money(),
+                  fontFamily: fontFamily,
+                  isUrdu: isUrdu,
+                  isNumber: true,
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -323,6 +329,8 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
+              if (!_dialogFormKey.currentState!.validate()) return;
+
               final user = FirebaseAuth.instance.currentUser;
               if (user == null) return;
 
@@ -380,7 +388,8 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
       validator: (value) {
         if (value == null || value.isEmpty) {

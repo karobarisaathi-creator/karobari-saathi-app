@@ -1,4 +1,6 @@
 // lib/features/artisans/widgets/artisan_card.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -34,28 +36,37 @@ class ArtisanCard extends StatefulWidget {
 class _ArtisanCardState extends State<ArtisanCard> {
   bool _isSending = false;
   String? _requestStatus; // 'pending', 'accepted', 'rejected' or null
+  StreamSubscription<String?>? _requestStatusSub;
 
   @override
   void initState() {
     super.initState();
-    _checkRequestStatus();
+    _listenRequestStatus();
   }
 
-  Future<void> _checkRequestStatus() async {
+  @override
+  void dispose() {
+    _requestStatusSub?.cancel();
+    super.dispose();
+  }
+
+  void _listenRequestStatus() {
     final nService = Provider.of<NotificationService>(context, listen: false);
-    final status = await nService.getArtisanRequestStatus(widget.artisan.id);
-    if (mounted) {
-      setState(() {
-        _requestStatus = status;
-      });
-    }
+    _requestStatusSub =
+        nService.artisanRequestStatusStream(widget.artisan.id).listen((status) {
+      if (mounted) {
+        setState(() {
+          _requestStatus = status;
+        });
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final isMe = widget.artisan.id == FirebaseAuth.instance.currentUser?.uid;
-    final distanceText = widget.distanceKm != null 
-        ? ' \u200E(${widget.distanceKm!.toStringAsFixed(1)} km)' 
+    final distanceText = widget.distanceKm != null
+        ? ' \u200E(${widget.distanceKm!.toStringAsFixed(1)} km)'
         : ' \u200E(0.0 km)';
 
     final bool isAvailable = widget.artisan.availability == 'available';
@@ -70,7 +81,8 @@ class _ArtisanCardState extends State<ArtisanCard> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.themeColor.withOpacity(0.3), width: 1.2),
+              border: Border.all(
+                  color: AppTheme.themeColor.withOpacity(0.3), width: 1.2),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.03),
@@ -87,7 +99,8 @@ class _ArtisanCardState extends State<ArtisanCard> {
                   profileImage: widget.artisan.profileImage,
                   category: widget.artisan.professionUrdu,
                   address: '${widget.artisan.location}$distanceText',
-                  isVerified: widget.artisan.isVerified || widget.artisan.verificationStatus == 'approved',
+                  isVerified: widget.artisan.isVerified ||
+                      widget.artisan.verificationStatus == 'approved',
                   customSize: 70,
                   isVerticalCategory: true,
                   suffix: null,
@@ -124,11 +137,15 @@ class _ArtisanCardState extends State<ArtisanCard> {
                         ),
                       ],
                     ),
-                    if (widget.artisan.availability == 'available' && 
-                        widget.artisan.id != FirebaseAuth.instance.currentUser?.uid)
-                      _buildWorkRequestButton(context, widget.isUrdu, widget.fontFamily),
-                    if (widget.artisan.id == FirebaseAuth.instance.currentUser?.uid)
-                      Icon(PhosphorIcons.caretRight(), size: 16, color: Colors.grey),
+                    if (widget.artisan.availability == 'available' &&
+                        widget.artisan.id !=
+                            FirebaseAuth.instance.currentUser?.uid)
+                      _buildWorkRequestButton(
+                          context, widget.isUrdu, widget.fontFamily),
+                    if (widget.artisan.id ==
+                        FirebaseAuth.instance.currentUser?.uid)
+                      Icon(PhosphorIcons.caretRight(),
+                          size: 16, color: Colors.grey),
                   ],
                 ),
               ],
@@ -137,30 +154,37 @@ class _ArtisanCardState extends State<ArtisanCard> {
           // Status Badge for others
           if (!isMe)
             Positioned.directional(
-              textDirection: widget.isUrdu ? TextDirection.rtl : TextDirection.ltr,
+              textDirection:
+                  widget.isUrdu ? TextDirection.rtl : TextDirection.ltr,
               top: 0,
               end: 0,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: isAvailable ? Colors.green : Colors.red,
                   borderRadius: BorderRadius.only(
-                    topRight: widget.isUrdu ? Radius.zero : const Radius.circular(16),
-                    bottomLeft: widget.isUrdu ? Radius.zero : const Radius.circular(16),
-                    topLeft: widget.isUrdu ? const Radius.circular(16) : Radius.zero,
-                    bottomRight: widget.isUrdu ? const Radius.circular(16) : Radius.zero,
+                    topRight:
+                        widget.isUrdu ? Radius.zero : const Radius.circular(16),
+                    bottomLeft:
+                        widget.isUrdu ? Radius.zero : const Radius.circular(16),
+                    topLeft:
+                        widget.isUrdu ? const Radius.circular(16) : Radius.zero,
+                    bottomRight:
+                        widget.isUrdu ? const Radius.circular(16) : Radius.zero,
                   ),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)
+                    BoxShadow(
+                        color: Colors.black.withOpacity(0.1), blurRadius: 4)
                   ],
                 ),
                 child: Text(
-                  isAvailable 
-                      ? (widget.isUrdu ? 'دستیاب' : 'Available') 
+                  isAvailable
+                      ? (widget.isUrdu ? 'دستیاب' : 'Available')
                       : (widget.isUrdu ? 'مصروف' : 'Busy'),
                   style: const TextStyle(
-                    color: Colors.white, 
-                    fontSize: 10, 
+                    color: Colors.white,
+                    fontSize: 10,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -171,7 +195,8 @@ class _ArtisanCardState extends State<ArtisanCard> {
     );
   }
 
-  Widget _buildWorkRequestButton(BuildContext context, bool isUrdu, String fontFamily) {
+  Widget _buildWorkRequestButton(
+      BuildContext context, bool isUrdu, String fontFamily) {
     final bool isPending = _requestStatus == 'pending';
     final bool isAccepted = _requestStatus == 'accepted';
     final bool isRejected = _requestStatus == 'rejected';
@@ -195,7 +220,9 @@ class _ArtisanCardState extends State<ArtisanCard> {
     }
 
     return InkWell(
-      onTap: (_isSending || isPending || isAccepted) ? null : () => _sendRequest(context, isUrdu),
+      onTap: (_isSending || isPending || isAccepted)
+          ? null
+          : () => _sendRequest(context, isUrdu),
       borderRadius: BorderRadius.circular(8),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
@@ -203,17 +230,24 @@ class _ArtisanCardState extends State<ArtisanCard> {
         decoration: BoxDecoration(
           color: btnColor,
           borderRadius: BorderRadius.circular(8),
-          boxShadow: (_isSending || isPending || isAccepted) ? null : [
-            BoxShadow(color: btnColor.withOpacity(0.3), blurRadius: 4, offset: const Offset(0, 2))
-          ],
+          boxShadow: (_isSending || isPending || isAccepted)
+              ? null
+              : [
+                  BoxShadow(
+                      color: btnColor.withOpacity(0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2))
+                ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (_isSending)
               const SizedBox(
-                width: 12, height: 12,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(
+                    color: Colors.white, strokeWidth: 2),
               )
             else ...[
               if (icon != null) ...[
@@ -241,7 +275,7 @@ class _ArtisanCardState extends State<ArtisanCard> {
 
     final nService = Provider.of<NotificationService>(context, listen: false);
     final user = FirebaseAuth.instance.currentUser;
-    
+
     try {
       await nService.sendArtisanWorkRequest(
         artisanUid: widget.artisan.id,
@@ -255,10 +289,13 @@ class _ArtisanCardState extends State<ArtisanCard> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isUrdu ? 'درخواست کامیابی سے بھیج دی گئی!' : 'Request sent successfully!'),
+            content: Text(isUrdu
+                ? 'درخواست کامیابی سے بھیج دی گئی!'
+                : 'Request sent successfully!'),
             backgroundColor: Colors.green.shade700,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       }
@@ -267,7 +304,9 @@ class _ArtisanCardState extends State<ArtisanCard> {
         setState(() => _isSending = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isUrdu ? 'درخواست بھیجنے میں غلطی ہوئی' : 'Failed to send request'),
+            content: Text(isUrdu
+                ? 'درخواست بھیجنے میں غلطی ہوئی'
+                : 'Failed to send request'),
             backgroundColor: AppTheme.expenseColor,
           ),
         );

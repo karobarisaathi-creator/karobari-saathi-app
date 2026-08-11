@@ -31,6 +31,7 @@ class ProfileInfoWidget extends StatefulWidget {
   final bool hasUpdate;
   final bool isVerified;
   final Widget? suffix;
+  final Widget? bottom;
   final double? customSize;
   final double? borderRadius;
   final String? reputationLabel;
@@ -58,6 +59,7 @@ class ProfileInfoWidget extends StatefulWidget {
     this.hasUpdate = false,
     this.isVerified = false,
     this.suffix,
+    this.bottom,
     this.customSize,
     this.borderRadius,
     this.reputationLabel,
@@ -313,6 +315,10 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+              ],
+              if (widget.bottom != null) ...[
+                const SizedBox(height: 4),
+                widget.bottom!,
               ],
             ],
           ),

@@ -22,25 +22,17 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
   late TabController _tabController;
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
-  Map<String, dynamic>? _stats;
-  bool _loadingStats = true;
-  int _pendingAdReports = 0;
+  final TextEditingController _broadcastTitleController =
+      TextEditingController();
+  final TextEditingController _broadcastMessageController =
+      TextEditingController();
+  bool _isBroadcastSending = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _checkAdminAccess();
-    _loadStats();
-    _listenToAdReports();
-  }
-
-  void _listenToAdReports() {
-    FirebaseFirestore.instance.collection('ad_reports').snapshots().listen((snapshot) {
-      if (mounted) {
-        setState(() => _pendingAdReports = snapshot.docs.length);
-      }
-    });
   }
 
   @override
@@ -48,6 +40,8 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
     _tabController.dispose();
     _noteController.dispose();
     _searchController.dispose();
+    _broadcastTitleController.dispose();
+    _broadcastMessageController.dispose();
     super.dispose();
   }
 
@@ -79,17 +73,6 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
     }
   }
 
-  Future<void> _loadStats() async {
-    final vService = Provider.of<VerificationService>(context, listen: false);
-    final stats = await vService.getAppStats();
-    if (mounted) {
-      setState(() {
-        _stats = stats;
-        _loadingStats = false;
-      });
-    }
-  }
-
   void _showImageDialog(String url, String title) {
     showDialog(
       context: context,
@@ -115,8 +98,10 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
                 fit: BoxFit.contain,
                 placeholder: (context, url) =>
                     const Center(child: CircularProgressIndicator()),
-                errorWidget: (context, url, error) =>
-                    Icon(PhosphorIcons.imageBroken(), color: Colors.white, size: 40),
+                errorWidget: (context, url, error) => Icon(
+                    PhosphorIcons.imageBroken(),
+                    color: Colors.white,
+                    size: 40),
               ),
             ),
           ],
@@ -141,10 +126,12 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text('منسوخ', style: TextStyle(color: AppTheme.textSecondary))),
+                child: Text('منسوخ',
+                    style: TextStyle(color: AppTheme.textSecondary))),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, _noteController.text),
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.expenseColor),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.expenseColor),
               child: const Text('مسترد کریں'),
             ),
           ],
@@ -162,11 +149,11 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
         adminNote: note,
       );
       _noteController.clear();
-      _loadStats(); // Update stats
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              backgroundColor: approve ? AppTheme.incomeColor : AppTheme.expenseColor,
+              backgroundColor:
+                  approve ? AppTheme.incomeColor : AppTheme.expenseColor,
               content: Text(approve
                   ? 'درخواست منظور کر دی گئی'
                   : 'درخواست مسترد کر دی گئی')),
@@ -174,8 +161,9 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(backgroundColor: AppTheme.expenseColor, content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            backgroundColor: AppTheme.expenseColor,
+            content: Text('Error: $e')));
       }
     }
   }
@@ -195,28 +183,8 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
           indicatorWeight: 3,
           tabs: [
             Tab(text: 'درخواستیں', icon: Icon(PhosphorIcons.clipboardText())),
-            Tab(text: 'شکایات', icon: Icon(PhosphorIcons.warningCircle())),
-            Tab(
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  const Text('اشتہارات'),
-                  if (_pendingAdReports > 0)
-                    Positioned(
-                      right: -12,
-                      top: -8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                        child: Text('$_pendingAdReports', style: const TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                ],
-              ),
-            ),
             Tab(text: 'پیغام', icon: Icon(PhosphorIcons.megaphone())),
             Tab(text: 'صارفین', icon: Icon(PhosphorIcons.users())),
-            Tab(text: 'سٹیٹس', icon: Icon(PhosphorIcons.chartBar())),
           ],
         ),
       ),
@@ -224,189 +192,115 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
         controller: _tabController,
         children: [
           _buildVerificationsTab(),
-          _buildReportsTab(),
-          _buildAdReportsTab(),
           _buildBroadcastTab(),
           _buildUsersTab(),
-          _buildStatsTab(),
         ],
       ),
     );
   }
 
-  Widget _buildAdReportsTab() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('ad_reports').orderBy('reportedAt', descending: true).snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState(PhosphorIcons.checkCircle(), 'کوئی اشتہار رپورٹ نہیں ہوا');
-        }
-        
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: snapshot.data!.docs.length,
-          itemBuilder: (context, index) {
-            final doc = snapshot.data!.docs[index];
-            final data = doc.data() as Map<String, dynamic>;
-            final date = (data['reportedAt'] as Timestamp?)?.toDate() ?? DateTime.now();
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: ExpansionTile(
-                leading: Icon(PhosphorIcons.warning(PhosphorIconsStyle.fill), color: AppTheme.expenseColor),
-                title: Text(data['reason'] ?? 'رپورٹ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                subtitle: Text(DateFormat('dd MMM, hh:mm a').format(date), style: const TextStyle(fontSize: 10)),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildInfoRow('آئٹم ID:', data['itemId'] ?? ''),
-                        _buildInfoRow('مالک ID:', data['itemOwnerId'] ?? ''),
-                        _buildInfoRow('رپورٹ کنندہ:', data['reporterId'] ?? ''),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => _deleteAdReport(doc.id),
-                                style: OutlinedButton.styleFrom(foregroundColor: Colors.grey),
-                                child: const Text('رد کریں'),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () => _takeActionOnAd(data['itemId'], data['itemOwnerId'], doc.id),
-                                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.expenseColor),
-                                child: const Text('ڈیلیٹ اشتہار'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _deleteAdReport(String reportId) async {
-    await FirebaseFirestore.instance.collection('ad_reports').doc(reportId).delete();
-  }
-
-  Future<void> _takeActionOnAd(String itemId, String ownerUid, String reportId) async {
-    try {
-      // 1. Delete the item from Firestore across all seller collections
-      final query = await FirebaseFirestore.instance.collectionGroup('inventory_items').where('id', isEqualTo: itemId).get();
-      
-      for (var doc in query.docs) {
-        await doc.reference.delete();
-      }
-      
-      // 2. ENTERPRISE CLEANUP: Delete ALL reports associated with this itemId
-      final allReportsQuery = await FirebaseFirestore.instance.collection('ad_reports').where('itemId', isEqualTo: itemId).get();
-      
-      final batch = FirebaseFirestore.instance.batch();
-      for (var reportDoc in allReportsQuery.docs) {
-        batch.delete(reportDoc.reference);
-      }
-      await batch.commit();
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اشتہار اور تمام متعلقہ رپورٹس حذف کر دی گئیں')));
-      }
-    } catch (e) {
-      debugPrint("Action error: $e");
-    }
-  }
-
   Widget _buildBroadcastTab() {
-    final titleController = TextEditingController();
-    final messageController = TextEditingController();
-    bool isSending = false;
-
-    return StatefulBuilder(
-      builder: (context, setInternalState) => SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('تمام صارفین کو نوٹیفیکیشن بھیجیں',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 20),
-            TextField(
-              controller: titleController,
-              decoration: InputDecoration(
-                  labelText: 'عنوان (Title)', 
-                  prefixIcon: Icon(PhosphorIcons.textT(), color: AppTheme.themeColor),
-                  border: const OutlineInputBorder()),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('تمام صارفین کو نوٹیفیکیشن بھیجیں',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _broadcastTitleController,
+            decoration: InputDecoration(
+              labelText: 'عنوان (Title)',
+              prefixIcon:
+                  Icon(PhosphorIcons.textT(), color: AppTheme.themeColor),
+              border: const OutlineInputBorder(),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: messageController,
-              maxLines: 4,
-              decoration: InputDecoration(
-                  labelText: 'پیغام (Message)', 
-                  prefixIcon: Padding(
-                    padding: const EdgeInsets.only(bottom: 60),
-                    child: Icon(PhosphorIcons.chatText(), color: AppTheme.themeColor),
-                  ),
-                  border: const OutlineInputBorder()),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _broadcastMessageController,
+            maxLines: 4,
+            decoration: InputDecoration(
+              labelText: 'پیغام (Message)',
+              prefixIcon: Padding(
+                padding: const EdgeInsets.only(bottom: 60),
+                child:
+                    Icon(PhosphorIcons.chatText(), color: AppTheme.themeColor),
+              ),
+              border: const OutlineInputBorder(),
             ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton.icon(
-                onPressed: isSending
-                    ? null
-                    : () async {
-                        if (titleController.text.isEmpty ||
-                            messageController.text.isEmpty) return;
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 55,
+            child: ElevatedButton.icon(
+              onPressed: _isBroadcastSending
+                  ? null
+                  : () async {
+                      if (_broadcastTitleController.text.isEmpty ||
+                          _broadcastMessageController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content:
+                                const Text('عنوان اور پیغام دونوں ضروری ہیں'),
+                            backgroundColor: AppTheme.expenseColor,
+                          ),
+                        );
+                        return;
+                      }
 
-                        setInternalState(() => isSending = true);
-                        try {
-                          await Provider.of<VerificationService>(context,
-                                  listen: false)
-                              .sendBroadcastNotification(
-                            title: titleController.text,
-                            message: messageController.text,
+                      setState(() => _isBroadcastSending = true);
+                      try {
+                        await Provider.of<VerificationService>(context,
+                                listen: false)
+                            .sendBroadcastNotification(
+                          title: _broadcastTitleController.text,
+                          message: _broadcastMessageController.text,
+                        );
+                        _broadcastTitleController.clear();
+                        _broadcastMessageController.clear();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content:
+                                  Text('تمام صارفین کو پیغام بھیج دیا گیا ہے'),
+                              backgroundColor: AppTheme.incomeColor,
+                            ),
                           );
-                          titleController.clear();
-                          messageController.clear();
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        'تمام صارفین کو پیغام بھیج دیا گیا ہے')));
-                          }
-                        } catch (e) {
-                          if (mounted)
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(backgroundColor: AppTheme.expenseColor, content: Text('خرابی: $e')));
-                        } finally {
-                          setInternalState(() => isSending = false);
                         }
-                      },
-                icon: isSending
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : Icon(PhosphorIcons.paperPlaneRight(PhosphorIconsStyle.fill)),
-                label: const Text('براڈکاسٹ بھیجیں'),
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.themeColor),
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: AppTheme.expenseColor,
+                              content: Text('خرابی: $e'),
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted)
+                          setState(() => _isBroadcastSending = false);
+                      }
+                    },
+              icon: _isBroadcastSending
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2),
+                    )
+                  : Icon(
+                      PhosphorIcons.paperPlaneRight(PhosphorIconsStyle.fill)),
+              label: const Text('براڈکاسٹ بھیجیں'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.themeColor,
+                foregroundColor: Colors.white,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -416,8 +310,9 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: vService.getPendingRequests(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
+        }
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return _buildEmptyState(
               PhosphorIcons.checkCircle(), 'کوئی نئی درخواست موجود نہیں ہے');
@@ -470,14 +365,16 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
                   ),
                   if (req['shopImageUrl'] != null) ...[
                     const SizedBox(height: 12),
-                    Row(children: [_buildImageThumb(req['shopImageUrl'], 'Workplace')]),
+                    Row(children: [
+                      _buildImageThumb(req['shopImageUrl'], 'Workplace')
+                    ]),
                   ],
                 ] else
                   Row(
                     children: [
                       _buildImageThumb(req['shopImageUrl'], 'دکان'),
                       const SizedBox(width: 12),
-                      _buildImageThumb(req['idImageUrl'], 'شناختی کارڈ'),
+                      _buildImageThumb(req['cnicFront'], 'شناختی کارڈ'),
                     ],
                   ),
               ],
@@ -486,48 +383,6 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
           _buildActionButtons(req['uid']),
         ],
       ),
-    );
-  }
-
-  Widget _buildReportsTab() {
-    final vService = Provider.of<VerificationService>(context);
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: vService.getReports(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
-          return const Center(child: CircularProgressIndicator());
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return _buildEmptyState(
-              PhosphorIcons.warningCircle(), 'کوئی شکایت موجود نہیں ہے');
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: snapshot.data!.length,
-          itemBuilder: (context, index) {
-            final report = snapshot.data![index];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: AppTheme.expenseColor.withOpacity(0.1))),
-              child: ListTile(
-                leading:
-                    Icon(PhosphorIcons.warningCircle(PhosphorIconsStyle.fill), color: AppTheme.expenseColor),
-                title: Text(report['reason'] ?? 'فراڈ کی رپورٹ',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 14)),
-                subtitle: Text('سیلر UID: ${report['sellerUid']}',
-                    style: const TextStyle(fontSize: 11)),
-                trailing: TextButton(
-                  onPressed: () => _showUserControl(report['sellerUid']),
-                  child:
-                      Text('ایکشن', style: TextStyle(color: AppTheme.expenseColor, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            );
-          },
-        );
-      },
     );
   }
 
@@ -552,8 +407,9 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
           child: StreamBuilder<List<Map<String, dynamic>>>(
             stream: vService.getAllUsers(),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting)
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
+              }
               final users = snapshot.data
                       ?.where((u) =>
                           u['phoneNumber']?.contains(_searchController.text) ??
@@ -582,8 +438,7 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
                         Text(user['displayName'] ?? 'صارف',
                             style: const TextStyle(
                                 fontWeight: FontWeight.bold, fontSize: 14)),
-                        if (isVerified)
-                          const SizedBox(width: 4),
+                        if (isVerified) const SizedBox(width: 4),
                         if (isVerified)
                           Icon(PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
                               size: 14, color: AppTheme.verifiedGold),
@@ -607,81 +462,17 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
     );
   }
 
-  Widget _buildStatsTab() {
-    if (_loadingStats) return const Center(child: CircularProgressIndicator());
-    return RefreshIndicator(
-      onRefresh: _loadStats,
-      child: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          _buildStatCard('کل یوزرز', _stats?['totalUsers']?.toString() ?? '0',
-              PhosphorIcons.users(), Colors.blue),
-          const SizedBox(height: 16),
-          _buildStatCard('کل آئٹمز', _stats?['totalItems']?.toString() ?? '0',
-              PhosphorIcons.shoppingBag(), Colors.orange),
-          const SizedBox(height: 16),
-          _buildStatCard(
-              'ویریفائیڈ سیلرز',
-              _stats?['totalVerified']?.toString() ?? '0',
-              PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
-              AppTheme.incomeColor),
-          const SizedBox(height: 16),
-          _buildStatCard(
-              'موصول شکایات',
-              _stats?['totalReports']?.toString() ?? '0',
-              PhosphorIcons.flag(),
-              AppTheme.expenseColor),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard(
-      String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4))
-        ],
-        border: Border.all(color: color.withOpacity(0.1)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title,
-                  style: const TextStyle(color: Colors.grey, fontSize: 14)),
-              const SizedBox(height: 4),
-              Text(value,
-                  style: TextStyle(
-                      color: AppTheme.darkColor,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold)),
-            ],
-          ),
-          Icon(icon, color: color, size: 40),
-        ],
-      ),
-    );
-  }
-
   Future<void> _showUserControl(String uid) async {
     await showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           ListTile(
-            leading: Icon(PhosphorIcons.prohibit(), color: AppTheme.expenseColor),
+            leading:
+                Icon(PhosphorIcons.prohibit(), color: AppTheme.expenseColor),
             title: const Text('صارف کو بلاک کریں'),
             onTap: () async {
               Navigator.pop(context);
@@ -690,20 +481,25 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
                     .toggleUserStatus(uid, true);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(backgroundColor: AppTheme.expenseColor, content: const Text('صارف بلاک کر دیا گیا')),
+                    SnackBar(
+                        backgroundColor: AppTheme.expenseColor,
+                        content: const Text('صارف بلاک کر دیا گیا')),
                   );
                 }
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(backgroundColor: AppTheme.expenseColor, content: Text('خرابی: $e')),
+                    SnackBar(
+                        backgroundColor: AppTheme.expenseColor,
+                        content: Text('خرابی: $e')),
                   );
                 }
               }
             },
           ),
           ListTile(
-            leading: Icon(PhosphorIcons.sealCheck(PhosphorIconsStyle.fill), color: AppTheme.incomeColor),
+            leading: Icon(PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
+                color: AppTheme.incomeColor),
             title: const Text('تصدیق منسوخ کریں'),
             onTap: () async {
               Navigator.pop(context);
@@ -712,13 +508,17 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
                     .revokeVerification(uid);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(backgroundColor: AppTheme.incomeColor, content: const Text('تصدیق منسوخ کر دی گئی')),
+                    SnackBar(
+                        backgroundColor: AppTheme.incomeColor,
+                        content: const Text('تصدیق منسوخ کر دی گئی')),
                   );
                 }
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(backgroundColor: AppTheme.expenseColor, content: Text('خرابی: $e')),
+                    SnackBar(
+                        backgroundColor: AppTheme.expenseColor,
+                        content: Text('خرابی: $e')),
                   );
                 }
               }

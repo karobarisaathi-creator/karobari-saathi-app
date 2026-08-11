@@ -17,8 +17,7 @@ import 'package:account_app/core/models/transaction_item_model.dart'; // Added i
 import 'package:account_app/core/models/category_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/notification_model.dart';
-import 'package:account_app/core/models/shared_account_model.dart';
-import 'package:account_app/core/models/chat_model.dart';
+import 'package:account_app/core/models/business_chat_model.dart'; // Added new chat
 import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
@@ -35,8 +34,7 @@ import 'package:account_app/core/services/balance_service.dart';
 import 'package:account_app/core/services/pdf_service.dart';
 import 'package:account_app/core/services/excel_service.dart'; // Added ExcelService
 import 'package:account_app/core/services/backup_service.dart';
-import 'package:account_app/core/services/chat_service.dart';
-import 'package:account_app/core/services/sharing_service.dart';
+import 'package:account_app/core/services/database/business_chat_service.dart';
 import 'package:account_app/core/services/security_service.dart';
 import 'package:account_app/core/services/price_database_service.dart';
 import 'package:account_app/core/services/verification_service.dart';
@@ -97,9 +95,8 @@ void main() async {
     Hive.registerAdapter(ProfessionCategoryAdapter()); // ✅ Register the new adapter
     Hive.registerAdapter(AppNotificationAdapter());
     Hive.registerAdapter(NotificationTypeAdapter());
-    Hive.registerAdapter(SharedAccountAdapter());
-    Hive.registerAdapter(ChatAdapter());
-    Hive.registerAdapter(ChatMessageAdapter());
+    Hive.registerAdapter(BusinessChatMessageAdapter()); // Enabled new
+    Hive.registerAdapter(BusinessChatRoomAdapter()); // Enabled new
     Hive.registerAdapter(ArtisanProfileAdapter());
     Hive.registerAdapter(ArtisanWorkOrderAdapter());
 
@@ -188,8 +185,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PdfService()),
         ChangeNotifierProvider(create: (_) => ExcelService()), // Added ExcelService provider
         ChangeNotifierProvider(create: (_) => BackupService()),
-        ChangeNotifierProvider(create: (_) => ChatService()),
-        ChangeNotifierProvider(create: (_) => SharingService()),
+        ChangeNotifierProvider(create: (_) => BusinessChatService()),
         ChangeNotifierProvider(create: (_) => SecurityService()),
         ChangeNotifierProvider(create: (_) => VerificationService()),
         Provider(create: (_) => PriceDatabaseService()),

@@ -16,9 +16,10 @@ import 'package:account_app/features/notifications/notifications_screen.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
 import 'package:account_app/features/accounts/add_party_screen.dart'; 
 import 'package:account_app/features/accounts/party_history_screen.dart';
+import 'package:account_app/features/accounts/sms_invitation_screen.dart';
 import 'package:account_app/features/artisans/artisan_detail_screen.dart';
 import 'package:account_app/features/artisans/artisan_work_orders_screen.dart';
-import 'package:account_app/features/inventory/chat_list_screen.dart';
+import 'package:account_app/features/business_chat/business_chat_list_screen.dart';
 import 'main_navigation_screen.dart'; 
 import 'package:account_app/core/widgets/party_card.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
@@ -206,13 +207,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           double netBalance = totalPayable - totalReceivable;
 
           // --- Professions Logic ---
+          final activeProfessions = professions.where((p) => p.isActive).toList();
           double profIncome = 0;
           double profExpense = 0;
-          for (var p in professions) {
-            if (p.isActive) {
-              profIncome += p.totalIncome;
-              profExpense += p.totalExpense;
-            }
+          for (var p in activeProfessions) {
+            profIncome += p.totalIncome;
+            profExpense += p.totalExpense;
           }
           double profProfit = profIncome - profExpense;
 
@@ -227,6 +227,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 profIncome: profIncome,
                 profExpense: profExpense,
                 profProfit: profProfit,
+                showProfessions: activeProfessions.isNotEmpty, // اگر کوئی پیشہ ہے تو دکھائیں
                 isUrdu: isUrdu,
                 fontFamily: fontFamily,
               ),
@@ -270,6 +271,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required double profIncome,
     required double profExpense,
     required double profProfit,
+    required bool showProfessions,
     required bool isUrdu,
     required String fontFamily,
   }) {
@@ -320,20 +322,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _buildHeaderStatItem(balanceLabel, netBalance.abs(), Colors.white, fontFamily, PhosphorIcons.wallet(), isBold: true),
             ],
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Divider(height: 1, thickness: 0.5, color: Colors.white10),
-          ),
-          // Profession Stats
-          Row(
-            children: [
-              _buildHeaderStatItem(isUrdu ? 'پیشہ آمدن' : 'Prof. Income', profIncome, AppTheme.incomeColor, fontFamily, PhosphorIcons.arrowDownLeft()),
-              _buildStatDivider(),
-              _buildHeaderStatItem(isUrdu ? 'پیشہ خرچ' : 'Prof. Expense', profExpense, AppTheme.expenseColor, fontFamily, PhosphorIcons.arrowUpRight()),
-              _buildStatDivider(),
-              _buildHeaderStatItem(isUrdu ? 'پیشہ منافع' : 'Prof. Profit', profProfit.abs(), Colors.white, fontFamily, PhosphorIcons.trendUp(), isBold: true),
-            ],
-          ),
+          if (showProfessions) ...[
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Divider(height: 1, thickness: 0.5, color: Colors.white10),
+            ),
+            // Profession Stats
+            Row(
+              children: [
+                _buildHeaderStatItem(isUrdu ? 'پیشہ آمدن' : 'Prof. Income', profIncome, AppTheme.incomeColor, fontFamily, PhosphorIcons.arrowDownLeft()),
+                _buildStatDivider(),
+                _buildHeaderStatItem(isUrdu ? 'پیشہ خرچ' : 'Prof. Expense', profExpense, AppTheme.expenseColor, fontFamily, PhosphorIcons.arrowUpRight()),
+                _buildStatDivider(),
+                _buildHeaderStatItem(isUrdu ? 'پیشہ منافع' : 'Prof. Profit', profProfit.abs(), Colors.white, fontFamily, PhosphorIcons.trendUp(), isBold: true),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -440,7 +444,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ChatListScreen()),
+                MaterialPageRoute(builder: (context) => const BusinessChatListScreen()),
               );
             },
             fontFamily: fontFamily,
@@ -687,7 +691,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             );
           },
           onMessage: () {
-            // Navigator.push(context, MaterialPageRoute(builder: (context) => BalanceAlertScreen(party: updatedParty)));
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => BalanceAlertScreen(party: updatedParty)),
+            );
           },
         );
       },

@@ -20,7 +20,7 @@ import 'package:account_app/core/widgets/artisan_rating_stars.dart';
 import 'artisan_work_orders_screen.dart';
 import 'artisan_reviews_screen.dart';
 import 'artisan_profile_screen.dart';
-import 'package:account_app/features/inventory/chat_screen.dart';
+import 'package:account_app/features/business_chat/business_chat_screen.dart';
 import 'package:account_app/features/settings/verification_request_screen.dart';
 
 class ArtisanDetailScreen extends StatefulWidget {
@@ -28,7 +28,11 @@ class ArtisanDetailScreen extends StatefulWidget {
   final ArtisanProfile? initialArtisan;
   final double? distanceKm;
 
-  const ArtisanDetailScreen({super.key, required this.artisanId, this.initialArtisan, this.distanceKm});
+  const ArtisanDetailScreen(
+      {super.key,
+      required this.artisanId,
+      this.initialArtisan,
+      this.distanceKm});
 
   @override
   State<ArtisanDetailScreen> createState() => _ArtisanDetailScreenState();
@@ -37,17 +41,20 @@ class ArtisanDetailScreen extends StatefulWidget {
 class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
   ArtisanProfile? _artisan;
   StreamSubscription<ArtisanProfile?>? _artisanSub;
+  StreamSubscription<String?>? _requestStatusSub;
   bool _isLoading = true;
   int _workCount = 0;
   bool _isSending = false;
   String? _requestStatus;
 
-  bool get isOwner => FirebaseAuth.instance.currentUser?.uid == widget.artisanId;
+  bool get isOwner =>
+      FirebaseAuth.instance.currentUser?.uid == widget.artisanId;
 
   @override
   void initState() {
     super.initState();
     _checkRequestStatus();
+    _listenRequestStatus();
     _setupArtisanListener();
     if (!widget.artisanId.startsWith('dummy')) {
       _loadExtraData();
@@ -57,6 +64,7 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
   @override
   void dispose() {
     _artisanSub?.cancel();
+    _requestStatusSub?.cancel();
     super.dispose();
   }
 
@@ -76,8 +84,9 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
     if (_artisan == null || !isOwner) return;
 
     final service = ArtisanService();
-    final newStatus = _artisan!.availability == 'available' ? 'busy' : 'available';
-    
+    final newStatus =
+        _artisan!.availability == 'available' ? 'busy' : 'available';
+
     final updatedProfile = _artisan!.copyWith(
       availability: newStatus,
       updatedAt: DateTime.now(),
@@ -141,11 +150,23 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
     }
   }
 
+  void _listenRequestStatus() {
+    final nService = Provider.of<NotificationService>(context, listen: false);
+    _requestStatusSub =
+        nService.artisanRequestStatusStream(widget.artisanId).listen((status) {
+      if (mounted) {
+        setState(() {
+          _requestStatus = status;
+        });
+      }
+    });
+  }
+
   void _sendWorkRequest(bool isUrdu) async {
     setState(() => _isSending = true);
     final nService = Provider.of<NotificationService>(context, listen: false);
     final user = FirebaseAuth.instance.currentUser;
-    
+
     try {
       await nService.sendArtisanWorkRequest(
         artisanUid: widget.artisanId,
@@ -159,7 +180,9 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isUrdu ? 'درخواست کامیابی سے بھیج دی گئی!' : 'Request sent successfully!'),
+            content: Text(isUrdu
+                ? 'درخواست کامیابی سے بھیج دی گئی!'
+                : 'Request sent successfully!'),
             backgroundColor: Colors.green.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -178,17 +201,22 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text(
             isUrdu ? 'اپنی رائے دیں' : 'Write a Review',
-            style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
+            style:
+                TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 isUrdu ? 'کاریگر کا کام کیسا رہا؟' : 'How was your experience?',
-                style: TextStyle(fontSize: 14, color: Colors.grey[600], fontFamily: fontFamily),
+                style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    fontFamily: fontFamily),
               ),
               const SizedBox(height: 20),
               // Star Selection
@@ -196,9 +224,12 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(5, (index) {
                   return IconButton(
-                    onPressed: () => setDialogState(() => selectedRating = index + 1.0),
+                    onPressed: () =>
+                        setDialogState(() => selectedRating = index + 1.0),
                     icon: Icon(
-                      index < selectedRating ? Icons.star_rounded : Icons.star_outline_rounded,
+                      index < selectedRating
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
                       color: Colors.amber,
                       size: 32,
                     ),
@@ -210,9 +241,12 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
                 controller: commentController,
                 maxLines: 3,
                 decoration: InputDecoration(
-                  hintText: isUrdu ? 'اپنا تجربہ لکھیں...' : 'Write your comment here...',
+                  hintText: isUrdu
+                      ? 'اپنا تجربہ لکھیں...'
+                      : 'Write your comment here...',
                   hintStyle: TextStyle(fontSize: 13, fontFamily: fontFamily),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ],
@@ -220,34 +254,38 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(isUrdu ? 'کینسل' : 'Cancel', style: TextStyle(fontFamily: fontFamily)),
+              child: Text(isUrdu ? 'کینسل' : 'Cancel',
+                  style: TextStyle(fontFamily: fontFamily)),
             ),
             ElevatedButton(
               onPressed: () async {
                 if (commentController.text.trim().isEmpty) return;
-                
+
                 final artisanService = ArtisanService();
-                // Passing a dummy work order ID since we are in simple mode
                 await artisanService.addReview(
                   artisanId: widget.artisanId,
-                  workOrderId: 'simple_${DateTime.now().millisecondsSinceEpoch}', 
                   rating: selectedRating,
                   comment: commentController.text.trim(),
                 );
-                
+
                 if (mounted) {
                   Navigator.pop(context);
                   _loadData(); // Refresh to see new rating
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(isUrdu ? 'آپ کا ریویو جمع ہوگیا ہے!' : 'Review submitted!'),
+                      content: Text(isUrdu
+                          ? 'آپ کا ریویو جمع ہوگیا ہے!'
+                          : 'Review submitted!'),
                       backgroundColor: Colors.green,
                     ),
                   );
                 }
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.themeColor),
-              child: Text(isUrdu ? 'جمع کریں' : 'Submit', style: TextStyle(fontFamily: fontFamily, color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.themeColor),
+              child: Text(isUrdu ? 'جمع کریں' : 'Submit',
+                  style:
+                      TextStyle(fontFamily: fontFamily, color: Colors.white)),
             ),
           ],
         ),
@@ -260,10 +298,86 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ChatScreen(
+        builder: (context) => BusinessChatScreen(
           otherUserId: _artisan!.id,
           otherUserName: _artisan!.name,
           otherUserImage: _artisan!.profileImage,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWorkRequestButton(bool isUrdu, String fontFamily) {
+    final bool isPending = _requestStatus == 'pending';
+    final bool isAccepted = _requestStatus == 'accepted';
+    final bool isRejected = _requestStatus == 'rejected';
+
+    Color btnColor = AppTheme.themeColor;
+    String btnText = isUrdu ? 'کیا کام کریں گے؟' : 'Available?';
+    IconData? icon;
+
+    if (isPending) {
+      btnColor = Colors.orange.shade700;
+      btnText = isUrdu ? 'جواب کا انتظار' : 'Waiting...';
+      icon = PhosphorIcons.clock();
+    } else if (isAccepted) {
+      btnColor = Colors.green.shade700;
+      btnText = isUrdu ? 'منظور شدہ' : 'Accepted';
+      icon = PhosphorIcons.checkCircle();
+    } else if (isRejected) {
+      btnColor = Colors.red.shade700;
+      btnText = isUrdu ? 'دوبارہ پوچھیں' : 'Ask Again';
+      icon = PhosphorIcons.arrowClockwise();
+    }
+
+    return InkWell(
+      onTap: (_isSending || isPending || isAccepted)
+          ? null
+          : () => _sendWorkRequest(isUrdu),
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: btnColor,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: (_isSending || isPending || isAccepted)
+              ? null
+              : [
+                  BoxShadow(
+                    color: btnColor.withOpacity(0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  )
+                ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_isSending)
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                    color: Colors.white, strokeWidth: 2),
+              )
+            else ...[
+              if (icon != null) ...[
+                Icon(icon, color: Colors.white, size: 16),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                btnText,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: fontFamily,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -285,9 +399,7 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
     final phone = Formatters.normalizePhoneNumber(_artisan!.phone);
     if (phone != null) {
       final uri = Uri.parse(
-        'https://wa.me/${phone.replaceAll('+', '')}?text=${Uri.encodeComponent(
-          'Salam! I found your profile on Karobari Saathi. I need your services.'
-        )}',
+        'https://wa.me/${phone.replaceAll('+', '')}?text=${Uri.encodeComponent('Salam! I found your profile on Karobari Saathi. I need your services.')}',
       );
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -417,11 +529,13 @@ Check out this artisan on Karobari Saathi!
         children: [
           ProfileInfoWidget(
             name: artisan.name,
-            phone: '', 
+            phone: '',
             profileImage: artisan.profileImage,
             category: artisan.professionUrdu,
-            address: '${artisan.location} \u200E(${widget.distanceKm?.toStringAsFixed(1) ?? "0.0"} km)', 
-            isVerified: artisan.isVerified || artisan.verificationStatus == 'approved',
+            address:
+                '${artisan.location} \u200E(${widget.distanceKm?.toStringAsFixed(1) ?? "0.0"} km)',
+            isVerified:
+                artisan.isVerified || artisan.verificationStatus == 'approved',
             isLarge: true,
             isVerticalCategory: true,
             textColor: Colors.white,
@@ -435,7 +549,8 @@ Check out this artisan on Karobari Saathi!
                   onTap: isOwner ? _toggleAvailability : null,
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: artisan.availability == 'available'
                           ? Colors.green.withOpacity(0.2)
@@ -478,7 +593,7 @@ Check out this artisan on Karobari Saathi!
               mainAxisSize: MainAxisSize.min,
               children: [
                 ArtisanRatingStars(
-                  rating: artisan.rating, 
+                  rating: artisan.rating,
                   size: 18,
                   color: Colors.white, // White stars as requested
                 ),
@@ -555,7 +670,8 @@ Check out this artisan on Karobari Saathi!
     );
   }
 
-  Widget _buildDescription(ArtisanProfile artisan, bool isUrdu, String fontFamily) {
+  Widget _buildDescription(
+      ArtisanProfile artisan, bool isUrdu, String fontFamily) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Column(
@@ -585,7 +701,8 @@ Check out this artisan on Karobari Saathi!
     );
   }
 
-  Widget _buildWorkGallery(ArtisanProfile artisan, bool isUrdu, String fontFamily) {
+  Widget _buildWorkGallery(
+      ArtisanProfile artisan, bool isUrdu, String fontFamily) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Column(
@@ -613,7 +730,8 @@ Check out this artisan on Karobari Saathi!
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
                     image: DecorationImage(
-                      image: CachedNetworkImageProvider(artisan.workImages[index]),
+                      image:
+                          CachedNetworkImageProvider(artisan.workImages[index]),
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -680,7 +798,8 @@ Check out this artisan on Karobari Saathi!
     );
   }
 
-  Widget _buildReviewsSection(ArtisanProfile artisan, bool isUrdu, String fontFamily) {
+  Widget _buildReviewsSection(
+      ArtisanProfile artisan, bool isUrdu, String fontFamily) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Column(
@@ -729,12 +848,15 @@ Check out this artisan on Karobari Saathi!
                   icon: Icon(PhosphorIcons.pencilLine(), size: 18),
                   label: Text(
                     isUrdu ? 'اپنی رائے دیں' : 'Write a Review',
-                    style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        fontFamily: fontFamily, fontWeight: FontWeight.bold),
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppTheme.themeColor,
-                    side: BorderSide(color: AppTheme.themeColor.withOpacity(0.5)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    side:
+                        BorderSide(color: AppTheme.themeColor.withOpacity(0.5)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),
@@ -776,7 +898,8 @@ Check out this artisan on Karobari Saathi!
 
   Widget _buildOwnerBottomBar(bool isUrdu, String fontFamily) {
     final artisan = _artisan!;
-    final bool isVerified = artisan.isVerified || artisan.verificationStatus == 'approved';
+    final bool isVerified =
+        artisan.isVerified || artisan.verificationStatus == 'approved';
     final bool isPending = artisan.verificationStatus == 'pending';
 
     return Container(
@@ -803,13 +926,16 @@ Check out this artisan on Karobari Saathi!
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const VerificationRequestScreen(
+                              builder: (context) =>
+                                  const VerificationRequestScreen(
                                 isArtisanMode: true,
                               ),
                             ),
                           ).then((_) => _loadData());
                         },
-                  icon: Icon(isPending ? PhosphorIcons.clock() : PhosphorIcons.shieldCheck()),
+                  icon: Icon(isPending
+                      ? PhosphorIcons.clock()
+                      : PhosphorIcons.shieldCheck()),
                   label: Text(
                     isPending
                         ? (isUrdu ? 'تصدیق جاری ہے...' : 'Verifying...')
@@ -817,7 +943,8 @@ Check out this artisan on Karobari Saathi!
                     style: TextStyle(fontFamily: fontFamily),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isPending ? Colors.grey[400] : AppTheme.verifiedGold,
+                    backgroundColor:
+                        isPending ? Colors.grey[400] : AppTheme.verifiedGold,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -908,22 +1035,7 @@ Check out this artisan on Karobari Saathi!
                 if (artisan.availability == 'available') ...[
                   Expanded(
                     flex: 3,
-                    child: ElevatedButton.icon(
-                      onPressed: (_isSending || isPending || isAccepted) ? null : () => _sendWorkRequest(isUrdu),
-                      icon: _isSending 
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : Icon(icon ?? PhosphorIcons.question(), size: 20),
-                      label: Text(
-                        btnText,
-                        style: TextStyle(fontFamily: fontFamily, fontSize: 13, fontWeight: FontWeight.bold),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: btnColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
+                    child: _buildWorkRequestButton(isUrdu, fontFamily),
                   ),
                   const SizedBox(width: 10),
                 ],
@@ -932,16 +1044,20 @@ Check out this artisan on Karobari Saathi!
                   flex: 2,
                   child: ElevatedButton.icon(
                     onPressed: _openInAppChat,
-                    icon: Icon(PhosphorIcons.chatCircleDots(PhosphorIconsStyle.fill), size: 20),
+                    icon: Icon(
+                        PhosphorIcons.chatCircleDots(PhosphorIconsStyle.fill),
+                        size: 20),
                     label: Text(
                       isUrdu ? 'چیٹ' : 'Chat',
-                      style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          fontFamily: fontFamily, fontWeight: FontWeight.bold),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.darkColor,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
                 ),
@@ -953,16 +1069,20 @@ Check out this artisan on Karobari Saathi!
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _whatsappArtisan,
-                  icon: Icon(PhosphorIcons.whatsappLogo(PhosphorIconsStyle.fill), size: 22),
+                  icon: Icon(
+                      PhosphorIcons.whatsappLogo(PhosphorIconsStyle.fill),
+                      size: 22),
                   label: Text(
                     isUrdu ? 'واٹس ایپ پر رابطہ کریں' : 'Contact on WhatsApp',
-                    style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        fontFamily: fontFamily, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF25D366),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),

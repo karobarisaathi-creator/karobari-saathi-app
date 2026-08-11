@@ -14,7 +14,7 @@ import 'package:photo_view/photo_view_gallery.dart';
 import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/models/review_model.dart';
 import 'package:account_app/core/models/ad_report_model.dart';
-import 'package:account_app/features/inventory/chat_screen.dart';
+import 'package:account_app/features/business_chat/business_chat_screen.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/verification_service.dart';
@@ -1297,11 +1297,16 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       child: ElevatedButton.icon(
                         onPressed: () {
                           if (_sellerInfo != null) {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => ChatScreen(
-                              otherUserId: _sellerInfo!['uid']!, 
-                              otherUserName: _sellerInfo!['name']!,
-                              otherUserImage: _sellerInfo!['photoUrl'],
-                            )));
+                            Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => BusinessChatScreen(
+                            otherUserId: _sellerInfo!['uid']!,
+                            otherUserName: _sellerInfo!['name']!,
+                            otherUserImage: _sellerInfo!['photoUrl'],
+                          ),
+                        ),
+                      );
                           }
                         },
                         icon: Icon(PhosphorIcons.chatCircleDots(PhosphorIconsStyle.fill), size: 18),

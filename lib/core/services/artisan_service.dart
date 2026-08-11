@@ -1,4 +1,5 @@
 // lib/features/artisans/services/artisan_service.dart
+import 'package:flutter/foundation.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -32,7 +33,8 @@ class ArtisanService extends BaseService {
     if (profile != null) {
       // 1. تصاویر ڈیلیٹ کریں (Storage)
       try {
-        if (profile.profileImage != null && profile.profileImage!.startsWith('http')) {
+        if (profile.profileImage != null &&
+            profile.profileImage!.startsWith('http')) {
           await _storage.refFromURL(profile.profileImage!).delete();
         }
         for (var imageUrl in profile.workImages) {
@@ -54,8 +56,10 @@ class ArtisanService extends BaseService {
 
   Future<String?> uploadImage(String userId, File file, String type) async {
     try {
-      final fileName = "${userId}_${type}_${DateTime.now().millisecondsSinceEpoch}.jpg";
-      final ref = _storage.ref().child('artisan_uploads').child(userId).child(fileName);
+      final fileName =
+          "${userId}_${type}_${DateTime.now().millisecondsSinceEpoch}.jpg";
+      final ref =
+          _storage.ref().child('artisan_uploads').child(userId).child(fileName);
       await ref.putFile(file);
       return await ref.getDownloadURL();
     } catch (e) {
@@ -125,20 +129,20 @@ class ArtisanService extends BaseService {
         .where('isActive', isEqualTo: true);
 
     final snapshot = await query.get();
-    var results = snapshot.docs
-        .map((doc) => ArtisanProfile.fromMap(doc.data()))
-        .toList();
+    var results =
+        snapshot.docs.map((doc) => ArtisanProfile.fromMap(doc.data())).toList();
 
     // قریبی لوکیشن کے حساب سے فلٹر
     if (latitude != null && longitude != null) {
       results = results.where((p) {
         if (p.latitude == null || p.longitude == null) return false;
         final distance = Geolocator.distanceBetween(
-          latitude,
-          longitude,
-          p.latitude!,
-          p.longitude!,
-        ) / 1000;
+              latitude,
+              longitude,
+              p.latitude!,
+              p.longitude!,
+            ) /
+            1000;
         return distance <= radiusKm;
       }).toList();
     }
@@ -173,7 +177,7 @@ class ArtisanService extends BaseService {
 
   Future<void> addReview({
     required String artisanId,
-    required String workOrderId,
+    String? workOrderId,
     required double rating,
     required String comment,
   }) async {
@@ -198,19 +202,25 @@ class ArtisanService extends BaseService {
         .doc(review.id)
         .set(review.toMap());
 
-    // 2. کام کی آرڈر کو اپ ڈیٹ کریں
-    await firestore
-        .collection('artisans')
-        .doc(artisanId)
-        .collection('work_orders')
-        .doc(workOrderId)
-        .update({
-      'rating': rating,
-      'review': comment,
-      'isRated': true,
-      'ratedAt': FieldValue.serverTimestamp(),
-      'status': 'rated',
-    });
+    // 2. کام کی آرڈر کو اپ ڈیٹ کریں جب ورک آرڈر دستیاب ہو
+    if (workOrderId != null && workOrderId.isNotEmpty) {
+      try {
+        await firestore
+            .collection('artisans')
+            .doc(artisanId)
+            .collection('work_orders')
+            .doc(workOrderId)
+            .update({
+          'rating': rating,
+          'review': comment,
+          'isRated': true,
+          'ratedAt': FieldValue.serverTimestamp(),
+          'status': 'rated',
+        });
+      } catch (e) {
+        debugPrint('Warning: could not update work order for review: $e');
+      }
+    }
 
     // 3. کاریگر کی اوسط ریٹنگ اپ ڈیٹ کریں
     await _updateArtisanRating(artisanId);
@@ -270,83 +280,760 @@ class ArtisanService extends BaseService {
   static List<Map<String, dynamic>> getProfessions() {
     return [
       // --- تعمیرات اور ہارڈویئر (Construction & Hardware) ---
-      {'id': 'mason', 'name': 'راج / مستری', 'icon': PhosphorIcons.wall(), 'category': 'Construction & Hardware', 'categoryUrdu': 'تعمیرات اور ہارڈویئر'},
-      {'id': 'plumber', 'name': 'پلمبر', 'icon': PhosphorIcons.wrench(), 'category': 'Construction & Hardware', 'categoryUrdu': 'تعمیرات اور ہارڈویئر'},
-      {'id': 'electrician', 'name': 'الیکٹریشن', 'icon': PhosphorIcons.lightning(), 'category': 'Construction & Hardware', 'categoryUrdu': 'تعمیرات اور ہارڈویئر'},
-      {'id': 'carpenter', 'name': 'ترکھان (لکڑی کا کام)', 'icon': PhosphorIcons.hammer(), 'category': 'Construction & Hardware', 'categoryUrdu': 'تعمیرات اور ہارڈویئر'},
-      {'id': 'painter', 'name': 'پینٹر', 'icon': PhosphorIcons.paintBrushBroad(), 'category': 'Construction & Hardware', 'categoryUrdu': 'تعمیرات اور ہارڈویئر'},
-      {'id': 'welder', 'name': 'ویلڈر', 'icon': PhosphorIcons.fire(), 'category': 'Construction & Hardware', 'categoryUrdu': 'تعمیرات اور ہارڈویئر'},
-      {'id': 'tile_fixer', 'name': 'ٹائل فکسر', 'icon': PhosphorIcons.gridFour(), 'category': 'Construction & Hardware', 'categoryUrdu': 'تعمیرات اور ہارڈویئر'},
-      {'id': 'plaster', 'name': 'پلاسٹر ماہر', 'icon': PhosphorIcons.paintRoller(), 'category': 'Construction & Hardware', 'categoryUrdu': 'تعمیرات اور ہارڈویئر'},
-      {'id': 'steel_fixer', 'name': 'سٹیل فکسر', 'icon': PhosphorIcons.stairs(), 'category': 'Construction & Hardware', 'categoryUrdu': 'تعمیرات اور ہارڈویئر'},
-      {'id': 'aluminum_worker', 'name': 'ایلومینیم کا کام', 'icon': PhosphorIcons.frameCorners(), 'category': 'Construction & Hardware', 'categoryUrdu': 'تعمیرات اور ہارڈویئر'},
-      {'id': 'glass_worker', 'name': 'شیشے کا کام', 'icon': PhosphorIcons.selectionAll(), 'category': 'Construction & Hardware', 'categoryUrdu': 'تعمیرات اور ہارڈویئر'},
+      {
+        'id': 'mason',
+        'name': 'راج / مستری',
+        'icon': PhosphorIcons.wall(),
+        'category': 'Construction & Hardware',
+        'categoryUrdu': 'تعمیرات اور ہارڈویئر'
+      },
+      {
+        'id': 'plumber',
+        'name': 'پلمبر',
+        'icon': PhosphorIcons.wrench(),
+        'category': 'Construction & Hardware',
+        'categoryUrdu': 'تعمیرات اور ہارڈویئر'
+      },
+      {
+        'id': 'electrician',
+        'name': 'الیکٹریشن',
+        'icon': PhosphorIcons.lightning(),
+        'category': 'Construction & Hardware',
+        'categoryUrdu': 'تعمیرات اور ہارڈویئر'
+      },
+      {
+        'id': 'carpenter',
+        'name': 'ترکھان (لکڑی کا کام)',
+        'icon': PhosphorIcons.hammer(),
+        'category': 'Construction & Hardware',
+        'categoryUrdu': 'تعمیرات اور ہارڈویئر'
+      },
+      {
+        'id': 'painter',
+        'name': 'پینٹر',
+        'icon': PhosphorIcons.paintBrushBroad(),
+        'category': 'Construction & Hardware',
+        'categoryUrdu': 'تعمیرات اور ہارڈویئر'
+      },
+      {
+        'id': 'welder',
+        'name': 'ویلڈر',
+        'icon': PhosphorIcons.fire(),
+        'category': 'Construction & Hardware',
+        'categoryUrdu': 'تعمیرات اور ہارڈویئر'
+      },
+      {
+        'id': 'tile_fixer',
+        'name': 'ٹائل فکسر',
+        'icon': PhosphorIcons.gridFour(),
+        'category': 'Construction & Hardware',
+        'categoryUrdu': 'تعمیرات اور ہارڈویئر'
+      },
+      {
+        'id': 'plaster',
+        'name': 'پلاسٹر ماہر',
+        'icon': PhosphorIcons.paintRoller(),
+        'category': 'Construction & Hardware',
+        'categoryUrdu': 'تعمیرات اور ہارڈویئر'
+      },
+      {
+        'id': 'steel_fixer',
+        'name': 'سٹیل فکسر',
+        'icon': PhosphorIcons.stairs(),
+        'category': 'Construction & Hardware',
+        'categoryUrdu': 'تعمیرات اور ہارڈویئر'
+      },
+      {
+        'id': 'aluminum_worker',
+        'name': 'ایلومینیم کا کام',
+        'icon': PhosphorIcons.frameCorners(),
+        'category': 'Construction & Hardware',
+        'categoryUrdu': 'تعمیرات اور ہارڈویئر'
+      },
+      {
+        'id': 'glass_worker',
+        'name': 'شیشے کا کام',
+        'icon': PhosphorIcons.selectionAll(),
+        'category': 'Construction & Hardware',
+        'categoryUrdu': 'تعمیرات اور ہارڈویئر'
+      },
+      {
+        'id': 'roofing_specialist',
+        'name': 'چھت کا ماہر',
+        'icon': PhosphorIcons.houseLine(),
+        'category': 'Construction & Hardware',
+        'categoryUrdu': 'تعمیرات اور ہارڈویئر'
+      },
+      {
+        'id': 'fence_builder',
+        'name': 'باڑ بنانے والا',
+        'icon': PhosphorIcons.wall(),
+        'category': 'Construction & Hardware',
+        'categoryUrdu': 'تعمیرات اور ہارڈویئر'
+      },
+      {
+        'id': 'flooring_specialist',
+        'name': 'فرش بنانے والا',
+        'icon': PhosphorIcons.gridFour(),
+        'category': 'Construction & Hardware',
+        'categoryUrdu': 'تعمیرات اور ہارڈویئر'
+      },
 
       // --- آئی ٹی اور سافٹ ویئر (IT & Software) ---
-      {'id': 'software_dev', 'name': 'سوفٹ ویئر ڈویلپر', 'icon': PhosphorIcons.code(), 'category': 'IT & Software', 'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'},
-      {'id': 'web_designer', 'name': 'ویب ڈیزائنر', 'icon': PhosphorIcons.browser(), 'category': 'IT & Software', 'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'},
-      {'id': 'graphic_designer', 'name': 'گرافک ڈیزائنر', 'icon': PhosphorIcons.palette(), 'category': 'IT & Software', 'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'},
-      {'id': 'digital_marketer', 'name': 'ڈیجیٹل مارکیٹنگ', 'icon': PhosphorIcons.megaphone(), 'category': 'IT & Software', 'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'},
-      {'id': 'video_editor', 'name': 'ویڈیو ایڈیٹر', 'icon': PhosphorIcons.videoCamera(), 'category': 'IT & Software', 'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'},
-      {'id': 'data_entry', 'name': 'ڈیٹا اینٹری آپریٹر', 'icon': PhosphorIcons.keyboard(), 'category': 'IT & Software', 'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'},
-      {'id': 'seo_expert', 'name': 'SEO ایکسپرٹ', 'icon': PhosphorIcons.magnifyingGlassPlus(), 'category': 'IT & Software', 'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'},
-      {'id': 'content_writer', 'name': 'کونٹینٹ رائٹر', 'icon': PhosphorIcons.article(), 'category': 'IT & Software', 'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'},
+      {
+        'id': 'software_dev',
+        'name': 'سوفٹ ویئر ڈویلپر',
+        'icon': PhosphorIcons.code(),
+        'category': 'IT & Software',
+        'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'
+      },
+      {
+        'id': 'web_designer',
+        'name': 'ویب ڈیزائنر',
+        'icon': PhosphorIcons.browser(),
+        'category': 'IT & Software',
+        'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'
+      },
+      {
+        'id': 'graphic_designer',
+        'name': 'گرافک ڈیزائنر',
+        'icon': PhosphorIcons.palette(),
+        'category': 'IT & Software',
+        'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'
+      },
+      {
+        'id': 'digital_marketer',
+        'name': 'ڈیجیٹل مارکیٹنگ',
+        'icon': PhosphorIcons.megaphone(),
+        'category': 'IT & Software',
+        'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'
+      },
+      {
+        'id': 'video_editor',
+        'name': 'ویڈیو ایڈیٹر',
+        'icon': PhosphorIcons.videoCamera(),
+        'category': 'IT & Software',
+        'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'
+      },
+      {
+        'id': 'data_entry',
+        'name': 'ڈیٹا اینٹری آپریٹر',
+        'icon': PhosphorIcons.keyboard(),
+        'category': 'IT & Software',
+        'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'
+      },
+      {
+        'id': 'seo_expert',
+        'name': 'SEO ایکسپرٹ',
+        'icon': PhosphorIcons.magnifyingGlassPlus(),
+        'category': 'IT & Software',
+        'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'
+      },
+      {
+        'id': 'content_writer',
+        'name': 'کونٹینٹ رائٹر',
+        'icon': PhosphorIcons.article(),
+        'category': 'IT & Software',
+        'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'
+      },
+      {
+        'id': 'mobile_app_developer',
+        'name': 'موبائل ایپ ڈویلپر',
+        'icon': PhosphorIcons.deviceMobile(),
+        'category': 'IT & Software',
+        'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'
+      },
+      {
+        'id': 'network_admin',
+        'name': 'نیٹ ورک ایڈمن',
+        'icon': PhosphorIcons.database(),
+        'category': 'IT & Software',
+        'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'
+      },
+      {
+        'id': 'it_support',
+        'name': 'آئی ٹی سپورٹ',
+        'icon': PhosphorIcons.userGear(),
+        'category': 'IT & Software',
+        'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'
+      },
+      {
+        'id': 'cyber_security',
+        'name': 'سائبر سیکیورٹی ماہر',
+        'icon': PhosphorIcons.shieldCheck(),
+        'category': 'IT & Software',
+        'categoryUrdu': 'آئی ٹی اور سافٹ ویئر'
+      },
 
       // --- انجینئرنگ اور نقشہ نویسی (Engineering & Architecture) ---
-      {'id': 'civil_engineer', 'name': 'سول انجینئر', 'icon': PhosphorIcons.buildings(), 'category': 'Engineering & Architecture', 'categoryUrdu': 'انجینئرنگ اور نقشہ نویسی'},
-      {'id': 'mechanical_engineer', 'name': 'مکینیکل انجینئر', 'icon': PhosphorIcons.gear(), 'category': 'Engineering & Architecture', 'categoryUrdu': 'انجینئرنگ اور نقشہ نویسی'},
-      {'id': 'electrical_engineer', 'name': 'الیکٹریکل انجینئر', 'icon': PhosphorIcons.plugCharging(), 'category': 'Engineering & Architecture', 'categoryUrdu': 'انجینئرنگ اور نقشہ نویسی'},
-      {'id': 'architect', 'name': 'نقشہ نویس / آرکیٹیکٹ', 'icon': PhosphorIcons.sketchLogo(), 'category': 'Engineering & Architecture', 'categoryUrdu': 'انجینئرنگ اور نقشہ نویسی'},
-      {'id': 'interior_designer', 'name': 'انٹیریئر ڈیزائنر', 'icon': PhosphorIcons.houseLine(), 'category': 'Engineering & Architecture', 'categoryUrdu': 'انجینئرنگ اور نقشہ نویسی'},
+      {
+        'id': 'civil_engineer',
+        'name': 'سول انجینئر',
+        'icon': PhosphorIcons.buildings(),
+        'category': 'Engineering & Architecture',
+        'categoryUrdu': 'انجینئرنگ اور نقشہ نویسی'
+      },
+      {
+        'id': 'mechanical_engineer',
+        'name': 'مکینیکل انجینئر',
+        'icon': PhosphorIcons.gear(),
+        'category': 'Engineering & Architecture',
+        'categoryUrdu': 'انجینئرنگ اور نقشہ نویسی'
+      },
+      {
+        'id': 'electrical_engineer',
+        'name': 'الیکٹریکل انجینئر',
+        'icon': PhosphorIcons.plugCharging(),
+        'category': 'Engineering & Architecture',
+        'categoryUrdu': 'انجینئرنگ اور نقشہ نویسی'
+      },
+      {
+        'id': 'architect',
+        'name': 'نقشہ نویس / آرکیٹیکٹ',
+        'icon': PhosphorIcons.sketchLogo(),
+        'category': 'Engineering & Architecture',
+        'categoryUrdu': 'انجینئرنگ اور نقشہ نویسی'
+      },
+      {
+        'id': 'interior_designer',
+        'name': 'انٹیریئر ڈیزائنر',
+        'icon': PhosphorIcons.houseLine(),
+        'category': 'Engineering & Architecture',
+        'categoryUrdu': 'انجینئرنگ اور نقشہ نویسی'
+      },
+      {
+        'id': 'site_supervisor',
+        'name': 'سائٹ سپروائزر',
+        'icon': PhosphorIcons.hardDrive(),
+        'category': 'Engineering & Architecture',
+        'categoryUrdu': 'انجینئرنگ اور نقشہ نویسی'
+      },
 
       // --- مرمت اور مکینک (Repair & Mechanics) ---
-      {'id': 'mobile_repair', 'name': 'موبائل ریپیئرنگ', 'icon': PhosphorIcons.deviceMobile(), 'category': 'Repair & Mechanics', 'categoryUrdu': 'مرمت اور مکینک'},
-      {'id': 'laptop_repair', 'name': 'کمپیوٹر / لیپ ٹاپ ریپیئر', 'icon': PhosphorIcons.laptop(), 'category': 'Repair & Mechanics', 'categoryUrdu': 'مرمت اور مکینک'},
-      {'id': 'ac_technician', 'name': 'AC ٹیکنیشن', 'icon': PhosphorIcons.snowflake(), 'category': 'Repair & Mechanics', 'categoryUrdu': 'مرمت اور مکینک'},
-      {'id': 'solar_installer', 'name': 'سولر انسٹالر', 'icon': PhosphorIcons.sun(), 'category': 'Repair & Mechanics', 'categoryUrdu': 'مرمت اور مکینک'},
-      {'id': 'mechanic', 'name': 'گاڑیوں کا مکینک', 'icon': PhosphorIcons.engine(), 'category': 'Repair & Mechanics', 'categoryUrdu': 'مرمت اور مکینک'},
-      {'id': 'bike_mechanic', 'name': 'بائیک مکینک', 'icon': PhosphorIcons.bicycle(), 'category': 'Repair & Mechanics', 'categoryUrdu': 'مرمت اور مکینک'},
-      {'id': 'cctv_installer', 'name': 'کیمرہ انسٹالر (CCTV)', 'icon': PhosphorIcons.cameraPlus(), 'category': 'Repair & Mechanics', 'categoryUrdu': 'مرمت اور مکینک'},
-      {'id': 'generator_mechanic', 'name': 'جنریٹر مکینک', 'icon': PhosphorIcons.lightningSlash(), 'category': 'Repair & Mechanics', 'categoryUrdu': 'مرمت اور مکینک'},
+      {
+        'id': 'mobile_repair',
+        'name': 'موبائل ریپیئرنگ',
+        'icon': PhosphorIcons.deviceMobile(),
+        'category': 'Repair & Mechanics',
+        'categoryUrdu': 'مرمت اور مکینک'
+      },
+      {
+        'id': 'laptop_repair',
+        'name': 'کمپیوٹر / لیپ ٹاپ ریپیئر',
+        'icon': PhosphorIcons.laptop(),
+        'category': 'Repair & Mechanics',
+        'categoryUrdu': 'مرمت اور مکینک'
+      },
+      {
+        'id': 'ac_technician',
+        'name': 'AC ٹیکنیشن',
+        'icon': PhosphorIcons.snowflake(),
+        'category': 'Repair & Mechanics',
+        'categoryUrdu': 'مرمت اور مکینک'
+      },
+      {
+        'id': 'solar_installer',
+        'name': 'سولر انسٹالر',
+        'icon': PhosphorIcons.sun(),
+        'category': 'Repair & Mechanics',
+        'categoryUrdu': 'مرمت اور مکینک'
+      },
+      {
+        'id': 'mechanic',
+        'name': 'گاڑیوں کا مکینک',
+        'icon': PhosphorIcons.engine(),
+        'category': 'Repair & Mechanics',
+        'categoryUrdu': 'مرمت اور مکینک'
+      },
+      {
+        'id': 'bike_mechanic',
+        'name': 'بائیک مکینک',
+        'icon': PhosphorIcons.bicycle(),
+        'category': 'Repair & Mechanics',
+        'categoryUrdu': 'مرمت اور مکینک'
+      },
+      {
+        'id': 'cctv_installer',
+        'name': 'کیمرہ انسٹالر (CCTV)',
+        'icon': PhosphorIcons.cameraPlus(),
+        'category': 'Repair & Mechanics',
+        'categoryUrdu': 'مرمت اور مکینک'
+      },
+      {
+        'id': 'generator_mechanic',
+        'name': 'جنریٹر مکینک',
+        'icon': PhosphorIcons.lightningSlash(),
+        'category': 'Repair & Mechanics',
+        'categoryUrdu': 'مرمت اور مکینک'
+      },
+      {
+        'id': 'watch_repair',
+        'name': 'گھڑی مرمت',
+        'icon': PhosphorIcons.watch(),
+        'category': 'Repair & Mechanics',
+        'categoryUrdu': 'مرمت اور مکینک'
+      },
+      {
+        'id': 'printer_technician',
+        'name': 'پرنٹر ٹیکنیشن',
+        'icon': PhosphorIcons.printer(),
+        'category': 'Repair & Mechanics',
+        'categoryUrdu': 'مرمت اور مکینک'
+      },
 
       // --- زراعت اور مویشی (Agriculture & Livestock) ---
-      {'id': 'agri_expert', 'name': 'ماہرِ زراعت', 'icon': PhosphorIcons.plant(), 'category': 'Agriculture & Livestock', 'categoryUrdu': 'زراعت اور مویشی'},
-      {'id': 'gardener', 'name': 'مالی', 'icon': PhosphorIcons.leaf(), 'category': 'Agriculture & Livestock', 'categoryUrdu': 'زراعت اور مویشی'},
-      {'id': 'tractor_driver', 'name': 'ٹریکٹر ڈرائیور', 'icon': PhosphorIcons.truck(), 'category': 'Agriculture & Livestock', 'categoryUrdu': 'زراعت اور مویشی'},
-      {'id': 'pest_control', 'name': 'کیڑے مار ادویات ماہر', 'icon': PhosphorIcons.bug(), 'category': 'Agriculture & Livestock', 'categoryUrdu': 'زراعت اور مویشی'},
-      {'id': 'livestock_expert', 'name': 'مویشی پال ماہر', 'icon': PhosphorIcons.cow(), 'category': 'Agriculture & Livestock', 'categoryUrdu': 'زراعت اور مویشی'},
-      {'id': 'poultry_expert', 'name': 'پولٹری فارم ماہر', 'icon': PhosphorIcons.bird(), 'category': 'Agriculture & Livestock', 'categoryUrdu': 'زراعت اور مویشی'},
+      {
+        'id': 'agri_expert',
+        'name': 'ماہرِ زراعت',
+        'icon': PhosphorIcons.plant(),
+        'category': 'Agriculture & Livestock',
+        'categoryUrdu': 'زراعت اور مویشی'
+      },
+      {
+        'id': 'gardener',
+        'name': 'مالی',
+        'icon': PhosphorIcons.leaf(),
+        'category': 'Agriculture & Livestock',
+        'categoryUrdu': 'زراعت اور مویشی'
+      },
+      {
+        'id': 'tractor_driver',
+        'name': 'ٹریکٹر ڈرائیور',
+        'icon': PhosphorIcons.truck(),
+        'category': 'Agriculture & Livestock',
+        'categoryUrdu': 'زراعت اور مویشی'
+      },
+      {
+        'id': 'pest_control',
+        'name': 'کیڑے مار ادویات ماہر',
+        'icon': PhosphorIcons.bug(),
+        'category': 'Agriculture & Livestock',
+        'categoryUrdu': 'زراعت اور مویشی'
+      },
+      {
+        'id': 'livestock_expert',
+        'name': 'مویشی پال ماہر',
+        'icon': PhosphorIcons.cow(),
+        'category': 'Agriculture & Livestock',
+        'categoryUrdu': 'زراعت اور مویشی'
+      },
+      {
+        'id': 'poultry_expert',
+        'name': 'پولٹری فارم ماہر',
+        'icon': PhosphorIcons.bird(),
+        'category': 'Agriculture & Livestock',
+        'categoryUrdu': 'زراعت اور مویشی'
+      },
+      {
+        'id': 'bee_keeper',
+        'name': 'مکھی پالنے والا',
+        'icon': PhosphorIcons.bug(),
+        'category': 'Agriculture & Livestock',
+        'categoryUrdu': 'زراعت اور مویشی'
+      },
+      {
+        'id': 'orchard_specialist',
+        'name': 'باغات کا ماہر',
+        'icon': PhosphorIcons.appleLogo(),
+        'category': 'Agriculture & Livestock',
+        'categoryUrdu': 'زراعت اور مویشی'
+      },
 
       // --- بیوٹی اور صحت (Beauty & Wellness) ---
-      {'id': 'barber', 'name': 'حجام / نائی', 'icon': PhosphorIcons.scissors(), 'category': 'Beauty & Wellness', 'categoryUrdu': 'بیوٹی اور صحت'},
-      {'id': 'beautician', 'name': 'بیوٹیشن (میک اپ)', 'icon': PhosphorIcons.sparkle(), 'category': 'Beauty & Wellness', 'categoryUrdu': 'بیوٹی اور صحت'},
-      {'id': 'gym_trainer', 'name': 'جم ٹرینر', 'icon': PhosphorIcons.barbell(), 'category': 'Beauty & Wellness', 'categoryUrdu': 'بیوٹی اور صحت'},
-      {'id': 'physiotherapist', 'name': 'فزیو تھراپسٹ', 'icon': PhosphorIcons.handHeart(), 'category': 'Beauty & Wellness', 'categoryUrdu': 'بیوٹی اور صحت'},
-      {'id': 'home_nurse', 'name': 'ہوم نرس', 'icon': PhosphorIcons.firstAidKit(), 'category': 'Beauty & Wellness', 'categoryUrdu': 'بیوٹی اور صحت'},
+      {
+        'id': 'barber',
+        'name': 'حجام / نائی',
+        'icon': PhosphorIcons.scissors(),
+        'category': 'Beauty & Wellness',
+        'categoryUrdu': 'بیوٹی اور صحت'
+      },
+      {
+        'id': 'beautician',
+        'name': 'بیوٹیشن (میک اپ)',
+        'icon': PhosphorIcons.sparkle(),
+        'category': 'Beauty & Wellness',
+        'categoryUrdu': 'بیوٹی اور صحت'
+      },
+      {
+        'id': 'gym_trainer',
+        'name': 'جم ٹرینر',
+        'icon': PhosphorIcons.barbell(),
+        'category': 'Beauty & Wellness',
+        'categoryUrdu': 'بیوٹی اور صحت'
+      },
+      {
+        'id': 'physiotherapist',
+        'name': 'فزیو تھراپسٹ',
+        'icon': PhosphorIcons.handHeart(),
+        'category': 'Beauty & Wellness',
+        'categoryUrdu': 'بیوٹی اور صحت'
+      },
+      {
+        'id': 'home_nurse',
+        'name': 'ہوم نرس',
+        'icon': PhosphorIcons.firstAidKit(),
+        'category': 'Beauty & Wellness',
+        'categoryUrdu': 'بیوٹی اور صحت'
+      },
+      {
+        'id': 'makeup_artist',
+        'name': 'میک اپ آرٹسٹ',
+        'icon': PhosphorIcons.sparkle(),
+        'category': 'Beauty & Wellness',
+        'categoryUrdu': 'بیوٹی اور صحت'
+      },
+      {
+        'id': 'nail_technician',
+        'name': 'نیل ٹیکنیشن',
+        'icon': PhosphorIcons.handbag(),
+        'category': 'Beauty & Wellness',
+        'categoryUrdu': 'بیوٹی اور صحت'
+      },
+      {
+        'id': 'massage_therapist',
+        'name': 'مساج تھراپسٹ',
+        'icon': PhosphorIcons.handsClapping(),
+        'category': 'Beauty & Wellness',
+        'categoryUrdu': 'بیوٹی اور صحت'
+      },
 
       // --- کھانا اور پکوان (Food & Hospitality) ---
-      {'id': 'cook', 'name': 'باورچی / شیف', 'icon': PhosphorIcons.cookingPot(), 'category': 'Food & Hospitality', 'categoryUrdu': 'کھانا اور پکوان'},
-      {'id': 'baker', 'name': 'بیکر / کیک ماہر', 'icon': PhosphorIcons.cake(), 'category': 'Food & Hospitality', 'categoryUrdu': 'کھانا اور پکوان'},
-      {'id': 'catering_service', 'name': 'کیٹرنگ سروس', 'icon': PhosphorIcons.forkKnife(), 'category': 'Food & Hospitality', 'categoryUrdu': 'کھانا اور پکوان'},
+      {
+        'id': 'cook',
+        'name': 'باورچی / شیف',
+        'icon': PhosphorIcons.cookingPot(),
+        'category': 'Food & Hospitality',
+        'categoryUrdu': 'کھانا اور پکوان'
+      },
+      {
+        'id': 'baker',
+        'name': 'بیکر / کیک ماہر',
+        'icon': PhosphorIcons.cake(),
+        'category': 'Food & Hospitality',
+        'categoryUrdu': 'کھانا اور پکوان'
+      },
+      {
+        'id': 'catering_service',
+        'name': 'کیٹرنگ سروس',
+        'icon': PhosphorIcons.forkKnife(),
+        'category': 'Food & Hospitality',
+        'categoryUrdu': 'کھانا اور پکوان'
+      },
+      {
+        'id': 'barista',
+        'name': 'بارسٹا',
+        'icon': PhosphorIcons.coffee(),
+        'category': 'Food & Hospitality',
+        'categoryUrdu': 'کھانا اور پکوان'
+      },
+      {
+        'id': 'food_delivery',
+        'name': 'فوڈ ڈیلیوری',
+        'icon': PhosphorIcons.bellRinging(),
+        'category': 'Food & Hospitality',
+        'categoryUrdu': 'کھانا اور پکوان'
+      },
 
       // --- ٹرانسپورٹ اور لاجسٹکس (Transport & Logistics) ---
-      {'id': 'driver', 'name': 'کار ڈرائیور', 'icon': PhosphorIcons.car(), 'category': 'Transport & Logistics', 'categoryUrdu': 'ٹرانسپورٹ اور لاجسٹکس'},
-      {'id': 'heavy_driver', 'name': 'ہیوی ڈرائیور (ٹرک/بس)', 'icon': PhosphorIcons.truck(), 'category': 'Transport & Logistics', 'categoryUrdu': 'ٹرانسپورٹ اور لاجسٹکس'},
-      {'id': 'delivery_boy', 'name': 'ڈیلیوری بائے', 'icon': PhosphorIcons.moped(), 'category': 'Transport & Logistics', 'categoryUrdu': 'ٹرانسپورٹ اور لاجسٹکس'},
-      {'id': 'mover_packer', 'name': 'موور اینڈ پیکر', 'icon': PhosphorIcons.package(), 'category': 'Transport & Logistics', 'categoryUrdu': 'ٹرانسپورٹ اور لاجسٹکس'},
+      {
+        'id': 'driver',
+        'name': 'کار ڈرائیور',
+        'icon': PhosphorIcons.car(),
+        'category': 'Transport & Logistics',
+        'categoryUrdu': 'ٹرانسپورٹ اور لاجسٹکس'
+      },
+      {
+        'id': 'heavy_driver',
+        'name': 'ہیوی ڈرائیور (ٹرک/بس)',
+        'icon': PhosphorIcons.truck(),
+        'category': 'Transport & Logistics',
+        'categoryUrdu': 'ٹرانسپورٹ اور لاجسٹکس'
+      },
+      {
+        'id': 'delivery_boy',
+        'name': 'ڈیلیوری بائے',
+        'icon': PhosphorIcons.moped(),
+        'category': 'Transport & Logistics',
+        'categoryUrdu': 'ٹرانسپورٹ اور لاجسٹکس'
+      },
+      {
+        'id': 'mover_packer',
+        'name': 'موور اینڈ پیکر',
+        'icon': PhosphorIcons.package(),
+        'category': 'Transport & Logistics',
+        'categoryUrdu': 'ٹرانسپورٹ اور لاجسٹکس'
+      },
+      {
+        'id': 'chauffeur',
+        'name': 'چوفیر',
+        'icon': PhosphorIcons.steeringWheel(),
+        'category': 'Transport & Logistics',
+        'categoryUrdu': 'ٹرانسپورٹ اور لاجسٹکس'
+      },
+      {
+        'id': 'warehouse_worker',
+        'name': 'ویئر ہاؤس ورکر',
+        'icon': PhosphorIcons.package(),
+        'category': 'Transport & Logistics',
+        'categoryUrdu': 'ٹرانسپورٹ اور لاجسٹکس'
+      },
 
       // --- تعلیم اور فنون (Education & Arts) ---
-      {'id': 'teacher', 'name': 'ٹیچر / ٹیوٹر', 'icon': PhosphorIcons.bookOpen(), 'category': 'Education & Arts', 'categoryUrdu': 'تعلیم اور فنون'},
-      {'id': 'quran_teacher', 'name': 'قاری صاحب / ٹیچر', 'icon': PhosphorIcons.mosque(), 'category': 'Education & Arts', 'categoryUrdu': 'تعلیم اور فنون'},
-      {'id': 'photographer', 'name': 'فوٹوگرافر', 'icon': PhosphorIcons.camera(), 'category': 'Education & Arts', 'categoryUrdu': 'تعلیم اور فنون'},
-      {'id': 'videographer', 'name': 'ویڈیوگرافر', 'icon': PhosphorIcons.videoCamera(), 'category': 'Education & Arts', 'categoryUrdu': 'تعلیم اور فنون'},
-      {'id': 'calligrapher', 'name': 'خوش نویس (خطاط)', 'icon': PhosphorIcons.pencilCircle(), 'category': 'Education & Arts', 'categoryUrdu': 'تعلیم اور فنون'},
+      {
+        'id': 'teacher',
+        'name': 'ٹیچر / ٹیوٹر',
+        'icon': PhosphorIcons.bookOpen(),
+        'category': 'Education & Arts',
+        'categoryUrdu': 'تعلیم اور فنون'
+      },
+      {
+        'id': 'quran_teacher',
+        'name': 'قاری صاحب / ٹیچر',
+        'icon': PhosphorIcons.mosque(),
+        'category': 'Education & Arts',
+        'categoryUrdu': 'تعلیم اور فنون'
+      },
+      {
+        'id': 'photographer',
+        'name': 'فوٹوگرافر',
+        'icon': PhosphorIcons.camera(),
+        'category': 'Education & Arts',
+        'categoryUrdu': 'تعلیم اور فنون'
+      },
+      {
+        'id': 'videographer',
+        'name': 'ویڈیوگرافر',
+        'icon': PhosphorIcons.videoCamera(),
+        'category': 'Education & Arts',
+        'categoryUrdu': 'تعلیم اور فنون'
+      },
+      {
+        'id': 'calligrapher',
+        'name': 'خوش نویس (خطاط)',
+        'icon': PhosphorIcons.pencilCircle(),
+        'category': 'Education & Arts',
+        'categoryUrdu': 'تعلیم اور فنون'
+      },
+      {
+        'id': 'music_teacher',
+        'name': 'موسیقی استاد',
+        'icon': PhosphorIcons.musicNotes(),
+        'category': 'Education & Arts',
+        'categoryUrdu': 'تعلیم اور فنون'
+      },
+      {
+        'id': 'dance_instructor',
+        'name': 'ڈانس انسٹرکٹر',
+        'icon': PhosphorIcons.musicNote(),
+        'category': 'Education & Arts',
+        'categoryUrdu': 'تعلیم اور فنون'
+      },
+      {
+        'id': 'language_tutor',
+        'name': 'زبان کا ٹیوٹر',
+        'icon': PhosphorIcons.translate(),
+        'category': 'Education & Arts',
+        'categoryUrdu': 'تعلیم اور فنون'
+      },
+
+      // --- گھر اور طرزِ زندگی (Home & Lifestyle) ---
+      {
+        'id': 'home_appliance_repair',
+        'name': 'گھریلو آلات کی مرمت',
+        'icon': PhosphorIcons.television(),
+        'category': 'Home & Lifestyle',
+        'categoryUrdu': 'گھر اور طرزِ زندگی'
+      },
+      {
+        'id': 'internet_technician',
+        'name': 'انٹرنیٹ ٹیکنیشن',
+        'icon': PhosphorIcons.wifiHigh(),
+        'category': 'Home & Lifestyle',
+        'categoryUrdu': 'گھر اور طرزِ زندگی'
+      },
+      {
+        'id': 'cleaning_service',
+        'name': 'صفائی سروس',
+        'icon': PhosphorIcons.houseSimple(),
+        'category': 'Home & Lifestyle',
+        'categoryUrdu': 'گھر اور طرزِ زندگی'
+      },
+      {
+        'id': 'interior_decorator',
+        'name': 'انٹیریئر ڈیکوریٹر',
+        'icon': PhosphorIcons.paintBrush(),
+        'category': 'Home & Lifestyle',
+        'categoryUrdu': 'گھر اور طرزِ زندگی'
+      },
+      {
+        'id': 'pool_cleaner',
+        'name': 'پول کلینر',
+        'icon': PhosphorIcons.drop(),
+        'category': 'Home & Lifestyle',
+        'categoryUrdu': 'گھر اور طرزِ زندگی'
+      },
+      {
+        'id': 'pet_groomer',
+        'name': 'پالتو جانوروں کا گرومر',
+        'icon': PhosphorIcons.pawPrint(),
+        'category': 'Home & Lifestyle',
+        'categoryUrdu': 'گھر اور طرزِ زندگی'
+      },
+
+      // --- مالیاتی اور مشاورتی خدمات (Finance & Consulting) ---
+      {
+        'id': 'tax_advisor',
+        'name': 'ٹیکس ایڈوائزر',
+        'icon': PhosphorIcons.coins(),
+        'category': 'Finance & Consulting',
+        'categoryUrdu': 'مالیاتی اور مشاورتی خدمات'
+      },
+      {
+        'id': 'business_consultant',
+        'name': 'بزنس کنسلٹنٹ',
+        'icon': PhosphorIcons.briefcase(),
+        'category': 'Finance & Consulting',
+        'categoryUrdu': 'مالیاتی اور مشاورتی خدمات'
+      },
+      {
+        'id': 'accounting_advisor',
+        'name': 'اکاؤنٹنگ ایڈوائزر',
+        'icon': PhosphorIcons.calculator(),
+        'category': 'Finance & Consulting',
+        'categoryUrdu': 'مالیاتی اور مشاورتی خدمات'
+      },
+      {
+        'id': 'insurance_agent',
+        'name': 'انشورنس ایجنٹ',
+        'icon': PhosphorIcons.shieldCheck(),
+        'category': 'Finance & Consulting',
+        'categoryUrdu': 'مالیاتی اور مشاورتی خدمات'
+      },
+
+      // --- پالتو اور باغبانی (Pet & Garden) ---
+      {
+        'id': 'pet_sitter',
+        'name': 'پالتو جانور سنبھالنے والا',
+        'icon': PhosphorIcons.pawPrint(),
+        'category': 'Pet & Garden',
+        'categoryUrdu': 'پالتو اور باغبانی'
+      },
+      {
+        'id': 'garden_maintenance',
+        'name': 'باغبانی کا ماہر',
+        'icon': PhosphorIcons.leaf(),
+        'category': 'Pet & Garden',
+        'categoryUrdu': 'پالتو اور باغبانی'
+      },
+      {
+        'id': 'tree_cutter',
+        'name': 'درخت کاٹنے والا',
+        'icon': PhosphorIcons.tree(),
+        'category': 'Pet & Garden',
+        'categoryUrdu': 'پالتو اور باغبانی'
+      },
+      {
+        'id': 'landscaper',
+        'name': 'لینڈ سکیپر',
+        'icon': PhosphorIcons.leaf(),
+        'category': 'Pet & Garden',
+        'categoryUrdu': 'پالتو اور باغبانی'
+      },
+
+      // --- تقریبات اور جشن (Events & Celebrations) ---
+      {
+        'id': 'event_planner',
+        'name': 'تقریبات کا آرگنائزر',
+        'icon': PhosphorIcons.calendarPlus(),
+        'category': 'Events & Celebrations',
+        'categoryUrdu': 'تقریبات اور جشن'
+      },
+      {
+        'id': 'photography_assistant',
+        'name': 'فوٹوگرافی اسسٹنٹ',
+        'icon': PhosphorIcons.camera(),
+        'category': 'Events & Celebrations',
+        'categoryUrdu': 'تقریبات اور جشن'
+      },
+      {
+        'id': 'dj',
+        'name': 'ڈی جے',
+        'icon': PhosphorIcons.musicNotes(),
+        'category': 'Events & Celebrations',
+        'categoryUrdu': 'تقریبات اور جشن'
+      },
+      {
+        'id': 'flower_designer',
+        'name': 'فلور ڈیزائنر',
+        'icon': PhosphorIcons.flower(),
+        'category': 'Events & Celebrations',
+        'categoryUrdu': 'تقریبات اور جشن'
+      },
+      {
+        'id': 'stage_designer',
+        'name': 'اسٹیج ڈیزائنر',
+        'icon': PhosphorIcons.sketchLogo(),
+        'category': 'Events & Celebrations',
+        'categoryUrdu': 'تقریبات اور جشن'
+      },
 
       // --- دیگر خدمات (Legal & Others) ---
-      {'id': 'lawyer', 'name': 'وکیل', 'icon': PhosphorIcons.scales(), 'category': 'Other Services', 'categoryUrdu': 'دیگر خدمات'},
-      {'id': 'accountant', 'name': 'اکاؤنٹنٹ', 'icon': PhosphorIcons.calculator(), 'category': 'Other Services', 'categoryUrdu': 'دیگر خدمات'},
-      {'id': 'security', 'name': 'سیکیورٹی گارڈ', 'icon': PhosphorIcons.shieldCheck(), 'category': 'Other Services', 'categoryUrdu': 'دیگر خدمات'},
-      {'id': 'cleaner', 'name': 'صفائی کارکن', 'icon': PhosphorIcons.broom(), 'category': 'Other Services', 'categoryUrdu': 'دیگر خدمات'},
+      {
+        'id': 'lawyer',
+        'name': 'وکیل',
+        'icon': PhosphorIcons.scales(),
+        'category': 'Other Services',
+        'categoryUrdu': 'دیگر خدمات'
+      },
+      {
+        'id': 'accountant',
+        'name': 'اکاؤنٹنٹ',
+        'icon': PhosphorIcons.calculator(),
+        'category': 'Other Services',
+        'categoryUrdu': 'دیگر خدمات'
+      },
+      {
+        'id': 'security',
+        'name': 'سیکیورٹی گارڈ',
+        'icon': PhosphorIcons.shieldCheck(),
+        'category': 'Other Services',
+        'categoryUrdu': 'دیگر خدمات'
+      },
+      {
+        'id': 'cleaner',
+        'name': 'صفائی کارکن',
+        'icon': PhosphorIcons.broom(),
+        'category': 'Other Services',
+        'categoryUrdu': 'دیگر خدمات'
+      },
+      {
+        'id': 'translator',
+        'name': 'مترجم',
+        'icon': PhosphorIcons.translate(),
+        'category': 'Other Services',
+        'categoryUrdu': 'دیگر خدمات'
+      },
+      {
+        'id': 'travel_agent',
+        'name': 'ٹریول ایجنٹ',
+        'icon': PhosphorIcons.airplane(),
+        'category': 'Other Services',
+        'categoryUrdu': 'دیگر خدمات'
+      },
+      {
+        'id': 'locksmith',
+        'name': 'تالا ساز',
+        'icon': PhosphorIcons.key(),
+        'category': 'Other Services',
+        'categoryUrdu': 'دیگر خدمات'
+      },
+      {
+        'id': 'tattoo_artist',
+        'name': 'ٹیٹو آرٹسٹ',
+        'icon': PhosphorIcons.pencilCircle(),
+        'category': 'Other Services',
+        'categoryUrdu': 'دیگر خدمات'
+      },
     ];
   }
 }

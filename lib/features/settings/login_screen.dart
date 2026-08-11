@@ -5,8 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:account_app/core/services/language_service.dart';
-import 'package:account_app/core/services/database_service.dart'; 
-import 'package:account_app/core/services/sharing_service.dart';
+import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/features/dashboard/dashboard_screen.dart';
 import 'package:account_app/features/dashboard/main_navigation_screen.dart';
@@ -486,13 +485,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     await _restoreUserData();
     if (!mounted) return;
-
-    try {
-      final sharingService = Provider.of<SharingService>(context, listen: false);
-      await sharingService.checkPendingShares(phoneNumber);
-    } catch (e) {
-      // Log error silently
-    }
 
     if (mounted) {
       if (isNewUser) {

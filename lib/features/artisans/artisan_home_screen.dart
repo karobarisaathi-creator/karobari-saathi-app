@@ -181,9 +181,56 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                 child: ListView.builder(
                   controller: scrollController,
                   padding: const EdgeInsets.all(16),
-                  itemCount: groupedProfessions.keys.length,
+                  itemCount: groupedProfessions.keys.length + 1, // Added 1 for "All"
                   itemBuilder: (context, index) {
-                    final category = groupedProfessions.keys.elementAt(index);
+                    if (index == 0) {
+                      // Special "All Professions" Option
+                      final isSelected = _selectedProfession == 'all';
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          InkWell(
+                            onTap: () {
+                              _onProfessionSelected('all');
+                              Navigator.pop(context);
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: isSelected ? AppTheme.themeColor.withOpacity(0.1) : Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isSelected ? AppTheme.themeColor : Colors.grey[200]!,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(PhosphorIcons.circlesThree(), color: isSelected ? AppTheme.themeColor : Colors.grey[700], size: 24),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    isUrdu ? 'تمام پیشے (All)' : 'All Professions',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: fontFamily,
+                                      color: isSelected ? AppTheme.themeColor : Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const Divider(),
+                        ],
+                      );
+                    }
+
+                    final categoryIndex = index - 1;
+                    final category = groupedProfessions.keys.elementAt(categoryIndex);
                     final categoryItems = groupedProfessions[category]!;
 
                     return Column(
