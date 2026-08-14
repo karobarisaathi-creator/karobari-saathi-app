@@ -17,6 +17,7 @@ import 'package:geolocator/geolocator.dart';
 import 'artisan_profile_screen.dart';
 import 'artisan_detail_screen.dart';
 import 'customer_orders_screen.dart';
+import 'package:account_app/core/services/logging_service.dart';
 
 class ArtisanHomeScreen extends StatefulWidget {
   const ArtisanHomeScreen({super.key});
@@ -26,6 +27,7 @@ class ArtisanHomeScreen extends StatefulWidget {
 }
 
 class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
+  final _logger = LoggingService();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedProfession = 'all';
@@ -35,6 +37,10 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   StreamSubscription<ArtisanProfile?>? _artisanSub;
   Position? _currentPosition;
   bool _isLoading = true;
+  
+  // پیجینیشن (Pagination) کے لیے متغیرات
+  int _currentPage = 1; // موجودہ صفحہ نمبر
+  static const int _pageSize = 20; // ایک وقت میں لوڈ ہونے والے کاریگروں کی تعداد
 
   @override
   void initState() {
@@ -105,8 +111,8 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
           _currentPosition = position;
         });
       }
-    } catch (e) {
-      debugPrint("Error getting location: $e");
+    } catch (e, stack) {
+      _logger.error("Error getting location", e, stack);
     }
   }
 
@@ -132,8 +138,8 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
           _isLoading = false;
         });
       }
-    } catch (e) {
-      debugPrint("Error loading artisans: $e");
+    } catch (e, stack) {
+      _logger.error("Error loading artisans", e, stack);
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -389,7 +395,7 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
           // نتائج
           Expanded(
             child: StreamBuilder<List<ArtisanProfile>>(
-              stream: ArtisanService().streamAllArtisans(),
+              stream: ArtisanService().streamArtisansPaginated(limit: _currentPage * _pageSize),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -451,8 +457,35 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
 
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: filtered.length,
+                  itemCount: filtered.length + (filtered.length >= _currentPage * _pageSize ? 1 : 0),
                   itemBuilder: (context, index) {
+                    if (index == filtered.length) {
+                      // Load More Button
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        child: Center(
+                          child: TextButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _currentPage++;
+                              });
+                            },
+                            icon: Icon(PhosphorIcons.plus(), size: 18),
+                            label: Text(
+                              isUrdu ? 'مزید لوڈ کریں' : 'Load More',
+                              style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
+                            ),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppTheme.themeColor,
+                              backgroundColor: AppTheme.themeColor.withOpacity(0.1),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    
                     final artisan = filtered[index];
                     final distance = _calculateDistance(artisan.latitude, artisan.longitude);
                     final isMe = artisan.id == myId;

@@ -1,5 +1,6 @@
 // lib/features/artisans/screens/artisan_detail_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -12,6 +13,7 @@ import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/core/utils/artisan_validators.dart';
 import 'package:account_app/core/services/artisan_service.dart';
 import 'package:account_app/core/services/artisan_work_order_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
@@ -182,21 +184,20 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildDialogTextField(
+                _buildValidatedTextField(
                   controller: descriptionController,
                   label: isUrdu ? 'کیا کام کروانا ہے؟' : 'Description of work',
-                  hint: isUrdu ? 'مثلاً: پنکھا ٹھیک کرنا ہے...' : 'e.g. Fixing a fan...',
-                  maxLines: 3,
+                  minLength: 10,
+                  maxLength: 500,
                   isUrdu: isUrdu,
-                  fontFamily: fontFamily,
+                  onChanged: (val) => setDialogState(() {}),
                 ),
                 const SizedBox(height: 12),
-                _buildDialogTextField(
+                _buildValidatedBudgetField(
                   controller: budgetController,
                   label: isUrdu ? 'تخمینی بجٹ (Rs.)' : 'Estimated Budget (Rs.)',
-                  isNumber: true,
                   isUrdu: isUrdu,
-                  fontFamily: fontFamily,
+                  onChanged: (val) => setDialogState(() {}),
                 ),
                 const SizedBox(height: 12),
                 InkWell(
@@ -246,18 +247,81 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
               color: AppTheme.themeColor,
               variant: AppButtonVariant.primary,
               onPressed: () async {
-                if (descriptionController.text.trim().isEmpty) return;
+                final desc = descriptionController.text.trim();
+                final budgetText = budgetController.text.trim();
+                final budget = double.tryParse(budgetText);
+
+                if (!ArtisanValidators.isValidDescription(desc) || 
+                    (budgetText.isNotEmpty && !ArtisanValidators.isValidBudget(budget))) {
+                  return;
+                }
+
                 Navigator.pop(context);
                 _processSendRequest(
                   isUrdu, 
-                  descriptionController.text.trim(),
-                  double.tryParse(budgetController.text),
+                  desc,
+                  budget,
                   selectedDate,
                 );
               },
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// کام کی تفصیلات کے لیے ویلیڈیٹڈ ٹیکسٹ فیلڈ
+  Widget _buildValidatedTextField({
+    required TextEditingController controller,
+    required String label,
+    required int minLength,
+    required int maxLength,
+    required bool isUrdu,
+    required void Function(String) onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      maxLines: 3,
+      maxLength: maxLength,
+      onChanged: onChanged,
+      style: const TextStyle(fontSize: 15),
+      decoration: InputDecoration(
+        labelText: label,
+        counterText: '${controller.text.length}/$maxLength',
+        // اگر حروف کم ہوں تو اردو یا انگریزی میں ایرر دکھائیں
+        errorText: controller.text.isNotEmpty && controller.text.length < minLength
+            ? (isUrdu ? 'کم از کم $minLength حروف درکار ہیں' : 'Min $minLength characters required')
+            : null,
+        filled: true,
+        fillColor: const Color(0xFFF5F7F9),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      ),
+    );
+  }
+
+  /// بجٹ کی تصدیق کے لیے ویلیڈیٹڈ فیلڈ
+  Widget _buildValidatedBudgetField({
+    required TextEditingController controller,
+    required String label,
+    required bool isUrdu,
+    required void Function(String) onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly], // صرف نمبرز کی اجازت
+      onChanged: onChanged,
+      style: const TextStyle(fontSize: 15),
+      decoration: InputDecoration(
+        labelText: label,
+        // اگر رقم 0 یا اس سے کم ہو تو ایرر دکھائیں
+        errorText: controller.text.isNotEmpty && (double.tryParse(controller.text) ?? 0) <= 0
+            ? (isUrdu ? 'برائے مہربانی درست رقم درج کریں' : 'Please enter a valid amount')
+            : null,
+        filled: true,
+        fillColor: const Color(0xFFF5F7F9),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
       ),
     );
   }

@@ -23,6 +23,8 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/widgets/artisan_rating_stars.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/utils/artisan_validators.dart';
+import 'package:account_app/core/services/logging_service.dart';
 
 import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/features/settings/verification_request_screen.dart';
@@ -35,6 +37,7 @@ class ArtisanProfileScreen extends StatefulWidget {
 }
 
 class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
+  final _logger = LoggingService();
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
@@ -143,8 +146,8 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
           } catch (_) {}
         }
       }
-    } catch (e) {
-      debugPrint("Error fetching profile data: $e");
+    } catch (e, stack) {
+      _logger.error("Error fetching profile data", e, stack);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -163,8 +166,8 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
           _locationController.text = "${p.locality}, ${p.subLocality}";
         });
       }
-    } catch (e) {
-      debugPrint("Location error: $e");
+    } catch (e, stack) {
+      _logger.error("Location error", e, stack);
     }
   }
 
@@ -201,8 +204,8 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
           }
         }
       }
-    } catch (e) {
-      debugPrint("Image pick error: $e");
+    } catch (e, stack) {
+      _logger.error("Image pick error", e, stack);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error picking image: $e')),
@@ -505,6 +508,16 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
                                     fontFamily: fontFamily,
                                     isUrdu: isUrdu,
                                     isNumber: true,
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return isUrdu ? 'یہ فیلڈ ضروری ہے' : 'This field is required';
+                                      }
+                                      final years = int.tryParse(value);
+                                      if (years == null || !ArtisanValidators.isValidExperience(years)) {
+                                        return ArtisanValidators.getErrorMessage('experience', isUrdu: isUrdu);
+                                      }
+                                      return null;
+                                    },
                                   ),
 
                                   const SizedBox(height: 16),
@@ -517,6 +530,15 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
                                     fontFamily: fontFamily,
                                     isUrdu: isUrdu,
                                     maxLines: 4,
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return isUrdu ? 'یہ فیلڈ ضروری ہے' : 'This field is required';
+                                      }
+                                      if (!ArtisanValidators.isValidDescription(value)) {
+                                        return ArtisanValidators.getErrorMessage('description', isUrdu: isUrdu);
+                                      }
+                                      return null;
+                                    },
                                   ),
 
                                   const SizedBox(height: 16),
@@ -750,6 +772,7 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
     int maxLines = 1,
     Widget? suffixIcon,
     bool readOnly = false,
+    String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
@@ -784,7 +807,7 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
-      validator: (value) {
+      validator: validator ?? (value) {
         if (value == null || value.isEmpty) {
           return isUrdu ? 'یہ فیلڈ ضروری ہے' : 'This field is required';
         }
