@@ -189,6 +189,7 @@ class _BusinessChatScreenState extends State<BusinessChatScreen> {
                           onOrderTap: (orderId) {
                             // آرڈر کی تفصیل کھولیں
                           },
+                          onLongPress: () => _showMessageOptions(msg, isUrdu, fontFamily),
                         ),
                       ],
                     );
@@ -210,6 +211,82 @@ class _BusinessChatScreenState extends State<BusinessChatScreen> {
 
           // انپٹ ایریا
           _buildInputArea(isUrdu, fontFamily),
+        ],
+      ),
+    );
+  }
+
+  void _showMessageOptions(BusinessChatMessage msg, bool isUrdu, String fontFamily) {
+    final bool isMe = msg.senderId == _chatService.currentUserId;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isMe && msg.messageType == 'text')
+              ListTile(
+                leading: Icon(PhosphorIcons.pencilSimple(), color: Colors.blue),
+                title: Text(isUrdu ? 'میسج تبدیل کریں' : 'Edit Message',
+                    style: TextStyle(fontFamily: fontFamily)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showEditDialog(msg, isUrdu, fontFamily);
+                },
+              ),
+            ListTile(
+              leading: Icon(PhosphorIcons.trash(), color: Colors.red),
+              title: Text(isUrdu ? 'میسج ڈیلیٹ کریں' : 'Delete Message',
+                  style: TextStyle(fontFamily: fontFamily, color: Colors.red)),
+              onTap: () async {
+                Navigator.pop(context);
+                await _chatService.deleteMessage(widget.otherUserId, msg.id);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditDialog(BusinessChatMessage msg, bool isUrdu, String fontFamily) {
+    final editController = TextEditingController(text: msg.message);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(isUrdu ? 'ترمیم کریں' : 'Edit Message',
+            style: TextStyle(fontFamily: fontFamily)),
+        content: TextField(
+          controller: editController,
+          maxLines: null,
+          decoration: InputDecoration(
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(isUrdu ? 'کینسل' : 'Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              if (editController.text.trim().isNotEmpty) {
+                await _chatService.editMessage(
+                    widget.otherUserId, msg.id, editController.text);
+                if (mounted) Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.themeColor),
+            child: Text(isUrdu ? 'اپ ڈیٹ کریں' : 'Update',
+                style: const TextStyle(color: Colors.white)),
+          ),
         ],
       ),
     );

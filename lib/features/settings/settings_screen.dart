@@ -27,7 +27,6 @@ import 'package:account_app/core/utils/formatters.dart';
 import 'app_lock_screen.dart';
 import 'verification_request_screen.dart';
 import 'package:account_app/features/artisans/artisan_profile_screen.dart';
-import 'package:account_app/features/inventory/seller_items_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/utils/image_utils.dart';
@@ -134,7 +133,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             initialBalance: 0,
             balanceType: 'credit',
             balance: 0,
-            isShared: false,
             isActive: true,
           ),
         );
@@ -319,48 +317,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                   fontFamily: fontFamily,
                   isUrdu: isUrdu,
-                  context: context,
-                ),
-                _buildDivider(context),
-                _buildSettingItem(
-                  icon: PhosphorIcons.package(),
-                  title: isUrdu ? 'آئٹم مینجمنٹ' : 'Item Management',
-                  onTap: () {
-                    final user = FirebaseAuth.instance.currentUser;
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => SellerItemsScreen(
-                          sellerUid: user?.uid ?? '',
-                          sellerName: user?.displayName ?? 'My Store',
-                        ),
-                      ),
-                    );
-                  },
-                  fontFamily: fontFamily,
-                  isUrdu: isUrdu,
-                  trailing: Consumer<DatabaseService>(
-                    builder: (context, dbService, child) {
-                      final count = dbService.getInventoryItems().length;
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppTheme.themeColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '$count',
-                          style: const TextStyle(
-                            color: AppTheme.themeColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            fontFamily: '',
-                          ),
-                        ),
-                      );
-                    },
-                  ),
                   context: context,
                 ),
                 _buildDivider(context),

@@ -40,7 +40,7 @@ class NotificationCard extends StatelessWidget {
     final bool isAccepted = data?['accepted'] == true;
     
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: notification.isRead ? const Color(0xFFF8F9FA) : Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -66,7 +66,7 @@ class NotificationCard extends StatelessWidget {
             if (isSystem && !isPriceDrop)
               _buildSystemHeader(isUrdu, fontFamily),
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -82,6 +82,7 @@ class NotificationCard extends StatelessWidget {
                               phone: data?['senderPhone'] ?? '',
                               profileImage: data?['senderPhotoUrl'],
                               isVerified: data?['isSenderVerified'] == true || data?['isSenderVerified'] == 'true',
+                              customSize: 36, // Reduced size
                             ),
                       ),
                       const SizedBox(width: 8),
@@ -89,11 +90,12 @@ class NotificationCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            _formatTime(notification.timestamp),
-                            style: const TextStyle(
-                              color: AppTheme.textSecondary,
+                            _formatTime(notification.timestamp, isUrdu),
+                            style: TextStyle(
+                              color: AppTheme.darkColor.withValues(alpha: 0.7),
                               fontSize: 10,
-                              fontFamily: '',
+                              fontFamily: isUrdu ? fontFamily : '',
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                           if (!notification.isRead)
@@ -107,24 +109,24 @@ class NotificationCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   // 2. تحریر / عنوان
                   Padding(
-                    padding: EdgeInsets.only(left: (isPriceDrop || isSystem) ? 0 : 52), 
+                    padding: EdgeInsets.only(left: (isPriceDrop || isSystem) ? 0 : 48), 
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (notification.title.isNotEmpty && !isPriceDrop)
                           Text(
-                            notification.title,
+                            _getTranslatedTitle(notification.title, isUrdu),
                             style: TextStyle(
                               fontFamily: fontFamily,
-                              fontSize: 14,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: AppTheme.darkColor,
                             ),
                           ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         if (isTransaction) ...[
                           Text(
                             (data?['description'] != null && data!['description'].toString().trim().isNotEmpty)
@@ -132,17 +134,19 @@ class NotificationCard extends StatelessWidget {
                                 : _getTransactionMessage(data!, isUrdu),
                             style: TextStyle(
                               fontFamily: fontFamily,
-                              fontSize: 13,
+                              fontSize: 15,
                               color: AppTheme.darkColor,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ] else ...[
                           Text(
-                            notification.message,
+                            _getTranslatedMessage(notification.message, isUrdu),
                             style: TextStyle(
                               fontFamily: fontFamily,
-                              fontSize: 13,
-                              color: AppTheme.textSecondary,
+                              fontSize: 15,
+                              color: AppTheme.darkColor.withValues(alpha: 0.9),
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
@@ -156,7 +160,7 @@ class NotificationCard extends StatelessWidget {
             // 3. بٹن بار
             if (isTransaction || isArtisanRequest)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Row(
                   children: [
                     if (isTransaction)
@@ -188,6 +192,7 @@ class NotificationCard extends StatelessWidget {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppTheme.incomeColor,
                                     foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
                                 ),
@@ -201,6 +206,7 @@ class NotificationCard extends StatelessWidget {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppTheme.expenseColor,
                                     foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
                                 ),
@@ -232,27 +238,16 @@ class NotificationCard extends StatelessWidget {
         color: isAccepted ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isAccepted ? Icons.check_circle : Icons.cancel,
-            color: isAccepted ? Colors.green : Colors.red,
-            size: 14,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            isAccepted 
-                ? (isUrdu ? 'منظور شدہ' : 'Accepted')
-                : (isUrdu ? 'معذرت کی گئی' : 'Declined'),
-            style: TextStyle(
-              color: isAccepted ? Colors.green : Colors.red,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-              fontFamily: fontFamily,
-            ),
-          ),
-        ],
+      child: Text(
+        isAccepted 
+            ? (isUrdu ? 'منظور شدہ' : 'Accepted')
+            : (isUrdu ? 'معذرت کی گئی' : 'Declined'),
+        style: TextStyle(
+          color: isAccepted ? Colors.green : Colors.red,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+          fontFamily: fontFamily,
+        ),
       ),
     );
   }
@@ -310,10 +305,33 @@ class NotificationCard extends StatelessWidget {
         const SizedBox(width: 12),
         Text(
           isUrdu ? 'سسٹم پیغام' : 'System Message',
-          style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.darkColor, fontSize: 14),
+          style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.darkColor, fontSize: 16),
         ),
       ],
     );
+  }
+
+  String _getTranslatedTitle(String title, bool isUrdu) {
+    if (isUrdu) {
+      if (title.toLowerCase().contains('work request')) return 'کام کی درخواست';
+      if (title.toLowerCase().contains('transaction')) return 'نیا لین دین';
+      return title;
+    } else {
+      if (title.contains('کام کی درخواست')) return 'Work Request';
+      if (title.contains('نیا لین دین')) return 'New Transaction';
+      return title;
+    }
+  }
+
+  String _getTranslatedMessage(String message, bool isUrdu) {
+    if (isUrdu) {
+       return message; // Usually messages are already in Urdu or contain names
+    } else {
+       if (message.contains('آپ سے کام کے بارے میں پوچھ رہے ہیں')) {
+          return 'is asking about work. Are you available?';
+       }
+       return message;
+    }
   }
 
   String _getTransactionMessage(Map<String, dynamic> data, bool isUrdu) {
@@ -332,12 +350,12 @@ class NotificationCard extends StatelessWidget {
     }
   }
 
-  String _formatTime(DateTime timestamp) {
+  String _formatTime(DateTime timestamp, bool isUrdu) {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
 
-    if (difference.inMinutes < 1) return 'Just now';
-    if (difference.inHours < 1) return '${difference.inMinutes}m ago';
+    if (difference.inMinutes < 1) return isUrdu ? 'ابھی' : 'Just now';
+    if (difference.inHours < 1) return isUrdu ? '${difference.inMinutes} منٹ پہلے' : '${difference.inMinutes}m ago';
     if (difference.inDays < 1) return DateFormat('hh:mm a').format(timestamp);
     return DateFormat('dd MMM').format(timestamp);
   }

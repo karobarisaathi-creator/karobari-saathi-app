@@ -626,8 +626,6 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
           initialBalance: 0.0,
           balanceType: 'credit',
           balance: 0.0,
-          isShared: false,
-          sharedWith: [],
           profileImage: finalImagePath,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),

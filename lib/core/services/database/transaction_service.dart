@@ -11,8 +11,6 @@ class TransactionService extends BaseService {
   Future<void> addTransaction(model.Transaction transaction) async {
     await transactionsBox?.put(transaction.id, transaction);
     await _accountService.recalculateAccountBalance(transaction.accountId);
-    final account = accountsBox?.get(transaction.accountId);
-    if (account != null) await _syncTransactionToSharedUsers(transaction, account);
     if (transaction.professionId != null) await _professionService.recalculateProfessionFinance(transaction.professionId!);
     notifyListeners();
   }
@@ -21,8 +19,6 @@ class TransactionService extends BaseService {
     final oldTransaction = transactionsBox?.get(transaction.id);
     await transactionsBox?.put(transaction.id, transaction);
     await _accountService.recalculateAccountBalance(transaction.accountId);
-    final account = accountsBox?.get(transaction.accountId);
-    if (account != null) await _syncTransactionToSharedUsers(transaction, account);
     if (transaction.professionId != null) await _professionService.recalculateProfessionFinance(transaction.professionId!);
     if (oldTransaction?.professionId != null && oldTransaction?.professionId != transaction.professionId) {
       await _professionService.recalculateProfessionFinance(oldTransaction!.professionId!);
@@ -33,8 +29,6 @@ class TransactionService extends BaseService {
   Future<void> deleteTransaction(String transactionId) async {
     final transaction = transactionsBox?.get(transactionId);
     if (transaction != null) {
-      final account = accountsBox?.get(transaction.accountId);
-      if (account != null && account.isShared) await _syncDeleteToSharedUsers(transactionId, account);
       await transactionsBox?.delete(transactionId);
       await _accountService.recalculateAccountBalance(transaction.accountId);
       if (transaction.professionId != null) await _professionService.recalculateProfessionFinance(transaction.professionId!);
@@ -77,30 +71,4 @@ class TransactionService extends BaseService {
     }
   }
 
-  Future<void> _syncTransactionToSharedUsers(model.Transaction transaction, Account account) async {
-    if (account.isShared && account.sharedWith.isNotEmpty) {
-      for (String phone in account.sharedWith) {
-        String clean = phone.replaceAll(RegExp(r'\D'), '');
-        List<String> formats = ['+$clean', '0${clean.substring(clean.length > 10 ? 2 : 0)}'];
-        for (String p in formats) {
-          final q = await firestore.collection('users').where('phoneNumber', isEqualTo: p).limit(1).get();
-          if (q.docs.isNotEmpty && q.docs.first.id != auth.currentUser?.uid) {
-            await firestore.collection('users').doc(q.docs.first.id).collection('transactions').doc(transaction.id).set(transaction.toMap());
-          }
-        }
-      }
-    }
-  }
-
-  Future<void> _syncDeleteToSharedUsers(String transactionId, Account account) async {
-    if (account.isShared && account.sharedWith.isNotEmpty) {
-      for (String phone in account.sharedWith) {
-        String clean = phone.replaceAll(RegExp(r'\D'), '');
-        final q = await firestore.collection('users').where('phoneNumber', isEqualTo: '+$clean').limit(1).get();
-        if (q.docs.isNotEmpty && q.docs.first.id != auth.currentUser?.uid) {
-          await firestore.collection('users').doc(q.docs.first.id).collection('transactions').doc(transactionId).delete();
-        }
-      }
-    }
-  }
 }

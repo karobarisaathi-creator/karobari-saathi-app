@@ -19,7 +19,9 @@ import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/models/business_chat_model.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
-import 'package:account_app/core/models/inventory_item_model.dart';
+import 'package:account_app/core/models/job_post_model.dart';
+import 'package:account_app/core/models/job_bid_model.dart';
+import 'package:account_app/core/models/dispute_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
 
 // Services
@@ -32,12 +34,14 @@ import 'package:account_app/core/services/firebase_service.dart';
 import 'package:account_app/core/services/balance_service.dart';
 import 'package:account_app/core/services/pdf_service.dart';
 import 'package:account_app/core/services/backup_service.dart';
+import 'package:account_app/core/services/database/job_service.dart';
 import 'package:account_app/core/services/database/business_chat_service.dart';
 import 'package:account_app/core/services/security_service.dart';
 
 // Screens
 import 'package:account_app/features/settings/login_screen.dart';
 import 'package:account_app/features/dashboard/dashboard_screen.dart';
+import 'package:account_app/features/dashboard/main_navigation_screen.dart';
 import 'package:account_app/features/settings/profile_setup_screen.dart';
 import 'package:account_app/features/settings/app_lock_screen.dart' as real_lock;
 
@@ -51,7 +55,6 @@ void main() async {
   Hive.registerAdapter(AccountAdapter());
   Hive.registerAdapter(TransactionAdapter());
   Hive.registerAdapter(TransactionItemAdapter());
-  Hive.registerAdapter(InventoryItemAdapter());
   Hive.registerAdapter(CategoryAdapter());
   Hive.registerAdapter(CategoryTypeAdapter());
   Hive.registerAdapter(ProfessionAdapter());
@@ -62,6 +65,10 @@ void main() async {
   Hive.registerAdapter(BusinessChatRoomAdapter());
   Hive.registerAdapter(ArtisanProfileAdapter());
   Hive.registerAdapter(ArtisanWorkOrderAdapter());
+  Hive.registerAdapter(JobPostAdapter());
+  Hive.registerAdapter(JobBidAdapter());
+  Hive.registerAdapter(DisputeAdapter());
+  Hive.registerAdapter(DisputeMessageAdapter());
 
   // Initialize Firebase
   await Firebase.initializeApp();
@@ -99,6 +106,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BalanceService()),
         ChangeNotifierProvider(create: (_) => PdfService()),
         ChangeNotifierProvider(create: (_) => BackupService()),
+        ChangeNotifierProvider(create: (_) => JobService()),
         ChangeNotifierProvider(create: (_) => BusinessChatService()),
         ChangeNotifierProvider(create: (_) => SecurityService()),
       ],
@@ -263,7 +271,7 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
         if (_needsProfileSetup) {
           return ProfileSetupScreen();
         } else {
-          return DashboardScreen();
+          return const MainNavigationScreen();
         }
       },
     );

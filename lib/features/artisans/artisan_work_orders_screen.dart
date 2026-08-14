@@ -8,7 +8,13 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/services/artisan_work_order_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
+import 'package:account_app/core/models/dispute_model.dart';
+import 'package:account_app/core/services/artisan_pro_service.dart';
+import 'package:account_app/features/artisans/widgets/work_agreement_dialog.dart';
+import 'package:account_app/core/services/notification_service.dart';
+import 'package:share_plus/share_plus.dart';
 
 class ArtisanWorkOrdersScreen extends StatefulWidget {
   final String artisanId;
@@ -22,19 +28,10 @@ class ArtisanWorkOrdersScreen extends StatefulWidget {
 
 class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
   final ArtisanWorkOrderService _service = ArtisanWorkOrderService();
-  final TextEditingController _customerNameController = TextEditingController();
-  final TextEditingController _customerPhoneController =
-      TextEditingController();
-  final TextEditingController _workDescriptionController =
-      TextEditingController();
-  final TextEditingController _amountController = TextEditingController();
+  final ArtisanProService _proService = ArtisanProService();
 
   @override
   void dispose() {
-    _customerNameController.dispose();
-    _customerPhoneController.dispose();
-    _workDescriptionController.dispose();
-    _amountController.dispose();
     super.dispose();
   }
 
@@ -70,33 +67,37 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddWorkDialog(isUrdu, fontFamily),
-        backgroundColor: AppTheme.themeColor,
-        child: Icon(PhosphorIcons.plus(), color: Colors.white),
-      ),
     );
   }
 
   Widget _buildOrderCard(
       ArtisanWorkOrder order, bool isUrdu, String fontFamily) {
     final statusColors = {
-      'pending': Colors.orange,
-      'in_progress': Colors.blue,
+      'negotiating': Colors.orange,
+      'quoted': Colors.purple,
+      'confirmed': Colors.blue,
+      'in_progress': Colors.indigo,
       'completed': Colors.green,
       'rated': AppTheme.goldColor,
     };
 
     final statusLabels = {
-      'pending': isUrdu ? 'زیرِ غور' : 'Pending',
+      'negotiating': isUrdu ? 'ڈیل ہو رہی ہے' : 'Negotiating',
+      'quoted': isUrdu ? 'قیمت دے دی گئی' : 'Quoted',
+      'confirmed': isUrdu ? 'منظور شدہ' : 'Confirmed',
       'in_progress': isUrdu ? 'جاری' : 'In Progress',
       'completed': isUrdu ? 'مکمل' : 'Completed',
       'rated': isUrdu ? 'ریٹنگ دی گئی' : 'Rated',
     };
 
+    final bool isNegotiating = order.status == 'negotiating' || order.status == 'quoted';
+    final bool needsQuote = order.status == 'negotiating' && (order.amount == null || order.amount == 0);
+    final bool waitingForCustomer = order.status == 'quoted' && !order.customerAgreed;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -119,9 +120,9 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: statusColors[order.status]?.withOpacity(0.1),
+                    color: statusColors[order.status]?.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: statusColors[order.status]!),
+                    border: Border.all(color: statusColors[order.status] ?? Colors.grey),
                   ),
                   child: Text(
                     statusLabels[order.status] ?? order.status,
@@ -135,16 +136,42 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Text(
               order.workDescription,
               style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[700],
+                fontSize: 15,
+                color: Colors.grey[800],
                 fontFamily: fontFamily,
+                height: 1.4,
               ),
             ),
-            const SizedBox(height: 8),
+            if (order.amount != null && order.amount! > 0) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(PhosphorIcons.money(), color: Colors.blue, size: 20),
+                    const SizedBox(width: 10),
+                    Text(
+                      isUrdu ? 'طے شدہ رقم:' : 'Fixed Amount:',
+                      style: TextStyle(fontFamily: fontFamily, fontSize: 13),
+                    ),
+                    const Spacer(),
+                    Text(
+                      'Rs ${order.amount!.toStringAsFixed(0)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const Divider(height: 24),
             Row(
               children: [
                 Icon(PhosphorIcons.calendar(), size: 14, color: Colors.grey),
@@ -153,71 +180,57 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
                   DateFormat('dd/MM/yyyy').format(order.createdAt),
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
-                if (order.amount != null) ...[
-                  const SizedBox(width: 12),
-                  Icon(PhosphorIcons.money(), size: 14, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Rs ${order.amount!.toStringAsFixed(0)}',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
                 const Spacer(),
-                if (order.status == 'pending')
-                  _buildStatusButton(
-                    order,
-                    'in_progress',
-                    isUrdu ? 'شروع کریں' : 'Start',
-                    Colors.blue,
-                    fontFamily,
+                
+                // Dispute Button
+                if (order.status != 'completed' && order.status != 'rated' && order.disputeStatus == null)
+                  IconButton(
+                    onPressed: () => _raiseDispute(order, isUrdu, fontFamily),
+                    icon: const Icon(Icons.gavel_outlined, color: Colors.redAccent, size: 20),
+                    tooltip: isUrdu ? 'تنازع' : 'Dispute',
                   ),
+
+                // Invoice Button
+                if (order.status == 'completed' || order.status == 'rated')
+                  IconButton(
+                    onPressed: () => _downloadInvoice(order, isUrdu),
+                    icon: const Icon(Icons.description_outlined, color: Colors.blue, size: 20),
+                    tooltip: isUrdu ? 'رسید' : 'Invoice',
+                  ),
+                
+                // Actions
+                if (needsQuote)
+                   _buildActionButton(
+                    onPressed: () => _showQuoteDialog(order, isUrdu, fontFamily),
+                    label: isUrdu ? 'رقم بتائیں' : 'Enter Price',
+                    color: Colors.orange,
+                    fontFamily: fontFamily,
+                  ),
+                
+                if (waitingForCustomer)
+                  Text(
+                    isUrdu ? 'گاہک کی منظوری کا انتظار...' : 'Waiting for customer...',
+                    style: TextStyle(fontFamily: fontFamily, fontSize: 12, color: Colors.orange, fontStyle: FontStyle.italic),
+                  ),
+
+                if (order.status == 'confirmed')
+                  _buildActionButton(
+                    onPressed: () => _service.updateStatus(widget.artisanId, order.id, 'in_progress'),
+                    label: isUrdu ? 'کام شروع کریں' : 'Start Work',
+                    color: Colors.blue,
+                    fontFamily: fontFamily,
+                  ),
+
                 if (order.status == 'in_progress')
-                  _buildStatusButton(
-                    order,
-                    'completed',
-                    isUrdu ? 'مکمل' : 'Complete',
-                    Colors.green,
-                    fontFamily,
+                  _buildActionButton(
+                    onPressed: () => _service.updateStatus(widget.artisanId, order.id, 'completed'),
+                    label: isUrdu ? 'مکمل کریں' : 'Complete',
+                    color: Colors.green,
+                    fontFamily: fontFamily,
                   ),
-                if (order.status == 'completed' && !order.isRated)
-                  _buildStatusButton(
-                    order,
-                    'rated',
-                    isUrdu ? 'ریٹنگ' : 'Rate',
-                    AppTheme.goldColor,
-                    fontFamily,
-                  ),
+                
                 if (order.isRated)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.goldColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.goldColor),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.star,
-                          color: AppTheme.goldColor,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${order.rating}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.goldColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                   _buildRatingBadge(order.rating),
               ],
             ),
           ],
@@ -226,185 +239,193 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
     );
   }
 
-  Widget _buildStatusButton(
-    ArtisanWorkOrder order,
-    String status,
-    String label,
-    Color color,
-    String fontFamily,
-  ) {
+  Widget _buildActionButton({required VoidCallback onPressed, required String label, required Color color, required String fontFamily}) {
     return ElevatedButton(
-      onPressed: () async {
-        await _service.updateStatus(widget.artisanId, order.id, status);
-      },
+      onPressed: onPressed,
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontFamily: fontFamily,
-        ),
+      child: Text(label, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: fontFamily, fontSize: 12)),
+    );
+  }
+
+  Widget _buildRatingBadge(double? rating) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.goldColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.goldColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.star, color: AppTheme.goldColor, size: 14),
+          const SizedBox(width: 4),
+          Text('${rating ?? 0}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.goldColor)),
+        ],
       ),
     );
   }
 
-  void _showAddWorkDialog(bool isUrdu, String fontFamily) {
-    final _dialogFormKey = GlobalKey<FormState>();
-
+  void _showQuoteDialog(ArtisanWorkOrder order, bool isUrdu, String fontFamily) {
+    final quoteController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Text(
-          isUrdu ? 'نیا کام شامل کریں' : 'Add New Work',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontFamily: fontFamily,
-          ),
-        ),
-        content: SingleChildScrollView(
-          child: Form(
-            key: _dialogFormKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildDialogTextField(
-                  controller: _customerNameController,
-                  label: isUrdu ? 'گاہک کا نام' : 'Customer Name',
-                  icon: PhosphorIcons.user(),
-                  fontFamily: fontFamily,
-                  isUrdu: isUrdu,
-                ),
-                const SizedBox(height: 12),
-                _buildDialogTextField(
-                  controller: _customerPhoneController,
-                  label: isUrdu ? 'گاہک کا فون' : 'Customer Phone',
-                  icon: PhosphorIcons.phone(),
-                  fontFamily: fontFamily,
-                  isUrdu: isUrdu,
-                  isPhone: true,
-                ),
-                const SizedBox(height: 12),
-                _buildDialogTextField(
-                  controller: _workDescriptionController,
-                  label: isUrdu ? 'کام کی تفصیل' : 'Work Description',
-                  icon: PhosphorIcons.note(),
-                  fontFamily: fontFamily,
-                  isUrdu: isUrdu,
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 12),
-                _buildDialogTextField(
-                  controller: _amountController,
-                  label: isUrdu ? 'رقم (اختیاری)' : 'Amount (Optional)',
-                  icon: PhosphorIcons.money(),
-                  fontFamily: fontFamily,
-                  isUrdu: isUrdu,
-                  isNumber: true,
-                ),
-              ],
-            ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(isUrdu ? 'رقم درج کریں' : 'Enter Price', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: quoteController,
+          keyboardType: TextInputType.number,
+          style: TextStyle(fontFamily: fontFamily),
+          decoration: InputDecoration(
+            hintText: isUrdu ? 'کل رقم (روپے میں)' : 'Total Amount (Rs)',
+            hintStyle: TextStyle(fontFamily: fontFamily),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              _clearControllers();
-              Navigator.pop(context);
-            },
-            child: Text(
-              isUrdu ? 'منسوخ' : 'Cancel',
-              style: TextStyle(fontFamily: fontFamily),
-            ),
+            onPressed: () => Navigator.pop(context), 
+            child: Text(isUrdu ? 'کینسل' : 'Cancel', style: TextStyle(fontFamily: fontFamily))
           ),
           ElevatedButton(
             onPressed: () async {
-              if (!_dialogFormKey.currentState!.validate()) return;
+              final amount = double.tryParse(quoteController.text);
+              if (amount != null && amount > 0) {
+                // Update Order
+                await _service.updateStatus(widget.artisanId, order.id, 'quoted');
+                await FirebaseFirestore.instance
+                  .collection('artisans')
+                  .doc(widget.artisanId)
+                  .collection('work_orders')
+                  .doc(order.id)
+                  .update({'amount': amount});
+                
+                // Send Notification
+                final nService = Provider.of<NotificationService>(context, listen: false);
+                final user = FirebaseAuth.instance.currentUser;
+                await nService.sendQuoteNotification(
+                  customerUid: order.customerId,
+                  artisanName: user?.displayName ?? 'Artisan',
+                  amount: amount,
+                  workOrderId: order.id,
+                );
 
-              final user = FirebaseAuth.instance.currentUser;
-              if (user == null) return;
+                // Audit Log
+                await _proService.logAction(
+                  action: 'quote_provided',
+                  userId: widget.artisanId,
+                  workOrderId: order.id,
+                  details: {'amount': amount},
+                );
 
-              final order = ArtisanWorkOrder(
-                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                artisanId: widget.artisanId,
-                customerId: user.uid,
-                customerName: _customerNameController.text.trim(),
-                customerPhone: _customerPhoneController.text.trim(),
-                workDescription: _workDescriptionController.text.trim(),
-                amount: double.tryParse(_amountController.text),
-                createdAt: DateTime.now(),
-              );
-
-              await _service.addWorkOrder(order);
-              _clearControllers();
-              if (mounted) Navigator.pop(context);
+                if (mounted) Navigator.pop(context);
+              }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.themeColor,
-            ),
-            child: Text(
-              isUrdu ? 'شامل کریں' : 'Add',
-              style: TextStyle(
-                color: Colors.white,
-                fontFamily: fontFamily,
-              ),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.themeColor),
+            child: Text(isUrdu ? 'بھیجیں' : 'Send', style: TextStyle(color: Colors.white, fontFamily: fontFamily, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDialogTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    required String fontFamily,
-    required bool isUrdu,
-    bool isNumber = false,
-    bool isPhone = false,
-    int maxLines = 1,
-  }) {
-    return TextFormField(
-      controller: controller,
-      maxLines: maxLines,
-      keyboardType: isNumber
-          ? TextInputType.number
-          : (isPhone ? TextInputType.phone : TextInputType.text),
-      style: TextStyle(fontFamily: fontFamily, fontSize: 14),
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, size: 20, color: AppTheme.themeColor),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+  void _raiseDispute(ArtisanWorkOrder order, bool isUrdu, String fontFamily) {
+    final reasonController = TextEditingController();
+    final descriptionController = TextEditingController();
+    String selectedReason = isUrdu ? 'کام معیاری نہیں' : 'Quality issue';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(isUrdu ? '⚖️ تنازع درج کریں' : '⚖️ Raise Dispute', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              value: selectedReason,
+              decoration: InputDecoration(
+                labelText: isUrdu ? 'تنازع کی قسم' : 'Dispute Type',
+                labelStyle: TextStyle(fontFamily: fontFamily),
+                border: const OutlineInputBorder(),
+              ),
+              items: (isUrdu 
+                ? ['کام معیاری نہیں', 'ادائیگی نہیں کی گئی', 'کام مکمل نہیں کیا', 'دوسرے ایشوز']
+                : ['Quality issue', 'Payment not made', 'Work not completed', 'Other issues']
+              ).map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontFamily: fontFamily)))).toList(),
+              onChanged: (value) => selectedReason = value ?? '',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descriptionController,
+              maxLines: 4,
+              style: TextStyle(fontFamily: fontFamily),
+              decoration: InputDecoration(
+                labelText: isUrdu ? 'تفصیل' : 'Description',
+                labelStyle: TextStyle(fontFamily: fontFamily),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(isUrdu ? 'کینسل' : 'Cancel', style: TextStyle(fontFamily: fontFamily)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final dispute = Dispute(
+                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                workOrderId: order.id,
+                raisedBy: FirebaseAuth.instance.currentUser!.uid,
+                reason: selectedReason,
+                description: descriptionController.text.trim(),
+                createdAt: DateTime.now(),
+              );
+              
+              await _proService.submitDispute(dispute);
+              await _proService.logAction(
+                action: 'dispute_raised',
+                userId: widget.artisanId,
+                workOrderId: order.id,
+                details: {'reason': selectedReason},
+              );
+
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(isUrdu ? 'تنازع درج کر دیا گیا ہے' : 'Dispute raised successfully', style: TextStyle(fontFamily: fontFamily)),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            child: Text(isUrdu ? 'درج کریں' : 'Submit', style: TextStyle(color: Colors.white, fontFamily: fontFamily, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return isUrdu ? 'یہ فیلڈ ضروری ہے' : 'This field is required';
-        }
-        return null;
-      },
     );
   }
 
-  void _clearControllers() {
-    _customerNameController.clear();
-    _customerPhoneController.clear();
-    _workDescriptionController.clear();
-    _amountController.clear();
+  Future<void> _downloadInvoice(ArtisanWorkOrder order, bool isUrdu) async {
+    try {
+      final path = await _proService.generateInvoice(order);
+      Share.shareXFiles([XFile(path)], text: isUrdu ? 'کام کی رسید' : 'Work Invoice');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
   }
 
   Widget _buildEmptyState(bool isUrdu, String fontFamily) {
@@ -424,24 +445,11 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            isUrdu ? 'پہلا کام شامل کریں' : 'Add your first work',
+            isUrdu ? 'ابھی تک کوئی آرڈر موصول نہیں ہوا' : 'No orders received yet',
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[400],
               fontFamily: fontFamily,
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () => _showAddWorkDialog(isUrdu, fontFamily),
-            icon: Icon(PhosphorIcons.plus()),
-            label: Text(
-              isUrdu ? 'نیا کام' : 'New Work',
-              style: TextStyle(fontFamily: fontFamily),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.themeColor,
-              foregroundColor: Colors.white,
             ),
           ),
         ],

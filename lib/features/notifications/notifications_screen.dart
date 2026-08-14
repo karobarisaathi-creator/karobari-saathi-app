@@ -414,17 +414,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               isReadOnly: notification.type == NotificationType.share),
         ),
       );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-          langService.isUrdu
-              ? 'متعلقہ کھاتہ موجود نہیں ہے (ID: $accountId)'
-              : 'Related account not found (ID: $accountId).',
-          style: TextStyle(
-              fontFamily: langService.isUrdu ? 'NooriNastaleeq' : 'NotoSans'),
-        ),
-        backgroundColor: AppTheme.themeColor,
-      ));
     }
   }
 
@@ -798,17 +787,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  String _formatTime(DateTime timestamp) {
+  String _formatTime(DateTime timestamp, bool isUrdu) {
     final now = DateTime.now();
     final diff = now.difference(timestamp);
     if (diff.inDays > 0)
       return DateFormat('MMM d').format(timestamp);
     else if (diff.inHours > 0)
-      return '${diff.inHours}h ago';
+      return isUrdu ? '${diff.inHours} گھنٹے پہلے' : '${diff.inHours}h ago';
     else if (diff.inMinutes > 0)
-      return '${diff.inMinutes}m ago';
+      return isUrdu ? '${diff.inMinutes} منٹ پہلے' : '${diff.inMinutes}m ago';
     else
-      return 'Just now';
+      return isUrdu ? 'ابھی' : 'Just now';
   }
 
   IconData _getNotificationIcon(NotificationType type) {

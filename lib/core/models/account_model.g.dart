@@ -25,8 +25,6 @@ class AccountAdapter extends TypeAdapter<Account> {
       initialBalance: fields[5] as double,
       balanceType: fields[6] as String,
       balance: fields[7] as double,
-      isShared: fields[8] == null ? false : fields[8] as bool,
-      sharedWith: (fields[9] as List).cast<String>(),
       profileImage: fields[10] as String?,
       createdAt: fields[11] as DateTime,
       updatedAt: fields[12] as DateTime,
@@ -40,7 +38,7 @@ class AccountAdapter extends TypeAdapter<Account> {
   @override
   void write(BinaryWriter writer, Account obj) {
     writer
-      ..writeByte(17)
+      ..writeByte(15)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -57,10 +55,6 @@ class AccountAdapter extends TypeAdapter<Account> {
       ..write(obj.balanceType)
       ..writeByte(7)
       ..write(obj.balance)
-      ..writeByte(8)
-      ..write(obj.isShared)
-      ..writeByte(9)
-      ..write(obj.sharedWith)
       ..writeByte(10)
       ..write(obj.profileImage)
       ..writeByte(11)

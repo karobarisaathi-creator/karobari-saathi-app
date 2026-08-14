@@ -13,7 +13,6 @@ import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
-import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/image_grid_viewer.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
@@ -65,7 +64,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   DateTime _selectedDate = DateTime.now();
   List<Account> _accounts = [];
   List<Profession> _professions = [];
-  List<InventoryItem> _inventoryItems = [];
   List<String> _allItemNames = [];
   bool _isLoading = false;
 
@@ -210,35 +208,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _calculateGrandTotal();
     }
 
-    void lookupItemInfo() {
-      final text = entry.descriptionController.text.trim().toLowerCase();
-      if (text.isEmpty) {
-        if (entry.unit != null) setState(() => entry.unit = null);
-        return;
-      }
-
-      final invItem = _inventoryItems.firstWhere(
-        (item) => item.name.trim().toLowerCase() == text,
-        orElse: () => InventoryItem(id: '', name: '', unit: '', defaultRate: 0, createdAt: DateTime.now(), updatedAt: DateTime.now())
-      );
-
-      if (invItem.id.isNotEmpty) {
-        if (entry.unit != invItem.unit) {
-          setState(() {
-            entry.unit = invItem.unit;
-            if (entry.rateController.text.isEmpty && invItem.defaultRate > 0) {
-              entry.rateController.text = invItem.defaultRate.toStringAsFixed(0);
-            }
-          });
-        }
-      }
-    }
-
     entry.quantityController.addListener(calculate);
     entry.subQuantityController.addListener(calculate);
     entry.rateController.addListener(calculate);
     entry.descriptionController.addListener(() {
-      lookupItemInfo();
       setState(() {});
     });
   }
@@ -259,13 +232,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
     _accounts = await databaseService.getAccounts();
     _professions = await databaseService.getProfessions();
-    _inventoryItems = databaseService.getInventoryItems();
 
-    // Collect unique item names from inventory and past transactions
+    // Collect unique item names from past transactions
     Set<String> names = {};
-    for (var item in _inventoryItems) {
-      names.add(item.name);
-    }
     final allTxs = databaseService.getAllTransactions();
     for (var tx in allTxs) {
       if (tx.items.isNotEmpty) {
@@ -445,41 +414,30 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   },
                   onSelected: (String selection) {
                     entry.descriptionController.text = selection;
-                    // Try to find if it's an inventory item to auto-fill rate
-                    final invItem = _inventoryItems.firstWhere(
-                      (item) => item.name.trim().toLowerCase() == selection.trim().toLowerCase(),
-                      orElse: () => InventoryItem(id: '', name: '', unit: '', defaultRate: 0, createdAt: DateTime.now(), updatedAt: DateTime.now())
-                    );
-                    if (invItem.id.isNotEmpty && invItem.defaultRate > 0) {
-                      setState(() {
-                        entry.rateController.text = invItem.defaultRate.toStringAsFixed(0);
-                        entry.unit = invItem.unit;
-                      });
-                    } else {
-                      // Search in past transactions for the rate
-                      final databaseService = Provider.of<DatabaseService>(context, listen: false);
-                      final allTxs = databaseService.getAllTransactions();
-                      for (var tx in allTxs.reversed) {
-                        bool found = false;
-                        if (tx.items.isNotEmpty) {
-                          for (var it in tx.items) {
-                            if (it.description.trim().toLowerCase() == selection.trim().toLowerCase()) {
-                              setState(() {
-                                entry.rateController.text = it.rate.toStringAsFixed(0);
-                                entry.unit = it.unit;
-                              });
-                              found = true;
-                              break;
-                            }
+                    
+                    // Search in past transactions for the rate
+                    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+                    final allTxs = databaseService.getAllTransactions();
+                    for (var tx in allTxs.reversed) {
+                      bool found = false;
+                      if (tx.items.isNotEmpty) {
+                        for (var it in tx.items) {
+                          if (it.description.trim().toLowerCase() == selection.trim().toLowerCase()) {
+                            setState(() {
+                              entry.rateController.text = it.rate.toStringAsFixed(0);
+                              entry.unit = it.unit;
+                            });
+                            found = true;
+                            break;
                           }
-                        } else if (tx.description.trim().toLowerCase() == selection.trim().toLowerCase()) {
-                          setState(() {
-                            entry.rateController.text = tx.rate.toStringAsFixed(0);
-                          });
-                          found = true;
                         }
-                        if (found) break;
+                      } else if (tx.description.trim().toLowerCase() == selection.trim().toLowerCase()) {
+                        setState(() {
+                          entry.rateController.text = tx.rate.toStringAsFixed(0);
+                        });
+                        found = true;
                       }
+                      if (found) break;
                     }
                   },
                   fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
@@ -727,24 +685,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         await databaseService.updateTransaction(transaction);
       } else {
         await databaseService.addTransaction(transaction);
-        
-        // Auto-save new items to inventory for analysis ONLY for 'expense' (Paid/Banaam) transactions
-        if (type == 'expense') {
-          for (var item in items) {
-            final exists = _inventoryItems.any((inv) => inv.name.toLowerCase() == item.description.toLowerCase());
-            if (!exists && item.description.isNotEmpty && item.description != 'دیگر' && item.description != 'Other') {
-              final newItem = InventoryItem(
-                id: DateTime.now().millisecondsSinceEpoch.toString() + item.description.hashCode.toString(),
-                name: item.description,
-                unit: item.unit ?? 'واحد',
-                defaultRate: item.rate,
-                createdAt: DateTime.now(),
-                updatedAt: DateTime.now(),
-              );
-              await databaseService.addInventoryItem(newItem);
-            }
-          }
-        }
 
         syncService.syncNewTransaction(transaction).catchError((e) => print(e));
         final account = _accounts.firstWhere((a) => a.id == _selectedAccountId);
@@ -775,50 +715,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         _dateInputController.text = DateFormat('dd/MM/yy').format(picked);
       });
     }
-  }
-
-  void _showInventoryPicker(int index) {
-    final languageService = Provider.of<LanguageService>(context, listen: false);
-    final isUrdu = languageService.isUrdu;
-    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (context) => Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              isUrdu ? 'آئٹم منتخب کریں' : 'Select Item',
-              style: TextStyle(fontFamily: fontFamily, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: _inventoryItems.length,
-              itemBuilder: (context, i) {
-                final item = _inventoryItems[i];
-                return ListTile(
-                  title: Text(item.name, style: TextStyle(fontFamily: fontFamily)),
-                  subtitle: Text('Rs ${item.defaultRate} / ${item.unit}', style: TextStyle(fontFamily: fontFamily)),
-                  onTap: () {
-                    setState(() {
-                      final entry = _itemEntries[index];
-                      entry.descriptionController.text = item.name;
-                      entry.rateController.text = item.defaultRate.toString();
-                      entry.unit = item.unit;
-                      // Auto-calculate will trigger from listeners
-                    });
-                    Navigator.pop(context);
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showSnackBar(String message, bool isError) {

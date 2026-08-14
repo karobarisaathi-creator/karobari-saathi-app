@@ -6,9 +6,6 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/category_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
-import 'package:account_app/core/models/inventory_item_model.dart';
-import 'package:account_app/core/models/review_model.dart';
-import 'package:account_app/core/models/ad_report_model.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
 import 'package:account_app/core/models/artisan_review_model.dart';
@@ -16,7 +13,6 @@ import 'package:account_app/core/models/artisan_review_model.dart';
 import 'database/account_service.dart';
 import 'database/transaction_service.dart';
 import 'database/profession_service.dart';
-import 'database/inventory_service.dart';
 import 'database/sync_service.dart';
 import 'database/category_service.dart';
 import 'database/settings_service.dart';
@@ -28,7 +24,6 @@ class DatabaseService extends ChangeNotifier {
   final AccountService _accountService = AccountService();
   final TransactionService _transactionService = TransactionService();
   final ProfessionService _professionService = ProfessionService();
-  final InventoryService _inventoryService = InventoryService();
   final SyncService _syncService = SyncService();
   final CategoryService _categoryService = CategoryService();
   final SettingsService _settingsService = SettingsService();
@@ -53,10 +48,13 @@ class DatabaseService extends ChangeNotifier {
   List<Account> getAccounts() => _accountService.getAccounts();
   Account? getAccount(String id) => _accountService.getAccount(id);
   Future<void> recalculateAccountBalance(String id) async { await _accountService.recalculateAccountBalance(id); notifyListeners(); }
-  Future<void> addSharedWith(String id, String phone) async { await _accountService.addSharedWith(id, phone); notifyListeners(); _triggerSync(); }
   Future<int> getPartiesCount() => _accountService.getPartiesCount();
   Future<int> getPendingDuesCount() => _accountService.getPendingDuesCount();
   Future<void> updateMyVerificationStatus(bool v) async { await _accountService.updateMyVerificationStatus(v); notifyListeners(); }
+  Future<bool> isUserVerified(String uid) async {
+    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    return doc.exists && doc.data()?['isVerified'] == true;
+  }
 
   // TRANSACTION OPERATIONS
   Future<void> addTransaction(model.Transaction t) async { await _transactionService.addTransaction(t); notifyListeners(); _triggerSync(); }
@@ -81,29 +79,6 @@ class DatabaseService extends ChangeNotifier {
   Future<Profession> createProfessionWithDefaults({required String name, required String season, String? description, double totalProduction = 0.0, String productionUnit = 'kg', double targetProduction = 0.0, Map<String, double>? budgetLimits, double benchmarkCostPerUnit = 0.0, ProfessionCategory categoryType = ProfessionCategory.general}) => _professionService.createProfessionWithDefaults(name: name, season: season, description: description, totalProduction: totalProduction, productionUnit: productionUnit, targetProduction: targetProduction, budgetLimits: budgetLimits, benchmarkCostPerUnit: benchmarkCostPerUnit, categoryType: categoryType);
   Future<int> getProfessionsCount() => _professionService.getProfessionsCount();
 
-  // INVENTORY OPERATIONS
-  Future<void> addInventoryItem(InventoryItem i) async { await _inventoryService.addInventoryItem(i); notifyListeners(); _triggerSync(); }
-  Future<void> updateInventoryItem(InventoryItem i) async { await _inventoryService.updateInventoryItem(i); notifyListeners(); _triggerSync(); }
-  Future<void> deleteInventoryItem(String id) async { await _inventoryService.deleteInventoryItem(id); notifyListeners(); _triggerSync(); }
-  List<InventoryItem> getInventoryItems() => _inventoryService.getInventoryItems();
-  InventoryItem? getInventoryItem(String id) => _inventoryService.getInventoryItem(id);
-  Future<List<InventoryItem>> getRemoteInventoryItems(String uid, {int limit = 50}) => _inventoryService.getRemoteInventoryItems(uid, limit: limit);
-  Future<List<InventoryItem>> searchGlobalInventory(String query, {int limit = 15}) => _inventoryService.searchGlobalInventory(query, limit: limit);
-  Future<Map<String, dynamic>> getGlobalMarketplaceItemsPaginated({int limit = 20, DocumentSnapshot? lastDocument}) => _inventoryService.getGlobalMarketplaceItemsPaginated(limit: limit, lastDocument: lastDocument);
-  Future<List<InventoryItem>> searchGlobalMarketplaceItems({required String searchQuery, int limit = 50}) => _inventoryService.searchGlobalMarketplaceItems(searchQuery: searchQuery, limit: limit);
-  Future<void> toggleFirestoreFavorite(String id, bool fav) => _inventoryService.toggleFirestoreFavorite(id, fav);
-  Future<void> addReview(Review r) => _inventoryService.addReview(r);
-  Future<List<Review>> getItemReviews(String id) => _inventoryService.getItemReviews(id);
-  Future<void> reportAd(AdReport r) => _inventoryService.reportAd(r);
-  Future<void> logContactEvent({required String itemId, required String action, String? targetPhone}) => _inventoryService.logContactEvent(itemId: itemId, action: action, targetPhone: targetPhone);
-  Future<void> incrementView(String id) => _inventoryService.incrementView(id);
-  Future<void> incrementShare(String id) => _inventoryService.incrementShare(id);
-  Future<void> addRecentlyViewed(InventoryItem i) async { await _inventoryService.addRecentlyViewed(i); notifyListeners(); }
-  List<InventoryItem> getRecentlyViewed() => _inventoryService.getRecentlyViewed();
-  Future<void> cleanupExpiredAds() async { await _inventoryService.cleanupExpiredAds(); notifyListeners(); }
-  Future<bool> isSellerVerified(String uid) => _inventoryService.isSellerVerified(uid);
-  Future<void> saveRemoteCachedItems(String uid, List<InventoryItem> items) => _inventoryService.saveRemoteCachedItems(uid, items);
-  List<InventoryItem> getRemoteCachedItems(String uid) => _inventoryService.getRemoteCachedItems(uid);
 
   // CATEGORY OPERATIONS
   Future<void> addCategory(Category cat) async { await _categoryService.addCategory(cat); notifyListeners(); _triggerSync(); }

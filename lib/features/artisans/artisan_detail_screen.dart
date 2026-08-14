@@ -163,6 +163,61 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
   }
 
   void _sendWorkRequest(bool isUrdu) async {
+    final descriptionController = TextEditingController();
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          isUrdu ? 'کام کی تفصیل لکھیں' : 'Work Details',
+          style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isUrdu
+                  ? 'کاریگر کو بتائیں کہ آپ کیا کام کروانا چاہتے ہیں۔'
+                  : 'Tell the artisan what you want to get done.',
+              style: TextStyle(fontSize: 14, fontFamily: fontFamily, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: descriptionController,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: isUrdu ? 'مثلاً: پنکھا ٹھیک کرنا ہے، نلکا لیک ہے وغیرہ' : 'e.g. Fixing a fan, leaking tap, etc.',
+                hintStyle: TextStyle(fontSize: 13, fontFamily: fontFamily),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: Colors.grey[50],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(isUrdu ? 'کینسل' : 'Cancel', style: TextStyle(fontFamily: fontFamily)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (descriptionController.text.trim().isEmpty) return;
+              Navigator.pop(context);
+              _processSendRequest(isUrdu, descriptionController.text.trim());
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.themeColor),
+            child: Text(isUrdu ? 'درخواست بھیجیں' : 'Send Request',
+                style: TextStyle(fontFamily: fontFamily, color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _processSendRequest(bool isUrdu, String workDescription) async {
     setState(() => _isSending = true);
     final nService = Provider.of<NotificationService>(context, listen: false);
     final user = FirebaseAuth.instance.currentUser;
@@ -171,6 +226,7 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
       await nService.sendArtisanWorkRequest(
         artisanUid: widget.artisanId,
         customerName: user?.displayName ?? (isUrdu ? 'ایک گاہک' : 'A Customer'),
+        workDescription: workDescription,
       );
 
       if (mounted) {

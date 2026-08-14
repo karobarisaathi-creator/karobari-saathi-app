@@ -33,13 +33,22 @@ class ArtisanWorkOrderAdapter extends TypeAdapter<ArtisanWorkOrder> {
       amount: fields[13] as double?,
       location: fields[14] as String?,
       isRated: fields[15] as bool,
+      customerAgreed: fields[16] as bool,
+      artisanAgreed: fields[17] as bool,
+      agreedAt: fields[18] as DateTime?,
+      contractTerms: fields[19] as String?,
+      paymentTerms: fields[20] as String?,
+      cancellationPolicy: fields[21] as String?,
+      customerAcceptedTerms: fields[22] as bool,
+      artisanAcceptedTerms: fields[23] as bool,
+      disputeStatus: fields[24] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ArtisanWorkOrder obj) {
     writer
-      ..writeByte(16)
+      ..writeByte(25)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -71,7 +80,25 @@ class ArtisanWorkOrderAdapter extends TypeAdapter<ArtisanWorkOrder> {
       ..writeByte(14)
       ..write(obj.location)
       ..writeByte(15)
-      ..write(obj.isRated);
+      ..write(obj.isRated)
+      ..writeByte(16)
+      ..write(obj.customerAgreed)
+      ..writeByte(17)
+      ..write(obj.artisanAgreed)
+      ..writeByte(18)
+      ..write(obj.agreedAt)
+      ..writeByte(19)
+      ..write(obj.contractTerms)
+      ..writeByte(20)
+      ..write(obj.paymentTerms)
+      ..writeByte(21)
+      ..write(obj.cancellationPolicy)
+      ..writeByte(22)
+      ..write(obj.customerAcceptedTerms)
+      ..writeByte(23)
+      ..write(obj.artisanAcceptedTerms)
+      ..writeByte(24)
+      ..write(obj.disputeStatus);
   }
 
   @override

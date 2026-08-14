@@ -54,6 +54,33 @@ class ArtisanWorkOrder extends HiveObject {
   @HiveField(15)
   final bool isRated;
 
+  @HiveField(16)
+  final bool customerAgreed;
+
+  @HiveField(17)
+  final bool artisanAgreed;
+
+  @HiveField(18)
+  final DateTime? agreedAt;
+
+  @HiveField(19)
+  final String? contractTerms;
+
+  @HiveField(20)
+  final String? paymentTerms;
+
+  @HiveField(21)
+  final String? cancellationPolicy;
+
+  @HiveField(22)
+  final bool customerAcceptedTerms;
+
+  @HiveField(23)
+  final bool artisanAcceptedTerms;
+
+  @HiveField(24)
+  final String? disputeStatus;
+
   ArtisanWorkOrder({
     required this.id,
     required this.artisanId,
@@ -71,6 +98,15 @@ class ArtisanWorkOrder extends HiveObject {
     this.amount,
     this.location,
     this.isRated = false,
+    this.customerAgreed = false,
+    this.artisanAgreed = false,
+    this.agreedAt,
+    this.contractTerms,
+    this.paymentTerms,
+    this.cancellationPolicy,
+    this.customerAcceptedTerms = false,
+    this.artisanAcceptedTerms = false,
+    this.disputeStatus,
   });
 
   Map<String, dynamic> toMap() {
@@ -91,6 +127,15 @@ class ArtisanWorkOrder extends HiveObject {
       'amount': amount,
       'location': location,
       'isRated': isRated,
+      'customerAgreed': customerAgreed,
+      'artisanAgreed': artisanAgreed,
+      'agreedAt': agreedAt?.toIso8601String(),
+      'contractTerms': contractTerms,
+      'paymentTerms': paymentTerms,
+      'cancellationPolicy': cancellationPolicy,
+      'customerAcceptedTerms': customerAcceptedTerms,
+      'artisanAcceptedTerms': artisanAcceptedTerms,
+      'disputeStatus': disputeStatus,
     };
   }
 
@@ -119,6 +164,15 @@ class ArtisanWorkOrder extends HiveObject {
       amount: (map['amount'] as num?)?.toDouble(),
       location: map['location']?.toString(),
       isRated: map['isRated'] ?? false,
+      customerAgreed: map['customerAgreed'] ?? false,
+      artisanAgreed: map['artisanAgreed'] ?? false,
+      agreedAt: map['agreedAt'] != null ? parseDate(map['agreedAt']) : null,
+      contractTerms: map['contractTerms'],
+      paymentTerms: map['paymentTerms'],
+      cancellationPolicy: map['cancellationPolicy'],
+      customerAcceptedTerms: map['customerAcceptedTerms'] ?? false,
+      artisanAcceptedTerms: map['artisanAcceptedTerms'] ?? false,
+      disputeStatus: map['disputeStatus'],
     );
   }
 }

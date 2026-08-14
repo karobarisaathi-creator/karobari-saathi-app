@@ -18,9 +18,11 @@ import 'package:account_app/core/models/category_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/models/business_chat_model.dart'; // Added new chat
-import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
+import 'package:account_app/core/models/job_post_model.dart';
+import 'package:account_app/core/models/job_bid_model.dart';
+import 'package:account_app/core/models/dispute_model.dart';
 
 // Services
 import 'package:account_app/core/services/database_service.dart';
@@ -34,9 +36,9 @@ import 'package:account_app/core/services/balance_service.dart';
 import 'package:account_app/core/services/pdf_service.dart';
 import 'package:account_app/core/services/excel_service.dart'; // Added ExcelService
 import 'package:account_app/core/services/backup_service.dart';
+import 'package:account_app/core/services/database/job_service.dart';
 import 'package:account_app/core/services/database/business_chat_service.dart';
 import 'package:account_app/core/services/security_service.dart';
-import 'package:account_app/core/services/price_database_service.dart';
 import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/core/widgets/simple_spinning_ring.dart';
 import './helpers/migration_helper.dart';  // ✅ یہ import کریں
@@ -88,7 +90,6 @@ void main() async {
     Hive.registerAdapter(AccountAdapter());
     Hive.registerAdapter(TransactionAdapter());
     Hive.registerAdapter(TransactionItemAdapter()); // ✅ Register TransactionItemAdapter (TypeId 20)
-    Hive.registerAdapter(InventoryItemAdapter()); // ✅ Register InventoryItemAdapter (TypeId 21)
     Hive.registerAdapter(CategoryAdapter());
     Hive.registerAdapter(CategoryTypeAdapter());
     Hive.registerAdapter(ProfessionAdapter());
@@ -99,6 +100,10 @@ void main() async {
     Hive.registerAdapter(BusinessChatRoomAdapter()); // Enabled new
     Hive.registerAdapter(ArtisanProfileAdapter());
     Hive.registerAdapter(ArtisanWorkOrderAdapter());
+    Hive.registerAdapter(JobPostAdapter());
+    Hive.registerAdapter(JobBidAdapter());
+    Hive.registerAdapter(DisputeAdapter());
+    Hive.registerAdapter(DisputeMessageAdapter());
 
     // Initialize Firebase using DefaultFirebaseOptions
     try {
@@ -185,10 +190,10 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PdfService()),
         ChangeNotifierProvider(create: (_) => ExcelService()), // Added ExcelService provider
         ChangeNotifierProvider(create: (_) => BackupService()),
+        ChangeNotifierProvider(create: (_) => JobService()),
         ChangeNotifierProvider(create: (_) => BusinessChatService()),
         ChangeNotifierProvider(create: (_) => SecurityService()),
         ChangeNotifierProvider(create: (_) => VerificationService()),
-        Provider(create: (_) => PriceDatabaseService()),
       ],
       child: Consumer2<LanguageService, ThemeService>(
         builder: (context, languageService, themeService, child) {

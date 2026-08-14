@@ -27,7 +27,7 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
-    // --- صارفین کا ڈیٹا (کھاتہ، ٹرانزیکشنز، انوینٹری) ---
+    // --- صارفین کا ڈیٹا (کھاتہ، ٹرانزیکشنز) ---
     match /users/{userId} {
       allow read: if isSignedIn();
       allow write: if isOwner(userId) || isAdmin();
@@ -44,17 +44,13 @@ service cloud.firestore {
       match /transactions/{transactionId} {
         allow read, write: if isOwner(userId) || isAdmin();
       }
-      match /inventory_items/{itemId} {
-        allow read: if isSignedIn();
-        allow write: if isOwner(userId) || isAdmin();
-      }
       match /notifications/{notificationId} {
         allow read, delete, update: if isOwner(userId) || isAdmin();
         allow create: if isSignedIn();
       }
     }
 
-    // --- بزنس چیٹ سسٹم (صرف نیا سسٹم) ---
+    // --- بزنس چیٹ سسٹم ---
     match /business_chats/{chatId} {
       allow read, update, delete: if isSignedIn() && request.auth.uid in resource.data.participants;
       allow create: if isSignedIn() && request.auth.uid in request.resource.data.participants;
@@ -92,48 +88,26 @@ service cloud.firestore {
       allow update: if isSignedIn() && (resource.data.customerUid == request.auth.uid || resource.data.artisanUid == request.auth.uid);
     }
 
-    // --- پرائس ٹریکر (Price Tracker) ---
-    match /price_reports/{reportId} {
-      allow read: if true;
+    // --- جاب پوسٹنگ سسٹم (Jobs) ---
+    match /jobs/{jobId} {
+      allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
+      allow update: if isSignedIn() && (request.auth.uid == resource.data.customerId || request.auth.uid == resource.data.artisanId || isAdmin());
+      allow delete: if isSignedIn() && (request.auth.uid == resource.data.customerId || isAdmin());
+
+      match /bids/{bidId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && (request.auth.uid == resource.data.artisanId || isAdmin());
+        allow delete: if isSignedIn() && (request.auth.uid == resource.data.artisanId || isAdmin());
+      }
     }
 
-    match /price_alerts/{alertId} {
-      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
-    }
-
-    // --- مارکیٹ پلیس سیکیورٹی لاگز اور رپورٹنگ ---
-    match /ad_reports/{reportId} {
-      allow read: if isAdmin();
-      allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
-    }
-
+    // --- آڈٹ لاگز ---
     match /audit_logs/{logId} {
       allow read: if isAdmin();
       allow create: if isSignedIn();
       allow update, delete: if false;
-    }
-
-    match /contact_logs/{logId} {
-      allow read: if isAdmin();
-      allow create: if isSignedIn();
-      allow update, delete: if false;
-    }
-
-    match /reviews/{reviewId} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
-    }
-
-    match /favorites/{favId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == request.resource.data.userId;
-      allow delete: if isSignedIn() && request.auth.uid == resource.data.userId;
     }
 
     // --- ویریفیکیشن سسٹم ---
@@ -152,10 +126,6 @@ service cloud.firestore {
     }
 
     // --- گلوبل سرچ سپورٹ ---
-    match /{path=**}/inventory_items/{itemId} {
-      allow read: if isSignedIn();
-    }
-
     match /{path=**}/work_orders/{orderId} {
       allow read: if isSignedIn() && (resource.data.customerId == request.auth.uid || resource.data.artisanId == request.auth.uid);
     }

@@ -42,7 +42,6 @@ class PartyDetailScreen extends StatefulWidget {
 
 class _PartyDetailScreenState extends State<PartyDetailScreen> {
   List<model.Transaction> _transactions = [];
-  Map<String, double> _transactionPriceChanges = {}; // Stores rate change % for each transaction
   bool _isLoading = true;
   bool _isCheckingRemote = false;
   Map<String, String>? _remoteProfile;
@@ -304,10 +303,6 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     // پارٹی کا تازہ ترین ڈیٹا لوڈ کریں تاکہ بیلنس اپڈیٹ ہو سکے
     final updatedParty = databaseService.getAccount(widget.party.id);
     
-    // Get list of managed item names to detect rate changes
-    final inventoryItems = databaseService.getInventoryItems();
-    final managedNames = inventoryItems.map((e) => e.name.trim().toLowerCase()).toSet();
-
     final allTransactions = await databaseService.getAllTransactions();
     if (mounted) {
       setState(() {
@@ -315,44 +310,6 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
             .where((t) => t.accountId == widget.party.id && t.partnershipId == null)
             .toList();
         _transactions.sort((a, b) => b.date.compareTo(a.date));
-
-        // Calculate Rate Changes (Percentage Function)
-        _transactionPriceChanges = {};
-        final chronological = _transactions.reversed.toList();
-        Map<String, double> lastRates = {};
-
-        for (var tx in chronological) {
-          // Only process 'income' transactions for rate history as per requirement
-          if (tx.type != 'income') continue;
-
-          if (tx.items.isNotEmpty) {
-            for (var item in tx.items) {
-              final name = item.description.trim().toLowerCase();
-              if (managedNames.contains(name) && item.rate > 0) {
-                if (lastRates.containsKey(name)) {
-                  final lastRate = lastRates[name]!;
-                  if ((item.rate - lastRate).abs() > 0.01) {
-                    final percentage = ((item.rate - lastRate) / lastRate) * 100;
-                    _transactionPriceChanges[tx.id] = percentage;
-                  }
-                }
-                lastRates[name] = item.rate;
-              }
-            }
-          } else if (tx.rate > 0) {
-            final name = tx.description.trim().toLowerCase();
-            if (managedNames.contains(name)) {
-              if (lastRates.containsKey(name)) {
-                final lastRate = lastRates[name]!;
-                if ((tx.rate - lastRate).abs() > 0.01) {
-                  final percentage = ((tx.rate - lastRate) / lastRate) * 100;
-                  _transactionPriceChanges[tx.id] = percentage;
-                }
-              }
-              lastRates[name] = tx.rate;
-            }
-          }
-        }
 
         _isLoading = false;
       });
@@ -1193,10 +1150,6 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                           fontWeight: FontWeight.normal,
                         ),
                       ),
-                      if (_transactionPriceChanges.containsKey(t.id)) ...[
-                        const SizedBox(width: 8),
-                        _buildPriceChangeBadge(_transactionPriceChanges[t.id]!),
-                      ],
                     ],
                   ),
                 ],
@@ -1309,32 +1262,6 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildPriceChangeBadge(double percentage) {
-    final isIncrease = percentage > 0;
-    final color = isIncrease ? AppTheme.expenseColor : AppTheme.incomeColor;
-    
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          isIncrease ? PhosphorIcons.arrowUp() : PhosphorIcons.arrowDown(),
-          size: 12,
-          color: color,
-        ),
-        const SizedBox(width: 2),
-        Text(
-          '${percentage.abs().toStringAsFixed(1)}%',
-          style: TextStyle(
-            fontSize: 11, 
-            fontWeight: FontWeight.bold, 
-            color: color, 
-            fontFamily: ''
-          ),
-        ),
-      ],
     );
   }
 }

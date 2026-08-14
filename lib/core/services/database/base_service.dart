@@ -6,7 +6,6 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/category_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
-import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
 
@@ -20,9 +19,7 @@ class BaseService extends ChangeNotifier {
   Box<model.Transaction>? get transactionsBox => Hive.isBoxOpen('transactions') ? Hive.box<model.Transaction>('transactions') : null;
   Box<Category>? get categoriesBox => Hive.isBoxOpen('categories') ? Hive.box<Category>('categories') : null;
   Box<Profession>? get professionsBox => Hive.isBoxOpen('professions') ? Hive.box<Profession>('professions') : null;
-  Box<InventoryItem>? get itemsBox => Hive.isBoxOpen('inventory_items') ? Hive.box<InventoryItem>('inventory_items') : null;
   Box<List>? get remoteCachedItemsBox => Hive.isBoxOpen('remote_cached_items') ? Hive.box<List>('remote_cached_items') : null;
-  Box<InventoryItem>? get recentlyViewedBox => Hive.isBoxOpen('recently_viewed') ? Hive.box<InventoryItem>('recently_viewed') : null;
   Box<ArtisanProfile>? get artisansBox => Hive.isBoxOpen('artisans') ? Hive.box<ArtisanProfile>('artisans') : null;
   Box<ArtisanWorkOrder>? get workOrdersBox => Hive.isBoxOpen('work_orders') ? Hive.box<ArtisanWorkOrder>('work_orders') : null;
   Box? get settingsBox => Hive.isBoxOpen('settings') ? Hive.box('settings') : null;
@@ -33,9 +30,7 @@ class BaseService extends ChangeNotifier {
     await Hive.openBox<model.Transaction>('transactions');
     await Hive.openBox<Category>('categories');
     await Hive.openBox<Profession>('professions');
-    await Hive.openBox<InventoryItem>('inventory_items');
     await Hive.openBox<List>('remote_cached_items');
-    await Hive.openBox<InventoryItem>('recently_viewed');
     await Hive.openBox<ArtisanProfile>('artisans');
     await Hive.openBox<ArtisanWorkOrder>('work_orders');
     await Hive.openBox('settings');
@@ -47,9 +42,7 @@ class BaseService extends ChangeNotifier {
     if (Hive.isBoxOpen('transactions')) await Hive.box<model.Transaction>('transactions').close();
     if (Hive.isBoxOpen('categories')) await Hive.box<Category>('categories').close();
     if (Hive.isBoxOpen('professions')) await Hive.box<Profession>('professions').close();
-    if (Hive.isBoxOpen('inventory_items')) await Hive.box<InventoryItem>('inventory_items').close();
     if (Hive.isBoxOpen('remote_cached_items')) await Hive.box<List>('remote_cached_items').close();
-    if (Hive.isBoxOpen('recently_viewed')) await Hive.box<InventoryItem>('recently_viewed').close();
     if (Hive.isBoxOpen('artisans')) await Hive.box<ArtisanProfile>('artisans').close();
     if (Hive.isBoxOpen('work_orders')) await Hive.box<ArtisanWorkOrder>('work_orders').close();
     if (Hive.isBoxOpen('settings')) await Hive.box('settings').close();
@@ -61,9 +54,7 @@ class BaseService extends ChangeNotifier {
     if (Hive.isBoxOpen('transactions')) await Hive.box<model.Transaction>('transactions').clear();
     if (Hive.isBoxOpen('categories')) await Hive.box<Category>('categories').clear();
     if (Hive.isBoxOpen('professions')) await Hive.box<Profession>('professions').clear();
-    if (Hive.isBoxOpen('inventory_items')) await Hive.box<InventoryItem>('inventory_items').clear();
     if (Hive.isBoxOpen('remote_cached_items')) await Hive.box<List>('remote_cached_items').clear();
-    if (Hive.isBoxOpen('recently_viewed')) await Hive.box<InventoryItem>('recently_viewed').clear();
     if (Hive.isBoxOpen('artisans')) await Hive.box<ArtisanProfile>('artisans').clear();
     if (Hive.isBoxOpen('work_orders')) await Hive.box<ArtisanWorkOrder>('work_orders').clear();
     if (Hive.isBoxOpen('settings')) await Hive.box('settings').clear();
