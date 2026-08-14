@@ -27,6 +27,15 @@ class ArtisanService extends BaseService {
   /// Throws:
   ///   - FirebaseException: اگر Firestore میں خرابی ہو
   Future<void> saveProfile(ArtisanProfile profile) async {
+    final user = auth.currentUser;
+    if (user == null) throw Exception('صارف لاگ ان نہیں ہے');
+    
+    // سیکیورٹی چیک: صرف مالک اپنی پروفائل اپ ڈیٹ کر سکتا ہے
+    if (user.uid != profile.id) {
+      _logger.warning("Security Alert: User ${user.uid} tried to update profile of ${profile.id}");
+      throw Exception('آپ کو یہ پروفائل تبدیل کرنے کا اختیار نہیں ہے');
+    }
+
     await firestore
         .collection('artisans')
         .doc(profile.id)
@@ -42,6 +51,14 @@ class ArtisanService extends BaseService {
   /// Parameters:
   ///   - [id]: String - کاریگر کی منفرد آئی ڈی
   Future<void> deleteProfile(String id) async {
+    final user = auth.currentUser;
+    if (user == null) throw Exception('صارف لاگ ان نہیں ہے');
+    
+    // سیکیورٹی چیک
+    if (user.uid != id) {
+      throw Exception('آپ کو یہ پروفائل حذف کرنے کا اختیار نہیں ہے');
+    }
+
     final profile = await getProfile(id);
     if (profile != null) {
       // 1. تصاویر ڈیلیٹ کریں (Storage)

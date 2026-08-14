@@ -18,6 +18,8 @@ class VerificationService with ChangeNotifier {
     'trusted-admin',
   };
 
+  static const int _maxImageSizeBytes = 10 * 1024 * 1024; // 10 MB
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
@@ -25,9 +27,11 @@ class VerificationService with ChangeNotifier {
   VerificationStatus _currentStatus = VerificationStatus.none;
   String? _adminNote;
   bool _isLoading = false;
+  StreamSubscription<DocumentSnapshot>? _statusSubscription;
 
   VerificationStatus get currentStatus => _currentStatus;
-  VerificationStatus get artisanStatus => _currentStatus; // Both point to the same unified status
+  VerificationStatus get artisanStatus =>
+      _currentStatus; // Both point to the same unified status
   String? get adminNote => _adminNote;
   String? get artisanAdminNote => _adminNote;
   bool get isLoading => _isLoading;
@@ -60,11 +64,18 @@ class VerificationService with ChangeNotifier {
     _init();
   }
 
+  @override
+  void dispose() {
+    _statusSubscription?.cancel();
+    super.dispose();
+  }
+
   void _init() {
     _auth.authStateChanges().listen((user) {
       if (user != null) {
         _listenToStatus(user.uid);
       } else {
+        _statusSubscription?.cancel();
         _currentStatus = VerificationStatus.none;
         _adminNote = null;
         notifyListeners();
@@ -75,94 +86,123 @@ class VerificationService with ChangeNotifier {
   void _listenToStatus(String uid) {
     VerificationStatus previousStatus = _currentStatus;
 
-    _firestore
+    _statusSubscription?.cancel();
+    _statusSubscription = _firestore
         .collection('verification_requests')
         .doc(uid)
         .snapshots()
-        .listen((doc) async {
-      if (doc.exists) {
-        final data = doc.data()!;
-        final statusStr = data['status'] as String?;
-        _adminNote = data['adminNote'] as String?;
+        .listen(
+      (doc) async {
+        try {
+          if (doc.exists) {
+            final data = doc.data();
+            if (data == null) {
+              _currentStatus = VerificationStatus.none;
+              _adminNote = null;
+              if (previousStatus == VerificationStatus.approved) {
+                await _updateUserVerifiedFlag(uid, false);
+                await _updateArtisanVerifiedFlag(uid, false);
+              }
+            } else {
+              final statusStr = data['status'] as String?;
+              _adminNote = data['adminNote'] as String?;
 
-        switch (statusStr) {
-          case 'pending':
-            _currentStatus = VerificationStatus.pending;
-            if (previousStatus == VerificationStatus.approved) {
-              await _updateUserVerifiedFlag(uid, false);
-              await _updateArtisanVerifiedFlag(uid, false);
-            }
-            break;
-          case 'approved':
-            _currentStatus = VerificationStatus.approved;
-            if (previousStatus != VerificationStatus.approved) {
-              await _updateUserVerifiedFlag(uid, true);
-              await _updateArtisanVerifiedFlag(uid, true);
-              if (previousStatus == VerificationStatus.pending) {
-                _createVerificationNotification(uid, true);
+              switch (statusStr) {
+                case 'pending':
+                  _currentStatus = VerificationStatus.pending;
+                  if (previousStatus == VerificationStatus.approved) {
+                    await _updateUserVerifiedFlag(uid, false);
+                    await _updateArtisanVerifiedFlag(uid, false);
+                  }
+                  break;
+                case 'approved':
+                  _currentStatus = VerificationStatus.approved;
+                  if (previousStatus != VerificationStatus.approved) {
+                    await _updateUserVerifiedFlag(uid, true);
+                    await _updateArtisanVerifiedFlag(uid, true);
+                    if (previousStatus == VerificationStatus.pending) {
+                      _createVerificationNotification(uid, true);
+                    }
+                  }
+                  break;
+                case 'rejected':
+                  _currentStatus = VerificationStatus.rejected;
+                  if (previousStatus == VerificationStatus.approved) {
+                    await _updateUserVerifiedFlag(uid, false);
+                    await _updateArtisanVerifiedFlag(uid, false);
+                  }
+                  if (previousStatus == VerificationStatus.pending) {
+                    _createVerificationNotification(uid, false);
+                  }
+                  break;
+                default:
+                  _currentStatus = VerificationStatus.none;
+                  _adminNote = null;
+                  if (previousStatus == VerificationStatus.approved) {
+                    await _updateUserVerifiedFlag(uid, false);
+                    await _updateArtisanVerifiedFlag(uid, false);
+                  }
               }
             }
-            break;
-          case 'rejected':
-            _currentStatus = VerificationStatus.rejected;
-            if (previousStatus == VerificationStatus.approved) {
-              await _updateUserVerifiedFlag(uid, false);
-              await _updateArtisanVerifiedFlag(uid, false);
-            }
-            if (previousStatus == VerificationStatus.pending) {
-              _createVerificationNotification(uid, false);
-            }
-            break;
-          default:
+          } else {
             _currentStatus = VerificationStatus.none;
             _adminNote = null;
             if (previousStatus == VerificationStatus.approved) {
               await _updateUserVerifiedFlag(uid, false);
               await _updateArtisanVerifiedFlag(uid, false);
             }
+          }
+          previousStatus = _currentStatus;
+          notifyListeners();
+        } catch (e) {
+          debugPrint('Error in _listenToStatus: $e');
+          _currentStatus = VerificationStatus.none;
+          notifyListeners();
         }
-      } else {
+      },
+      onError: (e) {
+        debugPrint('Stream error in _listenToStatus: $e');
         _currentStatus = VerificationStatus.none;
-        _adminNote = null;
-        if (previousStatus == VerificationStatus.approved) {
-          await _updateUserVerifiedFlag(uid, false);
-          await _updateArtisanVerifiedFlag(uid, false);
-        }
-      }
-      previousStatus = _currentStatus;
-      notifyListeners();
-    });
+        notifyListeners();
+      },
+    );
   }
 
   Future<void> _updateArtisanVerifiedFlag(String uid, bool isVerified) async {
     try {
-      await _firestore
-          .collection('artisans')
-          .doc(uid)
-          .set({
-            'isVerified': isVerified,
-            'verificationStatus': isVerified ? 'approved' : 'none',
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+      await _firestore.collection('artisans').doc(uid).set({
+        'isVerified': isVerified,
+        'verificationStatus': isVerified ? 'approved' : 'none',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     } catch (e) {
       debugPrint('Failed to update artisan verification flag: $e');
     }
   }
 
-  Future<void> submitArtisanRequest({
+  /// Unified method to submit verification requests (both artisans and regular users)
+  Future<void> submitVerificationRequest({
     required File cnicFront,
     required File cnicBack,
     File? shopImage,
-    required String artisanName,
-    required String profession,
+    required String businessName,
+    required String businessType,
+    bool isArtisanRequest = false,
   }) async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception('User not logged in');
+    if (user == null) throw Exception('صارف لاگ ان نہیں ہے');
 
     _isLoading = true;
     notifyListeners();
 
     try {
+      // Validate files
+      _validateImageFile(cnicFront);
+      _validateImageFile(cnicBack);
+      if (shopImage != null) {
+        _validateImageFile(shopImage);
+      }
+
       final frontUrl = await _uploadImage(cnicFront, 'cnic_front_${user.uid}');
       final backUrl = await _uploadImage(cnicBack, 'cnic_back_${user.uid}');
       String? shopUrl;
@@ -173,26 +213,47 @@ class VerificationService with ChangeNotifier {
       // Unified collection: verification_requests
       await _firestore.collection('verification_requests').doc(user.uid).set({
         'uid': user.uid,
-        'name': artisanName,
+        'name': isArtisanRequest ? (businessName) : (user.displayName ?? ''),
         'phone': user.phoneNumber ?? '',
-        'businessName': artisanName, // Using name as business name for artisans
-        'businessType': profession,
+        'businessName': businessName,
+        'businessType': businessType,
         'cnicFront': frontUrl,
         'cnicBack': backUrl,
         'shopImageUrl': shopUrl,
         'status': 'pending',
         'submittedAt': FieldValue.serverTimestamp(),
         'adminNote': null,
-        'isArtisanRequest': true,
+        'reviewedBy': null,
+        'reviewedAt': null,
+        'isArtisanRequest': isArtisanRequest,
       }, SetOptions(merge: false));
 
+      debugPrint('تصدیق درخواست کامیابی سے جمع ہوگئی');
     } catch (e) {
-      debugPrint('Artisan verification submission error: $e');
+      debugPrint('تصدیق درخواست میں خرابی: $e');
       rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  /// Deprecated: Use submitVerificationRequest instead
+  Future<void> submitArtisanRequest({
+    required File cnicFront,
+    required File cnicBack,
+    File? shopImage,
+    required String artisanName,
+    required String profession,
+  }) async {
+    return submitVerificationRequest(
+      cnicFront: cnicFront,
+      cnicBack: cnicBack,
+      shopImage: shopImage,
+      businessName: artisanName,
+      businessType: profession,
+      isArtisanRequest: true,
+    );
   }
 
   Future<void> _updateUserVerifiedFlag(String uid, bool isVerified) async {
@@ -213,6 +274,7 @@ class VerificationService with ChangeNotifier {
     }
   }
 
+  /// Deprecated: Use submitVerificationRequest instead
   Future<void> submitRequest({
     required File cnicFront,
     required File cnicBack,
@@ -221,56 +283,59 @@ class VerificationService with ChangeNotifier {
     required String businessType,
     bool isArtisan = false,
   }) async {
-    final user = _auth.currentUser;
-    if (user == null) throw Exception('User not logged in');
+    return submitVerificationRequest(
+      cnicFront: cnicFront,
+      cnicBack: cnicBack,
+      shopImage: shopImage,
+      businessName: businessName,
+      businessType: businessType,
+      isArtisanRequest: isArtisan,
+    );
+  }
 
-    _isLoading = true;
-    notifyListeners();
+  /// Validate image file before upload
+  void _validateImageFile(File file) {
+    if (!file.existsSync()) {
+      throw Exception('فائل موجود نہیں ہے: ${file.path}');
+    }
 
-    try {
-      final frontUrl = await _uploadImage(cnicFront, 'cnic_front_${user.uid}');
-      final backUrl = await _uploadImage(cnicBack, 'cnic_back_${user.uid}');
-      String? shopUrl;
-      if (shopImage != null) {
-        shopUrl = await _uploadImage(shopImage, 'shop_${user.uid}');
-      }
+    final fileSizeBytes = file.lengthSync();
+    if (fileSizeBytes > _maxImageSizeBytes) {
+      throw Exception(
+          'فائل بہت بڑی ہے۔ زیادہ سے زیادہ سائز: ${_maxImageSizeBytes ~/ (1024 * 1024)} MB');
+    }
 
-      await _firestore.collection('verification_requests').doc(user.uid).set({
-        'uid': user.uid,
-        'name': user.displayName ?? '',
-        'phone': user.phoneNumber ?? '',
-        'businessName': businessName,
-        'businessType': businessType,
-        'cnicFront': frontUrl,
-        'cnicBack': backUrl,
-        'shopImageUrl': shopUrl,
-        'status': 'pending',
-        'submittedAt': FieldValue.serverTimestamp(),
-        'adminNote': null,
-        'reviewedBy': null,
-        'reviewedAt': null,
-        'isArtisanRequest': isArtisan,
-      }, SetOptions(merge: false));
-    } catch (e) {
-      debugPrint('Verification submission error: $e');
-      rethrow;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+    final allowedExtensions = {'jpg', 'jpeg', 'png', 'gif'};
+    final extension = file.path.split('.').last.toLowerCase();
+    if (!allowedExtensions.contains(extension)) {
+      throw Exception('غیر معاون فائل کی قسم: $extension');
     }
   }
 
   Future<String> _uploadImage(File file, String fileName) async {
-    // Compress image before upload
-    final compressedFile = await ImageUtils.compressImage(file, quality: 70, maxWidth: 1024);
-    
-    final extension = file.path.split('.').last;
-    final ref = _storage
-        .ref()
-        .child('verification_documents')
-        .child('$fileName.$extension');
-    final uploadTask = await ref.putFile(compressedFile);
-    return await uploadTask.ref.getDownloadURL();
+    try {
+      // Compress image before upload
+      final compressedFile = await ImageUtils.compressImage(
+        file,
+        quality: 70,
+        maxWidth: 1024,
+      );
+
+      final extension = file.path.split('.').last.toLowerCase();
+      final ref = _storage
+          .ref()
+          .child('verification_documents')
+          .child('$fileName.$extension');
+
+      final uploadTask = await ref.putFile(compressedFile);
+      final downloadUrl = await uploadTask.ref.getDownloadURL();
+
+      debugPrint('تصویر کامیابی سے اپ لوڈ ہوگئی: $fileName');
+      return downloadUrl;
+    } catch (e) {
+      debugPrint('تصویر اپ لوڈ میں خرابی: $e');
+      rethrow;
+    }
   }
 
   Future<void> cancelRequest() async {

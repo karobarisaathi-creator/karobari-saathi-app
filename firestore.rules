@@ -66,18 +66,36 @@ service cloud.firestore {
     // --- کاریگر پروفائلز (Artisan Profiles) ---
     match /artisans/{artisanId} {
       allow read: if isSignedIn();
-      allow write: if isOwner(artisanId) || isAdmin();
+      allow write: if isAdmin() || (
+        isOwner(artisanId) &&
+        // سرور سائڈ ویلیڈیشن: نام اور پیشہ لازمی ہے
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 2 &&
+        request.resource.data.profession is string
+      );
 
       match /reviews/{reviewId} {
         allow read: if isSignedIn();
-        allow create: if isSignedIn();
+        // صرف لاگ ان صارف اپنا ریویو دے سکتا ہے
+        allow create: if isSignedIn() &&
+                      request.resource.data.reviewerId == request.auth.uid &&
+                      request.resource.data.rating >= 1 &&
+                      request.resource.data.rating <= 5;
         allow update, delete: if isAdmin();
       }
 
       match /work_orders/{orderId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn();
-        allow update: if isSignedIn();
+        allow read: if isSignedIn() && (
+          resource.data.artisanId == request.auth.uid ||
+          resource.data.customerId == request.auth.uid ||
+          isAdmin()
+        );
+        allow create: if isSignedIn(); // کسٹمر آرڈر بنا سکتا ہے
+        allow update: if isSignedIn() && (
+          resource.data.artisanId == request.auth.uid ||
+          resource.data.customerId == request.auth.uid ||
+          isAdmin()
+        );
         allow delete: if isAdmin();
       }
     }
