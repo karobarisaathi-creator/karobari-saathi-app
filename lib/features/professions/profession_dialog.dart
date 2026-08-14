@@ -3,6 +3,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 
 class ProfessionDialog extends StatefulWidget {
   final bool isUrdu;
@@ -244,74 +245,53 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
             const SizedBox(height: 24),
 
             // Save Button
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : () async {
-                  if (_nameController.text.isNotEmpty) {
-                    setState(() {
-                      _isSaving = true;
-                    });
-                    
-                    try {
-                      String finalDescription = "ICON:$_selectedIcon|${_descriptionController.text}";
+            AppButton(
+              text: widget.isUrdu ? 'محفوظ کریں' : 'Save Profession',
+              onPressed: () async {
+                if (_nameController.text.isNotEmpty) {
+                  setState(() {
+                    _isSaving = true;
+                  });
+                  
+                  try {
+                    String finalDescription = "ICON:$_selectedIcon|${_descriptionController.text}";
 
-                      await widget.onSave(
-                        _nameController.text,
-                        [],
-                        finalDescription,
-                        widget.profession?.totalProduction ?? 0.0,
-                        widget.profession?.productionUnit ?? '',
-                        _seasonController.text,
-                        widget.profession?.targetProduction ?? 0.0,
-                        widget.profession?.budgetLimits,
-                        widget.profession?.benchmarkCostPerUnit ?? 0.0,
-                      );
-                    } finally {
-                      if (mounted) {
-                        setState(() {
-                          _isSaving = false;
-                        });
-                      }
-                    }
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          widget.isUrdu ? 'پیشہ کا نام درج کریں' : 'Please enter profession name',
-                          style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight),
-                        ),
-                        backgroundColor: AppTheme.expenseColor,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
+                    await widget.onSave(
+                      _nameController.text,
+                      [],
+                      finalDescription,
+                      widget.profession?.totalProduction ?? 0.0,
+                      widget.profession?.productionUnit ?? '',
+                      _seasonController.text,
+                      widget.profession?.targetProduction ?? 0.0,
+                      widget.profession?.budgetLimits,
+                      widget.profession?.benchmarkCostPerUnit ?? 0.0,
                     );
+                  } finally {
+                    if (mounted) {
+                      setState(() {
+                        _isSaving = false;
+                      });
+                    }
                   }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.darkColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                child: _isSaving 
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                    )
-                  : Text(
-                      widget.isUrdu ? 'محفوظ کریں' : 'Save Profession',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontFamily: fontFamily,
-                        fontWeight: fontWeight,
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        widget.isUrdu ? 'پیشہ کا نام درج کریں' : 'Please enter profession name',
+                        style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight),
                       ),
+                      backgroundColor: AppTheme.expenseColor,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-              ),
+                  );
+                }
+              },
+              isLoading: _isSaving,
+              isFullWidth: true,
+              size: AppButtonSize.large,
+              color: AppTheme.darkColor,
             ),
           ],
         ),

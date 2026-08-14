@@ -69,47 +69,53 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.themeColor))
-          : _professions.isEmpty
-          ? Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(PhosphorIcons.briefcase(), size: 80, color: Colors.grey[400]),
-            const SizedBox(height: 20),
-            Text(
-              isUrdu ? 'کوئی پیشہ نہیں' : 'No Professions',
-              style: TextStyle(
-                fontSize: 20,
-                color: AppTheme.darkColor,
-                fontFamily: fontFamily,
-                fontWeight: fontWeight,
+      body: Consumer<DatabaseService>(
+        builder: (context, databaseService, child) {
+          final professions = databaseService.getProfessions();
+          
+          if (professions.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(PhosphorIcons.briefcase(), size: 80, color: Colors.grey[400]),
+                  const SizedBox(height: 20),
+                  Text(
+                    isUrdu ? 'کوئی پیشہ نہیں' : 'No Professions',
+                    style: TextStyle(
+                      fontSize: 20,
+                      color: AppTheme.darkColor,
+                      fontFamily: fontFamily,
+                      fontWeight: fontWeight,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    isUrdu ? 'پہلا پیشہ شامل کریں' : 'Add your first profession',
+                    style: TextStyle(
+                      color: AppTheme.darkColor.withOpacity(0.7),
+                      fontFamily: fontFamily,
+                      fontWeight: fontWeight,
+                    ),
+                  ),
+                ],
               ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: () async => await databaseService.fetchFromFirebase(),
+            color: AppTheme.themeColor,
+            backgroundColor: Colors.white,
+            child: ListView.builder(
+              padding: const EdgeInsets.only(top: 8, bottom: 80),
+              itemCount: professions.length,
+              itemBuilder: (context, index) {
+                return _buildProfessionCard(professions[index], isUrdu, fontFamily, fontWeight);
+              },
             ),
-            const SizedBox(height: 12),
-            Text(
-              isUrdu ? 'پہلا پیشہ شامل کریں' : 'Add your first profession',
-              style: TextStyle(
-                color: AppTheme.darkColor.withOpacity(0.7),
-                fontFamily: fontFamily,
-                fontWeight: fontWeight,
-              ),
-            ),
-          ],
-        ),
-      )
-          : RefreshIndicator(
-        onRefresh: _loadProfessions,
-        color: AppTheme.themeColor,
-        backgroundColor: Colors.white,
-        child: ListView.builder(
-          padding: const EdgeInsets.only(top: 8, bottom: 80),
-          itemCount: _professions.length,
-          itemBuilder: (context, index) {
-            return _buildProfessionCard(_professions[index], isUrdu, fontFamily, fontWeight);
-          },
-        ),
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'professions_fab',

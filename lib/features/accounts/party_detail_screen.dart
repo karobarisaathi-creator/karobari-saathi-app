@@ -1141,6 +1141,20 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                         ),
                         const SizedBox(width: 16),
                       ],
+                      if (t.professionName != null && t.professionName!.isNotEmpty) ...[
+                        Icon(PhosphorIcons.briefcase(), size: 14, color: AppTheme.themeColor.withOpacity(0.7)),
+                        const SizedBox(width: 4),
+                        Text(
+                          t.professionName!,
+                          style: TextStyle(
+                            color: AppTheme.themeColor,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: fontFamily,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                      ],
                       Text(
                         DateFormat('dd/MM/yyyy').format(t.date),
                         style: const TextStyle(

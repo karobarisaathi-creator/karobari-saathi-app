@@ -18,6 +18,8 @@ import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/category_chip.dart';
 import 'package:account_app/core/widgets/app_filter_chip.dart';
+import 'package:account_app/core/widgets/image_selector_field.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/l10n/app_localizations.dart';
 
 class AddPartyScreen extends StatefulWidget {
@@ -115,48 +117,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
     });
   }
 
-  Future<void> _pickImage() async {
-    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-    
-    final XFile? image = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 70,
-    );
-    
-    if (image != null) {
-      final croppedFile = await ImageCropper().cropImage(
-        sourcePath: image.path,
-        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
-        compressQuality: 70,
-        uiSettings: [
-          AndroidUiSettings(
-            toolbarTitle: isUrdu ? 'تصویر تراشیں' : 'Crop Image',
-            toolbarColor: AppTheme.darkColor,
-            toolbarWidgetColor: Colors.white,
-            initAspectRatio: CropAspectRatioPreset.square,
-            lockAspectRatio: true,
-          ),
-          IOSUiSettings(
-            title: isUrdu ? 'تصویر تراشیں' : 'Crop Image',
-          ),
-        ],
-      );
 
-      if (croppedFile != null) {
-        setState(() {
-          _profileImage = File(croppedFile.path);
-          _remoteImageUrl = null; // Clear remote image if user picks local
-        });
-      }
-    }
-  }
-
-  void _removeImage() {
-    setState(() {
-      _profileImage = null;
-      _remoteImageUrl = null;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -171,80 +132,25 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
       appBar: CustomAppBar(
         title: widget.partyToEdit != null ? l10n.editParty : l10n.addParty,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.themeColor))
-          : SingleChildScrollView(
+      body: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
               child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Profile Image
-                    Center(
-                      child: Stack(
-                        children: [
-                          GestureDetector(
-                            onTap: _pickImage,
-                            child: Container(
-                              width: 120,
-                              height: 120,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppTheme.darkColor.withOpacity(0.12), width: 1),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.02),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: _remoteImageUrl != null 
-                                    ? CachedNetworkImage(
-                                        imageUrl: _remoteImageUrl!,
-                                        fit: BoxFit.cover,
-                                        placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                        errorWidget: (context, url, error) => Icon(PhosphorIcons.user(), color: AppTheme.darkColor.withOpacity(0.3)),
-                                      )
-                                    : (_profileImage != null
-                                        ? Image.file(_profileImage!, fit: BoxFit.cover)
-                                        : Icon(PhosphorIcons.camera(), size: 45, color: AppTheme.darkColor.withOpacity(0.5))),
-                              ),
-                            ),
-                          ),
-                          if (_profileImage != null || _remoteImageUrl != null)
-                            Positioned(
-                              top: -4,
-                              right: -4,
-                              child: GestureDetector(
-                                onTap: _removeImage,
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.expenseColor,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2),
-                                  ),
-                                  child: const Icon(Icons.close, color: Colors.white, size: 14),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      isUrdu ? 'تصویر شامل کریں' : 'Add Photo',
-                      style: TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontFamily: fontFamily,
-                        fontWeight: fontWeight,
-                        fontSize: 14,
-                      ),
+                    // Profile Image Selector
+                    ImageSelectorField(
+                      isProfile: true,
+                      selectedFiles: _profileImage != null ? [_profileImage!] : [],
+                      remoteUrls: _remoteImageUrl != null && _remoteImageUrl!.isNotEmpty ? [_remoteImageUrl!] : [],
+                      onFilesChanged: (files) {
+                        setState(() {
+                          _profileImage = files.isNotEmpty ? files.first : null;
+                          if (files.isNotEmpty) _remoteImageUrl = null;
+                        });
+                      },
+                      onRemoteRemoved: (_) => setState(() => _remoteImageUrl = null),
                     ),
                     const SizedBox(height: 24),
 
@@ -295,27 +201,13 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                                 ),
                                 if (_foundProfile != null) ...[
                                   const Divider(height: 24, thickness: 0.5),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    height: 48,
-                                    child: ElevatedButton.icon(
-                                      onPressed: _useFoundProfile,
-                                      icon: Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill), size: 20),
-                                      label: Text(
-                                        isUrdu ? 'یہ معلومات استعمال کریں' : 'Use this information',
-                                        style: TextStyle(
-                                          fontFamily: fontFamily,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.green,
-                                        foregroundColor: Colors.white,
-                                        elevation: 0,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                      ),
-                                    ),
+                                  AppButton(
+                                    text: isUrdu ? 'یہ معلومات استعمال کریں' : 'Use this information',
+                                    onPressed: _useFoundProfile,
+                                    icon: PhosphorIcons.checkCircle(PhosphorIconsStyle.fill),
+                                    isFullWidth: true,
+                                    color: Colors.green,
+                                    size: AppButtonSize.large,
                                   ),
                                 ],
                               ],
@@ -372,19 +264,12 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Container(
-                          height: 54,
-                          child: ElevatedButton(
-                            onPressed: () => _showPhoneSelectionDialog(isUrdu, fontFamily, fontWeight),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.darkColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-                              elevation: 0,
-                            ),
-                            child: Icon(PhosphorIcons.addressBook()),
-                          ),
+                        AppButton(
+                          onPressed: () => _showPhoneSelectionDialog(isUrdu, fontFamily, fontWeight),
+                          icon: PhosphorIcons.addressBook(),
+                          text: '',
+                          color: AppTheme.darkColor,
+                          size: AppButtonSize.large,
                         ),
                       ],
                     ),
@@ -402,33 +287,14 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                     const SizedBox(height: 40),
               
                     // Save Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed: _saveParty,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.darkColor,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-                          elevation: 0,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(PhosphorIcons.floppyDisk(), size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              l10n.save,
-                              style: TextStyle(
-                                fontFamily: fontFamily,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    AppButton(
+                      text: l10n.save,
+                      onPressed: _saveParty,
+                      icon: PhosphorIcons.floppyDisk(),
+                      isFullWidth: true,
+                      size: AppButtonSize.large,
+                      color: AppTheme.darkColor,
+                      isLoading: _isLoading,
                     ),
                   ],
                 ),
@@ -624,7 +490,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
           address: null,
           category: _selectedCategory,
           initialBalance: 0.0,
-          balanceType: 'credit',
+          balanceType: 'receivable',
           balance: 0.0,
           profileImage: finalImagePath,
           createdAt: DateTime.now(),

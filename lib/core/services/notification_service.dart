@@ -85,19 +85,23 @@ class NotificationService with ChangeNotifier {
       // Trigger local notification for NEW arrivals while app is foreground
       for (var change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.added) {
-          final data = change.doc.data() as Map<String, dynamic>?;
-          if (data != null) {
-            final notification = AppNotification.fromMap(data);
-            // Only show if it's less than 1 minute old (avoids old data triggering on load)
-            if (DateTime.now().difference(notification.timestamp).inMinutes <
-                1) {
-              _showLocalNotificationRaw(
-                title: notification.title,
-                body: notification.message,
-                payload: notification.type.name,
-                dataPayload: notification.data,
-              );
+          try {
+            final data = change.doc.data() as Map<String, dynamic>?;
+            if (data != null) {
+              final notification = AppNotification.fromMap(data);
+              // Only show if it's less than 1 minute old (avoids old data triggering on load)
+              if (DateTime.now().difference(notification.timestamp).inMinutes <
+                  1) {
+                _showLocalNotificationRaw(
+                  title: notification.title,
+                  body: notification.message,
+                  payload: notification.type.name,
+                  dataPayload: notification.data,
+                );
+              }
             }
+          } catch (e) {
+            debugPrint('Error showing local notification for new arrival: $e');
           }
         }
       }
@@ -351,27 +355,33 @@ class NotificationService with ChangeNotifier {
     required String artisanUid,
     required String customerName,
     required String workDescription,
+    double? budget,
+    DateTime? expectedDate,
   }) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
     try {
       final String requestId = "${currentUser.uid}_$artisanUid";
+      final String formattedDate = expectedDate != null ? "${expectedDate.day}/${expectedDate.month}/${expectedDate.year}" : "";
 
       await _firestore.collection('artisan_requests').doc(requestId).set({
         'customerUid': currentUser.uid,
         'artisanUid': artisanUid,
         'status': 'pending',
         'workDescription': workDescription,
+        'budget': budget,
+        'expectedDate': expectedDate,
         'timestamp': FieldValue.serverTimestamp(),
       });
 
+      String budgetText = budget != null ? " (بجٹ: Rs. ${budget.toStringAsFixed(0)})" : "";
+      
       final notifId = "artisan_req_${DateTime.now().millisecondsSinceEpoch}";
       final notification = AppNotification(
         id: notifId,
-        title: 'کام کی درخواست',
-        message:
-            '$customerName آپ سے کام کے بارے میں پوچھ رہے ہیں۔ کیا آپ دستیاب ہیں؟',
+        title: 'کام کی نئی درخواست',
+        message: '$customerName: $workDescription$budgetText',
         type: NotificationType.general,
         isRead: false,
         timestamp: DateTime.now(),
@@ -381,11 +391,12 @@ class NotificationService with ChangeNotifier {
           'senderUid': currentUser.uid,
           'senderPhone': currentUser.phoneNumber,
           'senderPhotoUrl': currentUser.photoURL,
-          'isSenderVerified': currentUser.emailVerified,
           'artisanUid': artisanUid,
           'customerUid': currentUser.uid,
           'requestId': requestId,
           'workDescription': workDescription,
+          'budget': budget?.toString(),
+          'expectedDate': expectedDate?.toIso8601String(),
           'status': 'pending',
           'needsAction': true,
         },
@@ -491,13 +502,13 @@ class NotificationService with ChangeNotifier {
       final notifId = "quote_${DateTime.now().millisecondsSinceEpoch}";
       final notification = AppNotification(
         id: notifId,
-        title: 'قیمت کی تفصیل',
-        message: '$artisanName نے آپ کے کام کے لیے Rs. $amount کی قیمت دی ہے۔',
+        title: '💰 قیمت دی گئی ہے!',
+        message: '$artisanName نے آپ کے کام کے لیے Rs. $amount کی قیمت بتائی ہے۔',
         type: NotificationType.general,
         isRead: false,
         timestamp: DateTime.now(),
         data: {
-          'type': 'artisan_quote',
+          'type': 'quote_received',
           'artisanName': artisanName,
           'artisanUid': currentUser.uid,
           'amount': amount,

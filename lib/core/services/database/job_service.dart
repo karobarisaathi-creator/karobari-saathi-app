@@ -15,8 +15,12 @@ class JobService extends BaseService {
     await _firestore.collection('jobs').doc(job.id).set(job.toMap());
   }
 
+  Future<void> deleteJob(String jobId) async {
+    await _firestore.collection('jobs').doc(jobId).delete();
+  }
+
   // ============================================================
-  // 2. تمام کھلے کام (کاریگر کے لیے)
+  // 2. تمام کھلے کام (کاریگر کے لیے) - ریئل ٹائم
   // ====================
   Stream<List<JobPost>> getOpenJobs() {
     return _firestore
@@ -27,6 +31,31 @@ class JobService extends BaseService {
         .map((snapshot) => snapshot.docs
             .map((doc) => JobPost.fromMap(doc.data()))
             .toList());
+  }
+
+  // ============================================================
+  // 2b. پیجینیشن کے ساتھ کام لوڈ کریں (ایکس کی طرح)
+  // ====================
+  Future<QuerySnapshot<Map<String, dynamic>>> getJobsBatch({
+    required int limit,
+    DocumentSnapshot? startAfter,
+    String? category,
+  }) async {
+    Query<Map<String, dynamic>> query = _firestore
+        .collection('jobs')
+        .where('status', isEqualTo: 'open')
+        .orderBy('createdAt', descending: true)
+        .limit(limit);
+
+    if (category != null && category != 'all') {
+      query = query.where('category', isEqualTo: category);
+    }
+
+    if (startAfter != null) {
+      query = query.startAfterDocument(startAfter);
+    }
+
+    return await query.get();
   }
 
   // ============================================================
@@ -47,15 +76,45 @@ class JobService extends BaseService {
   // 4. بولی لگائیں (کاریگر)
   // ====================
   Future<void> placeBid(JobBid bid) async {
-    final batch = _firestore.batch();
+    final bidRef = _firestore.collection('jobs').doc(bid.jobId).collection('bids').doc(bid.artisanId);
     
-    final bidRef = _firestore.collection('jobs').doc(bid.jobId).collection('bids').doc(bid.id);
+    // Check if bid already exists
+    final doc = await bidRef.get();
+    final bool exists = doc.exists;
+
+    final batch = _firestore.batch();
     batch.set(bidRef, bid.toMap());
 
-    final jobRef = _firestore.collection('jobs').doc(bid.jobId);
-    batch.update(jobRef, {'bidCount': FieldValue.increment(1)});
+    if (!exists) {
+      final jobRef = _firestore.collection('jobs').doc(bid.jobId);
+      batch.update(jobRef, {'bidCount': FieldValue.increment(1)});
+    }
 
     await batch.commit();
+  }
+
+  Future<JobBid?> getArtisanBid(String jobId, String artisanId) async {
+    final doc = await _firestore
+        .collection('jobs')
+        .doc(jobId)
+        .collection('bids')
+        .doc(artisanId)
+        .get();
+    
+    if (doc.exists && doc.data() != null) {
+      return JobBid.fromMap(doc.data()!);
+    }
+    return null;
+  }
+
+  Stream<bool> hasArtisanBid(String jobId, String artisanId) {
+    return _firestore
+        .collection('jobs')
+        .doc(jobId)
+        .collection('bids')
+        .doc(artisanId)
+        .snapshots()
+        .map((doc) => doc.exists);
   }
 
   // ============================================================

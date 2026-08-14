@@ -121,121 +121,139 @@ class _ProfessionDetailScreenState extends State<ProfessionDetailScreen> {
     final languageService = Provider.of<LanguageService>(context);
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-    final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
 
-    // We rely on _profession fields now as they are recalculated in _loadData
-    final totalIncome = _profession.totalIncome;
-    final totalExpense = _profession.totalExpense;
-    final netProfit = _profession.netProfit;
+    return Consumer<DatabaseService>(
+      builder: (context, databaseService, child) {
+        // Get the most up-to-date profession object from the DB
+        final latestProfession = databaseService.getProfession(_profession.id) ?? _profession;
+        
+        // Get all transactions for this profession
+        final allTransactions = databaseService.getAllTransactions();
+        final professionTransactions = allTransactions
+            .where((t) => t.professionId == latestProfession.id)
+            .toList();
+        
+        // Sort: newest first
+        professionTransactions.sort((a, b) => b.date.compareTo(a.date));
 
-    final filteredTransactions = _transactions.where((t) {
-      final matchesSearch = t.description.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          t.category.toLowerCase().contains(_searchQuery.toLowerCase());
-      return matchesSearch;
-    }).toList();
+        final filteredTransactions = professionTransactions.where((t) {
+          final matchesSearch = t.description.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              t.category.toLowerCase().contains(_searchQuery.toLowerCase());
+          return matchesSearch;
+        }).toList();
 
-    if (_isAscending) {
-      filteredTransactions.sort((a, b) => a.date.compareTo(b.date));
-    } else {
-      filteredTransactions.sort((a, b) => b.date.compareTo(a.date));
-    }
+        if (_isAscending) {
+          filteredTransactions.sort((a, b) => a.date.compareTo(b.date));
+        }
 
-    return Scaffold(
-      backgroundColor: AppTheme.lightColor,
-      appBar: CustomAppBar(
-        title: _profession.name,
-        actions: [
-          IconButton(
-            icon: Icon(PhosphorIcons.plusCircle()),
-            onPressed: () => _navigateToCategoriesScreen(isUrdu),
-            tooltip: isUrdu ? 'زمرے مینج کریں' : 'Manage Categories',
+        // Real-time totals for the summary card
+        double totalIncome = 0;
+        double totalExpense = 0;
+        for (var t in professionTransactions) {
+          if (t.type == 'income') {
+            totalIncome += t.amount;
+          } else {
+            totalExpense += t.amount;
+          }
+        }
+        final netProfit = totalIncome - totalExpense;
+
+        return Scaffold(
+          backgroundColor: AppTheme.lightColor,
+          appBar: CustomAppBar(
+            title: latestProfession.name,
+            actions: [
+              IconButton(
+                icon: Icon(PhosphorIcons.plusCircle()),
+                onPressed: () => _navigateToCategoriesScreen(isUrdu),
+                tooltip: isUrdu ? 'زمرے مینج کریں' : 'Manage Categories',
+              ),
+            ],
           ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.themeColor))
-          : SingleChildScrollView(
-              child: Column(
-                children: [
-                  // Summary Card
-                  _buildNewSummaryCard(isUrdu, fontFamily, totalIncome, totalExpense, netProfit),
+          body: SingleChildScrollView(
+            child: Column(
+              children: [
+                // Summary Card (Now using local live totals)
+                _buildNewSummaryCard(latestProfession, isUrdu, fontFamily, totalIncome, totalExpense, netProfit),
 
-                  // Search & Filter Bar
-                  SearchSortBar(
-                    controller: _searchController,
-                    onSearchChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                      });
-                    },
-                    onSortToggled: () {
-                      setState(() {
-                        _isAscending = !_isAscending;
-                      });
-                    },
-                    isAscending: _isAscending,
-                  ),
+                // Search & Filter Bar
+                SearchSortBar(
+                  controller: _searchController,
+                  onSearchChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                  onSortToggled: () {
+                    setState(() {
+                      _isAscending = !_isAscending;
+                    });
+                  },
+                  isAscending: _isAscending,
+                ),
 
-                  // Transactions List Card
-                  if (filteredTransactions.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: filteredTransactions.length,
-                        separatorBuilder: (context, index) => Divider(
-                          color: AppTheme.darkColor.withOpacity(0.4),
-                          height: 1,
-                          thickness: 1.0,
-                        ),
-                        itemBuilder: (context, index) {
-                          return _buildTransactionItem(filteredTransactions[index], isUrdu, fontFamily);
-                        },
+                // Transactions List Card
+                if (filteredTransactions.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: filteredTransactions.length,
+                      separatorBuilder: (context, index) => Divider(
+                        color: AppTheme.darkColor.withOpacity(0.4),
+                        height: 1,
+                        thickness: 1.0,
                       ),
-                    )
-                  else
-                    Padding(
-                      padding: const EdgeInsets.all(48.0),
-                      child: Column(
-                        children: [
-                          Icon(PhosphorIcons.receipt(), size: 64, color: Colors.grey[400]),
-                          const SizedBox(height: 16),
-                          Text(
-                            isUrdu ? 'کوئی ٹرانزیکشن نہیں' : 'No Transactions',
-                            style: TextStyle(fontSize: 16, color: Colors.grey[600], fontFamily: fontFamily),
-                          ),
-                        ],
-                      ),
+                      itemBuilder: (context, index) {
+                        return _buildTransactionItem(filteredTransactions[index], isUrdu, fontFamily);
+                      },
                     ),
-                    
-                  const SizedBox(height: 80), // More space for FAB
-                ],
-              ),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.all(48.0),
+                    child: Column(
+                      children: [
+                        Icon(PhosphorIcons.receipt(), size: 64, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          isUrdu ? 'کوئی ٹرانزیکشن نہیں' : 'No Transactions',
+                          style: TextStyle(fontSize: 16, color: Colors.grey[600], fontFamily: fontFamily),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                const SizedBox(height: 80), // More space for FAB
+              ],
             ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'profession_detail_fab',
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AddProfessionTransactionScreen(
-                profession: _profession,
-                incomeCategories: _incomeCategories,
-                expenseCategories: _expenseCategories,
-              ),
-            ),
-          ).then((_) => _loadData());
-        },
-        backgroundColor: AppTheme.darkColor,
-        shape: const CircleBorder(),
-        elevation: 4,
-        child: Icon(PhosphorIcons.plus(), color: Colors.white, size: 30),
-      ),
+          ),
+          floatingActionButton: FloatingActionButton(
+            heroTag: 'profession_detail_fab',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AddProfessionTransactionScreen(
+                    profession: latestProfession,
+                    incomeCategories: _incomeCategories,
+                    expenseCategories: _expenseCategories,
+                  ),
+                ),
+              );
+            },
+            backgroundColor: AppTheme.darkColor,
+            shape: const CircleBorder(),
+            elevation: 4,
+            child: Icon(PhosphorIcons.plus(), color: Colors.white, size: 30),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildNewSummaryCard(bool isUrdu, String fontFamily, double totalIncome, double totalExpense, double netProfit) {
+  Widget _buildNewSummaryCard(Profession profession, bool isUrdu, String fontFamily, double totalIncome, double totalExpense, double netProfit) {
     // Profit Status Logic
     final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
     String profitStatus = netProfit >= 0
@@ -271,9 +289,9 @@ class _ProfessionDetailScreenState extends State<ProfessionDetailScreen> {
                       fontFamily: fontFamily,
                     ),
                   ),
-                  if (_profession.season.isNotEmpty)
+                  if (profession.season.isNotEmpty)
                     Text(
-                      _profession.season,
+                      profession.season,
                       style: TextStyle(
                         color: AppTheme.textSecondary,
                         fontSize: 12,
@@ -315,15 +333,15 @@ class _ProfessionDetailScreenState extends State<ProfessionDetailScreen> {
             ],
           ),
 
-          if (_profession.totalProduction > 0) ...[
+          if (profession.totalProduction > 0) ...[
             const SizedBox(height: 16),
             const Divider(height: 1, thickness: 0.5),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildSummaryItem('Cost/لاگت', _profession.costPerUnit, AppTheme.darkColor, fontFamily, fontWeight, PhosphorIcons.tag()),
-                _buildSummaryItem('Profit/منافع', _profession.profitPerUnit, AppTheme.darkColor, fontFamily, fontWeight, PhosphorIcons.trendUp()),
+                _buildSummaryItem('Cost/لاگت', profession.costPerUnit, AppTheme.darkColor, fontFamily, fontWeight, PhosphorIcons.tag()),
+                _buildSummaryItem('Profit/منافع', profession.profitPerUnit, AppTheme.darkColor, fontFamily, fontWeight, PhosphorIcons.trendUp()),
               ],
             ),
           ],
@@ -371,6 +389,10 @@ class _ProfessionDetailScreenState extends State<ProfessionDetailScreen> {
     final bool isIncome = transaction.type == 'income';
     final Color amountColor = isIncome ? AppTheme.incomeColor : AppTheme.expenseColor;
     final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
+
+    final db = Provider.of<DatabaseService>(context, listen: false);
+    final account = db.getAccount(transaction.accountId);
+    final accountName = account?.name ?? (isUrdu ? 'نامعلوم پارٹی' : 'Unknown Party');
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
@@ -429,13 +451,35 @@ class _ProfessionDetailScreenState extends State<ProfessionDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                transaction.category,
-                style: TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontFamily: fontFamily,
-                  fontWeight: fontWeight,
-                  fontSize: 12,
+              Expanded(
+                child: Row(
+                  children: [
+                    Text(
+                      transaction.category,
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontFamily: fontFamily,
+                        fontWeight: fontWeight,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(width: 4, height: 4, decoration: BoxDecoration(color: Colors.grey.shade400, shape: BoxShape.circle)),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        accountName,
+                        style: TextStyle(
+                          color: AppTheme.themeColor,
+                          fontFamily: fontFamily,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Text(

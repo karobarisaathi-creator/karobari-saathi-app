@@ -12,6 +12,17 @@ class TransactionService extends BaseService {
     await transactionsBox?.put(transaction.id, transaction);
     await _accountService.recalculateAccountBalance(transaction.accountId);
     if (transaction.professionId != null) await _professionService.recalculateProfessionFinance(transaction.professionId!);
+    
+    // Explicit Cloud Sync
+    if (auth.currentUser != null) {
+      await firestore
+          .collection('users')
+          .doc(auth.currentUser!.uid)
+          .collection('transactions')
+          .doc(transaction.id)
+          .set(transaction.toMap());
+    }
+    
     notifyListeners();
   }
 
@@ -19,10 +30,22 @@ class TransactionService extends BaseService {
     final oldTransaction = transactionsBox?.get(transaction.id);
     await transactionsBox?.put(transaction.id, transaction);
     await _accountService.recalculateAccountBalance(transaction.accountId);
+    
     if (transaction.professionId != null) await _professionService.recalculateProfessionFinance(transaction.professionId!);
     if (oldTransaction?.professionId != null && oldTransaction?.professionId != transaction.professionId) {
       await _professionService.recalculateProfessionFinance(oldTransaction!.professionId!);
     }
+
+    // Explicit Cloud Update
+    if (auth.currentUser != null) {
+      await firestore
+          .collection('users')
+          .doc(auth.currentUser!.uid)
+          .collection('transactions')
+          .doc(transaction.id)
+          .update(transaction.toMap());
+    }
+
     notifyListeners();
   }
 

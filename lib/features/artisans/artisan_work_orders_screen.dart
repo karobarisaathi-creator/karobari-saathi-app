@@ -14,6 +14,7 @@ import 'package:account_app/core/models/dispute_model.dart';
 import 'package:account_app/core/services/artisan_pro_service.dart';
 import 'package:account_app/features/artisans/widgets/work_agreement_dialog.dart';
 import 'package:account_app/core/services/notification_service.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 import 'package:share_plus/share_plus.dart';
 
 class ArtisanWorkOrdersScreen extends StatefulWidget {
@@ -240,14 +241,11 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
   }
 
   Widget _buildActionButton({required VoidCallback onPressed, required String label, required Color color, required String fontFamily}) {
-    return ElevatedButton(
+    return AppButton(
+      text: label,
       onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-      child: Text(label, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: fontFamily, fontSize: 12)),
+      color: color,
+      size: AppButtonSize.small,
     );
   }
 
@@ -292,7 +290,8 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
             onPressed: () => Navigator.pop(context), 
             child: Text(isUrdu ? 'کینسل' : 'Cancel', style: TextStyle(fontFamily: fontFamily))
           ),
-          ElevatedButton(
+          AppButton(
+            text: isUrdu ? 'بھیجیں' : 'Send',
             onPressed: () async {
               final amount = double.tryParse(quoteController.text);
               if (amount != null && amount > 0) {
@@ -326,8 +325,8 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
                 if (mounted) Navigator.pop(context);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.themeColor),
-            child: Text(isUrdu ? 'بھیجیں' : 'Send', style: TextStyle(color: Colors.white, fontFamily: fontFamily, fontWeight: FontWeight.bold)),
+            color: AppTheme.themeColor,
+            size: AppButtonSize.small,
           ),
         ],
       ),
@@ -378,7 +377,8 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text(isUrdu ? 'کینسل' : 'Cancel', style: TextStyle(fontFamily: fontFamily)),
           ),
-          ElevatedButton(
+          AppButton(
+            text: isUrdu ? 'درج کریں' : 'Submit',
             onPressed: () async {
               final dispute = Dispute(
                 id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -407,8 +407,8 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
                 );
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            child: Text(isUrdu ? 'درج کریں' : 'Submit', style: TextStyle(color: Colors.white, fontFamily: fontFamily, fontWeight: FontWeight.bold)),
+            color: Colors.orange,
+            size: AppButtonSize.small,
           ),
         ],
       ),

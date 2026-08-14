@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
@@ -10,9 +11,9 @@ import 'package:account_app/features/artisans/widgets/job_post_card.dart';
 import 'place_bid_screen.dart';
 import 'post_job_screen.dart';
 import 'package:account_app/core/services/artisan_service.dart';
-import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:account_app/core/services/job_algorithm_service.dart';
+import 'dart:ui' as ui;
 
 class BrowseJobsScreen extends StatefulWidget {
   const BrowseJobsScreen({super.key});
@@ -21,16 +22,35 @@ class BrowseJobsScreen extends StatefulWidget {
   State<BrowseJobsScreen> createState() => _BrowseJobsScreenState();
 }
 
-class _BrowseJobsScreenState extends State<BrowseJobsScreen> {
+class _BrowseJobsScreenState extends State<BrowseJobsScreen> with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
+  final ScrollController _scrollController = ScrollController();
+  
+  List<JobPost> _jobs = [];
+  DocumentSnapshot? _lastDocument;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
   String _selectedCategory = 'all';
-  bool _isFirstLoad = true;
+  bool _isInitialLoading = true;
+  
+  late AnimationController _shimmerController;
+  final int _batchSize = 10;
 
   @override
   void initState() {
     super.initState();
-    _setInitialCategory();
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+
+    _scrollController.addListener(_onScroll);
+    _initData();
+  }
+
+  Future<void> _initData() async {
+    await _setInitialCategory();
+    await _fetchJobs(isRefresh: true);
   }
 
   Future<void> _setInitialCategory() async {
@@ -39,25 +59,89 @@ class _BrowseJobsScreenState extends State<BrowseJobsScreen> {
 
     final profile = await ArtisanService().getProfile(user.uid);
     if (profile != null && mounted) {
+      _selectedCategory = profile.profession;
+    }
+  }
+
+  Future<void> _fetchJobs({bool isRefresh = false}) async {
+    if (_isLoadingMore) return;
+
+    if (mounted) {
       setState(() {
-        _selectedCategory = profile.profession;
-        _isFirstLoad = false;
+        if (isRefresh) {
+          _isInitialLoading = true;
+          _jobs = [];
+          _lastDocument = null;
+          _hasMore = true;
+        }
+        _isLoadingMore = true;
       });
-    } else if (mounted) {
-      setState(() => _isFirstLoad = false);
+    }
+
+    try {
+      final snapshot = await JobService().getJobsBatch(
+        limit: _batchSize,
+        startAfter: _lastDocument,
+        category: _selectedCategory,
+      );
+
+      if (snapshot.docs.isNotEmpty) {
+        _lastDocument = snapshot.docs.last;
+        final newJobs = snapshot.docs.map((doc) => JobPost.fromMap(doc.data())).toList();
+        
+        // Filter out expired jobs locally
+        final now = DateTime.now();
+        final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+        
+        final validJobs = newJobs.where((j) => j.customerId == currentUserId || j.deadline.isAfter(now)).toList();
+
+        if (mounted) {
+          setState(() {
+            _jobs.addAll(validJobs);
+            
+            // 🔥 یہاں الگورتھم استعمال ہو رہا ہے
+            // جیسے ہی نیا ڈیٹا آتا ہے، ہم پوری لسٹ کو دوبارہ "سمارٹ سورٹ" کرتے ہیں
+            final algorithm = JobAlgorithmService();
+            _jobs = algorithm.applySmartSort(_jobs, _selectedCategory, currentUserId);
+            
+            _hasMore = snapshot.docs.length == _batchSize;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() => _hasMore = false);
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching jobs: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isInitialLoading = false;
+          _isLoadingMore = false;
+        });
+      }
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (_hasMore && !_isLoadingMore) {
+        _fetchJobs();
+      }
     }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
+    _shimmerController.dispose();
     super.dispose();
   }
 
   void _showCategoryPicker(bool isUrdu, String fontFamily) {
     final professions = ArtisanService.getProfessions();
-    
-    // Group professions by category
     final Map<String, List<Map<String, dynamic>>> groupedProfessions = {};
     for (var p in professions) {
       final cat = isUrdu ? p['categoryUrdu'] : p['category'];
@@ -84,8 +168,7 @@ class _BrowseJobsScreenState extends State<BrowseJobsScreen> {
             children: [
               Container(
                 margin: const EdgeInsets.symmetric(vertical: 12),
-                width: 40,
-                height: 4,
+                width: 40, height: 4,
                 decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
               ),
               Text(
@@ -108,7 +191,8 @@ class _BrowseJobsScreenState extends State<BrowseJobsScreen> {
                             title: Text(isUrdu ? 'تمام کام' : 'All Jobs', style: TextStyle(fontFamily: fontFamily, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
                             selected: isSelected,
                             onTap: () {
-                              setState(() => _selectedCategory = 'all');
+                              _selectedCategory = 'all';
+                              _fetchJobs(isRefresh: true);
                               Navigator.pop(context);
                             },
                           ),
@@ -131,7 +215,8 @@ class _BrowseJobsScreenState extends State<BrowseJobsScreen> {
                             leading: Icon(p['icon'], color: isSelected ? AppTheme.themeColor : Colors.grey),
                             title: Text(isUrdu ? p['name'] : p['id'], style: TextStyle(fontFamily: fontFamily, fontSize: 13)),
                             onTap: () {
-                              setState(() => _selectedCategory = p['id']!);
+                              _selectedCategory = p['id']!;
+                              _fetchJobs(isRefresh: true);
                               Navigator.pop(context);
                             },
                           );
@@ -174,62 +259,42 @@ class _BrowseJobsScreenState extends State<BrowseJobsScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: _isFirstLoad 
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-        children: [
-          Expanded(
-            child: StreamBuilder<List<JobPost>>(
-              stream: JobService().getOpenJobs(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                var jobs = snapshot.data ?? [];
-                final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-                final algorithm = JobAlgorithmService();
-                
-                // 1. میعاد ختم ہونے والی جابز چھپائیں (صرف دوسروں کی)
-                final now = DateTime.now();
-                jobs = jobs.where((j) => j.customerId == currentUserId || j.deadline.isAfter(now)).toList();
-
-                // 2. کیٹیگری فلٹر (Client side)
-                if (_selectedCategory != 'all') {
-                  jobs = jobs.where((j) => j.category == _selectedCategory).toList();
-                }
-
-                // 3. سمارٹ سورٹنگ (AI Logic)
-                // ہم چیک کرتے ہیں کہ کیا صارف کاریگر ہے تاکہ اس کے پیشے کے مطابق ڈیٹا دکھائیں
-                String? artisanProfession;
-                if (_selectedCategory != 'all') {
-                  artisanProfession = _selectedCategory;
-                }
-
-                jobs = algorithm.applySmartSort(jobs, artisanProfession, currentUserId);
-
-                if (jobs.isEmpty) return _buildEmptyState(isUrdu, fontFamily);
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: jobs.length,
-                  itemBuilder: (context, index) {
-                    final job = jobs[index];
-                    return JobPostCard(
-                      job: job,
-                      isUrdu: isUrdu,
-                      fontFamily: fontFamily,
-                      currentUserId: FirebaseAuth.instance.currentUser?.uid ?? '',
-                      onBidTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => PlaceBidScreen(job: job)));
-                      },
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
+      body: RefreshIndicator(
+        onRefresh: () => _fetchJobs(isRefresh: true),
+        color: AppTheme.themeColor,
+        child: _isInitialLoading 
+            ? _buildShimmerLoading() 
+            : _jobs.isEmpty 
+                ? _buildEmptyState(isUrdu, fontFamily)
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _jobs.length + (_hasMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index < _jobs.length) {
+                        final job = _jobs[index];
+                        return JobPostCard(
+                          job: job,
+                          isUrdu: isUrdu,
+                          fontFamily: fontFamily,
+                          currentUserId: FirebaseAuth.instance.currentUser?.uid ?? '',
+                          onBidTap: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => PlaceBidScreen(job: job)));
+                          },
+                        );
+                      } else {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 32),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppTheme.themeColor.withValues(alpha: 0.5),
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
       ),
     );
   }
@@ -273,16 +338,103 @@ class _BrowseJobsScreenState extends State<BrowseJobsScreen> {
   }
 
   Widget _buildEmptyState(bool isUrdu, String fontFamily) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(PhosphorIcons.megaphone(), size: 64, color: Colors.grey[300]),
-          const SizedBox(height: 16),
-          Text(isUrdu ? 'کوئی کام دستیاب نہیں' : 'No jobs available',
-              style: TextStyle(
-                  fontSize: 18, color: Colors.grey, fontFamily: fontFamily)),
-        ],
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(PhosphorIcons.megaphone(), size: 64, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text(isUrdu ? 'کوئی کام دستیاب نہیں' : 'No jobs available',
+                style: TextStyle(
+                    fontSize: 18, color: Colors.grey, fontFamily: fontFamily)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShimmerLoading() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: 5,
+      itemBuilder: (context, index) => _buildShimmerCard(),
+    );
+  }
+
+  Widget _buildShimmerCard() {
+    return AnimatedBuilder(
+      animation: _shimmerController,
+      builder: (context, child) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey[200]!),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _shimmerBox(width: 40, height: 40, radius: 10),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _shimmerBox(width: 120, height: 12),
+                      const SizedBox(height: 6),
+                      _shimmerBox(width: 80, height: 10),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              _shimmerBox(width: double.infinity, height: 16),
+              const SizedBox(height: 8),
+              _shimmerBox(width: double.infinity, height: 16),
+              const SizedBox(height: 8),
+              _shimmerBox(width: 150, height: 16),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _shimmerBox(width: 100, height: 35, radius: 20),
+                  _shimmerBox(width: 100, height: 35, radius: 20),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _shimmerBox({required double width, required double height, double radius = 4}) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          stops: [
+            _shimmerController.value - 0.3,
+            _shimmerController.value,
+            _shimmerController.value + 0.3,
+          ],
+          colors: [
+            Colors.grey[200]!,
+            Colors.grey[100]!,
+            Colors.grey[200]!,
+          ],
+        ),
       ),
     );
   }

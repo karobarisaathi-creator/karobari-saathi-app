@@ -7,6 +7,7 @@ import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 import 'package:intl/intl.dart';
 import 'profile_info_widget.dart';
 
@@ -31,7 +32,6 @@ class NotificationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isTransaction = notification.type == NotificationType.transaction && notification.data != null;
-    final bool isPriceDrop = notification.type == NotificationType.price_drop;
     final bool isSystem = notification.type == NotificationType.system;
     final data = notification.data;
     final bool isAdded = data?['isAdded'] == true;
@@ -45,8 +45,8 @@ class NotificationCard extends StatelessWidget {
         color: notification.isRead ? const Color(0xFFF8F9FA) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isPriceDrop || isSystem ? AppTheme.themeColor.withOpacity(0.2) : AppTheme.darkColor.withOpacity(0.05), 
-          width: isPriceDrop || isSystem ? 1.5 : 1
+          color: isSystem ? AppTheme.themeColor.withOpacity(0.2) : AppTheme.darkColor.withOpacity(0.05), 
+          width: isSystem ? 1.5 : 1
         ),
         boxShadow: [
           BoxShadow(
@@ -61,9 +61,7 @@ class NotificationCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Column(
           children: [
-            if (isPriceDrop)
-              _buildPriceDropHeader(isUrdu, fontFamily),
-            if (isSystem && !isPriceDrop)
+            if (isSystem)
               _buildSystemHeader(isUrdu, fontFamily),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -75,7 +73,7 @@ class NotificationCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: (isPriceDrop || isSystem)
+                        child: isSystem
                           ? _buildSystemIdentity(isUrdu)
                           : ProfileInfoWidget(
                               name: data?['senderName'] ?? data?['artisanName'] ?? (isUrdu ? 'صارف' : 'User'),
@@ -112,11 +110,11 @@ class NotificationCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   // 2. تحریر / عنوان
                   Padding(
-                    padding: EdgeInsets.only(left: (isPriceDrop || isSystem) ? 0 : 48), 
+                    padding: EdgeInsets.only(left: isSystem ? 0 : 48), 
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (notification.title.isNotEmpty && !isPriceDrop)
+                        if (notification.title.isNotEmpty)
                           Text(
                             _getTranslatedTitle(notification.title, isUrdu),
                             style: TextStyle(
@@ -150,6 +148,9 @@ class NotificationCard extends StatelessWidget {
                             ),
                           ),
                         ],
+                        // 🔥 Additional fields for Artisan Request (Budget & Date)
+                        if (data?['type'] == 'artisan_request' || data?['type'] == 'artisan_response')
+                          _buildRequestExtraInfo(data, isUrdu, fontFamily),
                       ],
                     ),
                   ),
@@ -160,61 +161,39 @@ class NotificationCard extends StatelessWidget {
             // 3. بٹن بار
             if (isTransaction || isArtisanRequest)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 child: Row(
                   children: [
                     if (isTransaction)
-                      ElevatedButton(
+                      AppButton(
+                        text: isAdded 
+                            ? (isUrdu ? 'کھاتے میں شامل ہے' : 'Added')
+                            : (isUrdu ? 'کھاتے میں شامل کریں' : 'Add to Ledger'),
+                        variant: AppButtonVariant.outlined,
+                        size: AppButtonSize.small, // 🔥 Fixed Small (38px)
+                        color: isAdded ? Colors.grey : AppTheme.themeColor,
                         onPressed: isAdded ? null : onAddPressed,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isAdded ? Colors.grey.shade400 : AppTheme.themeColor,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: Text(
-                          isAdded 
-                              ? (isUrdu ? 'کھاتے میں شامل ہے' : 'Added')
-                              : (isUrdu ? 'کھاتے میں شامل کریں' : 'Add to Ledger'),
-                          style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 12),
-                        ),
                       ),
                     if (data?['type'] == 'artisan_request') ...[
-                      if (!isResponded)
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  onPressed: () => _respondToRequest(context, true),
-                                  icon: const Icon(Icons.check, size: 16),
-                                  label: Text(isUrdu ? 'ہاں' : 'Yes', style: TextStyle(fontFamily: fontFamily)),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppTheme.incomeColor,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  onPressed: () => _respondToRequest(context, false),
-                                  icon: const Icon(Icons.close, size: 16),
-                                  label: Text(isUrdu ? 'ناں' : 'No', style: TextStyle(fontFamily: fontFamily)),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppTheme.expenseColor,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      else
+                      if (!isResponded) ...[
+                        AppButton(
+                          text: isUrdu ? 'ہاں' : 'Yes',
+                          icon: Icons.check,
+                          variant: AppButtonVariant.outlined,
+                          size: AppButtonSize.small, // 🔥 Fixed Small (38px)
+                          color: AppTheme.incomeColor,
+                          onPressed: () => _respondToRequest(context, true),
+                        ),
+                        const SizedBox(width: 8),
+                        AppButton(
+                          text: isUrdu ? 'ناں' : 'No',
+                          icon: Icons.close,
+                          variant: AppButtonVariant.outlined,
+                          size: AppButtonSize.small, // 🔥 Fixed Small (38px)
+                          color: AppTheme.expenseColor,
+                          onPressed: () => _respondToRequest(context, false),
+                        ),
+                      ] else
                         _buildStatusIndicator(isAccepted, isUrdu, fontFamily),
                     ],
                     const Spacer(),
@@ -232,23 +211,15 @@ class NotificationCard extends StatelessWidget {
   }
 
   Widget _buildStatusIndicator(bool isAccepted, bool isUrdu, String fontFamily) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: isAccepted ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        isAccepted 
-            ? (isUrdu ? 'منظور شدہ' : 'Accepted')
-            : (isUrdu ? 'معذرت کی گئی' : 'Declined'),
-        style: TextStyle(
-          color: isAccepted ? Colors.green : Colors.red,
-          fontWeight: FontWeight.bold,
-          fontSize: 12,
-          fontFamily: fontFamily,
-        ),
-      ),
+    final color = isAccepted ? Colors.green : Colors.red;
+    return AppButton(
+      text: isAccepted 
+          ? (isUrdu ? 'منظور شدہ' : 'Accepted')
+          : (isUrdu ? 'معذرت کی گئی' : 'Declined'),
+      onPressed: null,
+      variant: AppButtonVariant.outlined,
+      size: AppButtonSize.small,
+      color: color,
     );
   }
 
@@ -273,26 +244,6 @@ class NotificationCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPriceDropHeader(bool isUrdu, String fontFamily) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-      decoration: BoxDecoration(
-        color: AppTheme.incomeColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
-      ),
-      child: Row(
-        children: [
-          Icon(PhosphorIcons.trendDown(PhosphorIconsStyle.bold), color: Colors.white, size: 14),
-          const SizedBox(width: 8),
-          Text(
-            isUrdu ? 'قیمت میں بڑی کمی!' : 'Big Price Drop!',
-            style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: fontFamily),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildSystemIdentity(bool isUrdu) {
     return Row(
@@ -383,5 +334,74 @@ class NotificationCard extends StatelessWidget {
         ),
       );
     }
+  }
+
+  Widget _buildRequestExtraInfo(Map<String, dynamic>? data, bool isUrdu, String fontFamily) {
+    if (data == null) return const SizedBox.shrink();
+
+    final budget = data['budget'];
+    final expectedDateStr = data['expectedDate'];
+    DateTime? expectedDate;
+    if (expectedDateStr != null) expectedDate = DateTime.tryParse(expectedDateStr);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          if (budget != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.green.withOpacity(0.2)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(PhosphorIcons.money(), size: 14, color: Colors.green[700]),
+                  const SizedBox(width: 4),
+                  Text(
+                    "Rs. $budget",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green[700],
+                      fontFamily: '',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (expectedDate != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.blue.withOpacity(0.2)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(PhosphorIcons.calendar(), size: 14, color: Colors.blue[700]),
+                  const SizedBox(width: 4),
+                  Text(
+                    Formatters.formatDate(expectedDate),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue[700],
+                      fontFamily: '',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }

@@ -8,6 +8,7 @@ import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 
 class AddProfessionTransactionScreen extends StatefulWidget {
   final Profession profession;
@@ -301,32 +302,24 @@ class _AddProfessionTransactionScreenState extends State<AddProfessionTransactio
                     Row(
                       children: [
                         Expanded(
-                          child: ElevatedButton.icon(
+                          child: AppButton(
+                            text: isUrdu ? 'آمدنی' : 'Income',
                             onPressed: () => _saveTransaction('income'),
-                            icon: Icon(PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold), color: Colors.white),
-                            label: Text(isUrdu ? 'آمدنی' : 'Income', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 16)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.incomeColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-                            ),
+                            icon: PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold),
+                            color: AppTheme.incomeColor,
+                            size: AppButtonSize.large,
+                            isFullWidth: true,
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: ElevatedButton.icon(
+                          child: AppButton(
+                            text: isUrdu ? 'خرچ' : 'Expense',
                             onPressed: () => _saveTransaction('expense'),
-                            icon: Icon(PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold), color: Colors.white),
-                            label: Text(isUrdu ? 'خرچ' : 'Expense', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 16)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.expenseColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-                            ),
+                            icon: PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold),
+                            color: AppTheme.expenseColor,
+                            size: AppButtonSize.large,
+                            isFullWidth: true,
                           ),
                         ),
                       ],

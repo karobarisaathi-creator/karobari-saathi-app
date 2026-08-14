@@ -17,6 +17,7 @@ import 'package:account_app/core/services/artisan_work_order_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/widgets/artisan_rating_stars.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 import 'artisan_work_orders_screen.dart';
 import 'artisan_reviews_screen.dart';
 import 'artisan_profile_screen.dart';
@@ -164,60 +165,151 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
 
   void _sendWorkRequest(bool isUrdu) async {
     final descriptionController = TextEditingController();
+    final budgetController = TextEditingController();
+    DateTime? selectedDate;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          isUrdu ? 'کام کی تفصیل لکھیں' : 'Work Details',
-          style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              isUrdu
-                  ? 'کاریگر کو بتائیں کہ آپ کیا کام کروانا چاہتے ہیں۔'
-                  : 'Tell the artisan what you want to get done.',
-              style: TextStyle(fontSize: 14, fontFamily: fontFamily, color: Colors.grey[600]),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(
+            isUrdu ? 'کام کی تفصیلات' : 'Work Details',
+            style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildDialogTextField(
+                  controller: descriptionController,
+                  label: isUrdu ? 'کیا کام کروانا ہے؟' : 'Description of work',
+                  hint: isUrdu ? 'مثلاً: پنکھا ٹھیک کرنا ہے...' : 'e.g. Fixing a fan...',
+                  maxLines: 3,
+                  isUrdu: isUrdu,
+                  fontFamily: fontFamily,
+                ),
+                const SizedBox(height: 12),
+                _buildDialogTextField(
+                  controller: budgetController,
+                  label: isUrdu ? 'تخمینی بجٹ (Rs.)' : 'Estimated Budget (Rs.)',
+                  isNumber: true,
+                  isUrdu: isUrdu,
+                  fontFamily: fontFamily,
+                ),
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now().add(const Duration(days: 1)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 90)),
+                    );
+                    if (date != null) setDialogState(() => selectedDate = date);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.grey[50],
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(PhosphorIcons.calendar(), size: 20, color: AppTheme.themeColor),
+                        const SizedBox(width: 10),
+                        Text(
+                          selectedDate == null 
+                            ? (isUrdu ? 'تاریخ منتخب کریں' : 'Select Date')
+                            : Formatters.formatDate(selectedDate!),
+                          style: TextStyle(fontFamily: fontFamily, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descriptionController,
-              maxLines: 4,
-              decoration: InputDecoration(
-                hintText: isUrdu ? 'مثلاً: پنکھا ٹھیک کرنا ہے، نلکا لیک ہے وغیرہ' : 'e.g. Fixing a fan, leaking tap, etc.',
-                hintStyle: TextStyle(fontSize: 13, fontFamily: fontFamily),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Colors.grey[50],
-              ),
+          ),
+          actions: [
+            AppButton(
+              text: isUrdu ? 'کینسل' : 'Cancel',
+              variant: AppButtonVariant.ghost,
+              color: Colors.grey[600],
+              onPressed: () => Navigator.pop(context),
+            ),
+            const SizedBox(width: 8),
+            AppButton(
+              text: isUrdu ? 'درخواست بھیجیں' : 'Send Request',
+              color: AppTheme.themeColor,
+              variant: AppButtonVariant.primary,
+              onPressed: () async {
+                if (descriptionController.text.trim().isEmpty) return;
+                Navigator.pop(context);
+                _processSendRequest(
+                  isUrdu, 
+                  descriptionController.text.trim(),
+                  double.tryParse(budgetController.text),
+                  selectedDate,
+                );
+              },
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(isUrdu ? 'کینسل' : 'Cancel', style: TextStyle(fontFamily: fontFamily)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (descriptionController.text.trim().isEmpty) return;
-              Navigator.pop(context);
-              _processSendRequest(isUrdu, descriptionController.text.trim());
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.themeColor),
-            child: Text(isUrdu ? 'درخواست بھیجیں' : 'Send Request',
-                style: TextStyle(fontFamily: fontFamily, color: Colors.white)),
-          ),
-        ],
       ),
     );
   }
 
-  void _processSendRequest(bool isUrdu, String workDescription) async {
+  Widget _buildDialogTextField({
+    required TextEditingController controller,
+    required String label,
+    String? hint,
+    int maxLines = 1,
+    bool isNumber = false,
+    required bool isUrdu,
+    required String fontFamily,
+  }) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      style: TextStyle(
+        color: AppTheme.darkColor, 
+        fontFamily: isNumber ? '' : fontFamily, 
+        fontSize: 16,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        labelStyle: TextStyle(
+          fontFamily: isUrdu ? 'NooriNastaleeq' : '', 
+          color: Colors.grey.shade600, 
+          fontSize: 13, 
+          fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal
+        ),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        fillColor: const Color(0xFFF5F7F9),
+        filled: true,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0), 
+          borderSide: BorderSide(color: Colors.grey.shade400)
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0), 
+          borderSide: BorderSide(color: Colors.grey.shade400)
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0), 
+          borderSide: const BorderSide(color: AppTheme.themeColor, width: 1)
+        ),
+      ),
+    );
+  }
+
+  void _processSendRequest(bool isUrdu, String workDescription, double? budget, DateTime? date) async {
     setState(() => _isSending = true);
     final nService = Provider.of<NotificationService>(context, listen: false);
     final user = FirebaseAuth.instance.currentUser;
@@ -227,6 +319,8 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
         artisanUid: widget.artisanId,
         customerName: user?.displayName ?? (isUrdu ? 'ایک گاہک' : 'A Customer'),
         workDescription: workDescription,
+        budget: budget,
+        expectedDate: date,
       );
 
       if (mounted) {
@@ -308,12 +402,17 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
             ],
           ),
           actions: [
-            TextButton(
+            AppButton(
+              text: isUrdu ? 'کینسل' : 'Cancel',
+              variant: AppButtonVariant.ghost,
+              color: Colors.grey[600],
               onPressed: () => Navigator.pop(context),
-              child: Text(isUrdu ? 'کینسل' : 'Cancel',
-                  style: TextStyle(fontFamily: fontFamily)),
             ),
-            ElevatedButton(
+            const SizedBox(width: 8),
+            AppButton(
+              text: isUrdu ? 'جمع کریں' : 'Submit',
+              color: AppTheme.themeColor,
+              variant: AppButtonVariant.primary,
               onPressed: () async {
                 if (commentController.text.trim().isEmpty) return;
 
@@ -337,11 +436,6 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
                   );
                 }
               },
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.themeColor),
-              child: Text(isUrdu ? 'جمع کریں' : 'Submit',
-                  style:
-                      TextStyle(fontFamily: fontFamily, color: Colors.white)),
             ),
           ],
         ),
@@ -386,56 +480,14 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
       icon = PhosphorIcons.arrowClockwise();
     }
 
-    return InkWell(
-      onTap: (_isSending || isPending || isAccepted)
+    return AppButton(
+      text: btnText,
+      icon: icon,
+      color: btnColor,
+      size: AppButtonSize.large,
+      onPressed: (_isSending || isPending || isAccepted)
           ? null
           : () => _sendWorkRequest(isUrdu),
-      borderRadius: BorderRadius.circular(8),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: BoxDecoration(
-          color: btnColor,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: (_isSending || isPending || isAccepted)
-              ? null
-              : [
-                  BoxShadow(
-                    color: btnColor.withOpacity(0.3),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  )
-                ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_isSending)
-              const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                    color: Colors.white, strokeWidth: 2),
-              )
-            else ...[
-              if (icon != null) ...[
-                Icon(icon, color: Colors.white, size: 16),
-                const SizedBox(width: 6),
-              ],
-              Text(
-                btnText,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: fontFamily,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 
@@ -685,40 +737,22 @@ Check out this artisan on Karobari Saathi!
       child: Row(
         children: [
           Expanded(
-            child: ElevatedButton.icon(
+            child: AppButton(
               onPressed: _callArtisan,
-              icon: Icon(PhosphorIcons.phone(PhosphorIconsStyle.fill)),
-              label: Text(
-                isUrdu ? 'کال کریں' : 'Call',
-                style: TextStyle(fontFamily: fontFamily),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+              icon: PhosphorIcons.phone(PhosphorIconsStyle.fill),
+              text: isUrdu ? 'کال کریں' : 'Call',
+              color: Colors.green,
+              size: AppButtonSize.large,
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: ElevatedButton.icon(
+            child: AppButton(
               onPressed: _whatsappArtisan,
-              icon: Icon(PhosphorIcons.whatsappLogo(PhosphorIconsStyle.fill)),
-              label: Text(
-                isUrdu ? 'واٹس ایپ' : 'WhatsApp',
-                style: TextStyle(fontFamily: fontFamily),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF25D366),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+              icon: PhosphorIcons.whatsappLogo(PhosphorIconsStyle.fill),
+              text: isUrdu ? 'واٹس ایپ' : 'WhatsApp',
+              color: const Color(0xFF25D366),
+              size: AppButtonSize.large,
             ),
           ),
         ],
@@ -897,24 +931,13 @@ Check out this artisan on Karobari Saathi!
           if (_requestStatus == 'accepted' && !isOwner)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _showAddReviewDialog(isUrdu, fontFamily),
-                  icon: Icon(PhosphorIcons.pencilLine(), size: 18),
-                  label: Text(
-                    isUrdu ? 'اپنی رائے دیں' : 'Write a Review',
-                    style: TextStyle(
-                        fontFamily: fontFamily, fontWeight: FontWeight.bold),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.themeColor,
-                    side:
-                        BorderSide(color: AppTheme.themeColor.withOpacity(0.5)),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
+              child: AppButton(
+                text: isUrdu ? 'اپنی رائے دیں' : 'Write a Review',
+                onPressed: () => _showAddReviewDialog(isUrdu, fontFamily),
+                icon: PhosphorIcons.pencilLine(),
+                color: AppTheme.themeColor,
+                isFullWidth: true,
+                size: AppButtonSize.large,
               ),
             ),
           // یہاں ریویوز کی لسٹ دکھائی جائے گی
@@ -975,7 +998,13 @@ Check out this artisan on Karobari Saathi!
           children: [
             if (!isVerified) ...[
               Expanded(
-                child: ElevatedButton.icon(
+                child: AppButton(
+                  text: isPending
+                      ? (isUrdu ? 'تصدیق جاری ہے...' : 'Verifying...')
+                      : (isUrdu ? 'تصدیق کروائیں' : 'Verify Now'),
+                  icon: isPending ? PhosphorIcons.clock() : PhosphorIcons.shieldCheck(),
+                  color: isPending ? Colors.grey : AppTheme.verifiedGold,
+                  size: AppButtonSize.large,
                   onPressed: isPending
                       ? null
                       : () {
@@ -989,31 +1018,15 @@ Check out this artisan on Karobari Saathi!
                             ),
                           ).then((_) => _loadData());
                         },
-                  icon: Icon(isPending
-                      ? PhosphorIcons.clock()
-                      : PhosphorIcons.shieldCheck()),
-                  label: Text(
-                    isPending
-                        ? (isUrdu ? 'تصدیق جاری ہے...' : 'Verifying...')
-                        : (isUrdu ? 'تصدیق کروائیں' : 'Verify Now'),
-                    style: TextStyle(fontFamily: fontFamily),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        isPending ? Colors.grey[400] : AppTheme.verifiedGold,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    disabledBackgroundColor: Colors.grey[300],
-                  ),
                 ),
               ),
               const SizedBox(width: 12),
             ],
             Expanded(
-              child: ElevatedButton.icon(
+              child: AppButton(
+                text: isUrdu ? 'میرے کام' : 'My Works',
+                icon: PhosphorIcons.listBullets(),
+                size: AppButtonSize.large,
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -1023,19 +1036,6 @@ Check out this artisan on Karobari Saathi!
                     ),
                   );
                 },
-                icon: Icon(PhosphorIcons.listBullets()),
-                label: Text(
-                  isUrdu ? 'میرے کام' : 'My Works',
-                  style: TextStyle(fontFamily: fontFamily),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.themeColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
               ),
             ),
           ],
@@ -1095,52 +1095,28 @@ Check out this artisan on Karobari Saathi!
                   ),
                   const SizedBox(width: 10),
                 ],
-                // In-App Chat Button (Always visible for customers)
+                // In-App Chat Button
                 Expanded(
                   flex: 2,
-                  child: ElevatedButton.icon(
+                  child: AppButton(
+                    text: isUrdu ? 'چیٹ' : 'Chat',
+                    icon: PhosphorIcons.chatCircleDots(PhosphorIconsStyle.fill),
+                    color: AppTheme.darkColor,
+                    size: AppButtonSize.large,
                     onPressed: _openInAppChat,
-                    icon: Icon(
-                        PhosphorIcons.chatCircleDots(PhosphorIconsStyle.fill),
-                        size: 20),
-                    label: Text(
-                      isUrdu ? 'چیٹ' : 'Chat',
-                      style: TextStyle(
-                          fontFamily: fontFamily, fontWeight: FontWeight.bold),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.darkColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
                   ),
                 ),
               ],
             ),
             if (isAccepted) ...[
               const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _whatsappArtisan,
-                  icon: Icon(
-                      PhosphorIcons.whatsappLogo(PhosphorIconsStyle.fill),
-                      size: 22),
-                  label: Text(
-                    isUrdu ? 'واٹس ایپ پر رابطہ کریں' : 'Contact on WhatsApp',
-                    style: TextStyle(
-                        fontFamily: fontFamily, fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF25D366),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
+              AppButton(
+                text: isUrdu ? 'واٹس ایپ پر رابطہ کریں' : 'Contact on WhatsApp',
+                icon: PhosphorIcons.whatsappLogo(PhosphorIconsStyle.fill),
+                color: const Color(0xFF25D366),
+                isFullWidth: true,
+                size: AppButtonSize.large,
+                onPressed: _whatsappArtisan,
               ),
             ],
           ],

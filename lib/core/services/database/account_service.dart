@@ -5,11 +5,33 @@ import 'base_service.dart';
 class AccountService extends BaseService {
   Future<void> addAccount(Account account) async {
     await accountsBox?.put(account.id, account);
+    
+    // Explicit Cloud Sync
+    if (auth.currentUser != null) {
+      await firestore
+          .collection('users')
+          .doc(auth.currentUser!.uid)
+          .collection('accounts')
+          .doc(account.id)
+          .set(account.toMap());
+    }
+    
     notifyListeners();
   }
 
   Future<void> updateAccount(Account account) async {
     await accountsBox?.put(account.id, account);
+
+    // Explicit Cloud Sync
+    if (auth.currentUser != null) {
+      await firestore
+          .collection('users')
+          .doc(auth.currentUser!.uid)
+          .collection('accounts')
+          .doc(account.id)
+          .update(account.toMap());
+    }
+
     notifyListeners();
   }
 
@@ -34,9 +56,9 @@ class AccountService extends BaseService {
     final account = accountsBox?.get(accountId);
     if (account != null) {
       final transactions = transactionsBox?.values.where((t) => t.accountId == accountId).toList() ?? [];
-      double pendingIncome = transactions.where((t) => t.type == 'income').fold(0.0, (sum, t) => sum + t.pendingAmount);
-      double pendingExpense = transactions.where((t) => t.type == 'expense').fold(0.0, (sum, t) => sum + t.pendingAmount);
-      double newBalance = account.initialBalance + pendingIncome - pendingExpense;
+      double income = transactions.where((t) => t.type == 'income').fold(0.0, (sum, t) => sum + t.amount);
+      double expense = transactions.where((t) => t.type == 'expense').fold(0.0, (sum, t) => sum + t.amount);
+      double newBalance = income - expense;
       await accountsBox?.put(account.id, account.copyWith(balance: newBalance));
     }
   }

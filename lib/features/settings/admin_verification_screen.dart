@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 
 class AdminVerificationScreen extends StatefulWidget {
   const AdminVerificationScreen({super.key});
@@ -128,11 +129,11 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
                 onPressed: () => Navigator.pop(context),
                 child: Text('منسوخ',
                     style: TextStyle(color: AppTheme.textSecondary))),
-            ElevatedButton(
+            AppButton(
+              text: 'مسترد کریں',
               onPressed: () => Navigator.pop(context, _noteController.text),
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.expenseColor),
-              child: const Text('مسترد کریں'),
+              color: AppTheme.expenseColor,
+              size: AppButtonSize.small,
             ),
           ],
         ),
@@ -232,73 +233,58 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
             ),
           ),
           const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton.icon(
-              onPressed: _isBroadcastSending
-                  ? null
-                  : () async {
-                      if (_broadcastTitleController.text.isEmpty ||
-                          _broadcastMessageController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content:
-                                const Text('عنوان اور پیغام دونوں ضروری ہیں'),
-                            backgroundColor: AppTheme.expenseColor,
-                          ),
-                        );
-                        return;
-                      }
+          AppButton(
+            text: 'براڈکاسٹ بھیجیں',
+            onPressed: () async {
+              if (_broadcastTitleController.text.isEmpty ||
+                  _broadcastMessageController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content:
+                        const Text('عنوان اور پیغام دونوں ضروری ہیں'),
+                    backgroundColor: AppTheme.expenseColor,
+                  ),
+                );
+                return;
+              }
 
-                      setState(() => _isBroadcastSending = true);
-                      try {
-                        await Provider.of<VerificationService>(context,
-                                listen: false)
-                            .sendBroadcastNotification(
-                          title: _broadcastTitleController.text,
-                          message: _broadcastMessageController.text,
-                        );
-                        _broadcastTitleController.clear();
-                        _broadcastMessageController.clear();
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content:
-                                  Text('تمام صارفین کو پیغام بھیج دیا گیا ہے'),
-                              backgroundColor: AppTheme.incomeColor,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              backgroundColor: AppTheme.expenseColor,
-                              content: Text('خرابی: $e'),
-                            ),
-                          );
-                        }
-                      } finally {
-                        if (mounted)
-                          setState(() => _isBroadcastSending = false);
-                      }
-                    },
-              icon: _isBroadcastSending
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2),
-                    )
-                  : Icon(
-                      PhosphorIcons.paperPlaneRight(PhosphorIconsStyle.fill)),
-              label: const Text('براڈکاسٹ بھیجیں'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.themeColor,
-                foregroundColor: Colors.white,
-              ),
-            ),
+              setState(() => _isBroadcastSending = true);
+              try {
+                await Provider.of<VerificationService>(context,
+                        listen: false)
+                    .sendBroadcastNotification(
+                  title: _broadcastTitleController.text,
+                  message: _broadcastMessageController.text,
+                );
+                _broadcastTitleController.clear();
+                _broadcastMessageController.clear();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content:
+                          Text('تمام صارفین کو پیغام بھیج دیا گیا ہے'),
+                      backgroundColor: AppTheme.incomeColor,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: AppTheme.expenseColor,
+                      content: Text('خرابی: $e'),
+                    ),
+                  );
+                }
+              } finally {
+                if (mounted)
+                  setState(() => _isBroadcastSending = false);
+              }
+            },
+            icon: PhosphorIcons.paperPlaneRight(PhosphorIconsStyle.fill),
+            isLoading: _isBroadcastSending,
+            isFullWidth: true,
+            size: AppButtonSize.large,
           ),
         ],
       ),
@@ -576,22 +562,21 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
       color: Colors.grey[50],
       child: Row(children: [
         Expanded(
-            child: ElevatedButton.icon(
+            child: AppButton(
+                text: 'مسترد',
                 onPressed: () => _process(uid, false),
-                icon: Icon(PhosphorIcons.xCircle()),
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: AppTheme.expenseColor,
-                    side: BorderSide(color: AppTheme.expenseColor)),
-                label: const Text('مسترد'))),
+                icon: PhosphorIcons.xCircle(),
+                variant: AppButtonVariant.outlined,
+                color: AppTheme.expenseColor,
+                size: AppButtonSize.small)),
         const SizedBox(width: 12),
         Expanded(
-            child: ElevatedButton.icon(
+            child: AppButton(
+                text: 'منظور',
                 onPressed: () => _process(uid, true),
-                icon: Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill)),
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.verifiedGold),
-                label: const Text('منظور'))),
+                icon: PhosphorIcons.checkCircle(PhosphorIconsStyle.fill),
+                color: AppTheme.verifiedGold,
+                size: AppButtonSize.small)),
       ]),
     );
   }

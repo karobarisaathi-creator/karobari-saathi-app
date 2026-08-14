@@ -8,6 +8,7 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 
 class BulkPartyTransactionScreen extends StatefulWidget {
   final Account? party;
@@ -425,27 +426,13 @@ class _BulkPartyTransactionScreenState extends State<BulkPartyTransactionScreen>
             padding: const EdgeInsets.all(16),
             width: double.infinity,
             color: Colors.white,
-            child: ElevatedButton(
-              onPressed: _isSaving ? null : _saveAllTransactions,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.themeColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: _isSaving
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(PhosphorIcons.checkCircle(), color: Colors.white),
-                        const SizedBox(width: 10),
-                        Text(
-                          isUrdu ? 'تمام ٹرانزیکشنز محفوظ کریں' : 'Save All Transactions',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: fontFamily),
-                        ),
-                      ],
-                    ),
+            child: AppButton(
+              text: isUrdu ? 'تمام ٹرانزیکشنز محفوظ کریں' : 'Save All Transactions',
+              onPressed: _saveAllTransactions,
+              icon: PhosphorIcons.checkCircle(),
+              isLoading: _isSaving,
+              isFullWidth: true,
+              size: AppButtonSize.large,
             ),
           ),
         ],

@@ -13,6 +13,7 @@ import 'package:account_app/core/models/artisan_work_order_model.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/features/artisans/widgets/work_agreement_dialog.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 import 'artisan_detail_screen.dart';
 
 class CustomerOrdersScreen extends StatefulWidget {
@@ -233,15 +234,12 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
                     ),
 
                   if (needsCustomerApproval)
-                    ElevatedButton.icon(
+                    AppButton(
+                      text: isUrdu ? 'منظور کریں' : 'Approve Deal',
                       onPressed: () => _showApproveDialog(order, isUrdu, fontFamily),
-                      icon: const Icon(Icons.check_circle_outline, size: 18),
-                      label: Text(isUrdu ? 'منظور کریں' : 'Approve Deal', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.incomeColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
+                      icon: Icons.check_circle_outline,
+                      color: AppTheme.incomeColor,
+                      size: AppButtonSize.small,
                     ),
 
                   if (order.status == 'completed' || order.status == 'rated')

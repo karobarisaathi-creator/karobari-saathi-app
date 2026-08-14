@@ -7,6 +7,7 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 
 class BalanceAlertScreen extends StatefulWidget {
   final Account party;
@@ -214,48 +215,24 @@ Please verify. Thanks.""";
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton.icon(
+                  child: AppButton(
+                    text: 'SMS',
                     onPressed: () => _sendSMS(context),
-                    icon: Icon(
-                        PhosphorIcons.chatTeardropDots(PhosphorIconsStyle.bold),
-                        size: 20),
-                    label: Text(
-                      'SMS',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontFamily: '',
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueGrey,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.0)),
-                    ),
+                    icon: PhosphorIcons.chatTeardropDots(PhosphorIconsStyle.bold),
+                    color: Colors.blueGrey,
+                    size: AppButtonSize.large,
+                    isFullWidth: true,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: ElevatedButton.icon(
+                  child: AppButton(
+                    text: 'WhatsApp',
                     onPressed: () => _sendWhatsApp(context),
-                    icon: Icon(
-                        PhosphorIcons.whatsappLogo(PhosphorIconsStyle.bold),
-                        size: 20),
-                    label: Text(
-                      'WhatsApp',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontFamily: '',
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green, // WhatsApp Green
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.0)),
-                    ),
+                    icon: PhosphorIcons.whatsappLogo(PhosphorIconsStyle.bold),
+                    color: Colors.green,
+                    size: AppButtonSize.large,
+                    isFullWidth: true,
                   ),
                 ),
               ],

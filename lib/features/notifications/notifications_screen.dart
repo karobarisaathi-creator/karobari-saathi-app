@@ -77,14 +77,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
 
-    final notificationService =
-        Provider.of<NotificationService>(context, listen: false);
+    try {
+      final notificationService =
+          Provider.of<NotificationService>(context, listen: false);
 
-    // Force a fresh fetch/listener restart
-    await notificationService.loadFromCloud();
+      // Force a fresh fetch/listener restart
+      await notificationService.loadFromCloud();
 
-    // Give it a moment to sync from Firestore before hiding spinner
-    await Future.delayed(const Duration(milliseconds: 1500));
+      // Give a small moment for initial data if needed, but don't block indefinitely
+      await Future.delayed(const Duration(milliseconds: 500));
+    } catch (e) {
+      debugPrint('Error loading notifications: $e');
+    }
 
     if (mounted) {
       setState(() {
@@ -100,106 +104,119 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
     
-    final notifications = notificationService.notifications;
-    final unreadCount = notificationService.unreadCount;
+    return Consumer<NotificationService>(
+      builder: (context, notificationService, child) {
+        final notifications = notificationService.notifications;
+        final unreadCount = notificationService.unreadCount;
 
-    return Scaffold(
-      backgroundColor: AppTheme.lightColor,
-      appBar: CustomAppBar(
-        title: isUrdu ? 'نوٹیفیکیشن' : 'Notifications',
-        showBackButton: true,
-        onBackPressed: () {
-          if (Navigator.canPop(context)) {
-            Navigator.pop(context);
-          } else {
-            Navigator.pushReplacementNamed(context, '/');
-          }
-        },
-        elevation: 1,
-        actions: [
-          if (unreadCount > 0)
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppTheme.darkColor.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  unreadCount.toString(),
-                  style: TextStyle(
-                    color: AppTheme.lightColor,
-                    fontSize: 13,
-                    fontWeight: FontWeight.normal,
-                  ),
-                ),
-              ),
-            ),
-          IconButton(
-            icon: Icon(PhosphorIcons.dotsThreeVertical()),
-            onPressed: () => _showActionMenu(
-                context, isUrdu, fontFamily, notificationService),
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.themeColor))
-          : notifications.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                                color: AppTheme.darkColor.withOpacity(0.05))),
-                        child: Icon(PhosphorIcons.bellSlash(),
-                            size: 48,
-                            color: AppTheme.darkColor.withOpacity(0.5)),
+        return Scaffold(
+          backgroundColor: AppTheme.lightColor,
+          appBar: CustomAppBar(
+            title: isUrdu ? 'نوٹیفیکیشن' : 'Notifications',
+            showBackButton: true,
+            onBackPressed: () {
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              } else {
+                Navigator.pushReplacementNamed(context, '/');
+              }
+            },
+            elevation: 1,
+            actions: [
+              if (unreadCount > 0)
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.darkColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      unreadCount.toString(),
+                      style: TextStyle(
+                        color: AppTheme.lightColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.normal,
                       ),
-                      const SizedBox(height: 24),
-                      Text(isUrdu ? 'کوئی نوٹیفیکیشن نہیں' : 'No Notifications',
-                          style: TextStyle(
-                              fontSize: 18,
-                              color: AppTheme.darkColor,
-                              fontWeight:
-                                  isUrdu ? FontWeight.bold : FontWeight.normal,
-                              fontFamily: fontFamily)),
-                      const SizedBox(height: 8),
-                      Text(
-                          isUrdu
-                              ? 'تمام نوٹیفیکیشنز یہاں نظر آئیں گی'
-                              : 'All notifications will appear here',
-                          style: TextStyle(
-                              color: AppTheme.textSecondary,
-                              fontFamily: fontFamily)),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadAllNotifications,
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 12),
-                    children: [
-                      if (_updateData != null) ...[
-                        _buildUpdateCard(isUrdu, fontFamily),
-                        const SizedBox(height: 16),
-                      ],
-                      ...notifications
-                          .map((n) => _buildNotificationCard(
-                              n, isUrdu, fontFamily, notificationService))
-                          .toList(),
-                    ],
+                    ),
                   ),
                 ),
+              IconButton(
+                icon: Icon(PhosphorIcons.dotsThreeVertical()),
+                onPressed: () => _showActionMenu(
+                    context, isUrdu, fontFamily, notificationService),
+              ),
+            ],
+          ),
+          body: _isLoading && notifications.isEmpty
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppTheme.themeColor))
+              : (notifications.isEmpty && _updateData == null)
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: AppTheme.darkColor.withOpacity(0.05))),
+                            child: Icon(PhosphorIcons.bellSlash(),
+                                size: 48,
+                                color: AppTheme.darkColor.withOpacity(0.5)),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(isUrdu ? 'کوئی نوٹیفیکیشن نہیں' : 'No Notifications',
+                              style: TextStyle(
+                                  fontSize: 18,
+                                  color: AppTheme.darkColor,
+                                  fontWeight:
+                                      isUrdu ? FontWeight.bold : FontWeight.normal,
+                                  fontFamily: fontFamily)),
+                          const SizedBox(height: 8),
+                          Text(
+                              isUrdu
+                                  ? 'تمام نوٹیفیکیشنز یہاں نظر آئیں گی'
+                                  : 'All notifications will appear here',
+                              style: TextStyle(
+                                  color: AppTheme.textSecondary,
+                                  fontFamily: fontFamily)),
+                        ],
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadAllNotifications,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
+                        itemCount: (notifications.length) + (_updateData != null ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (_updateData != null && index == 0) {
+                            return Column(
+                              children: [
+                                _buildUpdateCard(isUrdu, fontFamily),
+                                const SizedBox(height: 16),
+                              ],
+                            );
+                          }
+                          
+                          final nIndex = _updateData != null ? index - 1 : index;
+                          if (nIndex < 0 || nIndex >= notifications.length) return const SizedBox.shrink();
+                          
+                          final n = notifications[nIndex];
+                          
+                          return _buildNotificationCard(
+                            n, isUrdu, fontFamily, notificationService);
+                        },
+                      ),
+                    ),
+        );
+      },
     );
   }
 
@@ -292,11 +309,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         foregroundColor: AppTheme.themeColor,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 6),
-                        minimumSize: Size.zero,
+                            horizontal: 20, vertical: 0),
+                        minimumSize: const Size(0, 38),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(25)),
+                            borderRadius: BorderRadius.circular(20)),
                       ),
                       child: Text(
                         isUrdu ? 'ابھی اپ ڈیٹ کریں' : 'Update Now',
@@ -314,11 +331,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         foregroundColor: Colors.white,
                         side: const BorderSide(color: Colors.white70, width: 1),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 6),
-                        minimumSize: Size.zero,
+                            horizontal: 16, vertical: 0),
+                        minimumSize: const Size(0, 38),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(25)),
+                            borderRadius: BorderRadius.circular(20)),
                       ),
                       child: Text(
                         isUrdu ? 'بند کریں' : 'Dismiss',

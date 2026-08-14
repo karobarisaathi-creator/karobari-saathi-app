@@ -10,6 +10,7 @@ import 'package:account_app/core/models/job_bid_model.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/artisan_rating_stars.dart';
 import 'package:account_app/core/services/notification_service.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class JobBidsScreen extends StatelessWidget {
@@ -125,13 +126,11 @@ class JobBidsScreen extends StatelessWidget {
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
                 const Spacer(),
-                ElevatedButton(
+                AppButton(
+                  text: isUrdu ? 'قبول کریں' : 'Accept',
                   onPressed: () => _showAcceptConfirmation(context, bid, isUrdu, fontFamily),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.themeColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: Text(isUrdu ? 'قبول کریں' : 'Accept', style: const TextStyle(color: Colors.white)),
+                  color: AppTheme.themeColor,
+                  size: AppButtonSize.small,
                 ),
               ],
             ),
@@ -154,7 +153,8 @@ class JobBidsScreen extends StatelessWidget {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: Text(isUrdu ? 'نہیں' : 'No')),
-          ElevatedButton(
+          AppButton(
+            text: isUrdu ? 'جی ہاں' : 'Yes',
             onPressed: () async {
               Navigator.pop(context);
               
@@ -190,7 +190,8 @@ class JobBidsScreen extends StatelessWidget {
                 );
               }
             },
-            child: Text(isUrdu ? 'جی ہاں' : 'Yes'),
+            color: AppTheme.themeColor,
+            size: AppButtonSize.small,
           ),
         ],
       ),

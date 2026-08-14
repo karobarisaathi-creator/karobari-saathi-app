@@ -21,6 +21,7 @@ class JobPostAdapter extends TypeAdapter<JobPost> {
       customerId: fields[1] as String,
       customerName: fields[2] as String,
       customerPhone: fields[3] as String,
+      customerPhotoUrl: fields[15] as String?,
       title: fields[4] as String,
       description: fields[5] as String,
       location: fields[6] as String,
@@ -38,7 +39,7 @@ class JobPostAdapter extends TypeAdapter<JobPost> {
   @override
   void write(BinaryWriter writer, JobPost obj) {
     writer
-      ..writeByte(15)
+      ..writeByte(16)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -68,7 +69,9 @@ class JobPostAdapter extends TypeAdapter<JobPost> {
       ..writeByte(13)
       ..write(obj.selectedBidId)
       ..writeByte(14)
-      ..write(obj.bidCount);
+      ..write(obj.bidCount)
+      ..writeByte(15)
+      ..write(obj.customerPhotoUrl);
   }
 
   @override

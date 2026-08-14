@@ -453,7 +453,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
               style: TextStyle(fontSize: 11, color: Colors.grey[700], fontWeight: FontWeight.bold, fontFamily: ''),
             ),
           ],
-          
+
           const SizedBox(width: 12),
 
           // Percentage & Arrow (Now on the left side)
@@ -485,7 +485,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
 
           // Price (Back to its original right-side position)
           Text(
-            'Rs ${history.price.toStringAsFixed(0)}', 
+            'Rs ${history.price.toStringAsFixed(0)}',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, fontFamily: ''),
           ),
         ],

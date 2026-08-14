@@ -10,6 +10,8 @@ import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
+import 'package:account_app/core/widgets/image_selector_field.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 
 class VerificationRequestScreen extends StatefulWidget {
   final bool isArtisanMode; // To customize labels if opened from Artisan profile
@@ -46,57 +48,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImage(String type) async {
-    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: Text(isUrdu ? 'کیمرہ' : 'Camera'),
-              onTap: () => Navigator.pop(context, ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: Text(isUrdu ? 'گیلری' : 'Gallery'),
-              onTap: () => Navigator.pop(context, ImageSource.gallery),
-            ),
-          ],
-        ),
-      ),
-    );
 
-    if (source != null) {
-      final pickedFile =
-          await _picker.pickImage(source: source, imageQuality: 70);
-      if (pickedFile != null) {
-        final croppedFile = await ImageCropper().cropImage(
-          sourcePath: pickedFile.path,
-          aspectRatio: type == 'shop' 
-              ? const CropAspectRatio(ratioX: 16, ratioY: 9)
-              : const CropAspectRatio(ratioX: 3, ratioY: 2),
-          uiSettings: [
-            AndroidUiSettings(
-              toolbarTitle: isUrdu ? 'تصویر تراشیں' : 'Crop Image',
-              toolbarColor: AppTheme.darkColor,
-              toolbarWidgetColor: Colors.white,
-            ),
-          ],
-        );
-
-        if (croppedFile != null) {
-          setState(() {
-            if (type == 'front') _cnicFront = File(croppedFile.path);
-            if (type == 'back') _cnicBack = File(croppedFile.path);
-            if (type == 'shop') _shopImage = File(croppedFile.path);
-          });
-        }
-      }
-    }
-  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -241,89 +193,59 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                     const SizedBox(height: 15),
 
                     // CNIC Front
-                    _buildImagePicker(
-                      image: _cnicFront,
+                    ImageSelectorField(
                       label: isUrdu ? 'شناختی کارڈ (سامنے کی تصویر)' : 'CNIC Front Side',
-                      onTap: () => _pickImage('front'),
-                      isUrdu: isUrdu,
-                      fontFamily: fontFamily,
+                      selectedFiles: _cnicFront != null ? [_cnicFront!] : [],
+                      onFilesChanged: (files) => setState(() => _cnicFront = files.isNotEmpty ? files.first : null),
+                      maxTotal: 1,
+                      isFullWidth: true,
+                      aspectRatio: 3 / 2,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
                     // CNIC Back
-                    _buildImagePicker(
-                      image: _cnicBack,
+                    ImageSelectorField(
                       label: isUrdu ? 'شناختی کارڈ (پیچھے کی تصویر)' : 'CNIC Back Side',
-                      onTap: () => _pickImage('back'),
-                      isUrdu: isUrdu,
-                      fontFamily: fontFamily,
+                      selectedFiles: _cnicBack != null ? [_cnicBack!] : [],
+                      onFilesChanged: (files) => setState(() => _cnicBack = files.isNotEmpty ? files.first : null),
+                      maxTotal: 1,
+                      isFullWidth: true,
+                      aspectRatio: 3 / 2,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
-                    // Shop Image (Optional for some, but good to have)
-                    _buildImagePicker(
-                      image: _shopImage,
-                      label: isUrdu
-                          ? 'دکان یا کام کی جگہ (اختیاری)'
-                          : 'Shop or Workplace (Optional)',
-                      onTap: () => _pickImage('shop'),
-                      isUrdu: isUrdu,
-                      fontFamily: fontFamily,
+                    // Shop Image
+                    ImageSelectorField(
+                      label: isUrdu ? 'دکان یا کام کی جگہ (اختیاری)' : 'Shop or Workplace (Optional)',
+                      selectedFiles: _shopImage != null ? [_shopImage!] : [],
+                      onFilesChanged: (files) => setState(() => _shopImage = files.isNotEmpty ? files.first : null),
+                      maxTotal: 1,
+                      isFullWidth: true,
+                      aspectRatio: 16 / 9,
                     ),
 
                     const SizedBox(height: 40),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 55,
-                      child: ElevatedButton(
-                        onPressed:
-                            service.currentStatus == VerificationStatus.approved
-                                ? null
-                                : _submit,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.darkColor,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                          elevation: 0,
-                        ),
-                        child: Text(
-                          service.currentStatus == VerificationStatus.approved
-                              ? (isUrdu
-                                  ? 'پہلے ہی تصدیق شدہ'
-                                  : 'Already Verified')
-                              : (isUrdu
-                                  ? 'درخواست جمع کروائیں'
-                                  : 'Submit Request'),
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: fontFamily,
-                              color: Colors.white),
-                        ),
-                      ),
+                    AppButton(
+                      text: service.currentStatus == VerificationStatus.approved
+                          ? (isUrdu ? 'پہلے ہی تصدیق شدہ' : 'Already Verified')
+                          : (isUrdu ? 'درخواست جمع کروائیں' : 'Submit Request'),
+                      onPressed: service.currentStatus == VerificationStatus.approved
+                          ? null
+                          : _submit,
+                      isFullWidth: true,
+                      size: AppButtonSize.large,
+                      color: AppTheme.darkColor,
                     ),
                     const SizedBox(height: 16),
                     if (service.currentStatus == VerificationStatus.pending ||
                         service.currentStatus == VerificationStatus.rejected)
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: OutlinedButton(
-                          onPressed: _cancelRequest,
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: Colors.red.shade400),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: Text(
-                            isUrdu ? 'درخواست منسوخ کریں' : 'Cancel Request',
-                            style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: fontFamily,
-                                color: Colors.red.shade700),
-                          ),
-                        ),
+                      AppButton(
+                        text: isUrdu ? 'درخواست منسوخ کریں' : 'Cancel Request',
+                        onPressed: _cancelRequest,
+                        variant: AppButtonVariant.outlined,
+                        isFullWidth: true,
+                        size: AppButtonSize.large,
+                        color: Colors.red.shade700,
                       ),
                     const SizedBox(height: 40),
                   ],
@@ -459,23 +381,37 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     return TextFormField(
       enabled: enabled,
       controller: controller,
-      style: const TextStyle(fontSize: 16),
+      style: TextStyle(
+        color: AppTheme.darkColor, 
+        fontFamily: fontFamily, 
+        fontSize: 16,
+      ),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        labelStyle: TextStyle(fontFamily: fontFamily, color: Colors.grey[600]),
-        prefixIcon: Icon(icon, color: AppTheme.themeColor),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        labelStyle: TextStyle(
+          fontFamily: isUrdu ? 'NooriNastaleeq' : '', 
+          color: Colors.grey.shade600, 
+          fontSize: 13, 
+          fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal
+        ),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        fillColor: const Color(0xFFF5F7F9),
+        filled: true,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0), 
+          borderSide: BorderSide(color: Colors.grey.shade400)
+        ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(12.0), 
+          borderSide: BorderSide(color: Colors.grey.shade400)
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppTheme.themeColor, width: 2),
+          borderRadius: BorderRadius.circular(12.0), 
+          borderSide: const BorderSide(color: AppTheme.themeColor, width: 1)
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        prefixIcon: Icon(icon, color: AppTheme.themeColor, size: 20),
       ),
       validator: (value) => (value == null || value.isEmpty)
           ? (isUrdu ? 'ضروری ہے' : 'Required')
@@ -483,42 +419,5 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     );
   }
 
-  Widget _buildImagePicker({
-    required File? image,
-    required String label,
-    required VoidCallback onTap,
-    required bool isUrdu,
-    required String fontFamily,
-    bool enabled = true,
-  }) {
-    return InkWell(
-      onTap: enabled ? onTap : null,
-      child: Container(
-        height: 150,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.grey[50],
-          borderRadius: BorderRadius.circular(12),
-          border:
-              Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
-        ),
-        child: image != null
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(11),
-                child: Image.file(image,
-                    fit: BoxFit.cover, width: double.infinity),
-              )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(PhosphorIcons.cameraPlus(), size: 40, color: Colors.grey[400]),
-                  const SizedBox(height: 10),
-                  Text(label,
-                      style: TextStyle(
-                          color: Colors.grey[600], fontFamily: fontFamily, fontSize: 12)),
-                ],
-              ),
-      ),
-    );
-  }
+
 }

@@ -9,6 +9,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/services/notification_service.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 import 'artisan_rating_stars.dart';
 
 import 'package:account_app/core/widgets/profile_info_widget.dart';
@@ -76,8 +77,8 @@ class _ArtisanCardState extends State<ArtisanCard> {
       child: Stack(
         children: [
           Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4), 
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
@@ -105,7 +106,7 @@ class _ArtisanCardState extends State<ArtisanCard> {
                   isVerticalCategory: true,
                   suffix: null,
                 ),
-                const Divider(height: 16, thickness: 0.5),
+                const Divider(height: 4, thickness: 0.5),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -219,54 +220,15 @@ class _ArtisanCardState extends State<ArtisanCard> {
       icon = PhosphorIcons.arrowClockwise();
     }
 
-    return InkWell(
-      onTap: (_isSending || isPending || isAccepted)
+    return AppButton(
+      text: btnText,
+      icon: icon,
+      variant: AppButtonVariant.outlined,
+      size: AppButtonSize.mini, // 🔥 Changed to Mini (30px)
+      color: btnColor,
+      onPressed: (_isSending || isPending || isAccepted)
           ? null
           : () => _sendRequest(context, isUrdu),
-      borderRadius: BorderRadius.circular(8),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: btnColor,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: (_isSending || isPending || isAccepted)
-              ? null
-              : [
-                  BoxShadow(
-                      color: btnColor.withOpacity(0.3),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2))
-                ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_isSending)
-              const SizedBox(
-                width: 12,
-                height: 12,
-                child: CircularProgressIndicator(
-                    color: Colors.white, strokeWidth: 2),
-              )
-            else ...[
-              if (icon != null) ...[
-                Icon(icon, color: Colors.white, size: 14),
-                const SizedBox(width: 4),
-              ],
-              Text(
-                btnText,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: fontFamily,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 

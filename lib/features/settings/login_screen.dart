@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/features/dashboard/dashboard_screen.dart';
 import 'package:account_app/features/dashboard/main_navigation_screen.dart';
 import 'settings_screen.dart';
@@ -303,42 +304,16 @@ class _LoginScreenState extends State<LoginScreen> {
                             SizedBox(height: 32),
 
                             // Action Button
-                            SizedBox(
-                              width: double.infinity,
-                              height: 58,
-                              child: ElevatedButton(
-                                onPressed: _isLoading ? null : _handleLogin,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _themeColor,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  elevation: 8,
-                                  shadowColor: _themeColor.withOpacity(0.5),
-                                ),
-                                child: _isLoading
-                                    ? SizedBox(
-                                        width: 26,
-                                        height: 26,
-                                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                                      )
-                                    : Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            _verificationId.isEmpty
-                                                ? (isUrdu ? 'کوڈ بھیجیں' : 'Send Code')
-                                                : (isUrdu ? 'تصدیق کریں' : 'Verify & Login'),
-                                            style: TextStyle(fontSize: 18, fontWeight: fontWeight, fontFamily: fontFamily),
-                                          ),
-                                          if (_verificationId.isEmpty) ...[
-                                            SizedBox(width: 12),
-                                            Icon(PhosphorIcons.arrowRight(), size: 20),
-                                          ]
-                                        ],
-                                      ),
-                              ),
+                            AppButton(
+                              text: _verificationId.isEmpty
+                                  ? (isUrdu ? 'کوڈ بھیجیں' : 'Send Code')
+                                  : (isUrdu ? 'تصدیق کریں' : 'Verify & Login'),
+                              onPressed: _handleLogin,
+                              icon: _verificationId.isEmpty ? PhosphorIcons.arrowRight() : null,
+                              isLoading: _isLoading,
+                              isFullWidth: true,
+                              size: AppButtonSize.large,
+                              color: _themeColor,
                             ),
                             
                             SizedBox(height: 24),

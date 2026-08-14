@@ -62,12 +62,37 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               // Name Input
               TextFormField(
                 controller: _nameController,
-                style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight),
+                style: TextStyle(
+                  color: AppTheme.darkColor, 
+                  fontFamily: fontFamily, 
+                  fontSize: 16,
+                  fontWeight: fontWeight
+                ),
                 decoration: InputDecoration(
                   labelText: isUrdu ? 'اپنا نام درج کریں' : 'Enter your name',
-                  labelStyle: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: Icon(PhosphorIcons.user(), color: AppTheme.themeColor),
+                  labelStyle: TextStyle(
+                    fontFamily: isUrdu ? 'NooriNastaleeq' : '', 
+                    color: Colors.grey.shade600, 
+                    fontSize: 13, 
+                    fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal
+                  ),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  fillColor: const Color(0xFFF5F7F9),
+                  filled: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12.0), 
+                    borderSide: BorderSide(color: Colors.grey.shade400)
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12.0), 
+                    borderSide: BorderSide(color: Colors.grey.shade400)
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12.0), 
+                    borderSide: const BorderSide(color: AppTheme.themeColor, width: 1)
+                  ),
+                  prefixIcon: Icon(PhosphorIcons.user(), color: AppTheme.themeColor, size: 20),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {

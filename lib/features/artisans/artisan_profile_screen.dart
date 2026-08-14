@@ -21,6 +21,8 @@ import 'package:account_app/core/services/auth_service.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/widgets/artisan_rating_stars.dart';
+import 'package:account_app/core/widgets/image_selector_field.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 
 import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/features/settings/verification_request_screen.dart';
@@ -321,7 +323,8 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text(isUrdu ? 'کینسل' : 'Cancel', style: TextStyle(fontFamily: fontFamily)),
           ),
-          ElevatedButton(
+          AppButton(
+            text: isUrdu ? 'ہاں، ڈیلیٹ کریں' : 'Yes, Delete',
             onPressed: () async {
               Navigator.pop(context);
               setState(() => _isLoading = true);
@@ -349,11 +352,8 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
                 if (mounted) setState(() => _isLoading = false);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: Text(
-              isUrdu ? 'ہاں، ڈیلیٹ کریں' : 'Yes, Delete',
-              style: TextStyle(fontFamily: fontFamily, color: Colors.white, fontWeight: FontWeight.bold),
-            ),
+            color: Colors.red,
+            size: AppButtonSize.small,
           ),
         ],
       ),
@@ -396,81 +396,16 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
                       const SizedBox(height: 16),
                     ],
                     // پروفائل تصویر
-                    Center(
-                      child: GestureDetector(
-                        onTap: () => _pickImage(isProfile: true),
-                        child: Stack(
-                          children: [
-                            Container(
-                              width: 120,
-                              height: 120,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: AppTheme.themeColor.withOpacity(0.2),
-                                  width: 2,
-                                ),
-                              ),
-                              child: _profileImage != null
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.file(
-                                        _profileImage!,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    )
-                                  : (_remoteProfileImage != null && _remoteProfileImage!.isNotEmpty
-                                      ? ClipRRect(
-                                          borderRadius: BorderRadius.circular(12),
-                                          child: CachedNetworkImage(
-                                            imageUrl: _remoteProfileImage!,
-                                            fit: BoxFit.cover,
-                                            placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-                                            errorWidget: (context, url, error) => Icon(PhosphorIcons.camera(), size: 40, color: Colors.grey[400]),
-                                          ),
-                                        )
-                                      : Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              PhosphorIcons.camera(),
-                                              size: 40,
-                                              color: Colors.grey[400],
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              isUrdu ? 'تصویر شامل کریں' : 'Add Photo',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[400],
-                                                fontFamily: fontFamily,
-                                              ),
-                                            ),
-                                          ],
-                                        )),
-                            ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.themeColor,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 2),
-                                ),
-                                child: Icon(
-                                  PhosphorIcons.pencilSimple(),
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    ImageSelectorField(
+                      isProfile: true,
+                      selectedFiles: _profileImage != null ? [_profileImage!] : [],
+                      remoteUrls: _remoteProfileImage != null && _remoteProfileImage!.isNotEmpty ? [_remoteProfileImage!] : [],
+                      onFilesChanged: (files) {
+                        setState(() {
+                          _profileImage = files.isNotEmpty ? files.first : null;
+                        });
+                      },
+                      onRemoteRemoved: (_) => setState(() => _remoteProfileImage = null),
                     ),
 
                     const SizedBox(height: 24),
@@ -587,20 +522,14 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
                                   const SizedBox(height: 16),
 
                                   // کام کی تصاویر
-                                  Align(
-                                    alignment: isUrdu ? Alignment.centerRight : Alignment.centerLeft,
-                                    child: Text(
-                                      isUrdu ? 'کام کی تصاویر (اختیاری)' : 'Work Images (Optional)',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.darkColor,
-                                        fontFamily: fontFamily,
-                                      ),
-                                    ),
+                                  ImageSelectorField(
+                                    label: isUrdu ? 'کام کی تصاویر (اختیاری)' : 'Work Images (Optional)',
+                                    selectedFiles: _workImages,
+                                    remoteUrls: _remoteWorkImages,
+                                    onFilesChanged: (files) => setState(() => _workImages = files),
+                                    onRemoteRemoved: (index) => setState(() => _remoteWorkImages.removeAt(index)),
+                                    maxTotal: 6,
                                   ),
-                                  const SizedBox(height: 12),
-                                  _buildWorkImagesGrid(isUrdu, fontFamily),
                                 ],
                               ),
                             ),
@@ -611,50 +540,26 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
                     const SizedBox(height: 32),
 
                     // محفوظ کریں بٹن
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed: _saveProfile,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.darkColor,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          _isEditing
-                              ? (isUrdu ? 'اپ ڈیٹ کریں' : 'Update Profile')
-                              : (isUrdu ? 'پروفائل بنائیں' : 'Create Profile'),
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            fontFamily: fontFamily,
-                          ),
-                        ),
-                      ),
+                    AppButton(
+                      text: _isEditing
+                          ? (isUrdu ? 'اپ ڈیٹ کریں' : 'Update Profile')
+                          : (isUrdu ? 'پروفائل بنائیں' : 'Create Profile'),
+                      color: AppTheme.darkColor,
+                      variant: AppButtonVariant.primary,
+                      size: AppButtonSize.large,
+                      isFullWidth: true,
+                      onPressed: _saveProfile,
                     ),
 
                     if (_isEditing) ...[
                       const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: TextButton.icon(
-                          onPressed: () => _showDeleteConfirmation(isUrdu, fontFamily),
-                          icon: const Icon(Icons.delete_forever, color: Colors.red),
-                          label: Text(
-                            isUrdu ? 'کاریگر پروفائل ختم کریں' : 'Delete Artisan Profile',
-                            style: TextStyle(
-                              color: Colors.red,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: fontFamily,
-                            ),
-                          ),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
+                      AppButton(
+                        text: isUrdu ? 'کاریگر پروفائل ختم کریں' : 'Delete Artisan Profile',
+                        icon: Icons.delete_forever,
+                        color: Colors.red,
+                        variant: AppButtonVariant.ghost,
+                        isFullWidth: true,
+                        onPressed: () => _showDeleteConfirmation(isUrdu, fontFamily),
                       ),
                     ],
                   ],
@@ -1049,141 +954,5 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
     );
   }
 
-  Widget _buildWorkImagesGrid(bool isUrdu, String fontFamily) {
-    final int totalCount = _remoteWorkImages.length + _workImages.length;
 
-    return Column(
-      children: [
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            childAspectRatio: 1,
-          ),
-          itemCount: totalCount + 1,
-          itemBuilder: (context, index) {
-            if (index == totalCount) {
-              return GestureDetector(
-                onTap: () => _pickImage(isProfile: false),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          PhosphorIcons.plus(),
-                          size: 30,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          isUrdu ? 'شامل کریں' : 'Add',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey[400],
-                            fontFamily: fontFamily,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }
-
-            // Show Remote Images first
-            if (index < _remoteWorkImages.length) {
-              return Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: CachedNetworkImage(
-                      imageUrl: _remoteWorkImages[index],
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                    ),
-                  ),
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: GestureDetector(
-                      onTap: () => _removeWorkImage(index, isRemote: true),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.black54,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.close,
-                          color: Colors.white,
-                          size: 14,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            }
-
-            // Show Local (New) Images
-            final localIndex = index - _remoteWorkImages.length;
-            return Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.file(
-                    _workImages[localIndex],
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                  ),
-                ),
-                Positioned(
-                  top: 4,
-                  right: 4,
-                  child: GestureDetector(
-                    onTap: () => _removeWorkImage(localIndex, isRemote: false),
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.black54,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.close,
-                        color: Colors.white,
-                        size: 14,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: 8),
-        if (totalCount == 0)
-          Text(
-            isUrdu
-                ? 'اپنے کام کی تصاویر شامل کریں (اختیاری)'
-                : 'Add images of your work (optional)',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[400],
-              fontFamily: fontFamily,
-            ),
-          ),
-      ],
-    );
-  }
 }

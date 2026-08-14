@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 
 class WorkAgreementDialog extends StatelessWidget {
   final String artisanName;
@@ -94,19 +95,14 @@ class WorkAgreementDialog extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
           child: Text(isUrdu ? 'مسترد' : 'Reject', style: TextStyle(color: Colors.red, fontFamily: fontFamily)),
         ),
-        ElevatedButton(
+        AppButton(
+          text: isUrdu ? '✅ منظور' : '✅ Agree',
           onPressed: () {
             Navigator.pop(context);
             onAgree();
           },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-          child: Text(
-            isUrdu ? '✅ منظور' : '✅ Agree', 
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: fontFamily)
-          ),
+          color: Colors.green,
+          size: AppButtonSize.small,
         ),
       ],
     );

@@ -31,6 +31,7 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/utils/image_utils.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 
 import 'package:account_app/features/artisans/customer_orders_screen.dart';
 import 'package:account_app/features/settings/login_screen.dart'; // For navigation
@@ -415,67 +416,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 24),
 
-          // Help Card
-          InkWell(
-            onTap: () => _contactUs(context, isUrdu),
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green.shade400),
-              ),
-              child: Row(
-                children: [
-                  Icon(PhosphorIcons.headset(),
-                      size: 32, color: Colors.green.shade700),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      isUrdu
-                          ? 'ہم آپ کی کیسے مدد کر سکتے ہیں؟'
-                          : 'How can we help you?',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight:
-                            isUrdu ? FontWeight.bold : FontWeight.normal,
-                        color: Colors.green.shade900,
-                        fontFamily: fontFamily,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          // Help Button
+          AppButton(
+            text: isUrdu ? 'ہم آپ کی کیسے مدد کر سکتے ہیں؟' : 'How can we help you?',
+            onPressed: () => _contactUs(context, isUrdu),
+            icon: PhosphorIcons.headset(),
+            color: AppTheme.incomeColor,
+            isFullWidth: true,
+            size: AppButtonSize.large,
           ),
 
           const SizedBox(height: 24),
 
-          // Logout Button
-          TextButton.icon(
+          // Logout Buttons
+          AppButton(
+            text: isUrdu ? 'لاگ آؤٹ' : 'Logout',
             onPressed: () => _showLogoutDialog(context, isUrdu),
-            icon: Icon(PhosphorIcons.signOut(), color: Colors.red),
-            label: Text(
-              isUrdu ? 'لاگ آؤٹ' : 'Logout',
-              style: TextStyle(
-                  color: Colors.red,
-                  fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
-                  fontFamily: fontFamily),
-            ),
+            icon: PhosphorIcons.signOut(),
+            variant: AppButtonVariant.ghost,
+            color: Colors.red,
+            isFullWidth: true,
+            size: AppButtonSize.small,
           ),
           const SizedBox(height: 8),
-          TextButton.icon(
+          AppButton(
+            text: isUrdu ? 'اکاؤنٹ ختم کریں' : 'Deactivate Account',
             onPressed: () => _showDeactivateDialog(context, isUrdu),
-            icon: Icon(PhosphorIcons.userMinus(),
-                color: Colors.red.withOpacity(0.7)),
-            label: Text(
-              isUrdu ? 'اکاؤنٹ ختم کریں' : 'Deactivate Account',
-              style: TextStyle(
-                  color: Colors.red.withOpacity(0.7),
-                  fontSize: 13,
-                  fontFamily: fontFamily),
-            ),
+            icon: PhosphorIcons.userMinus(),
+            variant: AppButtonVariant.ghost,
+            color: Colors.red.withOpacity(0.7),
+            isFullWidth: true,
+            size: AppButtonSize.mini,
           ),
           const SizedBox(height: 30),
         ],
@@ -856,77 +827,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
 
                   const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: isUpdating
-                          ? null
-                          : () async {
-                              setModalState(() => isUpdating = true);
-                              try {
-                                String? finalPhotoUrl;
-                                String? finalStoreImageUrl;
+                  AppButton(
+                    text: isUrdu ? 'محفوظ کریں' : 'Save Changes',
+                    onPressed: () async {
+                      setModalState(() => isUpdating = true);
+                      try {
+                        String? finalPhotoUrl;
+                        String? finalStoreImageUrl;
 
-                                if (localImage != null) {
-                                  finalPhotoUrl = await _uploadToStorage(
-                                      currentUser!.uid, localImage!, 'profile');
-                                }
-                                if (localStoreImage != null) {
-                                  finalStoreImageUrl = await _uploadToStorage(
-                                      currentUser!.uid,
-                                      localStoreImage!,
-                                      'store');
-                                }
+                        if (localImage != null) {
+                          finalPhotoUrl = await _uploadToStorage(
+                              currentUser!.uid, localImage!, 'profile');
+                        }
+                        if (localStoreImage != null) {
+                          finalStoreImageUrl = await _uploadToStorage(
+                              currentUser!.uid,
+                              localStoreImage!,
+                              'store');
+                        }
 
-                                await Provider.of<AuthService>(context,
-                                        listen: false)
-                                    .updateProfile(
-                                  displayName: nameController.text.trim(),
-                                  photoUrl: finalPhotoUrl,
-                                  address: addressController.text.trim(),
-                                  slogan: sloganController.text.trim(),
-                                  storeName: storeNameController.text.trim(),
-                                  storeImage: finalStoreImageUrl,
-                                );
+                        await Provider.of<AuthService>(context,
+                                listen: false)
+                            .updateProfile(
+                          displayName: nameController.text.trim(),
+                          photoUrl: finalPhotoUrl,
+                          address: addressController.text.trim(),
+                          slogan: sloganController.text.trim(),
+                          storeName: storeNameController.text.trim(),
+                          storeImage: finalStoreImageUrl,
+                        );
 
-                                await currentUser?.reload();
-                                if (mounted) {
-                                  _loadSettingsData();
-                                  Navigator.pop(context);
-                                  _showSnackBar(
-                                      context,
-                                      isUrdu
-                                          ? 'پروفائل اپڈیٹ ہوگئی'
-                                          : 'Profile updated successfully',
-                                      isUrdu);
-                                }
-                              } catch (e) {
-                                if (mounted)
-                                  _showSnackBar(context, 'Error: $e', isUrdu,
-                                      isError: true);
-                              } finally {
-                                if (mounted)
-                                  setModalState(() => isUpdating = false);
-                              }
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.themeColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: isUpdating
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2))
-                          : Text(isUrdu ? 'محفوظ کریں' : 'Save Changes',
-                              style: TextStyle(
-                                  fontFamily: fontFamily,
-                                  fontWeight: FontWeight.bold)),
-                    ),
+                        await currentUser?.reload();
+                        if (mounted) {
+                          _loadSettingsData();
+                          Navigator.pop(context);
+                          _showSnackBar(
+                              context,
+                              isUrdu
+                                  ? 'پروفائل اپڈیٹ ہوگئی'
+                                  : 'Profile updated successfully',
+                              isUrdu);
+                        }
+                      } catch (e) {
+                        if (mounted)
+                          _showSnackBar(context, 'Error: $e', isUrdu,
+                              isError: true);
+                      } finally {
+                        if (mounted)
+                          setModalState(() => isUpdating = false);
+                      }
+                    },
+                    isLoading: isUpdating,
+                    isFullWidth: true,
+                    size: AppButtonSize.large,
                   ),
                   const SizedBox(height: 24),
                 ],
@@ -1086,7 +1039,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     color: AppTheme.textSecondary,
                     fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
           ),
-          ElevatedButton(
+          AppButton(
+            text: isUrdu ? 'لاگ آؤٹ' : 'Logout',
             onPressed: () async {
               Navigator.pop(dialogContext);
               try {
@@ -1099,13 +1053,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       isError: true);
               }
             },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.expenseColor,
-                foregroundColor: Colors.white),
-            child: Text(isUrdu ? 'لاگ آؤٹ' : 'Logout',
-                style: TextStyle(
-                    fontFamily: fontFamily,
-                    fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+            color: AppTheme.expenseColor,
+            size: AppButtonSize.small,
           ),
         ],
       ),
@@ -1144,7 +1093,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     color: AppTheme.textSecondary,
                     fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
           ),
-          ElevatedButton(
+          AppButton(
+            text: isUrdu ? 'تصدیق' : 'Confirm',
             onPressed: () async {
               Navigator.pop(dialogContext);
               try {
@@ -1158,13 +1108,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       isError: true);
               }
             },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.expenseColor,
-                foregroundColor: Colors.white),
-            child: Text(isUrdu ? 'تصدیق' : 'Confirm',
-                style: TextStyle(
-                    fontFamily: fontFamily,
-                    fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+            color: AppTheme.expenseColor,
+            size: AppButtonSize.small,
           ),
         ],
       ),
@@ -1375,20 +1320,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       {required String title,
       required IconData icon,
       required VoidCallback onPressed}) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon),
-        label: Text(title),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.darkColor,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      ),
+    return AppButton(
+      text: title,
+      onPressed: onPressed,
+      icon: icon,
+      color: AppTheme.darkColor,
+      isFullWidth: true,
+      size: AppButtonSize.large,
     );
   }
 
@@ -1557,19 +1495,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Close Button
             Padding(
               padding: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.themeColor,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: Text(isUrdu ? 'بند کریں' : 'Close',
-                      style: TextStyle(
-                          fontFamily: fontFamily, color: Colors.white)),
-                ),
+              child: AppButton(
+                text: isUrdu ? 'بند کریں' : 'Close',
+                onPressed: () => Navigator.pop(dialogContext),
+                isFullWidth: true,
+                size: AppButtonSize.large,
               ),
             ),
           ],

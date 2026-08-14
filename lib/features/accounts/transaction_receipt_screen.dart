@@ -21,6 +21,7 @@ import 'package:account_app/core/models/profession_model.dart';
 
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 
+import 'package:account_app/core/widgets/app_button.dart';
 import 'package:screenshot/screenshot.dart';
 
 class TransactionReceiptScreen extends StatefulWidget {
@@ -345,7 +346,8 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: ElevatedButton.icon(
+                      child: AppButton(
+                        text: isUrdu ? 'ایڈٹ کریں' : 'Edit',
                         onPressed: () {
                           if (widget.transaction.professionId != null && widget.transaction.professionId!.isNotEmpty) {
                             final db = Provider.of<DatabaseService>(context, listen: false);
@@ -384,28 +386,19 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                             MaterialPageRoute(builder: (context) => AddTransactionScreen(transactionToEdit: widget.transaction)),
                           );
                         },
-                        icon: Icon(PhosphorIcons.pencilLine()),
-                        label: Text(isUrdu ? 'ایڈٹ کریں' : 'Edit', style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueGrey,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
+                        icon: PhosphorIcons.pencilLine(),
+                        color: Colors.blueGrey,
+                        size: AppButtonSize.large,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: ElevatedButton.icon(
+                      child: AppButton(
+                        text: isUrdu ? 'شیئر کریں' : 'Share',
                         onPressed: () => _shareReceiptAsImage(context, widget.transaction, account, isUrdu),
-                        icon: Icon(PhosphorIcons.shareNetwork()),
-                        label: Text(isUrdu ? 'شیئر کریں' : 'Share', style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.themeColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
+                        icon: PhosphorIcons.shareNetwork(),
+                        color: AppTheme.themeColor,
+                        size: AppButtonSize.large,
                       ),
                     ),
                   ],

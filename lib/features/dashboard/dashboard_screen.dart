@@ -182,20 +182,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           double totalPayable = 0;    
 
           for (var party in parties) {
-            final partyTransactions = databaseService.getAllTransactions()
-                .where((t) => t.accountId == party.id && t.partnershipId == null)
-                .toList();
-
-            double partyTaken = 0;
-            double partyGiven = 0;
-            for (var t in partyTransactions) {
-              if (t.type == 'income') {
-                partyTaken += t.amount;
-              } else {
-                partyGiven += t.amount;
-              }
-            }
-            final liveBalance = partyTaken - partyGiven;
+            final liveBalance = party.balance;
             if (liveBalance > 0) {
               totalPayable += liveBalance;
             } else if (liveBalance < 0) {
