@@ -18,6 +18,7 @@ class BusinessChatCard extends StatelessWidget {
   final bool isUrdu;
   final String fontFamily;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   const BusinessChatCard({
     super.key,
@@ -31,6 +32,7 @@ class BusinessChatCard extends StatelessWidget {
     required this.isUrdu,
     required this.fontFamily,
     required this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -74,6 +76,7 @@ class BusinessChatCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
+          onLongPress: onLongPress,
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.all(12),

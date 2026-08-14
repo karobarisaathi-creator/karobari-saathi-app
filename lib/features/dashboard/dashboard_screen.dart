@@ -138,7 +138,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         initialBalance: 0,
         balanceType: 'credit',
         balance: 0,
-        isShared: false,
         isActive: true,
       ),
     );

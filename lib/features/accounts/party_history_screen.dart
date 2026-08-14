@@ -1,9 +1,6 @@
-import 'package:account_app/features/inventory/item_detail_screen.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:ui' as ui;
-import 'dart:io';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -11,10 +8,8 @@ import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
-import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
-import 'package:account_app/core/widgets/product_card.dart';
 
 class PartyHistoryScreen extends StatefulWidget {
   final Account party;
@@ -28,8 +23,6 @@ class PartyHistoryScreen extends StatefulWidget {
 class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProviderStateMixin {
   List<model.Transaction> _transactions = [];
   Map<String, List<ItemPriceHistory>> _itemHistory = {};
-  Map<String, InventoryItem> _managedItemsMap = {};
-  bool _isLoadingRemoteItems = false;
   late AnimationController _shimmerController;
   String? _remoteProfession;
   String? _remoteAddress;
@@ -61,12 +54,6 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
   }
 
   Future<void> _loadRemoteItems() async {
-    // Clear existing items to prevent data mixing between different parties
-    setState(() {
-      _managedItemsMap.clear();
-      _isLoadingRemoteItems = true;
-    });
-
     final db = Provider.of<DatabaseService>(context, listen: false);
     
     // 1. Find the party's UID via their phone number
@@ -78,50 +65,12 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
           _remoteAddress = profile['address'];
         });
       }
-      
-      if (profile['uid'] != null) {
-        final uid = profile['uid']!;
-
-        // 2. Load from local cache first (Immediate)
-        final cachedItems = db.getRemoteCachedItems(uid);
-        if (cachedItems.isNotEmpty && mounted) {
-          setState(() {
-            for (var item in cachedItems) {
-              _managedItemsMap[item.name.trim().toLowerCase()] = item;
-            }
-            _isLoadingRemoteItems = false; // Stop spinner as we have cached data
-          });
-        }
-
-        // 3. Fetch fresh items from Firebase in background
-        final remoteItems = await db.getRemoteInventoryItems(uid);
-        
-        if (mounted) {
-          setState(() {
-            // Filter to ensure only items belonging to this specific party are shown
-            final filteredItems = remoteItems.where((item) => item.accountId == uid).toList();
-            for (var item in filteredItems) {
-              _managedItemsMap[item.name.trim().toLowerCase()] = item;
-            }
-            _isLoadingRemoteItems = false;
-          });
-        }
-      } else {
-        if (mounted) setState(() => _isLoadingRemoteItems = false);
-      }
-    } else {
-      if (mounted) setState(() => _isLoadingRemoteItems = false);
     }
   }
 
   void _loadData() {
     final db = Provider.of<DatabaseService>(context, listen: false);
     final allTx = db.getAllTransactions().where((t) => t.accountId == widget.party.id).toList();
-    
-    // Get list of all managed item names to filter history
-    // (This helps us identify which items from transactions should have a rate history)
-    final inventoryItems = db.getInventoryItems();
-    final managedNames = inventoryItems.map((e) => e.name.trim().toLowerCase()).toSet();
     
     Map<String, int> itemCount = {};
 
@@ -136,11 +85,10 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
         _firstDeal = tx.date;
       }
 
-      // Track item frequency - Only count managed items with valid rates
+      // Track item frequency
       for (var item in tx.items) {
         final name = item.description.trim();
-        final nameLower = name.toLowerCase();
-        if (name.isNotEmpty && managedNames.contains(nameLower) && item.rate > 0) {
+        if (name.isNotEmpty && item.rate > 0) {
           itemCount[name] = (itemCount[name] ?? 0) + 1;
         }
       }
@@ -350,53 +298,8 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
                   ],
                 ),
               ),
-              ..._itemHistory.entries.map((entry) => _buildItemHistoryCard(entry.key, entry.value, isUrdu, fontFamily)).toList(),
+              ..._itemHistory.entries.map((entry) => _buildItemHistoryCard(entry.key, entry.value, isUrdu, fontFamily)),
               const SizedBox(height: 24),
-            ],
-
-            // Party's Items Section
-            if (_isLoadingRemoteItems)
-              const Center(child: CircularProgressIndicator())
-            else if (_managedItemsMap.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Row(
-                  children: [
-                    Icon(PhosphorIcons.shoppingBag(), color: AppTheme.themeColor, size: 22),
-                    const SizedBox(width: 8),
-                    Text(
-                      isUrdu ? '${widget.party.name} کی مصنوعات' : "${widget.party.name}'s Products",
-                      style: TextStyle(
-                        fontFamily: fontFamily,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.darkColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.52, // Balanced ratio
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                ),
-                itemCount: _managedItemsMap.length,
-                itemBuilder: (context, index) {
-                  final item = _managedItemsMap.values.toList()[index];
-                  return ProductCard(
-                    item: item,
-                    isUrdu: isUrdu,
-                    fontFamily: fontFamily,
-                    view: ProductCardView.grid,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ItemDetailScreen(item: item))),
-                  );
-                },
-              ),
             ],
           ],
         ),
@@ -405,9 +308,6 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
   }
 
   Widget _buildItemHistoryCard(String itemName, List<ItemPriceHistory> history, bool isUrdu, String fontFamily) {
-    final item = _managedItemsMap[itemName.toLowerCase()];
-    if (item == null) return const SizedBox.shrink();
-
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -415,17 +315,23 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10),
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ProductCard(
-            item: item,
-            isUrdu: isUrdu,
-            fontFamily: fontFamily,
-            view: ProductCardView.list,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ItemDetailScreen(item: item))),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(
+              itemName,
+              style: TextStyle(
+                fontFamily: fontFamily,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.darkColor,
+              ),
+            ),
           ),
           const Divider(height: 1),
           Padding(

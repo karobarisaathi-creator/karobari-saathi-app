@@ -280,6 +280,7 @@ class _ArtisanCardState extends State<ArtisanCard> {
       await nService.sendArtisanWorkRequest(
         artisanUid: widget.artisan.id,
         customerName: user?.displayName ?? (isUrdu ? 'ایک گاہک' : 'A Customer'),
+        workDescription: isUrdu ? 'دستیابی کے بارے میں پوچھ گچھ' : 'General availability inquiry',
       );
 
       if (mounted) {

@@ -41,15 +41,6 @@ class AccountService extends BaseService {
     }
   }
 
-  Future<void> addSharedWith(String accountId, String phoneNumber) async {
-    final account = accountsBox?.get(accountId);
-    if (account != null && !account.sharedWith.contains(phoneNumber)) {
-      final updated = account.copyWith(isShared: true, sharedWith: [...account.sharedWith, phoneNumber], updatedAt: DateTime.now());
-      await accountsBox?.put(accountId, updated);
-      notifyListeners();
-    }
-  }
-
   Future<int> getPartiesCount() async => accountsBox?.length ?? 0;
   Future<int> getPendingDuesCount() async => accountsBox?.values.where((p) => p.balance != 0).length ?? 0;
 

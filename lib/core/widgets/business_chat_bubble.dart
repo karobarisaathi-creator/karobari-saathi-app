@@ -15,6 +15,7 @@ class BusinessChatBubble extends StatelessWidget {
   final String fontFamily;
   final Function(String)? onImageTap;
   final Function(String)? onOrderTap;
+  final VoidCallback? onLongPress;
 
   const BusinessChatBubble({
     super.key,
@@ -24,80 +25,83 @@ class BusinessChatBubble extends StatelessWidget {
     required this.fontFamily,
     this.onImageTap,
     this.onOrderTap,
+    this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
-        decoration: BoxDecoration(
-          color: isMe ? AppTheme.themeColor : Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(isMe ? 16 : 0),
-            bottomRight: Radius.circular(isMe ? 0 : 16),
+      child: GestureDetector(
+        onLongPress: onLongPress,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.75,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+          decoration: BoxDecoration(
+            color: isMe ? AppTheme.themeColor : Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(16),
+              topRight: const Radius.circular(16),
+              bottomLeft: Radius.circular(isMe ? 16 : 0),
+              bottomRight: Radius.circular(isMe ? 0 : 16),
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            // فائل / تصویر
-            if (message.fileUrl != null && message.messageType == 'image')
-              _buildImageContent(context),
-
-            // آرڈر لنک
-            if (message.orderId != null)
-              _buildOrderContent(context),
-
-            // ٹیکسٹ
-            if (message.message.isNotEmpty)
-              Text(
-                message.message,
-                style: TextStyle(
-                  color: isMe ? Colors.white : AppTheme.darkColor,
-                  fontSize: 15,
-                  fontFamily: fontFamily,
-                ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
               ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // فائل / تصویر
+              if (message.fileUrl != null && message.messageType == 'image')
+                _buildImageContent(context),
 
-            const SizedBox(height: 4),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+              // آرڈر لنک
+              if (message.orderId != null) _buildOrderContent(context),
+
+              // ٹیکسٹ
+              if (message.message.isNotEmpty)
                 Text(
-                  DateFormat('hh:mm a').format(message.timestamp),
+                  message.message,
                   style: TextStyle(
-                    color: isMe ? Colors.white70 : Colors.grey,
-                    fontSize: 9,
+                    color: isMe ? Colors.white : AppTheme.darkColor,
+                    fontSize: 15,
+                    fontFamily: fontFamily,
                   ),
                 ),
-                if (message.editedAt != null) ...[
-                  const SizedBox(width: 4),
+
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Text(
-                    isUrdu ? '(ترمیم شدہ)' : '(edited)',
+                    DateFormat('hh:mm a').format(message.timestamp),
                     style: TextStyle(
-                      color: isMe ? Colors.white60 : Colors.grey,
-                      fontSize: 8,
+                      color: isMe ? Colors.white70 : Colors.grey,
+                      fontSize: 9,
                     ),
                   ),
+                  if (message.editedAt != null) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      isUrdu ? '(ترمیم شدہ)' : '(edited)',
+                      style: TextStyle(
+                        color: isMe ? Colors.white60 : Colors.grey,
+                        fontSize: 8,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );

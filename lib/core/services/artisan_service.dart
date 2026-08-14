@@ -184,8 +184,9 @@ class ArtisanService extends BaseService {
     final user = auth.currentUser;
     if (user == null) throw Exception('User not logged in');
 
+    final reviewId = DateTime.now().millisecondsSinceEpoch.toString();
     final review = ArtisanReview(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: reviewId,
       artisanId: artisanId,
       reviewerId: user.uid,
       reviewerName: user.displayName ?? 'User',
@@ -194,33 +195,28 @@ class ArtisanService extends BaseService {
       timestamp: DateTime.now(),
     );
 
-    // 1. ریویو محفوظ کریں
-    await firestore
-        .collection('artisans')
-        .doc(artisanId)
-        .collection('reviews')
-        .doc(review.id)
-        .set(review.toMap());
+    final artisanRef = firestore.collection('artisans').doc(artisanId);
+    final reviewRef = artisanRef.collection('reviews').doc(reviewId);
+    final workOrderRef = workOrderId != null && workOrderId.isNotEmpty
+        ? artisanRef.collection('work_orders').doc(workOrderId)
+        : null;
 
-    // 2. کام کی آرڈر کو اپ ڈیٹ کریں جب ورک آرڈر دستیاب ہو
-    if (workOrderId != null && workOrderId.isNotEmpty) {
-      try {
-        await firestore
-            .collection('artisans')
-            .doc(artisanId)
-            .collection('work_orders')
-            .doc(workOrderId)
-            .update({
+    // Use transaction for adding review and updating work order
+    await firestore.runTransaction((transaction) async {
+      // 1. ریویو محفوظ کریں
+      transaction.set(reviewRef, review.toMap());
+
+      // 2. کام کی آرڈر کو اپ ڈیٹ کریں جب ورک آرڈر دستیاب ہو
+      if (workOrderRef != null) {
+        transaction.update(workOrderRef, {
           'rating': rating,
           'review': comment,
           'isRated': true,
           'ratedAt': FieldValue.serverTimestamp(),
           'status': 'rated',
         });
-      } catch (e) {
-        debugPrint('Warning: could not update work order for review: $e');
       }
-    }
+    });
 
     // 3. کاریگر کی اوسط ریٹنگ اپ ڈیٹ کریں
     await _updateArtisanRating(artisanId);
@@ -231,16 +227,15 @@ class ArtisanService extends BaseService {
   // ============================================================
 
   Future<void> _updateArtisanRating(String artisanId) async {
-    final reviews = await firestore
-        .collection('artisans')
-        .doc(artisanId)
-        .collection('reviews')
-        .get();
+    final artisanRef = firestore.collection('artisans').doc(artisanId);
+    final reviews = await artisanRef.collection('reviews').get();
 
     if (reviews.docs.isEmpty) {
-      await firestore.collection('artisans').doc(artisanId).update({
-        'rating': 0.0,
-        'totalReviews': 0,
+      await firestore.runTransaction((transaction) async {
+        transaction.update(artisanRef, {
+          'rating': 0.0,
+          'totalReviews': 0,
+        });
       });
       return;
     }
@@ -250,10 +245,14 @@ class ArtisanService extends BaseService {
       total += (doc.data()['rating'] as num).toDouble();
     }
     final avg = total / reviews.docs.length;
+    final finalAvg = double.parse(avg.toStringAsFixed(1));
+    final count = reviews.docs.length;
 
-    await firestore.collection('artisans').doc(artisanId).update({
-      'rating': double.parse(avg.toStringAsFixed(1)),
-      'totalReviews': reviews.docs.length,
+    await firestore.runTransaction((transaction) async {
+      transaction.update(artisanRef, {
+        'rating': finalAvg,
+        'totalReviews': count,
+      });
     });
   }
 

@@ -4,7 +4,7 @@ import 'dashboard_screen.dart';
 import 'package:account_app/features/artisans/artisan_home_screen.dart';
 import 'package:account_app/features/professions/professions_screen.dart';
 import 'package:account_app/features/settings/settings_screen.dart';
-import 'package:account_app/features/inventory/marketplace_screen.dart';
+import 'package:account_app/features/artisans/browse_jobs_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:provider/provider.dart';
@@ -27,8 +27,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     DashboardScreen(),
     ProfessionsScreen(),
     const ArtisanHomeScreen(),
-    MarketplaceScreen(),
-    SettingsScreen(),
+    const BrowseJobsScreen(),
+    const SettingsScreen(),
   ];
 
   void onItemTapped(int index) {
@@ -83,12 +83,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 BottomNavigationBarItem(
                   icon: Icon(PhosphorIcons.users(), size: 24),
                   activeIcon: Icon(PhosphorIcons.users(PhosphorIconsStyle.fill), size: 24),
-                  label: 'Parties',
+                  label: isUrdu ? 'کھاتے' : 'Parties',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(PhosphorIcons.briefcase(), size: 24),
                   activeIcon: Icon(PhosphorIcons.briefcase(PhosphorIconsStyle.fill), size: 24),
-                  label: 'Professions',
+                  label: isUrdu ? 'پیشہ' : 'Professions',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(PhosphorIcons.hammer(), size: 24),
@@ -96,14 +96,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   label: isUrdu ? 'ماہرین' : 'Experts',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(PhosphorIcons.storefront(), size: 24),
-                  activeIcon: Icon(PhosphorIcons.storefront(PhosphorIconsStyle.fill), size: 24),
-                  label: 'Marketplace',
+                  icon: Icon(PhosphorIcons.megaphone(), size: 24),
+                  activeIcon: Icon(PhosphorIcons.megaphone(PhosphorIconsStyle.fill), size: 24),
+                  label: isUrdu ? 'کام' : 'Jobs',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(PhosphorIcons.gear(), size: 24),
                   activeIcon: Icon(PhosphorIcons.gear(PhosphorIconsStyle.fill), size: 24),
-                  label: 'Settings',
+                  label: isUrdu ? 'سیٹنگز' : 'Settings',
                 ),
               ],
             ),

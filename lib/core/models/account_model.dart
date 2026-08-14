@@ -29,12 +29,6 @@ class Account {
   @HiveField(7)
   final double balance;
 
-  @HiveField(8, defaultValue: false)
-  final bool isShared;
-
-  @HiveField(9)
-  final List<String> sharedWith;
-
   @HiveField(10)
   final String? profileImage;
 
@@ -65,8 +59,6 @@ class Account {
     required this.initialBalance,
     required this.balanceType,
     required this.balance,
-    this.isShared = false,
-    this.sharedWith = const [],
     this.profileImage,
     required this.createdAt,
     required this.updatedAt,
@@ -86,8 +78,6 @@ class Account {
       'initialBalance': initialBalance,
       'balanceType': balanceType,
       'balance': balance,
-      'isShared': isShared,
-      'sharedWith': sharedWith,
       'profileImage': profileImage,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -116,8 +106,6 @@ class Account {
       initialBalance: (map['initialBalance'] is num) ? (map['initialBalance'] as num).toDouble() : 0.0,
       balanceType: map['balanceType']?.toString() ?? 'Receivable',
       balance: (map['balance'] is num) ? (map['balance'] as num).toDouble() : 0.0,
-      isShared: map['isShared'] ?? false,
-      sharedWith: List<String>.from(map['sharedWith'] ?? []),
       profileImage: map['profileImage']?.toString(),
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
@@ -136,8 +124,6 @@ class Account {
     double? initialBalance,
     String? balanceType,
     double? balance,
-    bool? isShared,
-    List<String>? sharedWith,
     String? profileImage,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -155,8 +141,6 @@ class Account {
       initialBalance: initialBalance ?? this.initialBalance,
       balanceType: balanceType ?? this.balanceType,
       balance: balance ?? this.balance,
-      isShared: isShared ?? this.isShared,
-      sharedWith: sharedWith ?? this.sharedWith,
       profileImage: profileImage ?? this.profileImage,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? DateTime.now(),

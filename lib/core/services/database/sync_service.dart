@@ -3,7 +3,6 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/profession_model.dart';
-import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/models/category_model.dart';
 import 'dart:async';
 import 'base_service.dart';
@@ -14,7 +13,7 @@ class SyncService extends BaseService {
   final AccountService _accountService = AccountService();
   final ProfessionService _professionService = ProfessionService();
 
-  StreamSubscription? _accountsSub, _txSub, _proSub, _itemsSub, _catSub, _userSub;
+  StreamSubscription? _accountsSub, _txSub, _proSub, _catSub, _userSub;
 
   void startRealtimeSync() {
     final user = auth.currentUser;
@@ -79,20 +78,10 @@ class SyncService extends BaseService {
       }
       notifyListeners();
     });
-
-    _itemsSub = userDoc.collection('inventory_items').snapshots().listen((snap) {
-      for (var c in snap.docChanges) {
-        if (c.doc.data() == null) continue;
-        final i = InventoryItem.fromMap(c.doc.data()!);
-        if (c.type == DocumentChangeType.removed) itemsBox?.delete(i.id);
-        else itemsBox?.put(i.id, i);
-      }
-      notifyListeners();
-    });
   }
 
   void stopRealtimeSync() {
-    _accountsSub?.cancel(); _txSub?.cancel(); _proSub?.cancel(); _itemsSub?.cancel(); _catSub?.cancel(); _userSub?.cancel();
+    _accountsSub?.cancel(); _txSub?.cancel(); _proSub?.cancel(); _catSub?.cancel(); _userSub?.cancel();
   }
 
   Future<void> syncWithFirebase() async {
@@ -118,13 +107,6 @@ class SyncService extends BaseService {
     if (categoriesBox != null) {
       for (var c in categoriesBox!.values) batch.set(userDoc.collection('categories').doc(c.id), c.toMap());
     }
-    if (itemsBox != null) {
-      for (var i in itemsBox!.values) {
-        final data = i.toMap();
-        data['isSellerVerified'] = isVerified;
-        batch.set(userDoc.collection('inventory_items').doc(i.id), data);
-      }
-    }
     await batch.commit();
   }
 
@@ -138,14 +120,12 @@ class SyncService extends BaseService {
       userDoc.collection('transactions').get(),
       userDoc.collection('professions').get(),
       userDoc.collection('categories').get(),
-      userDoc.collection('inventory_items').get(),
     ]);
 
     for (var d in snaps[0].docs) await accountsBox?.put(d.id, Account.fromMap(d.data()));
     for (var d in snaps[1].docs) await transactionsBox?.put(d.id, model.Transaction.fromMap(d.data()));
     for (var d in snaps[2].docs) await professionsBox?.put(d.id, Profession.fromMap(d.data()));
     for (var d in snaps[3].docs) await categoriesBox?.put(d.id, Category.fromMap(d.data()));
-    for (var d in snaps[4].docs) await itemsBox?.put(d.id, InventoryItem.fromMap(d.data()));
 
     notifyListeners();
   }

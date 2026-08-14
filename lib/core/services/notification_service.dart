@@ -6,10 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/models/account_model.dart';
-import 'package:account_app/core/models/inventory_item_model.dart';
+import 'package:account_app/core/models/artisan_work_order_model.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
-import 'package:account_app/features/inventory/item_detail_screen.dart';
-import 'package:account_app/features/visual_finder/visual_finder_screen.dart';
 import 'database_service.dart';
 import 'auto_sync_service.dart';
 
@@ -205,12 +203,6 @@ class NotificationService with ChangeNotifier {
     if (_navigatorKey == null) return;
 
     String? accountId = data?['accountId'] ?? data?['relatedAccountId'];
-    String? productId = data?['productId'] ?? data?['itemId'];
-
-    if (productId != null) {
-      _navigateToProductDetail(productId);
-      return;
-    }
 
     if (accountId != null) {
       try {
@@ -358,6 +350,7 @@ class NotificationService with ChangeNotifier {
   Future<void> sendArtisanWorkRequest({
     required String artisanUid,
     required String customerName,
+    required String workDescription,
   }) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
@@ -369,13 +362,14 @@ class NotificationService with ChangeNotifier {
         'customerUid': currentUser.uid,
         'artisanUid': artisanUid,
         'status': 'pending',
+        'workDescription': workDescription,
         'timestamp': FieldValue.serverTimestamp(),
       });
 
       final notifId = "artisan_req_${DateTime.now().millisecondsSinceEpoch}";
       final notification = AppNotification(
         id: notifId,
-        title: 'کام کی درخواست (New Work Request)',
+        title: 'کام کی درخواست',
         message:
             '$customerName آپ سے کام کے بارے میں پوچھ رہے ہیں۔ کیا آپ دستیاب ہیں؟',
         type: NotificationType.general,
@@ -391,6 +385,7 @@ class NotificationService with ChangeNotifier {
           'artisanUid': artisanUid,
           'customerUid': currentUser.uid,
           'requestId': requestId,
+          'workDescription': workDescription,
           'status': 'pending',
           'needsAction': true,
         },
@@ -418,6 +413,8 @@ class NotificationService with ChangeNotifier {
 
     try {
       final String requestId = "${customerUid}_${currentUser.uid}";
+      final requestDoc = await _firestore.collection('artisan_requests').doc(requestId).get();
+      final requestData = requestDoc.data();
 
       await _firestore.collection('artisan_requests').doc(requestId).set({
         'status': accepted ? 'accepted' : 'rejected',
@@ -427,10 +424,33 @@ class NotificationService with ChangeNotifier {
       updateNotificationData(
           notificationId, {'responded': true, 'accepted': accepted});
 
+      if (accepted) {
+        // خودکار آرڈر بنائیں
+        final orderId = "order_${DateTime.now().millisecondsSinceEpoch}";
+        final order = ArtisanWorkOrder(
+          id: orderId,
+          artisanId: currentUser.uid,
+          customerId: customerUid,
+          customerName: requestData?['customerName'] ?? 'گاہک',
+          customerPhone: requestData?['customerPhone'] ?? '',
+          workDescription: requestData?['workDescription'] ?? 'کام کی تفصیل',
+          status: 'negotiating', // ڈیل ہو رہی ہے
+          createdAt: DateTime.now(),
+          artisanAgreed: true, // کاریگر نے "ہاں" کر کے اپنی طرف سے سائن کر دیا
+        );
+
+        await _firestore
+            .collection('artisans')
+            .doc(currentUser.uid)
+            .collection('work_orders')
+            .doc(orderId)
+            .set(order.toMap());
+      }
+
       final notifId = "artisan_res_${DateTime.now().millisecondsSinceEpoch}";
       final notification = AppNotification(
         id: notifId,
-        title: accepted ? 'کام کی منظوری! ✅' : 'معذرت ❌',
+        title: accepted ? 'کام کی منظوری!' : 'معذرت',
         message: accepted
             ? '$artisanName نے آپ کی کام کی درخواست قبول کر لی ہے۔ اب آپ رابطہ کر سکتے ہیں۔'
             : '$artisanName اس وقت کام کے لیے دستیاب نہیں ہیں۔',
@@ -455,6 +475,78 @@ class NotificationService with ChangeNotifier {
           .set(notification.toMap());
     } catch (e) {
       debugPrint('Error responding to artisan request: $e');
+    }
+  }
+
+  Future<void> sendQuoteNotification({
+    required String customerUid,
+    required String artisanName,
+    required double amount,
+    required String workOrderId,
+  }) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    try {
+      final notifId = "quote_${DateTime.now().millisecondsSinceEpoch}";
+      final notification = AppNotification(
+        id: notifId,
+        title: 'قیمت کی تفصیل',
+        message: '$artisanName نے آپ کے کام کے لیے Rs. $amount کی قیمت دی ہے۔',
+        type: NotificationType.general,
+        isRead: false,
+        timestamp: DateTime.now(),
+        data: {
+          'type': 'artisan_quote',
+          'artisanName': artisanName,
+          'artisanUid': currentUser.uid,
+          'amount': amount,
+          'workOrderId': workOrderId,
+        },
+      );
+
+      await _firestore
+          .collection('users')
+          .doc(customerUid)
+          .collection('notifications')
+          .doc(notifId)
+          .set(notification.toMap());
+    } catch (e) {
+      debugPrint('Error sending quote notification: $e');
+    }
+  }
+
+  Future<void> sendBidStatusNotification({
+    required String artisanUid,
+    required String jobTitle,
+    required bool accepted,
+  }) async {
+    try {
+      final notifId = "bid_${accepted ? 'acc' : 'rej'}_${DateTime.now().millisecondsSinceEpoch}";
+      final notification = AppNotification(
+        id: notifId,
+        title: accepted ? 'بولی قبول کر لی گئی!' : 'بولی مسترد',
+        message: accepted
+            ? 'آپ کی "$jobTitle" کے لیے لگائی گئی بولی قبول کر لی گئی ہے!'
+            : 'معذرت، "$jobTitle" کے لیے آپ کی بولی قبول نہیں کی گئی۔',
+        type: NotificationType.general,
+        isRead: false,
+        timestamp: DateTime.now(),
+        data: {
+          'type': 'bid_status',
+          'accepted': accepted,
+          'jobTitle': jobTitle,
+        },
+      );
+
+      await _firestore
+          .collection('users')
+          .doc(artisanUid)
+          .collection('notifications')
+          .doc(notifId)
+          .set(notification.toMap());
+    } catch (e) {
+      debugPrint('Error sending bid status notification: $e');
     }
   }
 
@@ -683,7 +775,7 @@ class NotificationService with ChangeNotifier {
         if (targetUserId == currentUser.uid) return;
 
         final dbService = DatabaseService();
-        bool isVerified = await dbService.isSellerVerified(currentUser.uid);
+        bool isVerified = await dbService.isUserVerified(currentUser.uid);
 
         String typeText = transactionType == 'income' ? 'رقم لی' : 'رقم دی';
         String messageBody =
@@ -692,7 +784,7 @@ class NotificationService with ChangeNotifier {
         final notifId = DateTime.now().millisecondsSinceEpoch.toString();
         final notification = AppNotification(
           id: notifId,
-          title: 'نیا لین دین (Karobari Saathi)',
+          title: 'نیا لین دین',
           message: messageBody,
           type: NotificationType.transaction,
           isRead: false,
@@ -722,12 +814,6 @@ class NotificationService with ChangeNotifier {
     }
   }
 
-  Future<void> sendShareNotification({
-    required String accountId,
-    required String accountName,
-    required String sharedWithPhone,
-  }) async {}
-
   Future<void> sendReminderNotification({
     required String accountId,
     required String accountName,
@@ -735,26 +821,4 @@ class NotificationService with ChangeNotifier {
   }) async {}
 
   Future<void> sendReportNotification(String period) async {}
-
-  void _navigateToProductDetail(String itemId) async {
-    if (_navigatorKey == null) return;
-
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collectionGroup('inventory_items')
-          .where('id', isEqualTo: itemId)
-          .limit(1)
-          .get();
-
-      if (doc.docs.isNotEmpty) {
-        final item = InventoryItem.fromMap(
-            {...doc.docs.first.data(), 'id': doc.docs.first.id});
-        _navigatorKey!.currentState!.push(
-          MaterialPageRoute(builder: (context) => ItemDetailScreen(item: item)),
-        );
-      }
-    } catch (e) {
-      debugPrint("Navigation to item error: $e");
-    }
-  }
 }

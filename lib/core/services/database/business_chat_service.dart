@@ -215,4 +215,36 @@ class BusinessChatService extends BaseService {
       'شکریہ! بہت اچھا کام کیا ہے۔',
     ];
   }
+
+  // ============================================================
+  // 9. میسج ڈیلیٹ کریں
+  // ============================================================
+
+  Future<void> deleteMessage(String otherUserId, String messageId) async {
+    final String chatRoomId = getChatRoomId(otherUserId);
+    await firestore
+        .collection('business_chats')
+        .doc(chatRoomId)
+        .collection('messages')
+        .doc(messageId)
+        .delete();
+  }
+
+  // ============================================================
+  // 10. میسج ایڈٹ کریں
+  // ============================================================
+
+  Future<void> editMessage(
+      String otherUserId, String messageId, String newMessage) async {
+    final String chatRoomId = getChatRoomId(otherUserId);
+    await firestore
+        .collection('business_chats')
+        .doc(chatRoomId)
+        .collection('messages')
+        .doc(messageId)
+        .update({
+      'message': newMessage.trim(),
+      'editedAt': FieldValue.serverTimestamp(),
+    });
+  }
 }

@@ -6,10 +6,13 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/services/artisan_work_order_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:account_app/core/services/artisan_service.dart';
+import 'package:account_app/core/services/artisan_pro_service.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/features/artisans/widgets/work_agreement_dialog.dart';
 import 'artisan_detail_screen.dart';
 
 class CustomerOrdersScreen extends StatefulWidget {
@@ -77,9 +80,15 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
     Color statusColor = Colors.orange;
     String statusText = isUrdu ? 'پینڈنگ' : 'Pending';
 
-    if (order.status == 'accepted') {
+    if (order.status == 'negotiating') {
+      statusColor = Colors.orange;
+      statusText = isUrdu ? 'ڈیل ہو رہی ہے' : 'Negotiating';
+    } else if (order.status == 'confirmed') {
       statusColor = Colors.blue;
-      statusText = isUrdu ? 'منظور شدہ' : 'Accepted';
+      statusText = isUrdu ? 'منظور شدہ' : 'Confirmed';
+    } else if (order.status == 'in_progress') {
+      statusColor = Colors.indigo;
+      statusText = isUrdu ? 'جاری' : 'In Progress';
     } else if (order.status == 'completed') {
       statusColor = Colors.green;
       statusText = isUrdu ? 'مکمل' : 'Completed';
@@ -91,6 +100,10 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
       statusText = isUrdu ? 'مسترد' : 'Rejected';
     }
 
+    final bool isNegotiating = order.status == 'negotiating';
+    final bool waitingForArtisan = isNegotiating && (order.amount == null || order.amount == 0);
+    final bool needsCustomerApproval = isNegotiating && !waitingForArtisan && !order.customerAgreed;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -98,7 +111,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -165,7 +178,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
               const SizedBox(height: 8),
               Text(
                 order.workDescription,
-                maxLines: 2,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 14,
@@ -173,6 +186,31 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
                   fontFamily: fontFamily,
                 ),
               ),
+              if (order.amount != null && order.amount! > 0) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(PhosphorIcons.money(), color: Colors.green, size: 20),
+                      const SizedBox(width: 10),
+                      Text(
+                        isUrdu ? 'کاریگر کا ماوضعہ:' : 'Artisan Quote:',
+                        style: TextStyle(fontFamily: fontFamily, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Rs ${order.amount!.toStringAsFixed(0)}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.green),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const Divider(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -187,6 +225,25 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
                       ),
                     ],
                   ),
+                  
+                  if (waitingForArtisan)
+                    Text(
+                      isUrdu ? 'ریٹ کا انتظار...' : 'Waiting for price...',
+                      style: TextStyle(fontFamily: fontFamily, fontSize: 12, color: Colors.orange, fontStyle: FontStyle.italic),
+                    ),
+
+                  if (needsCustomerApproval)
+                    ElevatedButton.icon(
+                      onPressed: () => _showApproveDialog(order, isUrdu, fontFamily),
+                      icon: const Icon(Icons.check_circle_outline, size: 18),
+                      label: Text(isUrdu ? 'منظور کریں' : 'Approve Deal', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.incomeColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+
                   if (order.status == 'completed' || order.status == 'rated')
                     Row(
                       children: [
@@ -203,6 +260,49 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showApproveDialog(ArtisanWorkOrder order, bool isUrdu, String fontFamily) async {
+    final artisanProfile = await ArtisanService().getProfile(order.artisanId);
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => WorkAgreementDialog(
+        artisanName: artisanProfile?.name ?? 'Artisan',
+        customerName: order.customerName,
+        amount: order.amount ?? 0,
+        workDescription: order.workDescription,
+        isUrdu: isUrdu,
+        fontFamily: fontFamily,
+        onAgree: () async {
+          await FirebaseFirestore.instance
+              .collectionGroup('work_orders')
+              .where('id', isEqualTo: order.id)
+              .get()
+              .then((snapshot) {
+            for (var doc in snapshot.docs) {
+              doc.reference.update({
+                'customerAgreed': true,
+                'customerAcceptedTerms': true,
+                'agreedAt': FieldValue.serverTimestamp(),
+                'status': 'confirmed',
+              });
+            }
+          });
+
+          // Log Action
+          await ArtisanProService().logAction(
+            action: 'contract_signed_by_customer',
+            userId: order.customerId,
+            workOrderId: order.id,
+            details: {'amount': order.amount},
+          );
+
+          _loadOrders();
+        },
       ),
     );
   }

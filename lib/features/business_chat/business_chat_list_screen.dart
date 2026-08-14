@@ -123,12 +123,57 @@ class _BusinessChatListScreenState extends State<BusinessChatListScreen> {
                               ),
                             );
                           },
+                          onLongPress: () => _showDeleteDialog(otherUserId, name, isUrdu, fontFamily),
                         );
                       },
                     );
                   },
                 );
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteDialog(String otherUserId, String name, bool isUrdu, String fontFamily) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          isUrdu ? 'چیٹ ختم کریں؟' : 'Delete Chat?',
+          style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          isUrdu
+              ? 'کیا آپ واقعی $name کے ساتھ گفتگو ختم کرنا چاہتے ہیں؟'
+              : 'Are you sure you want to delete conversation with $name?',
+          style: TextStyle(fontFamily: fontFamily),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(isUrdu ? 'کینسل' : 'Cancel', style: TextStyle(fontFamily: fontFamily)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _chatService.deleteChatRoom(otherUserId);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(isUrdu ? 'چیٹ ختم کر دی گئی' : 'Chat deleted'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text(
+              isUrdu ? 'ڈیلیٹ کریں' : 'Delete',
+              style: TextStyle(fontFamily: fontFamily, color: Colors.white),
             ),
           ),
         ],
