@@ -13,10 +13,11 @@ import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
-import 'package:account_app/core/models/inventory_item_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/image_grid_viewer.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/widgets/image_selector_field.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   final Account? account;
@@ -65,11 +66,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   DateTime _selectedDate = DateTime.now();
   List<Account> _accounts = [];
   List<Profession> _professions = [];
-  List<InventoryItem> _inventoryItems = [];
   List<String> _allItemNames = [];
   bool _isLoading = false;
 
-  List<String> _billImagePaths = [];
+  List<File> _billImages = [];
   final ImagePicker _imagePicker = ImagePicker();
 
   @override
@@ -85,7 +85,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _selectedProfessionId = t.professionId;
       _referenceNumberController.text = t.referenceNumber ?? '';
       if (t.billImage != null && t.billImage!.isNotEmpty) {
-        _billImagePaths = t.billImage!.split(',');
+        _billImages = t.billImage!.split(',').map((p) => File(p)).toList();
       }
       
       if (t.items.isNotEmpty) {
@@ -210,35 +210,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _calculateGrandTotal();
     }
 
-    void lookupItemInfo() {
-      final text = entry.descriptionController.text.trim().toLowerCase();
-      if (text.isEmpty) {
-        if (entry.unit != null) setState(() => entry.unit = null);
-        return;
-      }
-
-      final invItem = _inventoryItems.firstWhere(
-        (item) => item.name.trim().toLowerCase() == text,
-        orElse: () => InventoryItem(id: '', name: '', unit: '', defaultRate: 0, createdAt: DateTime.now(), updatedAt: DateTime.now())
-      );
-
-      if (invItem.id.isNotEmpty) {
-        if (entry.unit != invItem.unit) {
-          setState(() {
-            entry.unit = invItem.unit;
-            if (entry.rateController.text.isEmpty && invItem.defaultRate > 0) {
-              entry.rateController.text = invItem.defaultRate.toStringAsFixed(0);
-            }
-          });
-        }
-      }
-    }
-
     entry.quantityController.addListener(calculate);
     entry.subQuantityController.addListener(calculate);
     entry.rateController.addListener(calculate);
     entry.descriptionController.addListener(() {
-      lookupItemInfo();
       setState(() {});
     });
   }
@@ -258,14 +233,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   Future<void> _loadData() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
     _accounts = await databaseService.getAccounts();
-    _professions = await databaseService.getProfessions();
-    _inventoryItems = databaseService.getInventoryItems();
+    final allProfessions = await databaseService.getProfessions();
+    _professions = allProfessions.where((p) => p.isActive).toList();
 
-    // Collect unique item names from inventory and past transactions
+    // Collect unique item names from past transactions
     Set<String> names = {};
-    for (var item in _inventoryItems) {
-      names.add(item.name);
-    }
     final allTxs = databaseService.getAllTransactions();
     for (var tx in allTxs) {
       if (tx.items.isNotEmpty) {
@@ -276,9 +248,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         names.add(tx.description);
       }
     }
-    _allItemNames = names.toList();
-
-    setState(() {});
+    
+    if (mounted) {
+      setState(() {
+        _allItemNames = names.toList();
+      });
+    }
   }
 
   @override
@@ -322,6 +297,36 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   ),
                   const SizedBox(height: 16),
 
+                  // Profession Selector (Optional)
+                  if (_professions.isNotEmpty) ...[
+                    _buildDropdownField(
+                      value: _selectedProfessionId,
+                      label: isUrdu ? 'پیشہ منتخب کریں (اختیاری)' : 'Select Profession (Optional)',
+                      icon: PhosphorIcons.briefcase(),
+                      fontFamily: fontFamily,
+                      fontWeight: fontWeight,
+                      items: [
+                        DropdownMenuItem(
+                          value: null,
+                          child: Text(isUrdu ? 'کسی پیشے میں نہیں' : 'None', style: TextStyle(fontFamily: fontFamily)),
+                        ),
+                        ..._professions.map((p) => DropdownMenuItem(
+                          value: p.id,
+                          child: Text(
+                            "${p.name}${p.season.isNotEmpty ? ' (${p.season})' : ''}", 
+                            style: TextStyle(fontFamily: fontFamily)
+                          ),
+                        )),
+                      ],
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedProfessionId = val as String?;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
                   // Items List
                   ListView.separated(
                     shrinkWrap: true,
@@ -343,39 +348,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Image Grid
+                  // Image Selector
                   Container(
                     width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF5F7F9),
-                      borderRadius: BorderRadius.circular(12.0),
-                    ),
-                    padding: const EdgeInsets.all(12.0),
-                    child: Column(
-                      children: [
-                        if (_billImagePaths.isNotEmpty)
-                          ImageGridViewer(imagePaths: _billImagePaths, onRemove: (index) => setState(() => _billImagePaths.removeAt(index))),
-                        const SizedBox(height: 8),
-                        InkWell(
-                          onTap: _addBillImage,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppTheme.themeColor.withOpacity(0.1)),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(PhosphorIcons.camera(), color: AppTheme.themeColor, size: 22),
-                                const SizedBox(width: 8),
-                                Text(isUrdu ? 'تصویر شامل کریں' : 'Add Image', style: TextStyle(color: AppTheme.themeColor, fontFamily: fontFamily, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: ImageSelectorField(
+                      label: isUrdu ? 'بل کی تصویر (اختیاری)' : 'Bill Image (Optional)',
+                      selectedFiles: _billImages,
+                      onFilesChanged: (newList) => setState(() => _billImages = newList),
+                      maxTotal: 5,
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -384,32 +365,24 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: ElevatedButton.icon(
+                        child: AppButton(
+                          text: isUrdu ? 'رقم لی / جمع' : 'Received',
+                          icon: PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold),
+                          color: AppTheme.incomeColor,
+                          variant: AppButtonVariant.primary,
+                          size: AppButtonSize.large, // 🔥 Changed to Small (38px)
                           onPressed: () => _saveTransaction('income'),
-                          icon: Icon(PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold), color: Colors.white),
-                          label: Text(isUrdu ? 'رقم لی / جمع' : 'Received', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 16)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.incomeColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: ElevatedButton.icon(
+                        child: AppButton(
+                          text: isUrdu ? 'رقم دی / بنام' : 'Paid',
+                          icon: PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold),
+                          color: AppTheme.expenseColor,
+                          variant: AppButtonVariant.primary,
+                          size: AppButtonSize.large, // 🔥 Changed to Small (38px)
                           onPressed: () => _saveTransaction('expense'),
-                          icon: Icon(PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold), color: Colors.white),
-                          label: Text(isUrdu ? 'رقم دی / بنام' : 'Paid', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 16)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.expenseColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-                          ),
                         ),
                       ),
                     ],
@@ -445,41 +418,30 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   },
                   onSelected: (String selection) {
                     entry.descriptionController.text = selection;
-                    // Try to find if it's an inventory item to auto-fill rate
-                    final invItem = _inventoryItems.firstWhere(
-                      (item) => item.name.trim().toLowerCase() == selection.trim().toLowerCase(),
-                      orElse: () => InventoryItem(id: '', name: '', unit: '', defaultRate: 0, createdAt: DateTime.now(), updatedAt: DateTime.now())
-                    );
-                    if (invItem.id.isNotEmpty && invItem.defaultRate > 0) {
-                      setState(() {
-                        entry.rateController.text = invItem.defaultRate.toStringAsFixed(0);
-                        entry.unit = invItem.unit;
-                      });
-                    } else {
-                      // Search in past transactions for the rate
-                      final databaseService = Provider.of<DatabaseService>(context, listen: false);
-                      final allTxs = databaseService.getAllTransactions();
-                      for (var tx in allTxs.reversed) {
-                        bool found = false;
-                        if (tx.items.isNotEmpty) {
-                          for (var it in tx.items) {
-                            if (it.description.trim().toLowerCase() == selection.trim().toLowerCase()) {
-                              setState(() {
-                                entry.rateController.text = it.rate.toStringAsFixed(0);
-                                entry.unit = it.unit;
-                              });
-                              found = true;
-                              break;
-                            }
+                    
+                    // Search in past transactions for the rate
+                    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+                    final allTxs = databaseService.getAllTransactions();
+                    for (var tx in allTxs.reversed) {
+                      bool found = false;
+                      if (tx.items.isNotEmpty) {
+                        for (var it in tx.items) {
+                          if (it.description.trim().toLowerCase() == selection.trim().toLowerCase()) {
+                            setState(() {
+                              entry.rateController.text = it.rate.toStringAsFixed(0);
+                              entry.unit = it.unit;
+                            });
+                            found = true;
+                            break;
                           }
-                        } else if (tx.description.trim().toLowerCase() == selection.trim().toLowerCase()) {
-                          setState(() {
-                            entry.rateController.text = tx.rate.toStringAsFixed(0);
-                          });
-                          found = true;
                         }
-                        if (found) break;
+                      } else if (tx.description.trim().toLowerCase() == selection.trim().toLowerCase()) {
+                        setState(() {
+                          entry.rateController.text = tx.rate.toStringAsFixed(0);
+                        });
+                        found = true;
                       }
+                      if (found) break;
                     }
                   },
                   fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
@@ -665,10 +627,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-  Future<void> _addBillImage() async {
-    final List<XFile> images = await _imagePicker.pickMultiImage(maxWidth: 1024, maxHeight: 1024, imageQuality: 80);
-    if (images.isNotEmpty) setState(() => _billImagePaths.addAll(images.map((e) => e.path)));
-  }
+
 
   Future<void> _saveTransaction(String type) async {
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
@@ -705,11 +664,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         }
       }
 
+      String? profName;
+      if (_selectedProfessionId != null) {
+        try {
+          profName = _professions.firstWhere((p) => p.id == _selectedProfessionId).name;
+        } catch (_) {}
+      }
+
       final transaction = Transaction(
         id: widget.transactionToEdit?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
         accountId: _selectedAccountId!,
         amount: grandTotal,
-        pendingAmount: grandTotal, // مینول ٹرانزیکشن کے لیے بیلنس اپ ڈیٹ کرنے کے لیے یہ ضروری ہے
+        pendingAmount: grandTotal,
         type: type,
         category: 'دیگر',
         description: mainDescription.isEmpty ? 'دیگر' : mainDescription,
@@ -718,35 +684,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         rate: grandTotal,
         createdAt: widget.transactionToEdit?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
-        billImage: _billImagePaths.isNotEmpty ? _billImagePaths.join(',') : null,
+        billImage: _billImages.isNotEmpty ? _billImages.map((f) => f.path).join(',') : null,
         referenceNumber: _referenceNumberController.text.trim(),
         items: items,
+        professionId: _selectedProfessionId,
+        professionName: profName,
       );
 
       if (widget.transactionToEdit != null) {
         await databaseService.updateTransaction(transaction);
       } else {
         await databaseService.addTransaction(transaction);
-        
-        // Auto-save new items to inventory for analysis ONLY for 'expense' (Paid/Banaam) transactions
-        if (type == 'expense') {
-          for (var item in items) {
-            final exists = _inventoryItems.any((inv) => inv.name.toLowerCase() == item.description.toLowerCase());
-            if (!exists && item.description.isNotEmpty && item.description != 'دیگر' && item.description != 'Other') {
-              final newItem = InventoryItem(
-                id: DateTime.now().millisecondsSinceEpoch.toString() + item.description.hashCode.toString(),
-                name: item.description,
-                unit: item.unit ?? 'واحد',
-                defaultRate: item.rate,
-                createdAt: DateTime.now(),
-                updatedAt: DateTime.now(),
-              );
-              await databaseService.addInventoryItem(newItem);
-            }
-          }
-        }
 
-        syncService.syncNewTransaction(transaction).catchError((e) => print(e));
+        syncService.syncNewTransaction(transaction).catchError((e) => debugPrint(e.toString()));
         final account = _accounts.firstWhere((a) => a.id == _selectedAccountId);
         if (account.phone.isNotEmpty) {
           notificationService.notifyPartyByPhone(
@@ -754,16 +704,23 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             amount: grandTotal, 
             transactionType: type,
             description: transaction.description,
-            items: transaction.items?.map((e) => e.toMap()).toList(),
-          ).catchError((e) => print(e));
+            items: transaction.items.map((e) => e.toMap()).toList(),
+          ).catchError((e) => debugPrint(e.toString()));
         }
       }
+
+      if (!mounted) return;
+      
       _showSnackBar(isUrdu ? 'محفوظ ہوگیا' : 'Saved successfully', false);
       Navigator.pop(context);
     } catch (e) {
-      _showSnackBar('Error: $e', true);
+      if (mounted) {
+        _showSnackBar('Error: $e', true);
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -777,52 +734,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
   }
 
-  void _showInventoryPicker(int index) {
-    final languageService = Provider.of<LanguageService>(context, listen: false);
-    final isUrdu = languageService.isUrdu;
-    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (context) => Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              isUrdu ? 'آئٹم منتخب کریں' : 'Select Item',
-              style: TextStyle(fontFamily: fontFamily, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: _inventoryItems.length,
-              itemBuilder: (context, i) {
-                final item = _inventoryItems[i];
-                return ListTile(
-                  title: Text(item.name, style: TextStyle(fontFamily: fontFamily)),
-                  subtitle: Text('Rs ${item.defaultRate} / ${item.unit}', style: TextStyle(fontFamily: fontFamily)),
-                  onTap: () {
-                    setState(() {
-                      final entry = _itemEntries[index];
-                      entry.descriptionController.text = item.name;
-                      entry.rateController.text = item.defaultRate.toString();
-                      entry.unit = item.unit;
-                      // Auto-calculate will trigger from listeners
-                    });
-                    Navigator.pop(context);
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showSnackBar(String message, bool isError) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: isError ? AppTheme.expenseColor : AppTheme.incomeColor));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message), 
+        backgroundColor: isError ? AppTheme.expenseColor : AppTheme.incomeColor,
+        duration: const Duration(seconds: 2),
+      )
+    );
   }
 
   @override
