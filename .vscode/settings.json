@@ -1,0 +1,6 @@
+{
+    "deepseekCopilot.apiKey": "sk-733e33fd05fc405cab0b315037e9f06d",
+    "deepseekCopilot.maxTokens": 500,
+    "deepseekCopilot.enableInline": true,
+    "deepseekCopilot.suggestionDelay": 200
+}
