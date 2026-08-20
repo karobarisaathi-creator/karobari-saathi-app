@@ -103,9 +103,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
     Map<String, List<ItemPriceHistory>> history = {};
     
     for (var tx in chronologicalTx) {
-      // Only process 'income' transactions for rate history as per user requirement
-      if (tx.type != 'income') continue;
-
+      // Process both income and expense transactions for rate history
       if (tx.items.isNotEmpty) {
         for (var item in tx.items) {
           // Add to history if it has a rate
@@ -435,7 +433,9 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
   Widget _buildPriceRow(ItemPriceHistory history, bool isUrdu) {
     final isIncrease = (history.changePercentage ?? 0) > 0;
     // Rate increase is Red, Rate decrease is Green
-    final color = isIncrease ? AppTheme.expenseColor : AppTheme.incomeColor;
+    final color = history.type == 'income' 
+        ? (isIncrease ? AppTheme.expenseColor : AppTheme.incomeColor)
+        : (isIncrease ? AppTheme.expenseColor : AppTheme.incomeColor); // Same logic for now, but aware of type
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),

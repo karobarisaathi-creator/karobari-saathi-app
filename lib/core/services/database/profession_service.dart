@@ -1,16 +1,42 @@
+import 'package:flutter/foundation.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'base_service.dart';
 
 class ProfessionService extends BaseService {
   Future<void> addProfession(Profession profession) async {
+    // 1. Save locally
     await professionsBox?.put(profession.id, profession);
     notifyListeners();
+
+    // 2. Cloud Sync
+    if (auth.currentUser != null) {
+      firestore
+          .collection('users')
+          .doc(auth.currentUser!.uid)
+          .collection('professions')
+          .doc(profession.id)
+          .set(profession.toMap())
+          .catchError((e) => debugPrint("Offline Sync: Profession addition delayed"));
+    }
   }
 
   Future<void> updateProfession(Profession profession) async {
-    await professionsBox?.put(profession.id, profession.copyWith(updatedAt: DateTime.now()));
+    final updated = profession.copyWith(updatedAt: DateTime.now());
+    // 1. Update locally
+    await professionsBox?.put(profession.id, updated);
     notifyListeners();
+
+    // 2. Cloud Sync
+    if (auth.currentUser != null) {
+      firestore
+          .collection('users')
+          .doc(auth.currentUser!.uid)
+          .collection('professions')
+          .doc(profession.id)
+          .update(updated.toMap())
+          .catchError((e) => debugPrint("Offline Sync: Profession update delayed"));
+    }
   }
 
   Future<void> deleteProfession(String professionId) async {
@@ -18,12 +44,24 @@ class ProfessionService extends BaseService {
     for (var transaction in transactionsToDelete) {
       await transactionsBox?.delete(transaction.id);
       if (auth.currentUser != null) {
-        await firestore.collection('users').doc(auth.currentUser!.uid).collection('transactions').doc(transaction.id).delete();
+        firestore
+            .collection('users')
+            .doc(auth.currentUser!.uid)
+            .collection('transactions')
+            .doc(transaction.id)
+            .delete()
+            .catchError((_) {});
       }
     }
     await professionsBox?.delete(professionId);
     if (auth.currentUser != null) {
-      await firestore.collection('users').doc(auth.currentUser!.uid).collection('professions').doc(professionId).delete();
+      firestore
+          .collection('users')
+          .doc(auth.currentUser!.uid)
+          .collection('professions')
+          .doc(professionId)
+          .delete()
+          .catchError((e) => debugPrint("Offline Sync: Profession deletion delayed"));
     }
     notifyListeners();
   }
@@ -39,8 +77,16 @@ class ProfessionService extends BaseService {
       double expense = txs.where((t) => t.type == 'expense').fold(0.0, (sum, t) => sum + t.amount);
       final updated = profession.copyWith(totalIncome: income, totalExpense: expense, updatedAt: DateTime.now());
       await professionsBox?.put(profession.id, updated);
+      
+      // Background Cloud Sync (Don't await, keeping it Local First & Fast)
       if (auth.currentUser != null) {
-        await firestore.collection('users').doc(auth.currentUser!.uid).collection('professions').doc(profession.id).set(updated.toMap());
+        firestore
+            .collection('users')
+            .doc(auth.currentUser!.uid)
+            .collection('professions')
+            .doc(profession.id)
+            .set(updated.toMap())
+            .catchError((e) => debugPrint("Offline Sync: Profession finance update delayed"));
       }
     }
   }

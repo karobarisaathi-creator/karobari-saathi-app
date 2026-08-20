@@ -4,35 +4,37 @@ import 'base_service.dart';
 
 class AccountService extends BaseService {
   Future<void> addAccount(Account account) async {
+    // 1. Save locally (Guaranteed success)
     await accountsBox?.put(account.id, account);
+    notifyListeners();
     
-    // Explicit Cloud Sync
+    // 2. Fire and Forget Cloud Sync (Don't make user wait)
     if (auth.currentUser != null) {
-      await firestore
+      firestore
           .collection('users')
           .doc(auth.currentUser!.uid)
           .collection('accounts')
           .doc(account.id)
-          .set(account.toMap());
+          .set(account.toMap())
+          .catchError((e) => debugPrint("Offline Sync: Account addition delayed"));
     }
-    
-    notifyListeners();
   }
 
   Future<void> updateAccount(Account account) async {
+    // 1. Update locally
     await accountsBox?.put(account.id, account);
+    notifyListeners();
 
-    // Explicit Cloud Sync
+    // 2. Fire and Forget Cloud Sync
     if (auth.currentUser != null) {
-      await firestore
+      firestore
           .collection('users')
           .doc(auth.currentUser!.uid)
           .collection('accounts')
           .doc(account.id)
-          .update(account.toMap());
+          .update(account.toMap())
+          .catchError((e) => debugPrint("Offline Sync: Account update delayed"));
     }
-
-    notifyListeners();
   }
 
   Future<void> deleteAccount(String accountId) async {
@@ -45,6 +47,18 @@ class AccountService extends BaseService {
         await firestore.collection('users').doc(auth.currentUser!.uid).collection('transactions').doc(transaction.id).delete();
       }
     }
+    
+    // 🆕 کلاؤڈ سے اکاؤنٹ ڈیلیٹ کریں (Fire and Forget)
+    if (auth.currentUser != null) {
+      firestore
+          .collection('users')
+          .doc(auth.currentUser!.uid)
+          .collection('accounts')
+          .doc(accountId)
+          .delete()
+          .catchError((e) => debugPrint("Offline Sync: Account deletion delayed"));
+    }
+
     await accountsBox?.delete(accountId);
     notifyListeners();
   }

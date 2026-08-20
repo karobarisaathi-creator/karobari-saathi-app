@@ -695,8 +695,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         await databaseService.updateTransaction(transaction);
       } else {
         await databaseService.addTransaction(transaction);
-
+        // Sync and Notification can happen in background
         syncService.syncNewTransaction(transaction).catchError((e) => debugPrint(e.toString()));
+        
         final account = _accounts.firstWhere((a) => a.id == _selectedAccountId);
         if (account.phone.isNotEmpty) {
           notificationService.notifyPartyByPhone(
@@ -711,17 +712,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
       if (!mounted) return;
       
-      _showSnackBar(isUrdu ? 'محفوظ ہوگیا' : 'Saved successfully', false);
+      // Close the screen first to avoid UI lag/spinner sticking
       Navigator.pop(context);
+      _showSnackBar(isUrdu ? 'محفوظ ہوگیا' : 'Saved successfully', false);
     } catch (e) {
       if (mounted) {
+        setState(() => _isLoading = false);
         _showSnackBar('Error: $e', true);
       }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
     }
+    // Removed finally to prevent setState on a popped screen
   }
 
   Future<void> _selectDate(BuildContext context, bool isUrdu) async {

@@ -5,7 +5,7 @@ class JobAlgorithmService {
   // 1. میعاد ختم ہونے والی جابز کو فلٹر کرنا
   List<JobPost> filterExpired(List<JobPost> jobs) {
     final now = DateTime.now();
-    return jobs.where((job) => job.deadline.isAfter(now)).toList();
+    return jobs.where((job) => job.deadline == null || job.deadline!.isAfter(now)).toList();
   }
 
   // 2. متعلقہ پیشوں کی لسٹ حاصل کرنا
@@ -23,7 +23,8 @@ class JobAlgorithmService {
   }
 
   // 3. جاب کی "شدت" یا Urgency کا اندازہ لگانا
-  String getUrgencyLabel(DateTime deadline, bool isUrdu) {
+  String getUrgencyLabel(DateTime? deadline, bool isUrdu) {
+    if (deadline == null) return '';
     final daysLeft = deadline.difference(DateTime.now()).inDays;
     if (daysLeft <= 1) return isUrdu ? 'انتہائی ضروری' : 'Urgent';
     if (daysLeft <= 3) return isUrdu ? 'جلد ضرورت' : 'High Priority';
@@ -43,9 +44,9 @@ class JobAlgorithmService {
     for (var job in jobs) {
       if (currentUserId != null && job.customerId == currentUserId) {
         myJobs.add(job);
-      } else if (artisanProfession != null && job.category == artisanProfession) {
+      } else if (artisanProfession != null && job.categories.contains(artisanProfession)) {
         matchingJobs.add(job);
-      } else if (relatedCategories.contains(job.category)) {
+      } else if (job.categories.any((cat) => relatedCategories.contains(cat))) {
         relatedJobs.add(job);
       } else {
         others.add(job);

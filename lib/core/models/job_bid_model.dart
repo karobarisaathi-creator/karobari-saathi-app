@@ -41,6 +41,12 @@ class JobBid extends HiveObject {
   @HiveField(11)
   final int artisanExperience;
 
+  @HiveField(12)
+  final String? proposedScope;
+
+  @HiveField(13)
+  final String? artisanPhotoUrl;
+
   JobBid({
     required this.id,
     required this.jobId,
@@ -54,6 +60,8 @@ class JobBid extends HiveObject {
     this.status = 'pending',
     this.artisanRating = 0.0,
     this.artisanExperience = 0,
+    this.proposedScope,
+    this.artisanPhotoUrl,
   });
 
   Map<String, dynamic> toMap() {
@@ -70,6 +78,8 @@ class JobBid extends HiveObject {
       'status': status,
       'artisanRating': artisanRating,
       'artisanExperience': artisanExperience,
+      'proposedScope': proposedScope,
+      'artisanPhotoUrl': artisanPhotoUrl,
     };
   }
 
@@ -94,6 +104,42 @@ class JobBid extends HiveObject {
       status: map['status'] ?? 'pending',
       artisanRating: (map['artisanRating'] as num?)?.toDouble() ?? 0.0,
       artisanExperience: (map['artisanExperience'] as num?)?.toInt() ?? 0,
+      proposedScope: map['proposedScope'],
+      artisanPhotoUrl: map['artisanPhotoUrl'],
+    );
+  }
+
+  JobBid copyWith({
+    String? id,
+    String? jobId,
+    String? artisanId,
+    String? artisanName,
+    String? artisanPhone,
+    double? amount,
+    String? message,
+    int? estimatedDays,
+    DateTime? createdAt,
+    String? status,
+    double? artisanRating,
+    int? artisanExperience,
+    String? proposedScope,
+    String? artisanPhotoUrl,
+  }) {
+    return JobBid(
+      id: id ?? this.id,
+      jobId: jobId ?? this.jobId,
+      artisanId: artisanId ?? this.artisanId,
+      artisanName: artisanName ?? this.artisanName,
+      artisanPhone: artisanPhone ?? this.artisanPhone,
+      amount: amount ?? this.amount,
+      message: message ?? this.message,
+      estimatedDays: estimatedDays ?? this.estimatedDays,
+      createdAt: createdAt ?? this.createdAt,
+      status: status ?? this.status,
+      artisanRating: artisanRating ?? this.artisanRating,
+      artisanExperience: artisanExperience ?? this.artisanExperience,
+      proposedScope: proposedScope ?? this.proposedScope,
+      artisanPhotoUrl: artisanPhotoUrl ?? this.artisanPhotoUrl,
     );
   }
 }

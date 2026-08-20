@@ -1,6 +1,6 @@
 // lib/features/artisans/services/artisan_work_order_service.dart
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:account_app/core/services/database/base_service.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
 
@@ -10,12 +10,19 @@ class ArtisanWorkOrderService extends BaseService {
   // ============================================================
 
   Future<void> addWorkOrder(ArtisanWorkOrder order) async {
-    await firestore
+    // 1. Save locally
+    await workOrdersBox?.put(order.id, order);
+    notifyListeners();
+
+    // 2. Background Cloud Sync
+    firestore
         .collection('artisans')
         .doc(order.artisanId)
         .collection('work_orders')
         .doc(order.id)
-        .set(order.toMap());
+        .set(order.toMap())
+        .catchError(
+            (e) => debugPrint("Offline Sync: WorkOrder addition delayed"));
   }
 
   // ============================================================
@@ -35,20 +42,62 @@ class ArtisanWorkOrderService extends BaseService {
   }
 
   // ============================================================
-  // 3. گاہک کے تمام کام حاصل کریں
+  // 2.5. گاہک کے تمام کام حاصل کریں (ریئل ٹائم)
   // ============================================================
 
-  Future<List<ArtisanWorkOrder>> getCustomerWorkOrders(String customerId) async {
-    // چونکہ ہر کام مختلف کاریگر کے پاس ہے، ہم collectionGroup استعمال کریں گے
-    final snapshot = await firestore
+  Stream<List<ArtisanWorkOrder>> streamCustomerWorkOrders(String customerId) {
+    return firestore
         .collectionGroup('work_orders')
         .where('customerId', isEqualTo: customerId)
-        .orderBy('createdAt', descending: true)
-        .get();
+        .snapshots()
+        .map((snapshot) {
+      final orders = snapshot.docs
+          .map((doc) => ArtisanWorkOrder.fromMap(doc.data()))
+          .toList();
 
-    return snapshot.docs
-        .map((doc) => ArtisanWorkOrder.fromMap(doc.data()))
-        .toList();
+      // لوکل کیش کو بھی اپ ڈیٹ کریں
+      for (var order in orders) {
+        workOrdersBox?.put(order.id, order);
+      }
+
+      orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return orders;
+    });
+  }
+
+  // ============================================================
+  // 3. گاہک کے تمام کام حاصل کریں (فیوچر)
+  // ============================================================
+
+  Future<List<ArtisanWorkOrder>> getCustomerWorkOrders(
+      String customerId) async {
+    // 1. Return Local First
+    final localOrders = workOrdersBox?.values
+            .where((o) => o.customerId == customerId)
+            .toList() ??
+        [];
+
+    // 2. Trigger Background Sync
+    _syncCustomerOrdersFromCloud(customerId);
+
+    return localOrders;
+  }
+
+  Future<void> _syncCustomerOrdersFromCloud(String customerId) async {
+    try {
+      final snapshot = await firestore
+          .collectionGroup('work_orders')
+          .where('customerId', isEqualTo: customerId)
+          .get();
+
+      for (var doc in snapshot.docs) {
+        final order = ArtisanWorkOrder.fromMap(doc.data());
+        await workOrdersBox?.put(order.id, order);
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Error syncing customer orders: $e");
+    }
   }
 
   // ============================================================
@@ -62,9 +111,40 @@ class ArtisanWorkOrderService extends BaseService {
   ) async {
     final user = auth.currentUser;
     if (user == null) throw Exception('Unauthorized');
+    if (user.uid != artisanId) {
+      throw Exception('Only the artisan can update work status');
+    }
+
+    const allowedStatuses = {
+      'negotiating',
+      'quoted',
+      'confirmed',
+      'in_progress',
+      'completed',
+      'rated',
+      'rejected',
+    };
+    if (!allowedStatuses.contains(status)) {
+      throw ArgumentError('Invalid work order status: $status');
+    }
+
+    final orderRef = firestore
+        .collection('artisans')
+        .doc(artisanId)
+        .collection('work_orders')
+        .doc(orderId);
+    final orderSnapshot = await orderRef.get();
+    final currentStatus = orderSnapshot.data()?['status']?.toString();
+    final validTransition =
+        (currentStatus == 'negotiating' && status == 'quoted') ||
+            (currentStatus == 'confirmed' && status == 'in_progress') ||
+            (currentStatus == 'in_progress' && status == 'completed');
+    if (!orderSnapshot.exists || !validTransition) {
+      throw StateError('Invalid work order status transition');
+    }
 
     // Only the artisan or the customer (if linked) should update status.
-    // For now, we strictly check if the artisan is the one updating it 
+    // For now, we strictly check if the artisan is the one updating it
     // or if the customer is updating (e.g. for ratings/agreement).
     // In this simple check, we ensure the caller is at least logged in.
 
@@ -74,18 +154,21 @@ class ArtisanWorkOrderService extends BaseService {
 
     if (status == 'completed') {
       data['completedAt'] = FieldValue.serverTimestamp();
+      // کاریگر کی پروفائل میں کام کی تعداد بڑھائیں
+      firestore.collection('artisans').doc(artisanId).update({
+        'workCount': FieldValue.increment(1),
+      }).catchError((e) => debugPrint("Error incrementing workCount: $e"));
     }
 
-    if (status == 'rated') {
-      data['ratedAt'] = FieldValue.serverTimestamp();
-    }
+    await orderRef.update(data);
 
-    await firestore
-        .collection('artisans')
-        .doc(artisanId)
-        .collection('work_orders')
-        .doc(orderId)
-        .update(data);
+    final localOrder = workOrdersBox?.get(orderId);
+    if (localOrder != null) {
+      final updatedOrder = localOrder.copyWith(status: status);
+      await workOrdersBox?.put(orderId, updatedOrder);
+      notifyListeners();
+      _sendWorkStatusNotification(updatedOrder);
+    }
   }
 
   // ============================================================
@@ -145,13 +228,22 @@ class ArtisanWorkOrderService extends BaseService {
   // ============================================================
 
   Future<int> getWorkCount(String artisanId) async {
-    final snapshot = await firestore
-        .collection('artisans')
-        .doc(artisanId)
-        .collection('work_orders')
-        .get();
+    try {
+      final snapshot = await firestore
+          .collection('artisans')
+          .doc(artisanId)
+          .collection('work_orders')
+          .get();
 
-    return snapshot.docs.length;
+      return snapshot.docs.length;
+    } catch (e) {
+      debugPrint("Error fetching work count: $e");
+      // اگر پرمیشن نہیں ہے تو لوکل ڈیٹا سے گنتی کریں
+      final localCount =
+          workOrdersBox?.values.where((o) => o.artisanId == artisanId).length ??
+              0;
+      return localCount;
+    }
   }
 
   Future<int> getCompletedWorkCount(String artisanId) async {
@@ -163,5 +255,50 @@ class ArtisanWorkOrderService extends BaseService {
         .get();
 
     return snapshot.docs.length;
+  }
+
+  // ============================================================
+  // نوٹیفکیشن ہیلپر
+  // ============================================================
+
+  void _sendWorkStatusNotification(ArtisanWorkOrder order) async {
+    try {
+      final String notifId =
+          "work_${order.status}_${DateTime.now().millisecondsSinceEpoch}";
+      String title = "";
+      String message = "";
+
+      if (order.status == 'in_progress') {
+        title = "🚀 کام شروع ہو گیا!";
+        message = "کاریگر نے آپ کے کام پر کام شروع کر دیا ہے۔";
+      } else if (order.status == 'completed') {
+        title = "✅ کام مکمل ہو گیا!";
+        message =
+            "کاریگر نے کام مکمل کر دیا ہے۔ اب آپ اپنی رائے (ریٹنگ) دے سکتے ہیں۔";
+      } else {
+        return;
+      }
+
+      await firestore
+          .collection('users')
+          .doc(order.customerId)
+          .collection('notifications')
+          .doc(notifId)
+          .set({
+        'id': notifId,
+        'title': title,
+        'message': message,
+        'type': 'general',
+        'isRead': false,
+        'timestamp': FieldValue.serverTimestamp(),
+        'data': {
+          'type': 'work_status_update',
+          'orderId': order.id,
+          'status': order.status,
+        },
+      });
+    } catch (e) {
+      debugPrint("Error sending work status notification: $e");
+    }
   }
 }

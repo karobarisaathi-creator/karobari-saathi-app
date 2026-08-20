@@ -411,17 +411,6 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
         ),
         title: const SizedBox.shrink(),
         actions: [
-          // پیج انٹری بٹن
-          _buildHeaderActionButton(
-            isUrdu ? 'پیج انٹری' : 'Entry', 
-            PhosphorIcons.listBullets(), 
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => BulkPartyTransactionScreen(party: currentParty)),
-            ).then((_) => _loadTransactions()),
-            fontFamily,
-          ),
-          const SizedBox(width: 8),
           // تجزیہ بٹن
           _buildHeaderActionButton(
             isUrdu ? 'تجزیہ' : 'Analysis', 
@@ -436,7 +425,12 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
             onSelected: (value) async {
-              if (value == 'history') {
+              if (value == 'bulk_entry') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => BulkPartyTransactionScreen(party: currentParty)),
+                ).then((_) => _loadTransactions());
+              } else if (value == 'history') {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -477,6 +471,15 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               }
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              PopupMenuItem<String>(
+                value: 'bulk_entry',
+                child: ListTile(
+                  leading: Icon(PhosphorIcons.listBullets(), color: AppTheme.darkColor),
+                  title: Text(isUrdu ? 'پیج انٹری (تیز اندراج)' : 'Page Entry (Fast)', style: TextStyle(fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+                  contentPadding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
               PopupMenuItem<String>(
                 value: 'history',
                 child: ListTile(
@@ -530,6 +533,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               color: AppTheme.scaffoldBackground,
               child: Column(
                 children: [
+                  const SizedBox(height: 12), // Added spacing from header
                   SearchSortBar(
                     controller: _searchController,
                     onSearchChanged: (value) => setState(() => _searchQuery = value),

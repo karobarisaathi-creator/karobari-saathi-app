@@ -1,0 +1,3 @@
+- `[x]` JobPostCard کو ری-ڈیزائن کرنا (Header, Divider, Content, Footer)
+- `[x]` کارڈ کی اونچائی اور پیڈنگ کو ایڈجسٹ کرنا
+- `[x]` دستی تصدیق (Manual Verification - Ready for testing)

@@ -10,7 +10,6 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/features/dashboard/dashboard_screen.dart';
 import 'package:account_app/features/dashboard/main_navigation_screen.dart';
-import 'settings_screen.dart';
 import 'profile_setup_screen.dart';
 
 class LoginScreen extends StatefulWidget {

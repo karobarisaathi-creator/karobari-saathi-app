@@ -14,8 +14,11 @@ import 'package:account_app/core/models/dispute_model.dart';
 import 'package:account_app/core/services/artisan_pro_service.dart';
 import 'package:account_app/features/artisans/widgets/work_agreement_dialog.dart';
 import 'package:account_app/core/services/notification_service.dart';
+import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:share_plus/share_plus.dart';
+import 'widgets/work_negotiation_popup.dart';
+import 'widgets/unified_work_order_card.dart';
 
 class ArtisanWorkOrdersScreen extends StatefulWidget {
   final String artisanId;
@@ -42,9 +45,10 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey[50],
       appBar: CustomAppBar(
         title: isUrdu ? 'میرے کام' : 'My Work Orders',
+        showBackButton: false,
       ),
       body: StreamBuilder<List<ArtisanWorkOrder>>(
         stream: _service.getArtisanWorkOrders(widget.artisanId),
@@ -53,17 +57,38 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          // 🆕 صرف وہ کام دکھائیں جو فائنل (Confirmed) ہو چکے ہوں
+          final orders = snapshot.data?.where((o) => o.status != 'negotiating' && o.status != 'quoted').toList() ?? [];
+
+          if (orders.isEmpty) {
             return _buildEmptyState(isUrdu, fontFamily);
           }
 
-          final orders = snapshot.data!;
           return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: orders.length,
             itemBuilder: (context, index) {
               final order = orders[index];
-              return _buildOrderCard(order, isUrdu, fontFamily);
+              return UnifiedWorkOrderCard(
+                order: order,
+                isArtisanMode: true,
+                isUrdu: isUrdu,
+                fontFamily: fontFamily,
+                onTap: () {
+                  // Finalized orders might still need some discussion
+                  showDialog(
+                    context: context,
+                    builder: (context) => WorkNegotiationPopup(workOrder: order, isDirect: true),
+                  );
+                },
+                onAction: () {
+                  if (order.status == 'confirmed') {
+                    _startWork(order, isUrdu);
+                  } else if (order.status == 'in_progress') {
+                    _completeWork(order, isUrdu);
+                  }
+                },
+              );
             },
           );
         },
@@ -91,151 +116,230 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
       'rated': isUrdu ? 'ریٹنگ دی گئی' : 'Rated',
     };
 
-    final bool isNegotiating = order.status == 'negotiating' || order.status == 'quoted';
-    final bool needsQuote = order.status == 'negotiating' && (order.amount == null || order.amount == 0);
-    final bool waitingForCustomer = order.status == 'quoted' && !order.customerAgreed;
-
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    order.customerName,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: fontFamily,
+      child: InkWell(
+        onTap: () {
+          if (order.status == 'negotiating' || order.status == 'quoted') {
+            showDialog(
+              context: context,
+              builder: (context) => WorkNegotiationPopup(workOrder: order, isDirect: true),
+            );
+          }
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: ProfileInfoWidget(
+                      name: order.customerName,
+                      phone: order.customerPhone,
+                      customSize: 32,
                     ),
                   ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColors[order.status]?.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: statusColors[order.status] ?? Colors.grey),
+                    ),
+                    child: Text(
+                      statusLabels[order.status] ?? order.status,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: statusColors[order.status],
+                        fontWeight: FontWeight.bold,
+                        fontFamily: fontFamily,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                order.workDescription,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.grey[800],
+                  fontFamily: fontFamily,
+                  height: 1.4,
                 ),
+              ),
+              if (order.lockedScope != null) ...[
+                const SizedBox(height: 12),
+                _buildLockedScope(order.lockedScope!, isUrdu, fontFamily),
+              ],
+              if (order.amount != null && order.amount! > 0) ...[
+                const SizedBox(height: 12),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: statusColors[order.status]?.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: statusColors[order.status] ?? Colors.grey),
+                    color: Colors.blue.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(
-                    statusLabels[order.status] ?? order.status,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: statusColors[order.status],
-                      fontWeight: FontWeight.bold,
-                      fontFamily: fontFamily,
-                    ),
+                  child: Row(
+                    children: [
+                      Icon(PhosphorIcons.money(), color: Colors.blue, size: 20),
+                      const SizedBox(width: 10),
+                      Text(
+                        isUrdu ? 'طے شدہ رقم:' : 'Fixed Amount:',
+                        style: TextStyle(fontFamily: fontFamily, fontSize: 13),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Rs ${order.amount!.toStringAsFixed(0)}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                    ],
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              order.workDescription,
-              style: TextStyle(
-                fontSize: 15,
-                color: Colors.grey[800],
-                fontFamily: fontFamily,
-                height: 1.4,
+              const Divider(height: 24),
+              Row(
+                children: [
+                  Icon(PhosphorIcons.calendar(), size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(
+                    DateFormat('dd/MM/yyyy').format(order.createdAt),
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const Spacer(),
+                  
+                  // Agreement Download Button
+                  if (order.lockedScope != null)
+                    IconButton(
+                      onPressed: () => _downloadAgreement(order, isUrdu),
+                      icon: Icon(PhosphorIcons.scroll(), color: Colors.amber.shade800, size: 20),
+                      tooltip: isUrdu ? 'معاہدہ ڈاؤن لوڈ کریں' : 'Download Agreement',
+                    ),
+
+                  // Dispute Button (Only after deal is confirmed)
+                  if (order.status != 'negotiating' && order.status != 'quoted' && order.status != 'completed' && order.status != 'rated' && order.disputeStatus == null)
+                    IconButton(
+                      onPressed: () => _raiseDispute(order, isUrdu, fontFamily),
+                      icon: Icon(PhosphorIcons.gavel(), color: Colors.redAccent, size: 20),
+                      tooltip: isUrdu ? 'تنازع' : 'Dispute',
+                    ),
+
+                  // Invoice Button
+                  if (order.status == 'completed' || order.status == 'rated')
+                    IconButton(
+                      onPressed: () => _downloadInvoice(order, isUrdu),
+                      icon: Icon(PhosphorIcons.fileText(), color: Colors.blue, size: 20),
+                      tooltip: isUrdu ? 'رسید' : 'Invoice',
+                    ),
+                  
+                  // Actions
+                  if (order.status == 'negotiating' || order.status == 'quoted')
+                    Text(
+                      isUrdu ? 'بات چیت کے لیے کلک کریں' : 'Tap to negotiate',
+                      style: TextStyle(fontFamily: fontFamily, fontSize: 12, color: AppTheme.themeColor, fontWeight: FontWeight.bold),
+                    ),
+
+                  if (order.status == 'confirmed')
+                    _buildActionButton(
+                      onPressed: () => _startWork(order, isUrdu),
+                      label: isUrdu ? '🚀 کام شروع کریں' : 'Start Work',
+                      color: Colors.blue,
+                      fontFamily: fontFamily,
+                    ),
+
+                  if (order.status == 'in_progress')
+                    _buildActionButton(
+                      onPressed: () => _completeWork(order, isUrdu),
+                      label: isUrdu ? '✅ مکمل کریں' : 'Complete',
+                      color: Colors.green,
+                      fontFamily: fontFamily,
+                    ),
+
+                  if (order.isRated) _buildRatingBadge(order.rating),
+                ],
               ),
-            ),
-            if (order.amount != null && order.amount! > 0) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(PhosphorIcons.money(), color: Colors.blue, size: 20),
-                    const SizedBox(width: 10),
-                    Text(
-                      isUrdu ? 'طے شدہ رقم:' : 'Fixed Amount:',
-                      style: TextStyle(fontFamily: fontFamily, fontSize: 13),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'Rs ${order.amount!.toStringAsFixed(0)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                  ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _startWork(ArtisanWorkOrder order, bool isUrdu) async {
+    try {
+      // 1. Status کو in_progress کریں
+      await _service.updateStatus(order.artisanId, order.id, 'in_progress');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isUrdu ? '🚀 کام شروع ہو گیا!' : 'Work started!'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error starting work: $e");
+    }
+  }
+
+  Future<void> _completeWork(ArtisanWorkOrder order, bool isUrdu) async {
+    try {
+      // 1. Status کو completed کریں
+      await _service.updateStatus(order.artisanId, order.id, 'completed');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isUrdu ? '✅ کام مکمل ہو گیا!' : 'Work completed!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error completing work: $e");
+    }
+  }
+
+  Widget _buildLockedScope(String scope, bool isUrdu, String fontFamily) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F9FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.shade100, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(PhosphorIcons.lockKey(), color: Colors.blue.shade800, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                isUrdu ? 'لاک شدہ معاہدہ (اسٹامپ پیپر)' : 'Locked Agreement (Stamp Paper)',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade900,
+                  fontFamily: fontFamily,
                 ),
               ),
             ],
-            const Divider(height: 24),
-            Row(
-              children: [
-                Icon(PhosphorIcons.calendar(), size: 14, color: Colors.grey),
-                const SizedBox(width: 4),
-                Text(
-                  DateFormat('dd/MM/yyyy').format(order.createdAt),
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-                const Spacer(),
-                
-                // Dispute Button
-                if (order.status != 'completed' && order.status != 'rated' && order.disputeStatus == null)
-                  IconButton(
-                    onPressed: () => _raiseDispute(order, isUrdu, fontFamily),
-                    icon: const Icon(Icons.gavel_outlined, color: Colors.redAccent, size: 20),
-                    tooltip: isUrdu ? 'تنازع' : 'Dispute',
-                  ),
-
-                // Invoice Button
-                if (order.status == 'completed' || order.status == 'rated')
-                  IconButton(
-                    onPressed: () => _downloadInvoice(order, isUrdu),
-                    icon: const Icon(Icons.description_outlined, color: Colors.blue, size: 20),
-                    tooltip: isUrdu ? 'رسید' : 'Invoice',
-                  ),
-                
-                // Actions
-                if (needsQuote)
-                   _buildActionButton(
-                    onPressed: () => _showQuoteDialog(order, isUrdu, fontFamily),
-                    label: isUrdu ? 'رقم بتائیں' : 'Enter Price',
-                    color: Colors.orange,
-                    fontFamily: fontFamily,
-                  ),
-                
-                if (waitingForCustomer)
-                  Text(
-                    isUrdu ? 'گاہک کی منظوری کا انتظار...' : 'Waiting for customer...',
-                    style: TextStyle(fontFamily: fontFamily, fontSize: 12, color: Colors.orange, fontStyle: FontStyle.italic),
-                  ),
-
-                if (order.status == 'confirmed')
-                  _buildActionButton(
-                    onPressed: () => _service.updateStatus(widget.artisanId, order.id, 'in_progress'),
-                    label: isUrdu ? 'کام شروع کریں' : 'Start Work',
-                    color: Colors.blue,
-                    fontFamily: fontFamily,
-                  ),
-
-                if (order.status == 'in_progress')
-                  _buildActionButton(
-                    onPressed: () => _service.updateStatus(widget.artisanId, order.id, 'completed'),
-                    label: isUrdu ? 'مکمل کریں' : 'Complete',
-                    color: Colors.green,
-                    fontFamily: fontFamily,
-                  ),
-                
-                if (order.isRated)
-                   _buildRatingBadge(order.rating),
-              ],
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            scope,
+            style: TextStyle(fontSize: 14, color: Colors.black87, height: 1.5, fontFamily: fontFamily),
+          ),
+        ],
       ),
     );
   }
@@ -260,7 +364,7 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.star, color: AppTheme.goldColor, size: 14),
+          Icon(PhosphorIcons.star(PhosphorIconsStyle.fill), color: AppTheme.goldColor, size: 14),
           const SizedBox(width: 4),
           Text('${rating ?? 0}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.goldColor)),
         ],
@@ -419,6 +523,19 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
     try {
       final path = await _proService.generateInvoice(order);
       Share.shareXFiles([XFile(path)], text: isUrdu ? 'کام کی رسید' : 'Work Invoice');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _downloadAgreement(ArtisanWorkOrder order, bool isUrdu) async {
+    try {
+      final path = await _proService.generateAgreement(order);
+      Share.shareXFiles([XFile(path)], text: isUrdu ? 'کام کا معاہدہ' : 'Work Agreement');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

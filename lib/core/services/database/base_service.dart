@@ -9,6 +9,9 @@ import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
 
+import 'package:account_app/core/models/job_post_model.dart';
+import 'package:account_app/core/models/job_bid_model.dart';
+
 /// بیس سروس - تمام سروسز کے لیے مشترکہ کوڈ
 class BaseService extends ChangeNotifier {
   final cf.FirebaseFirestore firestore = cf.FirebaseFirestore.instance;
@@ -22,6 +25,8 @@ class BaseService extends ChangeNotifier {
   Box<List>? get remoteCachedItemsBox => Hive.isBoxOpen('remote_cached_items') ? Hive.box<List>('remote_cached_items') : null;
   Box<ArtisanProfile>? get artisansBox => Hive.isBoxOpen('artisans') ? Hive.box<ArtisanProfile>('artisans') : null;
   Box<ArtisanWorkOrder>? get workOrdersBox => Hive.isBoxOpen('work_orders') ? Hive.box<ArtisanWorkOrder>('work_orders') : null;
+  Box<JobPost>? get jobsBox => Hive.isBoxOpen('jobs') ? Hive.box<JobPost>('jobs') : null;
+  Box<JobBid>? get bidsBox => Hive.isBoxOpen('bids') ? Hive.box<JobBid>('bids') : null;
   Box? get settingsBox => Hive.isBoxOpen('settings') ? Hive.box('settings') : null;
 
   // Hive Boxes کو کھولیں
@@ -33,6 +38,8 @@ class BaseService extends ChangeNotifier {
     await Hive.openBox<List>('remote_cached_items');
     await Hive.openBox<ArtisanProfile>('artisans');
     await Hive.openBox<ArtisanWorkOrder>('work_orders');
+    await Hive.openBox<JobPost>('jobs');
+    await Hive.openBox<JobBid>('bids');
     await Hive.openBox('settings');
   }
 
@@ -45,6 +52,8 @@ class BaseService extends ChangeNotifier {
     if (Hive.isBoxOpen('remote_cached_items')) await Hive.box<List>('remote_cached_items').close();
     if (Hive.isBoxOpen('artisans')) await Hive.box<ArtisanProfile>('artisans').close();
     if (Hive.isBoxOpen('work_orders')) await Hive.box<ArtisanWorkOrder>('work_orders').close();
+    if (Hive.isBoxOpen('jobs')) await Hive.box<JobPost>('jobs').close();
+    if (Hive.isBoxOpen('bids')) await Hive.box<JobBid>('bids').close();
     if (Hive.isBoxOpen('settings')) await Hive.box('settings').close();
   }
 
@@ -57,6 +66,8 @@ class BaseService extends ChangeNotifier {
     if (Hive.isBoxOpen('remote_cached_items')) await Hive.box<List>('remote_cached_items').clear();
     if (Hive.isBoxOpen('artisans')) await Hive.box<ArtisanProfile>('artisans').clear();
     if (Hive.isBoxOpen('work_orders')) await Hive.box<ArtisanWorkOrder>('work_orders').clear();
+    if (Hive.isBoxOpen('jobs')) await Hive.box<JobPost>('jobs').clear();
+    if (Hive.isBoxOpen('bids')) await Hive.box<JobBid>('bids').clear();
     if (Hive.isBoxOpen('settings')) await Hive.box('settings').clear();
   }
 }

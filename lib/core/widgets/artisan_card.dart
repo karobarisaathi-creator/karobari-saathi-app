@@ -13,6 +13,7 @@ import 'package:account_app/core/widgets/app_button.dart';
 import 'artisan_rating_stars.dart';
 
 import 'package:account_app/core/widgets/profile_info_widget.dart';
+import 'package:account_app/core/services/artisan_service.dart';
 
 class ArtisanCard extends StatefulWidget {
   final ArtisanProfile artisan;
@@ -104,7 +105,7 @@ class _ArtisanCardState extends State<ArtisanCard> {
                       widget.artisan.verificationStatus == 'approved',
                   customSize: 70,
                   isVerticalCategory: true,
-                  suffix: null,
+                  suffix: null, // Removed Heart from here
                 ),
                 const Divider(height: 4, thickness: 0.5),
                 Row(
@@ -138,13 +139,25 @@ class _ArtisanCardState extends State<ArtisanCard> {
                         ),
                       ],
                     ),
-                    if (widget.artisan.availability == 'available' &&
-                        widget.artisan.id !=
-                            FirebaseAuth.instance.currentUser?.uid)
-                      _buildWorkRequestButton(
-                          context, widget.isUrdu, widget.fontFamily),
-                    if (widget.artisan.id ==
-                        FirebaseAuth.instance.currentUser?.uid)
+                    if (!isMe)
+                      StreamBuilder<bool>(
+                        stream: ArtisanService().isFavorite(widget.artisan.id),
+                        builder: (context, snapshot) {
+                          final isFav = snapshot.data ?? false;
+                          return IconButton(
+                            icon: Icon(
+                              isFav
+                                  ? PhosphorIcons.heart(PhosphorIconsStyle.fill)
+                                  : PhosphorIcons.heart(),
+                              color: isFav ? Colors.red : Colors.grey,
+                              size: 24,
+                            ),
+                            onPressed: () => ArtisanService()
+                                .toggleFavorite(widget.artisan.id),
+                          );
+                        },
+                      ),
+                    if (isMe)
                       Icon(PhosphorIcons.caretRight(),
                           size: 16, color: Colors.grey),
                   ],

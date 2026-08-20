@@ -49,6 +49,7 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
   String _availability = 'available';
   String _verificationStatus = 'none';
   bool _showPhone = true;
+  bool _showWhatsApp = true;
   bool _isLoading = false;
   bool _isEditing = false;
   bool _isVerified = false;
@@ -101,6 +102,7 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
             _selectedProfession = profile.profession;
             _availability = profile.availability;
             _showPhone = profile.showPhone;
+            _showWhatsApp = profile.showWhatsApp;
             _verificationStatus = profile.verificationStatus;
             _isVerified = profile.isVerified;
             _showExpertFields = true;
@@ -269,7 +271,8 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
         rate: null, // Removed rate field
         availability: _availability,
         phone: _phoneController.text.trim(),
-        showPhone: true, // Always show phone by default
+        showPhone: _showPhone,
+        showWhatsApp: _showWhatsApp,
         description: _descriptionController.text.trim(),
         profileImage: profileImageUrl,
         workImages: finalWorkImages,
@@ -451,6 +454,14 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
                             readOnly: true,
                             hint: isUrdu ? 'لاگ ان نمبر' : 'Login phone',
                           ),
+                          const SizedBox(height: 16),
+                          _buildSwitchTile(
+                            title: isUrdu ? 'واٹس ایپ بٹن دکھائیں' : 'Show WhatsApp Button',
+                            subtitle: isUrdu ? 'بولی کارڈ پر واٹس ایپ کا نشان نظر آئے گا' : 'Show WhatsApp icon on bid cards',
+                            value: _showWhatsApp,
+                            onChanged: (val) => setState(() => _showWhatsApp = val),
+                            fontFamily: fontFamily,
+                          ),
                         ],
                       ),
                     ),
@@ -588,6 +599,30 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildSwitchTile({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    required String fontFamily,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F7F9),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: SwitchListTile(
+        title: Text(title, style: TextStyle(fontFamily: fontFamily, fontSize: 14, fontWeight: FontWeight.bold)),
+        subtitle: Text(subtitle, style: TextStyle(fontFamily: fontFamily, fontSize: 11, color: Colors.grey[600])),
+        value: value,
+        onChanged: onChanged,
+        activeColor: AppTheme.themeColor,
+        contentPadding: EdgeInsets.zero,
+      ),
     );
   }
 

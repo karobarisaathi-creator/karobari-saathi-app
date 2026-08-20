@@ -23,7 +23,6 @@ import 'package:account_app/core/widgets/app_button.dart';
 import 'artisan_work_orders_screen.dart';
 import 'artisan_reviews_screen.dart';
 import 'artisan_profile_screen.dart';
-import 'package:account_app/features/business_chat/business_chat_screen.dart';
 import 'package:account_app/features/settings/verification_request_screen.dart';
 
 class ArtisanDetailScreen extends StatefulWidget {
@@ -107,12 +106,21 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
   }
 
   Future<void> _loadExtraData() async {
-    final workService = ArtisanWorkOrderService();
-    final count = await workService.getWorkCount(widget.artisanId);
-    if (mounted) {
+    if (_artisan != null) {
       setState(() {
-        _workCount = count;
+        _workCount = _artisan!.workCount;
       });
+    }
+
+    // اگر اپنا پروفائل ہے تو تازہ ترین تعداد حاصل کریں
+    if (isOwner) {
+      final workService = ArtisanWorkOrderService();
+      final count = await workService.getWorkCount(widget.artisanId);
+      if (mounted) {
+        setState(() {
+          _workCount = count;
+        });
+      }
     }
   }
 
@@ -442,8 +450,8 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
                         setDialogState(() => selectedRating = index + 1.0),
                     icon: Icon(
                       index < selectedRating
-                          ? Icons.star_rounded
-                          : Icons.star_outline_rounded,
+                          ? PhosphorIcons.star(PhosphorIconsStyle.fill)
+                          : PhosphorIcons.star(),
                       color: Colors.amber,
                       size: 32,
                     ),
@@ -502,20 +510,6 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
               },
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  void _openInAppChat() {
-    if (_artisan == null) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => BusinessChatScreen(
-          otherUserId: _artisan!.id,
-          otherUserName: _artisan!.name,
-          otherUserImage: _artisan!.profileImage,
         ),
       ),
     );
@@ -626,10 +620,28 @@ Check out this artisan on Karobari Saathi!
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(PhosphorIcons.arrowLeft(), color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
+          _buildAvailabilityBadge(artisan, isUrdu, fontFamily),
+          if (!isOwner)
+            StreamBuilder<bool>(
+              stream: ArtisanService().isFavorite(widget.artisanId),
+              builder: (context, snapshot) {
+                final isFav = snapshot.data ?? false;
+                return IconButton(
+                  icon: Icon(
+                    isFav
+                        ? PhosphorIcons.heart(PhosphorIconsStyle.fill)
+                        : PhosphorIcons.heart(),
+                    color: isFav ? Colors.red : Colors.white,
+                  ),
+                  onPressed: () =>
+                      ArtisanService().toggleFavorite(widget.artisanId),
+                );
+              },
+            ),
           IconButton(
             icon: Icon(PhosphorIcons.shareNetwork(), color: Colors.white),
             onPressed: _shareProfile,
@@ -682,7 +694,7 @@ Check out this artisan on Karobari Saathi!
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 50,
-        bottom: 24,
+        bottom: 32,
         left: 20,
         right: 20,
       ),
@@ -714,83 +726,67 @@ Check out this artisan on Karobari Saathi!
             subtitleColor: Colors.white70,
             categoryColor: Colors.white, // Profession in white as requested
             customSize: 85,
-            suffix: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                InkWell(
-                  onTap: isOwner ? _toggleAvailability : null,
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: artisan.availability == 'available'
-                          ? Colors.green.withOpacity(0.2)
-                          : Colors.red.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: artisan.availability == 'available'
-                            ? Colors.green
-                            : Colors.red,
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      artisan.availability == 'available'
-                          ? (isUrdu ? 'دستیاب' : 'Available')
-                          : (isUrdu ? 'مصروف' : 'Busy'),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: artisan.availability == 'available'
-                            ? Colors.green[300]
-                            : Colors.red[300],
-                        fontWeight: FontWeight.bold,
-                        fontFamily: fontFamily,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
           ),
-          const SizedBox(height: 20),
-          // Ratings and Reviews
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ArtisanRatingStars(
-                  rating: artisan.rating,
-                  size: 18,
-                  color: Colors.white, // White stars as requested
+          const SizedBox(height: 12),
+          // Ratings and Reviews (Without background box)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ArtisanRatingStars(
+                rating: artisan.rating,
+                size: 16,
+                color: Colors.white, // White stars
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${artisan.rating}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  '${artisan.rating}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '(${artisan.totalReviews} ${isUrdu ? 'ریویوز' : 'reviews'})',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                    fontFamily: fontFamily,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAvailabilityBadge(ArtisanProfile artisan, bool isUrdu, String fontFamily) {
+    return Center(
+      child: InkWell(
+        onTap: isOwner ? _toggleAvailability : null,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: artisan.availability == 'available'
+                ? Colors.green.withValues(alpha: 0.2)
+                : Colors.red.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: artisan.availability == 'available'
+                  ? Colors.green
+                  : Colors.red,
+              width: 1,
+            ),
+          ),
+          child: Text(
+            artisan.availability == 'available'
+                ? (isUrdu ? 'دستیاب' : 'Available')
+                : (isUrdu ? 'مصروف' : 'Busy'),
+            style: TextStyle(
+              fontSize: 10,
+              color: artisan.availability == 'available'
+                  ? Colors.green[300]
+                  : Colors.red[300],
+              fontWeight: FontWeight.bold,
+              fontFamily: fontFamily,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1159,30 +1155,20 @@ Check out this artisan on Karobari Saathi!
                   ),
                   const SizedBox(width: 10),
                 ],
-                // In-App Chat Button
-                Expanded(
-                  flex: 2,
-                  child: AppButton(
-                    text: isUrdu ? 'چیٹ' : 'Chat',
-                    icon: PhosphorIcons.chatCircleDots(PhosphorIconsStyle.fill),
-                    color: AppTheme.darkColor,
-                    size: AppButtonSize.large,
-                    onPressed: _openInAppChat,
+                // In-App WhatsApp Button (Replaced Chat)
+                if (artisan.showWhatsApp)
+                  Expanded(
+                    flex: 2,
+                    child: AppButton(
+                      text: isUrdu ? 'واٹس ایپ' : 'WhatsApp',
+                      icon: PhosphorIcons.whatsappLogo(PhosphorIconsStyle.fill),
+                      color: const Color(0xFF25D366),
+                      size: AppButtonSize.large,
+                      onPressed: _whatsappArtisan,
+                    ),
                   ),
-                ),
               ],
             ),
-            if (isAccepted) ...[
-              const SizedBox(height: 10),
-              AppButton(
-                text: isUrdu ? 'واٹس ایپ پر رابطہ کریں' : 'Contact on WhatsApp',
-                icon: PhosphorIcons.whatsappLogo(PhosphorIconsStyle.fill),
-                color: const Color(0xFF25D366),
-                isFullWidth: true,
-                size: AppButtonSize.large,
-                onPressed: _whatsappArtisan,
-              ),
-            ],
           ],
         ),
       ),

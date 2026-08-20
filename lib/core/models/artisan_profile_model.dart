@@ -42,6 +42,12 @@ class ArtisanProfile extends HiveObject {
   @HiveField(11)
   final bool showPhone;
 
+  @HiveField(22)
+  final bool showWhatsApp;
+
+  @HiveField(23)
+  final int workCount;
+
   @HiveField(12)
   final String description;
 
@@ -85,6 +91,8 @@ class ArtisanProfile extends HiveObject {
     this.availability = 'available',
     required this.phone,
     this.showPhone = true,
+    this.showWhatsApp = true,
+    this.workCount = 0,
     required this.description,
     this.profileImage,
     this.workImages = const [],
@@ -111,6 +119,8 @@ class ArtisanProfile extends HiveObject {
       'availability': availability,
       'phone': phone,
       'showPhone': showPhone,
+      'showWhatsApp': showWhatsApp,
+      'workCount': workCount,
       'description': description,
       'profileImage': profileImage,
       'workImages': workImages,
@@ -145,6 +155,8 @@ class ArtisanProfile extends HiveObject {
       availability: map['availability']?.toString() ?? 'available',
       phone: map['phone']?.toString() ?? '',
       showPhone: map['showPhone'] ?? true,
+      showWhatsApp: map['showWhatsApp'] ?? true,
+      workCount: (map['workCount'] as num?)?.toInt() ?? 0,
       description: map['description']?.toString() ?? '',
       profileImage: map['profileImage']?.toString(),
       workImages: List<String>.from(map['workImages'] ?? []),
@@ -170,6 +182,8 @@ class ArtisanProfile extends HiveObject {
     String? availability,
     String? phone,
     bool? showPhone,
+    bool? showWhatsApp,
+    int? workCount,
     String? description,
     String? profileImage,
     List<String>? workImages,
@@ -193,6 +207,8 @@ class ArtisanProfile extends HiveObject {
       availability: availability ?? this.availability,
       phone: phone ?? this.phone,
       showPhone: showPhone ?? this.showPhone,
+      showWhatsApp: showWhatsApp ?? this.showWhatsApp,
+      workCount: workCount ?? this.workCount,
       description: description ?? this.description,
       profileImage: profileImage ?? this.profileImage,
       workImages: workImages ?? this.workImages,

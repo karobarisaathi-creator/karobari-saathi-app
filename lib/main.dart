@@ -17,7 +17,6 @@ import 'package:account_app/core/models/transaction_item_model.dart'; // Added i
 import 'package:account_app/core/models/category_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/notification_model.dart';
-import 'package:account_app/core/models/business_chat_model.dart'; // Added new chat
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
 import 'package:account_app/core/models/job_post_model.dart';
@@ -36,8 +35,9 @@ import 'package:account_app/core/services/balance_service.dart';
 import 'package:account_app/core/services/pdf_service.dart';
 import 'package:account_app/core/services/excel_service.dart'; // Added ExcelService
 import 'package:account_app/core/services/backup_service.dart';
+import 'package:account_app/core/services/artisan_service.dart';
+import 'package:account_app/core/services/artisan_work_order_service.dart';
 import 'package:account_app/core/services/database/job_service.dart';
-import 'package:account_app/core/services/database/business_chat_service.dart';
 import 'package:account_app/core/services/security_service.dart';
 import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/core/widgets/simple_spinning_ring.dart';
@@ -49,7 +49,6 @@ import 'package:account_app/features/settings/login_screen.dart';
 import 'package:account_app/features/dashboard/dashboard_screen.dart';
 import 'package:account_app/features/settings/profile_setup_screen.dart';
 import 'package:account_app/features/accounts/add_party_screen.dart';
-import 'package:account_app/features/settings/settings_screen.dart';
 import 'package:account_app/features/accounts/reports_screen.dart';
 import 'package:account_app/features/notifications/notifications_screen.dart';
 import 'package:account_app/features/professions/professions_screen.dart';
@@ -96,8 +95,6 @@ void main() async {
     Hive.registerAdapter(ProfessionCategoryAdapter()); // ✅ Register the new adapter
     Hive.registerAdapter(AppNotificationAdapter());
     Hive.registerAdapter(NotificationTypeAdapter());
-    Hive.registerAdapter(BusinessChatMessageAdapter()); // Enabled new
-    Hive.registerAdapter(BusinessChatRoomAdapter()); // Enabled new
     Hive.registerAdapter(ArtisanProfileAdapter());
     Hive.registerAdapter(ArtisanWorkOrderAdapter());
     Hive.registerAdapter(JobPostAdapter());
@@ -122,6 +119,8 @@ void main() async {
     final transactionsBox = await Hive.openBox<Transaction>('transactions');
     await Hive.openBox<Category>('categories');
     final professionsBox = await Hive.openBox<Profession>('professions');
+    await Hive.openBox<JobPost>('jobs');
+    await Hive.openBox<JobBid>('bids');
     await Hive.openBox('settings');
 
     try {
@@ -191,7 +190,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ExcelService()), // Added ExcelService provider
         ChangeNotifierProvider(create: (_) => BackupService()),
         ChangeNotifierProvider(create: (_) => JobService()),
-        ChangeNotifierProvider(create: (_) => BusinessChatService()),
+        ChangeNotifierProvider(create: (_) => ArtisanService()),
+        ChangeNotifierProvider(create: (_) => ArtisanWorkOrderService()),
         ChangeNotifierProvider(create: (_) => SecurityService()),
         ChangeNotifierProvider(create: (_) => VerificationService()),
       ],
@@ -249,7 +249,6 @@ class MyApp extends StatelessWidget {
               '/login': (context) => LoginScreen(),
               '/profileSetup': (context) => const ProfileSetupScreen(),
               '/addParty': (context) => AddPartyScreen(),
-              '/settings': (context) => SettingsScreen(),
               '/reports': (context) => ReportsScreen(),
               '/notifications': (context) => NotificationsScreen(),
               '/professions': (context) => ProfessionsScreen(),
@@ -267,7 +266,7 @@ class AppWrapper extends StatefulWidget {
   _AppWrapperState createState() => _AppWrapperState();
 }
 
-class _AppWrapperState extends State<AppWrapper> {
+class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
   bool _isLoading = true;
   bool _needsLogin = true;
   bool _isUnlocked = false; // Tracks session unlock status
@@ -279,7 +278,19 @@ class _AppWrapperState extends State<AppWrapper> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeApp();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Presence updates removed
   }
 
   Future<void> _initializeApp() async {

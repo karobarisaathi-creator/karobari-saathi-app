@@ -1,5 +1,6 @@
 // lib/features/artisans/widgets/artisan_rating_stars.dart
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class ArtisanRatingStars extends StatelessWidget {
   final double rating;
@@ -28,11 +29,11 @@ class ArtisanRatingStars extends StatelessWidget {
 
           IconData icon;
           if (isFullStar) {
-            icon = Icons.star_rounded;
+            icon = PhosphorIcons.star(PhosphorIconsStyle.fill);
           } else if (isPartialStar) {
-            icon = Icons.star_half_rounded;
+            icon = PhosphorIcons.starHalf(PhosphorIconsStyle.fill);
           } else {
-            icon = Icons.star_outline_rounded;
+            icon = PhosphorIcons.star();
           }
 
           return Icon(

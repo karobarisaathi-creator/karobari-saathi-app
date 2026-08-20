@@ -147,14 +147,14 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                             color: AppTheme.darkColor.withOpacity(0.05),
                           ),
                           errorWidget: (context, url, error) => _buildInitials(
-                              displayName, widget.isLarge, AppTheme.darkColor),
+                              displayName, widget.isLarge, AppTheme.darkColor, size),
                         )
                       : (File(displayImage).existsSync()
                           ? Image.file(File(displayImage), fit: BoxFit.cover)
                           : _buildInitials(
-                              displayName, widget.isLarge, AppTheme.darkColor)))
+                              displayName, widget.isLarge, AppTheme.darkColor, size)))
                   : _buildInitials(
-                      displayName, widget.isLarge, AppTheme.darkColor,
+                      displayName, widget.isLarge, AppTheme.darkColor, size,
                       isStore: widget.isStore),
             ),
           ),
@@ -226,12 +226,12 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
 
     // Default Row Layout
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center, 
-      mainAxisSize: widget.suffix != null ? MainAxisSize.max : MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisSize: MainAxisSize.max,
       children: [
         imagePart,
         const SizedBox(width: 12),
-        Expanded(
+        Flexible(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
@@ -303,6 +303,17 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
+              if (widget.phone.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  Formatters.formatPhoneNumber(widget.phone),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: effectiveSubtitleColor,
+                    fontFamily: phoneHasUrdu ? fontFamily : '',
+                  ),
+                ),
+              ],
               if (widget.address != null && widget.address!.isNotEmpty) ...[
                 const SizedBox(height: 1),
                 Text(
@@ -327,38 +338,15 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
     );
   }
 
-  Widget _buildInitials(String name, bool isLarge, Color color,
+  Widget _buildInitials(String name, bool isLarge, Color color, double size,
       {bool isStore = false}) {
-    if (name.trim().isEmpty || name == 'Unknown' || name == 'نامعلوم') {
-      return Center(
-        child: Icon(
-          isStore ? PhosphorIcons.storefront() : PhosphorIcons.user(),
-          size: isLarge ? 24 : 18,
-          color: color.withOpacity(0.5),
-        ),
-      );
-    }
-
-    try {
-      return Center(
-        child: Text(
-          Formatters.getInitials(name),
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.bold,
-            fontSize: isLarge ? 20 : 14,
-          ),
-        ),
-      );
-    } catch (e) {
-      return Center(
-        child: Icon(
-          isStore ? PhosphorIcons.storefront() : PhosphorIcons.user(),
-          size: isLarge ? 24 : 18,
-          color: color.withOpacity(0.5),
-        ),
-      );
-    }
+    return Center(
+      child: Icon(
+        isStore ? PhosphorIcons.storefront() : PhosphorIcons.user(),
+        size: isLarge ? size * 0.5 : size * 0.6, // Relative to container size
+        color: color.withOpacity(0.4),
+      ),
+    );
   }
 }
 

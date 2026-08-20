@@ -29,13 +29,15 @@ class JobBidAdapter extends TypeAdapter<JobBid> {
       status: fields[9] as String,
       artisanRating: fields[10] as double,
       artisanExperience: fields[11] as int,
+      proposedScope: fields[12] as String?,
+      artisanPhotoUrl: fields[13] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, JobBid obj) {
     writer
-      ..writeByte(12)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -59,7 +61,11 @@ class JobBidAdapter extends TypeAdapter<JobBid> {
       ..writeByte(10)
       ..write(obj.artisanRating)
       ..writeByte(11)
-      ..write(obj.artisanExperience);
+      ..write(obj.artisanExperience)
+      ..writeByte(12)
+      ..write(obj.proposedScope)
+      ..writeByte(13)
+      ..write(obj.artisanPhotoUrl);
   }
 
   @override

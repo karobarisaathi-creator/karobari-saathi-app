@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dashboard_screen.dart';
-import 'package:account_app/features/artisans/artisan_home_screen.dart';
 import 'package:account_app/features/professions/professions_screen.dart';
-import 'package:account_app/features/settings/settings_screen.dart';
+import 'package:account_app/features/notifications/notifications_screen.dart';
 import 'package:account_app/features/artisans/browse_jobs_screen.dart';
+import 'package:account_app/features/artisans/artisan_work_orders_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:provider/provider.dart';
+import 'package:account_app/core/widgets/app_drawer.dart';
+import 'package:account_app/core/services/notification_service.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -21,14 +24,19 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = [
+  void openDrawer() {
+    _scaffoldKey.currentState?.openDrawer();
+  }
+
+  List<Widget> get _screens => [
     DashboardScreen(),
     ProfessionsScreen(),
-    const ArtisanHomeScreen(),
+    ArtisanWorkOrdersScreen(artisanId: FirebaseAuth.instance.currentUser?.uid ?? ''),
     const BrowseJobsScreen(),
-    const SettingsScreen(),
+    const NotificationsScreen(),
   ];
 
   void onItemTapped(int index) {
@@ -40,13 +48,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     final isUrdu = Provider.of<LanguageService>(context).isUrdu;
-    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
     
-    // Calculate dynamic bottom bar height based on device settings
+    // Calculate dynamic bottom bar height
     final double bottomPadding = MediaQuery.of(context).padding.bottom;
     final double textScaleFactor = MediaQuery.of(context).textScaleFactor;
     
-    // Adjust height for larger fonts/display zoom
     final double dynamicHeight = (kBottomNavigationBarHeight * 
         (textScaleFactor > 1.2 ? textScaleFactor * 0.8 : 1.0)).clamp(
       kBottomNavigationBarHeight, 
@@ -54,6 +60,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
 
     return Scaffold(
+      key: _scaffoldKey,
+      drawer: const AppDrawer(),
       body: IndexedStack(
         index: _selectedIndex,
         children: _screens,
@@ -63,7 +71,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         color: AppTheme.darkColor,
         child: MediaQuery(
           data: MediaQuery.of(context).copyWith(
-            textScaler: const TextScaler.linear(1.0), // Prevent text scaling in nav bar
+            textScaler: const TextScaler.linear(1.0),
           ),
           child: SingleChildScrollView(
             physics: const NeverScrollableScrollPhysics(),
@@ -91,9 +99,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   label: isUrdu ? 'پیشہ' : 'Professions',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(PhosphorIcons.hammer(), size: 24),
-                  activeIcon: Icon(PhosphorIcons.hammer(PhosphorIconsStyle.fill), size: 24),
-                  label: isUrdu ? 'ماہرین' : 'Experts',
+                  icon: Icon(PhosphorIcons.listBullets(), size: 24),
+                  activeIcon: Icon(PhosphorIcons.listBullets(PhosphorIconsStyle.fill), size: 24),
+                  label: isUrdu ? 'مجھے ملے کام' : 'My Jobs',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(PhosphorIcons.megaphone(), size: 24),
@@ -101,9 +109,25 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   label: isUrdu ? 'کام' : 'Jobs',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(PhosphorIcons.gear(), size: 24),
-                  activeIcon: Icon(PhosphorIcons.gear(PhosphorIconsStyle.fill), size: 24),
-                  label: isUrdu ? 'سیٹنگز' : 'Settings',
+                  icon: Consumer<NotificationService>(
+                    builder: (context, notifService, child) {
+                      return Badge(
+                        label: Text(notifService.unreadCount.toString()),
+                        isLabelVisible: notifService.unreadCount > 0,
+                        child: Icon(PhosphorIcons.bell(), size: 24),
+                      );
+                    },
+                  ),
+                  activeIcon: Consumer<NotificationService>(
+                    builder: (context, notifService, child) {
+                      return Badge(
+                        label: Text(notifService.unreadCount.toString()),
+                        isLabelVisible: notifService.unreadCount > 0,
+                        child: Icon(PhosphorIcons.bell(PhosphorIconsStyle.fill), size: 24),
+                      );
+                    },
+                  ),
+                  label: isUrdu ? 'اطلاعات' : 'Notifications',
                 ),
               ],
             ),

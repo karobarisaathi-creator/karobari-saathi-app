@@ -41,8 +41,82 @@ class ArtisanProService {
   }
 
   // ============================================================
-  // 2. Invoice Service
+  // 2. Agreement & Invoice Service
   // ====================
+  Future<String> generateAgreement(ArtisanWorkOrder order) async {
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Container(
+            padding: const pw.EdgeInsets.all(20),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Center(child: pw.Text('WORK AGREEMENT (STAMP PAPER)', style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold))),
+                pw.SizedBox(height: 5),
+                pw.Center(child: pw.Text('Karobari Saathi - Verified Contract', style: pw.TextStyle(fontSize: 10))),
+                pw.SizedBox(height: 20),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Contract #: ${order.id}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    pw.Text('Date: ${DateFormat('dd/MM/yyyy').format(order.agreedAt ?? order.createdAt)}'),
+                  ],
+                ),
+                pw.Divider(thickness: 2),
+                pw.SizedBox(height: 10),
+                pw.Text('PARTIES:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text('Customer: ${order.customerName} (ID: ${order.customerId})'),
+                pw.Text('Artisan: (ID: ${order.artisanId})'),
+                pw.SizedBox(height: 15),
+                pw.Text('SCOPE OF WORK (STAMPED):', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
+                  child: pw.Text(order.lockedScope ?? order.workDescription),
+                ),
+                pw.SizedBox(height: 15),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('AGREED AMOUNT:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    pw.Text('Rs. ${order.amount?.toStringAsFixed(0)}', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                  ],
+                ),
+                pw.SizedBox(height: 30),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+                  children: [
+                    pw.Column(children: [
+                      pw.SizedBox(width: 100, child: pw.Divider()),
+                      pw.Text('Customer Signed'),
+                      pw.Text('Verified Digitally', style: pw.TextStyle(fontSize: 8)),
+                    ]),
+                    pw.Column(children: [
+                      pw.SizedBox(width: 100, child: pw.Divider()),
+                      pw.Text('Artisan Signed'),
+                      pw.Text('Verified Digitally', style: pw.TextStyle(fontSize: 8)),
+                    ]),
+                  ],
+                ),
+                pw.SizedBox(height: 40),
+                pw.Divider(),
+                pw.Text('LEGAL NOTICE:', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                pw.Text('This is a legally binding digital contract. Any changes must be mutually agreed upon in writing. This document serves as proof of scope and pricing in case of dispute.', style: pw.TextStyle(fontSize: 8)),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    final output = await getTemporaryDirectory();
+    final file = File('${output.path}/agreement_${order.id}.pdf');
+    await file.writeAsBytes(await pdf.save());
+    return file.path;
+  }
+
   Future<String> generateInvoice(ArtisanWorkOrder order) async {
     final pdf = pw.Document();
     pdf.addPage(

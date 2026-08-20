@@ -173,28 +173,92 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: CustomAppBar(
-        title: 'ایڈمن کنٹرول پینل',
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          indicatorColor: AppTheme.verifiedGold,
-          indicatorWeight: 3,
-          tabs: [
-            Tab(text: 'درخواستیں', icon: Icon(PhosphorIcons.clipboardText())),
-            Tab(text: 'پیغام', icon: Icon(PhosphorIcons.megaphone())),
-            Tab(text: 'صارفین', icon: Icon(PhosphorIcons.users())),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildPillTabBar(),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildVerificationsTab(),
+                  _buildBroadcastTab(),
+                  _buildUsersTab(),
+                ],
+              ),
+            ),
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+    );
+  }
+
+  Widget _buildPillTabBar() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Row(
         children: [
-          _buildVerificationsTab(),
-          _buildBroadcastTab(),
-          _buildUsersTab(),
+          // Back Button integrated into the row
+          Container(
+            margin: const EdgeInsets.only(right: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              icon: Icon(PhosphorIcons.caretLeft(), color: AppTheme.themeColor),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          // Pill TabBar
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                indicator: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                labelColor: AppTheme.themeColor,
+                unselectedLabelColor: Colors.grey[600],
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  fontFamily: 'NooriNastaleeq',
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontSize: 14,
+                  fontFamily: 'NooriNastaleeq',
+                ),
+                tabs: const [
+                  Tab(text: 'درخواستیں'),
+                  Tab(text: 'پیغام'),
+                  Tab(text: 'صارفین'),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -202,91 +266,105 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
 
   Widget _buildBroadcastTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('تمام صارفین کو نوٹیفیکیشن بھیجیں',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _broadcastTitleController,
-            decoration: InputDecoration(
-              labelText: 'عنوان (Title)',
-              prefixIcon:
-                  Icon(PhosphorIcons.textT(), color: AppTheme.themeColor),
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _broadcastMessageController,
-            maxLines: 4,
-            decoration: InputDecoration(
-              labelText: 'پیغام (Message)',
-              prefixIcon: Padding(
-                padding: const EdgeInsets.only(bottom: 60),
-                child:
-                    Icon(PhosphorIcons.chatText(), color: AppTheme.themeColor),
+      padding: const EdgeInsets.all(16),
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.grey[200]!),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(PhosphorIcons.megaphone(PhosphorIconsStyle.fill),
+                      color: AppTheme.themeColor),
+                  const SizedBox(width: 8),
+                  const Text('براڈکاسٹ نوٹیفیکیشن',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                ],
               ),
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 24),
-          AppButton(
-            text: 'براڈکاسٹ بھیجیں',
-            onPressed: () async {
-              if (_broadcastTitleController.text.isEmpty ||
-                  _broadcastMessageController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content:
-                        const Text('عنوان اور پیغام دونوں ضروری ہیں'),
-                    backgroundColor: AppTheme.expenseColor,
+              const SizedBox(height: 20),
+              TextField(
+                controller: _broadcastTitleController,
+                decoration: InputDecoration(
+                  labelText: 'عنوان (Title)',
+                  hintText: 'پیغام کا عنوان لکھیں',
+                  prefixIcon:
+                      Icon(PhosphorIcons.textT(), color: AppTheme.themeColor),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _broadcastMessageController,
+                maxLines: 5,
+                decoration: InputDecoration(
+                  labelText: 'پیغام (Message)',
+                  hintText: 'اپنا پیغام یہاں ٹائپ کریں...',
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(bottom: 80),
+                    child: Icon(PhosphorIcons.chatText(),
+                        color: AppTheme.themeColor),
                   ),
-                );
-                return;
-              }
+                ),
+              ),
+              const SizedBox(height: 24),
+              AppButton(
+                text: 'پیغام بھیجیں',
+                onPressed: () async {
+                  if (_broadcastTitleController.text.isEmpty ||
+                      _broadcastMessageController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('عنوان اور پیغام دونوں ضروری ہیں'),
+                        backgroundColor: AppTheme.expenseColor,
+                      ),
+                    );
+                    return;
+                  }
 
-              setState(() => _isBroadcastSending = true);
-              try {
-                await Provider.of<VerificationService>(context,
-                        listen: false)
-                    .sendBroadcastNotification(
-                  title: _broadcastTitleController.text,
-                  message: _broadcastMessageController.text,
-                );
-                _broadcastTitleController.clear();
-                _broadcastMessageController.clear();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content:
-                          Text('تمام صارفین کو پیغام بھیج دیا گیا ہے'),
-                      backgroundColor: AppTheme.incomeColor,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      backgroundColor: AppTheme.expenseColor,
-                      content: Text('خرابی: $e'),
-                    ),
-                  );
-                }
-              } finally {
-                if (mounted)
-                  setState(() => _isBroadcastSending = false);
-              }
-            },
-            icon: PhosphorIcons.paperPlaneRight(PhosphorIconsStyle.fill),
-            isLoading: _isBroadcastSending,
-            isFullWidth: true,
-            size: AppButtonSize.large,
+                  setState(() => _isBroadcastSending = true);
+                  try {
+                    await Provider.of<VerificationService>(context,
+                            listen: false)
+                        .sendBroadcastNotification(
+                      title: _broadcastTitleController.text,
+                      message: _broadcastMessageController.text,
+                    );
+                    _broadcastTitleController.clear();
+                    _broadcastMessageController.clear();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('تمام صارفین کو پیغام بھیج دیا گیا ہے'),
+                          backgroundColor: AppTheme.incomeColor,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          backgroundColor: AppTheme.expenseColor,
+                          content: Text('خرابی: $e'),
+                        ),
+                      );
+                    }
+                  } finally {
+                    if (mounted) setState(() => _isBroadcastSending = false);
+                  }
+                },
+                icon: PhosphorIcons.paperPlaneRight(PhosphorIconsStyle.fill),
+                isLoading: _isBroadcastSending,
+                isFullWidth: true,
+                size: AppButtonSize.large,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -377,17 +455,65 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: TextField(
             controller: _searchController,
             decoration: InputDecoration(
               hintText: 'فون نمبر سے تلاش کریں...',
               prefixIcon: Icon(PhosphorIcons.magnifyingGlass()),
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
             ),
             onChanged: (v) => setState(() {}),
           ),
+        ),
+        StreamBuilder<Map<String, dynamic>>(
+          stream: vService.getAppStatsStream(),
+          builder: (context, snapshot) {
+            final total = snapshot.data?['totalUsers'] ?? 0;
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.themeColor.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(PhosphorIcons.users(PhosphorIconsStyle.fill),
+                          size: 20, color: AppTheme.themeColor),
+                      const SizedBox(width: 10),
+                      Text('کل رجسٹرڈ صارفین',
+                          style: TextStyle(
+                              color: AppTheme.themeColor,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              fontFamily: 'NooriNastaleeq')),
+                    ],
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.themeColor,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '$total',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
         Expanded(
           child: StreamBuilder<List<Map<String, dynamic>>>(
@@ -412,11 +538,12 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: CircleAvatar(
+                      backgroundColor: Colors.grey[200],
                       backgroundImage: user['photoURL'] != null
                           ? NetworkImage(user['photoURL'])
                           : null,
                       child: user['photoURL'] == null
-                          ? Icon(PhosphorIcons.user())
+                          ? Icon(PhosphorIcons.user(), color: Colors.grey)
                           : null,
                     ),
                     title: Row(

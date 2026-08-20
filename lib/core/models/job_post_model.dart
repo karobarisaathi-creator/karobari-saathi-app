@@ -27,13 +27,13 @@ class JobPost extends HiveObject {
   final String location;
 
   @HiveField(7)
-  final String category;
+  final List<String> categories;
 
   @HiveField(8)
   final double? estimatedBudget;
 
   @HiveField(9)
-  final DateTime deadline;
+  final DateTime? deadline;
 
   @HiveField(10)
   final List<String> images;
@@ -53,6 +53,30 @@ class JobPost extends HiveObject {
   @HiveField(15)
   final String? customerPhotoUrl;
 
+  @HiveField(16)
+  final List<String> clarifications;
+
+  @HiveField(17)
+  final String? detailedScope;
+
+  @HiveField(18)
+  final String? scopeOfWork;
+
+  @HiveField(19)
+  final String? exclusions;
+
+  @HiveField(20)
+  final bool? isComplex;
+
+  @HiveField(21)
+  final int? estimatedDays;
+
+  @HiveField(22)
+  final bool? requiresHeightWork;
+
+  @HiveField(23)
+  final bool? requiresSpecialTools;
+
   JobPost({
     required this.id,
     required this.customerId,
@@ -62,14 +86,22 @@ class JobPost extends HiveObject {
     required this.title,
     required this.description,
     required this.location,
-    required this.category,
+    required this.categories,
     this.estimatedBudget,
-    required this.deadline,
+    this.deadline,
     this.images = const [],
     this.status = 'open',
     required this.createdAt,
     this.selectedBidId,
     this.bidCount = 0,
+    this.clarifications = const [],
+    this.detailedScope,
+    this.scopeOfWork,
+    this.exclusions,
+    this.isComplex,
+    this.estimatedDays,
+    this.requiresHeightWork,
+    this.requiresSpecialTools,
   });
 
   Map<String, dynamic> toMap() {
@@ -82,14 +114,22 @@ class JobPost extends HiveObject {
       'title': title,
       'description': description,
       'location': location,
-      'category': category,
+      'categories': categories,
       'estimatedBudget': estimatedBudget,
-      'deadline': deadline.toIso8601String(),
+      'deadline': deadline?.toIso8601String(),
       'images': images,
       'status': status,
       'createdAt': createdAt.toIso8601String(),
       'selectedBidId': selectedBidId,
       'bidCount': bidCount,
+      'clarifications': clarifications,
+      'detailedScope': detailedScope,
+      'scopeOfWork': scopeOfWork,
+      'exclusions': exclusions,
+      'isComplex': isComplex,
+      'estimatedDays': estimatedDays,
+      'requiresHeightWork': requiresHeightWork,
+      'requiresSpecialTools': requiresSpecialTools,
     };
   }
 
@@ -110,14 +150,78 @@ class JobPost extends HiveObject {
       title: map['title'] ?? '',
       description: map['description'] ?? '',
       location: map['location'] ?? '',
-      category: map['category'] ?? '',
+      categories: map['categories'] != null 
+          ? List<String>.from(map['categories']) 
+          : (map['category'] != null ? [map['category']] : []),
       estimatedBudget: (map['estimatedBudget'] as num?)?.toDouble(),
-      deadline: parseDate(map['deadline']),
+      deadline: map['deadline'] != null ? parseDate(map['deadline']) : null,
       images: List<String>.from(map['images'] ?? []),
       status: map['status'] ?? 'open',
       createdAt: parseDate(map['createdAt']),
       selectedBidId: map['selectedBidId'],
       bidCount: (map['bidCount'] as num?)?.toInt() ?? 0,
+      clarifications: List<String>.from(map['clarifications'] ?? []),
+      detailedScope: map['detailedScope'],
+      scopeOfWork: map['scopeOfWork'],
+      exclusions: map['exclusions'],
+      isComplex: map['isComplex'],
+      estimatedDays: (map['estimatedDays'] as num?)?.toInt(),
+      requiresHeightWork: map['requiresHeightWork'],
+      requiresSpecialTools: map['requiresSpecialTools'],
+    );
+  }
+
+  JobPost copyWith({
+    String? id,
+    String? customerId,
+    String? customerName,
+    String? customerPhone,
+    String? customerPhotoUrl,
+    String? title,
+    String? description,
+    String? location,
+    List<String>? categories,
+    double? estimatedBudget,
+    DateTime? deadline,
+    List<String>? images,
+    String? status,
+    DateTime? createdAt,
+    String? selectedBidId,
+    int? bidCount,
+    List<String>? clarifications,
+    String? detailedScope,
+    String? scopeOfWork,
+    String? exclusions,
+    bool? isComplex,
+    int? estimatedDays,
+    bool? requiresHeightWork,
+    bool? requiresSpecialTools,
+  }) {
+    return JobPost(
+      id: id ?? this.id,
+      customerId: customerId ?? this.customerId,
+      customerName: customerName ?? this.customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
+      customerPhotoUrl: customerPhotoUrl ?? this.customerPhotoUrl,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      location: location ?? this.location,
+      categories: categories ?? this.categories,
+      estimatedBudget: estimatedBudget ?? this.estimatedBudget,
+      deadline: deadline ?? this.deadline,
+      images: images ?? this.images,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      selectedBidId: selectedBidId ?? this.selectedBidId,
+      bidCount: bidCount ?? this.bidCount,
+      clarifications: clarifications ?? this.clarifications,
+      detailedScope: detailedScope ?? this.detailedScope,
+      scopeOfWork: scopeOfWork ?? this.scopeOfWork,
+      exclusions: exclusions ?? this.exclusions,
+      isComplex: isComplex ?? this.isComplex,
+      estimatedDays: estimatedDays ?? this.estimatedDays,
+      requiresHeightWork: requiresHeightWork ?? this.requiresHeightWork,
+      requiresSpecialTools: requiresSpecialTools ?? this.requiresSpecialTools,
     );
   }
 }

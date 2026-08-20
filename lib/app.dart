@@ -16,7 +16,6 @@ import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/category_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/notification_model.dart';
-import 'package:account_app/core/models/business_chat_model.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
 import 'package:account_app/core/models/job_post_model.dart';
@@ -35,7 +34,6 @@ import 'package:account_app/core/services/balance_service.dart';
 import 'package:account_app/core/services/pdf_service.dart';
 import 'package:account_app/core/services/backup_service.dart';
 import 'package:account_app/core/services/database/job_service.dart';
-import 'package:account_app/core/services/database/business_chat_service.dart';
 import 'package:account_app/core/services/security_service.dart';
 
 // Screens
@@ -61,8 +59,6 @@ void main() async {
   Hive.registerAdapter(ProfessionCategoryAdapter());
   Hive.registerAdapter(AppNotificationAdapter());
   Hive.registerAdapter(NotificationTypeAdapter());
-  Hive.registerAdapter(BusinessChatMessageAdapter());
-  Hive.registerAdapter(BusinessChatRoomAdapter());
   Hive.registerAdapter(ArtisanProfileAdapter());
   Hive.registerAdapter(ArtisanWorkOrderAdapter());
   Hive.registerAdapter(JobPostAdapter());
@@ -107,7 +103,6 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PdfService()),
         ChangeNotifierProvider(create: (_) => BackupService()),
         ChangeNotifierProvider(create: (_) => JobService()),
-        ChangeNotifierProvider(create: (_) => BusinessChatService()),
         ChangeNotifierProvider(create: (_) => SecurityService()),
       ],
       child: Consumer2<LanguageService, ThemeService>(

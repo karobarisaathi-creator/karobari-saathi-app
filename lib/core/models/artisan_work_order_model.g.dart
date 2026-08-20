@@ -42,13 +42,14 @@ class ArtisanWorkOrderAdapter extends TypeAdapter<ArtisanWorkOrder> {
       customerAcceptedTerms: fields[22] as bool,
       artisanAcceptedTerms: fields[23] as bool,
       disputeStatus: fields[24] as String?,
+      lockedScope: fields[25] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ArtisanWorkOrder obj) {
     writer
-      ..writeByte(25)
+      ..writeByte(26)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -98,7 +99,9 @@ class ArtisanWorkOrderAdapter extends TypeAdapter<ArtisanWorkOrder> {
       ..writeByte(23)
       ..write(obj.artisanAcceptedTerms)
       ..writeByte(24)
-      ..write(obj.disputeStatus);
+      ..write(obj.disputeStatus)
+      ..writeByte(25)
+      ..write(obj.lockedScope);
   }
 
   @override

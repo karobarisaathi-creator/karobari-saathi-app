@@ -25,21 +25,31 @@ class JobPostAdapter extends TypeAdapter<JobPost> {
       title: fields[4] as String,
       description: fields[5] as String,
       location: fields[6] as String,
-      category: fields[7] as String,
+      categories: fields[7] is List 
+          ? (fields[7] as List).cast<String>() 
+          : (fields[7] is String ? [fields[7] as String] : []),
       estimatedBudget: fields[8] as double?,
-      deadline: fields[9] as DateTime,
+      deadline: fields[9] as DateTime?,
       images: (fields[10] as List).cast<String>(),
       status: fields[11] as String,
       createdAt: fields[12] as DateTime,
       selectedBidId: fields[13] as String?,
       bidCount: fields[14] as int,
+      clarifications: (fields[16] as List).cast<String>(),
+      detailedScope: fields[17] as String?,
+      scopeOfWork: fields[18] as String?,
+      exclusions: fields[19] as String?,
+      isComplex: fields[20] as bool?,
+      estimatedDays: fields[21] as int?,
+      requiresHeightWork: fields[22] as bool?,
+      requiresSpecialTools: fields[23] as bool?,
     );
   }
 
   @override
   void write(BinaryWriter writer, JobPost obj) {
     writer
-      ..writeByte(16)
+      ..writeByte(24)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -55,7 +65,7 @@ class JobPostAdapter extends TypeAdapter<JobPost> {
       ..writeByte(6)
       ..write(obj.location)
       ..writeByte(7)
-      ..write(obj.category)
+      ..write(obj.categories)
       ..writeByte(8)
       ..write(obj.estimatedBudget)
       ..writeByte(9)
@@ -71,7 +81,23 @@ class JobPostAdapter extends TypeAdapter<JobPost> {
       ..writeByte(14)
       ..write(obj.bidCount)
       ..writeByte(15)
-      ..write(obj.customerPhotoUrl);
+      ..write(obj.customerPhotoUrl)
+      ..writeByte(16)
+      ..write(obj.clarifications)
+      ..writeByte(17)
+      ..write(obj.detailedScope)
+      ..writeByte(18)
+      ..write(obj.scopeOfWork)
+      ..writeByte(19)
+      ..write(obj.exclusions)
+      ..writeByte(20)
+      ..write(obj.isComplex)
+      ..writeByte(21)
+      ..write(obj.estimatedDays)
+      ..writeByte(22)
+      ..write(obj.requiresHeightWork)
+      ..writeByte(23)
+      ..write(obj.requiresSpecialTools);
   }
 
   @override

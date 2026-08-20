@@ -20,19 +20,20 @@ class ArtisanService extends BaseService {
   // ============================================================
 
   /// کاریگر کی پروفائل کو ڈیٹا بیس میں محفوظ کرتا ہے
-  /// 
+  ///
   /// Parameters:
   ///   - [profile]: ArtisanProfile - محفوظ کی جانے والی پروفائل
-  /// 
+  ///
   /// Throws:
   ///   - FirebaseException: اگر Firestore میں خرابی ہو
   Future<void> saveProfile(ArtisanProfile profile) async {
     final user = auth.currentUser;
     if (user == null) throw Exception('صارف لاگ ان نہیں ہے');
-    
+
     // سیکیورٹی چیک: صرف مالک اپنی پروفائل اپ ڈیٹ کر سکتا ہے
     if (user.uid != profile.id) {
-      _logger.warning("Security Alert: User ${user.uid} tried to update profile of ${profile.id}");
+      _logger.warning(
+          "Security Alert: User ${user.uid} tried to update profile of ${profile.id}");
       throw Exception('آپ کو یہ پروفائل تبدیل کرنے کا اختیار نہیں ہے');
     }
 
@@ -47,13 +48,13 @@ class ArtisanService extends BaseService {
   // ============================================================
 
   /// کاریگر کی پروفائل اور اس سے منسلک تصاویر کو حذف کرتا ہے
-  /// 
+  ///
   /// Parameters:
   ///   - [id]: String - کاریگر کی منفرد آئی ڈی
   Future<void> deleteProfile(String id) async {
     final user = auth.currentUser;
     if (user == null) throw Exception('صارف لاگ ان نہیں ہے');
-    
+
     // سیکیورٹی چیک
     if (user.uid != id) {
       throw Exception('آپ کو یہ پروفائل حذف کرنے کا اختیار نہیں ہے');
@@ -85,12 +86,12 @@ class ArtisanService extends BaseService {
   // ============================================================
 
   /// کاریگر کی تصویر (پروفائل یا کام کی تصویر) Firebase Storage پر اپ لوڈ کرتا ہے
-  /// 
+  ///
   /// Parameters:
   ///   - [userId]: String - صارف کی آئی ڈی
   ///   - [file]: File - اپ لوڈ کی جانے والی فائل
   ///   - [type]: String - تصویر کی قسم (مثلاً 'profile' یا 'work')
-  /// 
+  ///
   /// Returns:
   ///   - Future<String?>: تصویر کا ڈاؤن لوڈ URL، یا خرابی کی صورت میں null
   Future<String?> uploadImage(String userId, File file, String type) async {
@@ -111,10 +112,10 @@ class ArtisanService extends BaseService {
           "${userId}_${type}_${DateTime.now().millisecondsSinceEpoch}.$extension";
       final ref =
           _storage.ref().child('artisan_uploads').child(userId).child(fileName);
-      
+
       _logger.info("Uploading $type image for user: $userId");
       await ref.putFile(file);
-      
+
       final url = await ref.getDownloadURL();
       _logger.info("Upload successful: $url");
       return url;
@@ -133,33 +134,44 @@ class ArtisanService extends BaseService {
   // ============================================================
 
   /// کسی مخصوص آئی ڈی کے ذریعے کاریگر کی پروفائل حاصل کرتا ہے
-  /// 
+  ///
   /// Parameters:
   ///   - [id]: String - کاریگر کی آئی ڈی
-  /// 
+  ///
   /// Returns:
   ///   - Future<ArtisanProfile?>: کاریگر کی پروفائل یا null اگر موجود نہ ہو
   Future<ArtisanProfile?> getProfile(String id) async {
+    // 1. Check local cache first
+    if (artisansBox?.containsKey(id) ?? false) {
+      return artisansBox!.get(id);
+    }
+
+    // 2. Fetch from Cloud
     final doc = await firestore.collection('artisans').doc(id).get();
     if (doc.exists) {
-      return ArtisanProfile.fromMap(doc.data()!);
+      final profile = ArtisanProfile.fromMap(doc.data()!);
+      await artisansBox?.put(id, profile); // Cache it
+      return profile;
     }
     return null;
   }
 
   /// کسی مخصوص آئی ڈی کے لیے کاریگر کی پروفائل کی لائیو اسٹریم فراہم کرتا ہے
-  /// 
+  ///
   /// Parameters:
   ///   - [id]: String - کاریگر کی آئی ڈی
-  /// 
+  ///
   /// Returns:
   ///   - Stream<ArtisanProfile?>: پروفائل کی تبدیلیوں کی اسٹریم
   Stream<ArtisanProfile?> streamProfile(String id) {
-    return firestore
-        .collection('artisans')
-        .doc(id)
-        .snapshots()
-        .map((doc) => doc.exists ? ArtisanProfile.fromMap(doc.data()!) : null);
+    return firestore.collection('artisans').doc(id).snapshots().map((doc) {
+      if (doc.exists) {
+        final profile = ArtisanProfile.fromMap(doc.data()!);
+        artisansBox?.put(id, profile); // Update cache on every change
+        return profile;
+      }
+      return null;
+    });
   }
 
   // ============================================================
@@ -167,22 +179,38 @@ class ArtisanService extends BaseService {
   // ============================================================
 
   /// تمام فعال (Active) کاریگروں کی فہرست حاصل کرتا ہے
-  /// 
+  ///
   /// Returns:
   ///   - Future<List<ArtisanProfile>>: کاریگروں کی فہرست
   Future<List<ArtisanProfile>> getAllArtisans() async {
-    final snapshot = await firestore
-        .collection('artisans')
-        .where('isActive', isEqualTo: true)
-        .get();
+    // Return local first for speed
+    final localArtisans = artisansBox?.values.toList() ?? [];
 
-    return snapshot.docs
-        .map((doc) => ArtisanProfile.fromMap(doc.data()))
-        .toList();
+    // Trigger background sync
+    _syncAllArtisansFromCloud();
+
+    return localArtisans;
+  }
+
+  Future<void> _syncAllArtisansFromCloud() async {
+    try {
+      final snapshot = await firestore
+          .collection('artisans')
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      for (var doc in snapshot.docs) {
+        final profile = ArtisanProfile.fromMap(doc.data());
+        await artisansBox?.put(profile.id, profile);
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Error syncing artisans: $e");
+    }
   }
 
   /// تمام فعال کاریگروں کی لائیو اسٹریم فراہم کرتا ہے
-  /// 
+  ///
   /// Returns:
   ///   - Stream<List<ArtisanProfile>>: کاریگروں کی فہرست کی اسٹریم
   Stream<List<ArtisanProfile>> streamAllArtisans() {
@@ -196,10 +224,10 @@ class ArtisanService extends BaseService {
   }
 
   /// تمام فعال کاریگروں کی لائیو اسٹریم فراہم کرتا ہے (پیجینیشن کے ساتھ)
-  /// 
+  ///
   /// Parameters:
   ///   - [limit]: int - کتنے کاریگر ایک وقت میں لوڈ کرنے ہیں
-  /// 
+  ///
   /// Returns:
   ///   - Stream<List<ArtisanProfile>>: کاریگروں کی فہرست کی اسٹریم
   Stream<List<ArtisanProfile>> streamArtisansPaginated({int limit = 20}) {
@@ -219,13 +247,13 @@ class ArtisanService extends BaseService {
   // ============================================================
 
   /// پیشے (Profession) اور لوکیشن کے حساب سے کاریگروں کو تلاش کرتا ہے
-  /// 
+  ///
   /// Parameters:
   ///   - [profession]: String - مطلوبہ پیشہ
   ///   - [latitude]: double? - صارف کی عرضِ بلد (اختیاری)
   ///   - [longitude]: double? - صارف کی طولِ بلد (اختیاری)
   ///   - [radiusKm]: double - تلاش کا دائرہ (کلو میٹر میں)
-  /// 
+  ///
   /// Returns:
   ///   - Future<List<ArtisanProfile>>: تلاش کے معیار پر پورا اترنے والے کاریگروں کی فہرست
   Future<List<ArtisanProfile>> searchByProfession(
@@ -268,10 +296,10 @@ class ArtisanService extends BaseService {
   // ============================================================
 
   /// نام کے ذریعے کاریگروں کو تلاش کرتا ہے
-  /// 
+  ///
   /// Parameters:
   ///   - [query]: String - تلاش کے لیے نام یا نام کا حصہ
-  /// 
+  ///
   /// Returns:
   ///   - Future<List<ArtisanProfile>>: ملتے جلتے ناموں والے کاریگروں کی فہرست
   Future<List<ArtisanProfile>> searchByName(String query) async {
@@ -294,7 +322,7 @@ class ArtisanService extends BaseService {
   // ============================================================
 
   /// کاریگر کے لیے ایک نیا ریویو (Review) شامل کرتا ہے اور اوسط ریٹنگ اپ ڈیٹ کرتا ہے
-  /// 
+  ///
   /// Parameters:
   ///   - [artisanId]: String - کاریگر کی آئی ڈی
   ///   - [workOrderId]: String? - متعلقہ کام کے آرڈر کی آئی ڈی (اگر ہو)
@@ -308,6 +336,9 @@ class ArtisanService extends BaseService {
   }) async {
     final user = auth.currentUser;
     if (user == null) throw Exception('User not logged in');
+    if (rating < 1 || rating > 5) {
+      throw ArgumentError('Rating must be between 1 and 5');
+    }
 
     final reviewId = DateTime.now().millisecondsSinceEpoch.toString();
     final review = ArtisanReview(
@@ -328,6 +359,17 @@ class ArtisanService extends BaseService {
 
     // Use transaction for adding review and updating work order
     await firestore.runTransaction((transaction) async {
+      if (workOrderRef != null) {
+        final orderSnapshot = await transaction.get(workOrderRef);
+        final orderData = orderSnapshot.data();
+        if (!orderSnapshot.exists ||
+            orderData?['customerId'] != user.uid ||
+            orderData?['status'] != 'completed' ||
+            orderData?['isRated'] == true) {
+          throw StateError('Only completed, unrated work can be reviewed');
+        }
+      }
+
       // 1. ریویو محفوظ کریں
       transaction.set(reviewRef, review.toMap());
 
@@ -352,7 +394,7 @@ class ArtisanService extends BaseService {
   // ============================================================
 
   /// کاریگر کی اوسط ریٹنگ اور کل ریویوز کی تعداد کو اپ ڈیٹ کرتا ہے
-  /// 
+  ///
   /// Parameters:
   ///   - [artisanId]: String - کاریگر کی آئی ڈی
   Future<void> _updateArtisanRating(String artisanId) async {
@@ -390,10 +432,10 @@ class ArtisanService extends BaseService {
   // ============================================================
 
   /// کسی کاریگر کے تمام ریویوز کی لائیو اسٹریم فراہم کرتا ہے
-  /// 
+  ///
   /// Parameters:
   ///   - [artisanId]: String - کاریگر کی آئی ڈی
-  /// 
+  ///
   /// Returns:
   ///   - Stream<List<ArtisanReview>>: ریویوز کی فہرست کی اسٹریم
   Stream<List<ArtisanReview>> getReviews(String artisanId) {
@@ -409,11 +451,64 @@ class ArtisanService extends BaseService {
   }
 
   // ============================================================
+  // 8.5. پسندیدہ کاریگر (Favorites)
+  // ============================================================
+
+  /// کاریگر کو پسندیدہ لسٹ میں شامل یا خارج کرتا ہے
+  Future<void> toggleFavorite(String artisanId) async {
+    final user = auth.currentUser;
+    if (user == null) return;
+
+    final favoriteRef = firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('favorite_artisans')
+        .doc(artisanId);
+
+    final doc = await favoriteRef.get();
+    if (doc.exists) {
+      await favoriteRef.delete();
+    } else {
+      await favoriteRef.set({
+        'artisanId': artisanId,
+        'addedAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  /// چیک کرتا ہے کہ آیا کاریگر پسندیدہ لسٹ میں ہے
+  Stream<bool> isFavorite(String artisanId) {
+    final user = auth.currentUser;
+    if (user == null) return Stream.value(false);
+
+    return firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('favorite_artisans')
+        .doc(artisanId)
+        .snapshots()
+        .map((doc) => doc.exists);
+  }
+
+  /// صارف کے تمام پسندیدہ کاریگروں کی آئی ڈیز حاصل کرتا ہے
+  Stream<List<String>> getFavoriteArtisanIds() {
+    final user = auth.currentUser;
+    if (user == null) return Stream.value([]);
+
+    return firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('favorite_artisans')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => doc.id).toList());
+  }
+
+  // ============================================================
   // 9. پیشوں کی فہرست
   // ============================================================
 
   /// سسٹم میں موجود تمام پیشوں (Professions) کی فہرست فراہم کرتا ہے
-  /// 
+  ///
   /// Returns:
   ///   - List<Map<String, dynamic>>: پیشوں کی تفصیلات بشمول نام، آئی ڈی اور آئیکون
   static List<Map<String, dynamic>> getProfessions() {

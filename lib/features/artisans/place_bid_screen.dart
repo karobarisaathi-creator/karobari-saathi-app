@@ -25,12 +25,14 @@ class _PlaceBidScreenState extends State<PlaceBidScreen> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _messageController = TextEditingController();
   final TextEditingController _daysController = TextEditingController();
+  final TextEditingController _scopeController = TextEditingController();
   bool _isLoading = false;
   bool _isEditing = false;
 
   @override
   void initState() {
     super.initState();
+    _scopeController.text = widget.job.description; // Initial scope from job post
     _loadExistingBid();
   }
 
@@ -46,6 +48,7 @@ class _PlaceBidScreenState extends State<PlaceBidScreen> {
           _amountController.text = bid.amount.toStringAsFixed(0);
           _daysController.text = bid.estimatedDays.toString();
           _messageController.text = bid.message;
+          _scopeController.text = bid.proposedScope ?? widget.job.description;
           _isEditing = true;
         });
       }
@@ -61,6 +64,7 @@ class _PlaceBidScreenState extends State<PlaceBidScreen> {
     _amountController.dispose();
     _messageController.dispose();
     _daysController.dispose();
+    _scopeController.dispose();
     super.dispose();
   }
 
@@ -95,6 +99,10 @@ class _PlaceBidScreenState extends State<PlaceBidScreen> {
                 isUrdu: isUrdu,
                 fontFamily: fontFamily,
               ),
+
+              const SizedBox(height: 24),
+              _buildStampPaperSection(isUrdu, fontFamily),
+              const SizedBox(height: 24),
 
               const SizedBox(height: 16),
               Text(isUrdu ? 'کتنے دن لگیں گے؟' : 'Days to complete', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: fontFamily, color: AppTheme.darkColor)),
@@ -134,6 +142,78 @@ class _PlaceBidScreenState extends State<PlaceBidScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildStampPaperSection(bool isUrdu, String fontFamily) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade300, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with Seal-like icon
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isUrdu ? 'قانونی معاہدہ' : 'Legal Agreement',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.darkColor,
+                      fontFamily: fontFamily,
+                    ),
+                  ),
+                  Text(
+                    isUrdu ? 'ڈیجیٹل اسٹامپ پیپر' : 'Digital Stamp Paper',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.amber.shade800,
+                      fontFamily: fontFamily,
+                    ),
+                  ),
+                ],
+              ),
+              Icon(PhosphorIcons.sealCheck(PhosphorIconsStyle.fill), color: Colors.amber.shade700, size: 40),
+            ],
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(thickness: 2, color: Colors.black12),
+          ),
+          Text(
+            isUrdu 
+                ? 'اس معاہدے میں کام کی وہ تمام تفصیلات شامل کریں جن پر آپ گاہک کے ساتھ متفق ہیں۔ ڈیل فائنل ہونے کے بعد یہ تفصیل تبدیل نہیں ہو سکے گی اور دونوں فریق اس کے پابند ہوں گے۔' 
+                : 'Include all work details you agree upon with the customer. Once the deal is finalized, this cannot be changed and both parties will be bound by it.',
+            style: TextStyle(fontSize: 12, color: Colors.grey[700], height: 1.4, fontStyle: FontStyle.italic, fontFamily: fontFamily),
+          ),
+          const SizedBox(height: 20),
+          _buildTextField(
+            controller: _scopeController,
+            label: isUrdu ? 'کام کا دائرہ کار (Detailed Scope of Work)' : 'Detailed Scope of Work',
+            icon: PhosphorIcons.pencilLine(),
+            maxLines: 10,
+            isUrdu: isUrdu,
+            fontFamily: fontFamily,
+          ),
+        ],
       ),
     );
   }
@@ -232,17 +312,19 @@ class _PlaceBidScreenState extends State<PlaceBidScreen> {
       final artisan = await ArtisanService().getProfile(user.uid);
       
       final bid = JobBid(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: _isEditing ? (await JobService().getArtisanBid(widget.job.id, user.uid))!.id : DateTime.now().millisecondsSinceEpoch.toString(),
         jobId: widget.job.id,
         artisanId: user.uid,
         artisanName: user.displayName ?? 'Artisan',
         artisanPhone: user.phoneNumber ?? '',
+        artisanPhotoUrl: user.photoURL,
         amount: double.parse(_amountController.text),
         message: _messageController.text.trim(),
         estimatedDays: int.parse(_daysController.text),
         createdAt: DateTime.now(),
         artisanRating: artisan?.rating ?? 0.0,
         artisanExperience: artisan?.experience ?? 0,
+        proposedScope: _scopeController.text.trim(),
       );
 
       await JobService().placeBid(bid);

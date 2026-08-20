@@ -4,6 +4,7 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/category_model.dart';
+import 'package:account_app/core/models/artisan_work_order_model.dart';
 import 'dart:async';
 import 'base_service.dart';
 import 'account_service.dart';
@@ -13,7 +14,12 @@ class SyncService extends BaseService {
   final AccountService _accountService = AccountService();
   final ProfessionService _professionService = ProfessionService();
 
-  StreamSubscription? _accountsSub, _txSub, _proSub, _catSub, _userSub;
+  StreamSubscription? _accountsSub,
+      _txSub,
+      _proSub,
+      _catSub,
+      _userSub,
+      _orderSub;
 
   void startRealtimeSync() {
     final user = auth.currentUser;
@@ -73,15 +79,39 @@ class SyncService extends BaseService {
       for (var c in snap.docChanges) {
         if (c.doc.data() == null) continue;
         final p = Profession.fromMap(c.doc.data()!);
-        if (c.type == DocumentChangeType.removed) professionsBox?.delete(p.id);
-        else professionsBox?.put(p.id, p);
+        if (c.type == DocumentChangeType.removed)
+          professionsBox?.delete(p.id);
+        else
+          professionsBox?.put(p.id, p);
+      }
+      notifyListeners();
+    });
+
+    // 🆕 Work Orders (History) Real-time Sync
+    _orderSub = firestore
+        .collectionGroup('work_orders')
+        .where('customerId', isEqualTo: user.uid)
+        .snapshots()
+        .listen((snap) {
+      for (var c in snap.docChanges) {
+        if (c.doc.data() == null) continue;
+        final o = ArtisanWorkOrder.fromMap(c.doc.data()!);
+        if (c.type == DocumentChangeType.removed)
+          workOrdersBox?.delete(o.id);
+        else
+          workOrdersBox?.put(o.id, o);
       }
       notifyListeners();
     });
   }
 
   void stopRealtimeSync() {
-    _accountsSub?.cancel(); _txSub?.cancel(); _proSub?.cancel(); _catSub?.cancel(); _userSub?.cancel();
+    _accountsSub?.cancel();
+    _txSub?.cancel();
+    _proSub?.cancel();
+    _catSub?.cancel();
+    _userSub?.cancel();
+    _orderSub?.cancel();
   }
 
   Future<void> syncWithFirebase() async {
@@ -105,8 +135,11 @@ class SyncService extends BaseService {
       for (var p in professionsBox!.values) batch.set(userDoc.collection('professions').doc(p.id), p.toMap());
     }
     if (categoriesBox != null) {
-      for (var c in categoriesBox!.values) batch.set(userDoc.collection('categories').doc(c.id), c.toMap());
+      for (var c in categoriesBox!.values)
+        batch.set(userDoc.collection('categories').doc(c.id), c.toMap());
     }
+    // Work Orders are spread across artisans, syncWithFirebase for orders is complex
+    // Usually orders are managed by artisans. We just need to fetch them.
     await batch.commit();
   }
 
@@ -120,12 +153,22 @@ class SyncService extends BaseService {
       userDoc.collection('transactions').get(),
       userDoc.collection('professions').get(),
       userDoc.collection('categories').get(),
+      firestore
+          .collectionGroup('work_orders')
+          .where('customerId', isEqualTo: user.uid)
+          .get(),
     ]);
 
-    for (var d in snaps[0].docs) await accountsBox?.put(d.id, Account.fromMap(d.data()));
-    for (var d in snaps[1].docs) await transactionsBox?.put(d.id, model.Transaction.fromMap(d.data()));
-    for (var d in snaps[2].docs) await professionsBox?.put(d.id, Profession.fromMap(d.data()));
-    for (var d in snaps[3].docs) await categoriesBox?.put(d.id, Category.fromMap(d.data()));
+    for (var d in snaps[0].docs)
+      await accountsBox?.put(d.id, Account.fromMap(d.data()));
+    for (var d in snaps[1].docs)
+      await transactionsBox?.put(d.id, model.Transaction.fromMap(d.data()));
+    for (var d in snaps[2].docs)
+      await professionsBox?.put(d.id, Profession.fromMap(d.data()));
+    for (var d in snaps[3].docs)
+      await categoriesBox?.put(d.id, Category.fromMap(d.data()));
+    for (var d in snaps[4].docs)
+      await workOrdersBox?.put(d.id, ArtisanWorkOrder.fromMap(d.data()));
 
     notifyListeners();
   }

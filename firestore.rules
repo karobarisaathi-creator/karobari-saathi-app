@@ -48,6 +48,9 @@ service cloud.firestore {
         allow read, delete, update: if isOwner(userId) || isAdmin();
         allow create: if isSignedIn();
       }
+      match /favorite_artisans/{artisanId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // --- بزنس چیٹ سسٹم ---
@@ -66,38 +69,43 @@ service cloud.firestore {
     // --- کاریگر پروفائلز (Artisan Profiles) ---
     match /artisans/{artisanId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || (
-        isOwner(artisanId) &&
-        // سرور سائڈ ویلیڈیشن: نام اور پیشہ لازمی ہے
-        request.resource.data.name is string &&
-        request.resource.data.name.size() > 2 &&
-        request.resource.data.profession is string
+      allow write: if isAdmin() || isOwner(artisanId);
+
+      allow update: if isSignedIn() && (
+        isOwner(artisanId) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['workCount', 'updatedAt', 'availability', 'rating', 'totalReviews', 'showWhatsApp', 'showPhone'])
       );
+
+      match /work_orders/{orderId} {
+        allow read: if isSignedIn() &&
+          (request.auth.uid == artisanId || resource.data.customerId == request.auth.uid);
+        allow create: if isSignedIn() &&
+          (request.resource.data.artisanId == artisanId &&
+           request.resource.data.customerId == request.auth.uid);
+        allow update: if isAdmin() ||
+          (request.auth.uid == artisanId &&
+            request.resource.data.artisanId == resource.data.artisanId &&
+            request.resource.data.customerId == resource.data.customerId &&
+            ((resource.data.status == 'negotiating' && request.resource.data.status == 'quoted') ||
+             (resource.data.status == 'confirmed' && request.resource.data.status == 'in_progress') ||
+             (resource.data.status == 'in_progress' && request.resource.data.status == 'completed'))) ||
+          (request.auth.uid == resource.data.customerId &&
+            resource.data.status == 'completed' &&
+            request.resource.data.status == 'rated' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'review', 'isRated', 'ratedAt', 'status'])) ||
+          (request.auth.uid == resource.data.customerId &&
+            (resource.data.status == 'negotiating' || resource.data.status == 'quoted') &&
+            request.resource.data.status == 'confirmed' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customerAgreed', 'customerAcceptedTerms', 'agreedAt', 'status']));
+        allow delete: if isAdmin() || request.auth.uid == artisanId || resource.data.customerId == request.auth.uid;
+      }
 
       match /reviews/{reviewId} {
         allow read: if isSignedIn();
-        // صرف لاگ ان صارف اپنا ریویو دے سکتا ہے
-        allow create: if isSignedIn() &&
-                      request.resource.data.reviewerId == request.auth.uid &&
-                      request.resource.data.rating >= 1 &&
-                      request.resource.data.rating <= 5;
+        allow create: if isSignedIn();
         allow update, delete: if isAdmin();
       }
 
-      match /work_orders/{orderId} {
-        allow read: if isSignedIn() && (
-          resource.data.artisanId == request.auth.uid ||
-          resource.data.customerId == request.auth.uid ||
-          isAdmin()
-        );
-        allow create: if isSignedIn(); // کسٹمر آرڈر بنا سکتا ہے
-        allow update: if isSignedIn() && (
-          resource.data.artisanId == request.auth.uid ||
-          resource.data.customerId == request.auth.uid ||
-          isAdmin()
-        );
-        allow delete: if isAdmin();
-      }
     }
 
     match /artisan_requests/{requestId} {
@@ -109,19 +117,27 @@ service cloud.firestore {
     // --- جاب پوسٹنگ سسٹم (Jobs) ---
     match /jobs/{jobId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (
-        request.auth.uid == resource.data.customerId ||
-        resource.data.status == 'open' ||
-        isAdmin()
-      );
+      allow create: if isSignedIn() && request.resource.data.customerId == request.auth.uid;
+      allow update: if isAdmin() ||
+        (isSignedIn() && request.auth.uid == resource.data.customerId &&
+          request.resource.data.customerId == resource.data.customerId);
       allow delete: if isSignedIn() && (request.auth.uid == resource.data.customerId || isAdmin());
 
       match /bids/{bidId} {
         allow read: if isSignedIn();
-        allow create: if isSignedIn();
-        allow update: if isSignedIn() && (request.auth.uid == resource.data.artisanId || isAdmin());
-        allow delete: if isSignedIn() && (request.auth.uid == resource.data.artisanId || isAdmin());
+        allow create: if isSignedIn() && request.resource.data.artisanId == request.auth.uid;
+        allow update: if isAdmin() ||
+          (isSignedIn() && request.auth.uid ==
+            get(/databases/$(database)/documents/jobs/$(jobId)).data.customerId &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
+            (request.resource.data.status == 'accepted' || request.resource.data.status == 'rejected')) ||
+          (isSignedIn() && request.auth.uid == resource.data.artisanId &&
+            request.resource.data.artisanId == resource.data.artisanId &&
+            request.resource.data.jobId == resource.data.jobId &&
+            request.resource.data.status == resource.data.status);
+        allow delete: if isAdmin() ||
+          (isSignedIn() && request.auth.uid ==
+            get(/databases/$(database)/documents/jobs/$(jobId)).data.customerId);
       }
     }
 
@@ -134,6 +150,7 @@ service cloud.firestore {
 
     // --- ویریفیکیشن سسٹم ---
     match /verification_requests/{userId} {
+      allow list: if isAdmin();
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId)
           && request.resource.data.uid == request.auth.uid

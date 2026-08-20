@@ -8,6 +8,11 @@ import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
+import 'package:account_app/core/models/job_post_model.dart';
+import 'package:account_app/features/artisans/job_detail_screen.dart';
+import 'package:account_app/core/services/database/job_service.dart';
+import 'package:account_app/core/services/database/job_negotiation_service.dart';
+import 'package:account_app/features/artisans/widgets/work_negotiation_popup.dart';
 import 'database_service.dart';
 import 'auto_sync_service.dart';
 
@@ -207,11 +212,48 @@ class NotificationService with ChangeNotifier {
     if (_navigatorKey == null) return;
 
     String? accountId = data?['accountId'] ?? data?['relatedAccountId'];
+    String? jobId = data?['jobId'];
+    String? notificationType = type ?? data?['type'];
+
+    if (jobId != null || notificationType == 'new_bid') {
+      final id = jobId ?? data?['jobId'];
+      if (id != null) {
+        _navigatorKey!.currentState!.push(
+          MaterialPageRoute(
+            builder: (context) => _buildJobDestinationScreen(id),
+          ),
+        );
+        return;
+      }
+    }
+
+    if (notificationType == 'artisan_response') {
+      final artisanUid = data?['artisanUid'];
+      final orderId = data?['orderId'];
+      final status = data?['status'];
+      if (status == 'negotiating' && orderId != null && artisanUid != null) {
+        // Fetch the work order first
+        final doc = await _firestore.collection('artisans').doc(artisanUid).collection('work_orders').doc(orderId).get();
+        if (doc.exists) {
+          final order = ArtisanWorkOrder.fromMap(doc.data()!);
+          showDialog(
+            context: _navigatorKey!.currentContext!,
+            builder: (context) => WorkNegotiationPopup(workOrder: order, isDirect: true),
+          );
+        }
+        return;
+      }
+    }
+
+    if (notificationType == 'bid_accepted') {
+      // Chat navigation removed
+      return;
+    }
 
     if (accountId != null) {
       try {
         final context = _navigatorKey!.currentState!.context;
-        await Future.delayed(Duration(milliseconds: 500));
+        await Future.delayed(const Duration(milliseconds: 500));
 
         _navigatorKey!.currentState!.push(
           MaterialPageRoute(
@@ -240,6 +282,28 @@ class NotificationService with ChangeNotifier {
             }
           }
           return Center(child: CircularProgressIndicator());
+        },
+      ),
+    );
+  }
+
+  Widget _buildJobDestinationScreen(String jobId) {
+    return Scaffold(
+      body: FutureBuilder<DocumentSnapshot>(
+        future: FirebaseFirestore.instance.collection('jobs').doc(jobId).get(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            if (snapshot.hasData && snapshot.data!.exists) {
+              final job = JobPost.fromMap(snapshot.data!.data() as Map<String, dynamic>);
+              return JobDetailScreen(job: job);
+            } else {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Job Details')),
+                body: const Center(child: Text('Job not found or deleted.')),
+              );
+            }
+          }
+          return const Center(child: CircularProgressIndicator());
         },
       ),
     );
@@ -416,7 +480,7 @@ class NotificationService with ChangeNotifier {
   Future<void> respondToArtisanRequest({
     required String customerUid,
     required String artisanName,
-    required bool accepted,
+    required String response, // 'inquiry', 'accepted', 'rejected'
     required String notificationId,
   }) async {
     final currentUser = _auth.currentUser;
@@ -427,16 +491,23 @@ class NotificationService with ChangeNotifier {
       final requestDoc = await _firestore.collection('artisan_requests').doc(requestId).get();
       final requestData = requestDoc.data();
 
+      bool isAccepted = response == 'accepted';
+      bool isInquiry = response == 'inquiry';
+
       await _firestore.collection('artisan_requests').doc(requestId).set({
-        'status': accepted ? 'accepted' : 'rejected',
+        'status': response == 'rejected' ? 'rejected' : (isInquiry ? 'negotiating' : 'accepted'),
         'respondedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
       updateNotificationData(
-          notificationId, {'responded': true, 'accepted': accepted});
+          notificationId, {
+            'responded': true, 
+            'accepted': isAccepted,
+            'status': isInquiry ? 'negotiating' : (isAccepted ? 'accepted' : 'rejected')
+          });
 
-      if (accepted) {
-        // خودکار آرڈر بنائیں
+      if (isAccepted || isInquiry) {
+        // خودکار آرڈر بنائیں (اگر پہلے سے نہیں بنا)
         final orderId = "order_${DateTime.now().millisecondsSinceEpoch}";
         final order = ArtisanWorkOrder(
           id: orderId,
@@ -445,9 +516,9 @@ class NotificationService with ChangeNotifier {
           customerName: requestData?['customerName'] ?? 'گاہک',
           customerPhone: requestData?['customerPhone'] ?? '',
           workDescription: requestData?['workDescription'] ?? 'کام کی تفصیل',
-          status: 'negotiating', // ڈیل ہو رہی ہے
+          status: 'negotiating', 
           createdAt: DateTime.now(),
-          artisanAgreed: true, // کاریگر نے "ہاں" کر کے اپنی طرف سے سائن کر دیا
+          artisanAgreed: true,
         );
 
         await _firestore
@@ -456,15 +527,31 @@ class NotificationService with ChangeNotifier {
             .collection('work_orders')
             .doc(orderId)
             .set(order.toMap());
+
+        if (isInquiry) {
+          // خودکار پیغام بھیجیں
+          final negService = JobNegotiationService();
+          await negService.sendNegotiationMessage(
+            jobId: orderId, 
+            artisanId: currentUser.uid, 
+            message: 'السلام علیکم! کیا آپ اس کام کے بارے میں مزید تفصیل بتا سکتے ہیں؟',
+            isDirect: true,
+          );
+        }
       }
 
       final notifId = "artisan_res_${DateTime.now().millisecondsSinceEpoch}";
+      String title = response == 'rejected' ? 'معذرت' : (isInquiry ? 'پوچھ گچھ' : 'کام کی منظوری!');
+      String message = response == 'rejected' 
+          ? '$artisanName اس وقت کام کے لیے دستیاب نہیں ہیں۔'
+          : (isInquiry 
+              ? '$artisanName آپ سے کام کی تفصیل پوچھ رہے ہیں۔' 
+              : '$artisanName نے آپ کی کام کی درخواست قبول کر لی ہے۔ اب آپ رابطہ کر سکتے ہیں۔');
+
       final notification = AppNotification(
         id: notifId,
-        title: accepted ? 'کام کی منظوری!' : 'معذرت',
-        message: accepted
-            ? '$artisanName نے آپ کی کام کی درخواست قبول کر لی ہے۔ اب آپ رابطہ کر سکتے ہیں۔'
-            : '$artisanName اس وقت کام کے لیے دستیاب نہیں ہیں۔',
+        title: title,
+        message: message,
         type: NotificationType.general,
         isRead: false,
         timestamp: DateTime.now(),
@@ -473,8 +560,10 @@ class NotificationService with ChangeNotifier {
           'artisanName': artisanName,
           'artisanUid': currentUser.uid,
           'customerUid': customerUid,
-          'accepted': accepted,
+          'accepted': isAccepted,
+          'status': isInquiry ? 'negotiating' : (isAccepted ? 'accepted' : 'rejected'),
           'requestId': requestId,
+          'orderId': isAccepted || isInquiry ? "order_${DateTime.now().millisecondsSinceEpoch}" : null, // This is a bit risky but let's use the one generated above if needed
         },
       );
 

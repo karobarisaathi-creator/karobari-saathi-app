@@ -13,6 +13,8 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
+import 'package:account_app/core/models/artisan_work_order_model.dart';
+import 'package:account_app/features/artisans/widgets/work_negotiation_popup.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/version_check_service.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -113,14 +115,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           backgroundColor: AppTheme.lightColor,
           appBar: CustomAppBar(
             title: isUrdu ? 'نوٹیفیکیشن' : 'Notifications',
-            showBackButton: true,
-            onBackPressed: () {
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-              } else {
-                Navigator.pushReplacementNamed(context, '/');
-              }
-            },
+            showBackButton: false,
             elevation: 1,
             actions: [
               if (unreadCount > 0)
@@ -381,6 +376,38 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   void _handleNotificationClick(
       BuildContext context, AppNotification notification) async {
+    final data = notification.data;
+    if (data == null) return;
+
+    final type = data['type'];
+
+    if (type == 'artisan_request' || type == 'artisan_response') {
+      final status = data['status'];
+      if (status == 'negotiating') {
+        final orderId = data['orderId'];
+        final artisanUid = data['artisanUid'] ?? FirebaseAuth.instance.currentUser?.uid;
+        
+        if (orderId != null && artisanUid != null) {
+          // Fetch work order
+          final doc = await FirebaseFirestore.instance
+              .collection('artisans')
+              .doc(artisanUid)
+              .collection('work_orders')
+              .doc(orderId)
+              .get();
+          
+          if (doc.exists && mounted) {
+            final order = ArtisanWorkOrder.fromMap(doc.data()!);
+            showDialog(
+              context: context,
+              builder: (context) => WorkNegotiationPopup(workOrder: order, isDirect: true),
+            );
+          }
+        }
+        return;
+      }
+    }
+
     final databaseService =
         Provider.of<DatabaseService>(context, listen: false);
     final langService = Provider.of<LanguageService>(context, listen: false);
@@ -550,19 +577,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       return;
     }
 
-    // Normalize phone number for lookup
-    String lookupPhone = senderPhone.replaceAll(RegExp(r'\D'), '');
-    if (lookupPhone.startsWith('92'))
-      lookupPhone = '0' + lookupPhone.substring(2);
+    // 🆕 انتہائی مضبوط طریقہ: آخری 10 ہندسوں سے میچ کریں
+    String normalize(String p) {
+      String clean = p.replaceAll(RegExp(r'\D'), '');
+      return clean.length >= 10 
+          ? clean.substring(clean.length - 10) 
+          : clean;
+    }
 
+    final lookupSuffix = normalize(senderPhone);
     final accounts = await db.getAccounts();
     Account? targetAccount;
 
     try {
       targetAccount = accounts.firstWhere((a) {
-        String p = a.phone.replaceAll(RegExp(r'\D'), '');
-        if (p.startsWith('92')) p = '0' + p.substring(2);
-        return p == lookupPhone;
+        return normalize(a.phone) == lookupSuffix;
       });
     } catch (e) {
       // Account not found

@@ -177,24 +177,24 @@ class NotificationCard extends StatelessWidget {
                     if (data?['type'] == 'artisan_request') ...[
                       if (!isResponded) ...[
                         AppButton(
-                          text: isUrdu ? 'ہاں' : 'Yes',
-                          icon: Icons.check,
+                          text: isUrdu ? 'کیا کام ہے؟' : 'What work?',
+                          icon: PhosphorIcons.question(),
                           variant: AppButtonVariant.outlined,
-                          size: AppButtonSize.small, // 🔥 Fixed Small (38px)
-                          color: AppTheme.incomeColor,
-                          onPressed: () => _respondToRequest(context, true),
+                          size: AppButtonSize.small,
+                          color: AppTheme.themeColor,
+                          onPressed: () => _respondToRequest(context, 'inquiry'),
                         ),
                         const SizedBox(width: 8),
                         AppButton(
                           text: isUrdu ? 'ناں' : 'No',
-                          icon: Icons.close,
+                          icon: PhosphorIcons.x(),
                           variant: AppButtonVariant.outlined,
-                          size: AppButtonSize.small, // 🔥 Fixed Small (38px)
+                          size: AppButtonSize.small,
                           color: AppTheme.expenseColor,
-                          onPressed: () => _respondToRequest(context, false),
+                          onPressed: () => _respondToRequest(context, 'rejected'),
                         ),
                       ] else
-                        _buildStatusIndicator(isAccepted, isUrdu, fontFamily),
+                        _buildStatusIndicator(isAccepted || data?['status'] == 'negotiating', isUrdu, fontFamily, data?['status']),
                     ],
                     const Spacer(),
                     IconButton(
@@ -210,16 +210,20 @@ class NotificationCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusIndicator(bool isAccepted, bool isUrdu, String fontFamily) {
+  Widget _buildStatusIndicator(bool isAccepted, bool isUrdu, String fontFamily, [String? status]) {
     final color = isAccepted ? Colors.green : Colors.red;
+    String text = isAccepted ? (isUrdu ? 'منظور شدہ' : 'Accepted') : (isUrdu ? 'معذرت کی گئی' : 'Declined');
+    
+    if (status == 'negotiating') {
+      text = isUrdu ? 'پوچھ گچھ جاری' : 'Inquiring';
+    }
+
     return AppButton(
-      text: isAccepted 
-          ? (isUrdu ? 'منظور شدہ' : 'Accepted')
-          : (isUrdu ? 'معذرت کی گئی' : 'Declined'),
+      text: text,
       onPressed: null,
       variant: AppButtonVariant.outlined,
       size: AppButtonSize.small,
-      color: color,
+      color: status == 'negotiating' ? Colors.blue : color,
     );
   }
 
@@ -311,7 +315,7 @@ class NotificationCard extends StatelessWidget {
     return DateFormat('dd MMM').format(timestamp);
   }
 
-  void _respondToRequest(BuildContext context, bool accepted) async {
+  void _respondToRequest(BuildContext context, String response) async {
     final nService = Provider.of<NotificationService>(context, listen: false);
     final user = FirebaseAuth.instance.currentUser;
     final data = notification.data;
@@ -321,7 +325,7 @@ class NotificationCard extends StatelessWidget {
     await nService.respondToArtisanRequest(
       customerUid: data['senderUid'],
       artisanName: user.displayName ?? 'Artisan',
-      accepted: accepted,
+      response: response,
       notificationId: notification.id,
     );
 
@@ -330,7 +334,7 @@ class NotificationCard extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(isUrdu ? 'جواب بھیج دیا گیا!' : 'Response sent!'),
-          backgroundColor: accepted ? Colors.green : Colors.red,
+          backgroundColor: response != 'rejected' ? Colors.green : Colors.red,
         ),
       );
     }

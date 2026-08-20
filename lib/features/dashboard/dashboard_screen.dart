@@ -19,7 +19,6 @@ import 'package:account_app/features/accounts/party_history_screen.dart';
 import 'package:account_app/features/accounts/sms_invitation_screen.dart';
 import 'package:account_app/features/artisans/artisan_detail_screen.dart';
 import 'package:account_app/features/artisans/artisan_work_orders_screen.dart';
-import 'package:account_app/features/business_chat/business_chat_list_screen.dart';
 import 'main_navigation_screen.dart'; 
 import 'package:account_app/core/widgets/party_card.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
@@ -124,28 +123,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final user = FirebaseAuth.instance.currentUser;
     final dbService = Provider.of<DatabaseService>(context);
     
-    final profilePhoto = user?.photoURL;
-    final myAccount = dbService.getAccounts().firstWhere(
-      (a) => a.phone == (user?.phoneNumber ?? ''),
-      orElse: () => Account(
-        id: 'me',
-        name: user?.displayName ?? (isUrdu ? 'میرا پروفائل' : 'My Profile'),
-        phone: user?.phoneNumber ?? '',
-        profileImage: profilePhoto,
-        category: isUrdu ? 'دکاندار' : 'Shopkeeper',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        initialBalance: 0,
-        balanceType: 'credit',
-        balance: 0,
-        isActive: true,
-      ),
-    );
-
-    final String? effectivePhoto = (myAccount.id != 'me' && myAccount.profileImage != null) 
-        ? myAccount.profileImage 
-        : profilePhoto;
-
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBackground,
       extendBodyBehindAppBar: true,
@@ -162,11 +139,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
             fontSize: 18,
           ),
         ),
-        leading: const SizedBox.shrink(), // Remove the menu icon
+        leading: IconButton(
+          icon: const Icon(Icons.menu, color: Colors.white),
+          onPressed: () => MainNavigationScreen.of(context)?.openDrawer(),
+        ),
         actions: [
+          IconButton(
+            icon: Icon(PhosphorIcons.plusCircle(), color: Colors.white, size: 26),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AddPartyScreen()),
+              );
+            },
+            tooltip: isUrdu ? 'پارٹی شامل کریں' : 'Add Party',
+          ),
           if (_myArtisanProfile != null)
             _buildAvailabilityToggle(isUrdu, fontFamily),
-          _buildNotificationAction(),
           const SizedBox(width: 8),
         ],
       ),
@@ -205,8 +194,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           return Column(
             children: [
               _buildLargeDarkHeader(
-                myAccount: myAccount,
-                photo: effectivePhoto,
                 receivable: totalReceivable,
                 payable: totalPayable,
                 netBalance: netBalance,
@@ -233,24 +220,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'dashboard_fab',
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddPartyScreen()),
-          );
-        },
-        backgroundColor: AppTheme.darkColor,
-        shape: const CircleBorder(),
-        child: Icon(PhosphorIcons.plus(), color: Colors.white, size: 30),
-      ),
     );
   }
 
   Widget _buildLargeDarkHeader({
-    required Account myAccount,
-    required String? photo,
     required double receivable,
     required double payable,
     required double netBalance,
@@ -267,8 +240,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Container(
       padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 55,
-        bottom: 10, // فاصلہ کم کر دیا گیا
+        top: MediaQuery.of(context).padding.top + 60,
+        bottom: 20,
         left: 20,
         right: 20,
       ),
@@ -278,26 +251,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       child: Column(
         children: [
-          ProfileInfoWidget(
-            name: myAccount.name,
-            phone: '', 
-            profileImage: photo,
-            category: (_myArtisanProfile != null && _myArtisanProfile!.professionUrdu.isNotEmpty) 
-                ? _myArtisanProfile!.professionUrdu 
-                : (isUrdu ? 'پرسنل اکاؤنٹ' : 'Personal Account'),
-            address: (_myArtisanProfile != null && _myArtisanProfile!.location.isNotEmpty)
-                ? _myArtisanProfile!.location
-                : (myAccount.address?.isNotEmpty == true ? myAccount.address : null),
-            isLarge: true,
-            isVerticalCategory: true,
-            textColor: Colors.white,
-            subtitleColor: Colors.white70,
-            categoryColor: Colors.white,
-            customSize: 55,
-            borderRadius: 8,
-            isVerified: myAccount.isVerified || (_myArtisanProfile?.isVerified ?? false),
-          ),
-          const SizedBox(height: 16),
           // Party Stats
           Row(
             children: [
@@ -370,116 +323,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Container(height: 20, width: 1, color: Colors.white12);
   }
 
-  Widget _buildBusinessCommandCenter(bool isUrdu, String fontFamily) {
-    return Container(
-      height: 55, 
-      margin: const EdgeInsets.only(top: 4), // فاصلہ مزید کم کر دیا گیا
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        children: [
-          // 0. Search Toggle Button
-          _buildCommandCard(
-            label: isUrdu ? 'تلاش کریں' : 'Search',
-            icon: PhosphorIcons.magnifyingGlass(),
-            color: _isSearchVisible ? AppTheme.themeColor : Colors.grey,
-            onTap: () => setState(() => _isSearchVisible = !_isSearchVisible),
-            fontFamily: fontFamily,
-          ),
-
-          // 1. Public Profile Preview
-          _buildCommandCard(
-            label: isUrdu ? 'پروفائل' : 'Profile',
-            icon: PhosphorIcons.userFocus(),
-            color: Colors.blue,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ArtisanDetailScreen(
-                    artisanId: _myArtisanProfile!.id,
-                    initialArtisan: _myArtisanProfile,
-                  ),
-                ),
-              );
-            },
-            fontFamily: fontFamily,
-          ),
-          
-          // 2. Active Orders
-          _buildCommandCard(
-            label: isUrdu ? 'آرڈرز' : 'Orders',
-            icon: PhosphorIcons.briefcase(),
-            color: Colors.orange,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ArtisanWorkOrdersScreen(artisanId: _myArtisanProfile!.id),
-                ),
-              );
-            },
-            fontFamily: fontFamily,
-          ),
-
-          // 3. Chat List
-          _buildCommandCard(
-            label: isUrdu ? 'چیٹ لسٹ' : 'Chat List',
-            icon: PhosphorIcons.chatCircleDots(),
-            color: Colors.teal,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const BusinessChatListScreen()),
-              );
-            },
-            fontFamily: fontFamily,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCommandCard({
-    required String label,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-    required String fontFamily,
-  }) {
-    return Center(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8), // سائز بڑا کر دیا گیا
-          margin: const EdgeInsets.only(right: 8),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: color.withOpacity(0.4), width: 1.5),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: color, size: 18), // آئی کن بڑا کر دیا گیا
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: AppTheme.darkColor,
-                  fontSize: 12, // فونٹ تھوڑا بڑا
-                  fontWeight: FontWeight.bold,
-                  fontFamily: fontFamily,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildAvailabilityToggle(bool isUrdu, String fontFamily) {
     final isAvailable = _myArtisanProfile?.availability == 'available';
     final color = isAvailable ? Colors.greenAccent : AppTheme.expenseColor;
@@ -530,43 +373,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildNotificationAction() {
-    return Consumer<NotificationService>(
-      builder: (context, notificationService, child) {
-        return Stack(
-          alignment: Alignment.center,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.notifications_none, color: Colors.white, size: 28),
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => NotificationsScreen()));
-              },
-            ),
-            if (notificationService.unreadCount > 0)
-              Positioned(
-                right: 8,
-                top: 10,
-                child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: AppTheme.expenseColor,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppTheme.darkColor, width: 1.5),
-                  ),
-                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                  child: Text(
-                    notificationService.unreadCount > 99 ? '99+' : notificationService.unreadCount.toString(),
-                    style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-
   Widget _buildPartyList(List<Account> parties, DatabaseService databaseService, bool isUrdu, String fontFamily) {
     final filteredParties = parties.where((p) {
       return p.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
@@ -579,22 +385,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     // Define scrolling headers
     final List<Widget> headers = [];
-    if (_myArtisanProfile != null) {
-      headers.add(_buildBusinessCommandCenter(isUrdu, fontFamily));
-    }
-    if (_isSearchVisible) {
-      headers.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: SearchSortBar(
-            hintText: isUrdu ? 'پارٹی تلاش کریں...' : 'Search Party...',
-            onSearchChanged: (value) => setState(() => _searchQuery = value),
-            onSortToggled: () => setState(() => _isAscending = !_isAscending),
-            isAscending: _isAscending,
-          ),
+    headers.add(
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: SearchSortBar(
+          hintText: isUrdu ? 'پارٹی تلاش کریں...' : 'Search Party...',
+          onSearchChanged: (value) => setState(() => _searchQuery = value),
+          onSortToggled: () => setState(() => _isAscending = !_isAscending),
+          isAscending: _isAscending,
         ),
-      );
-    }
+      ),
+    );
 
     if (filteredParties.isEmpty && headers.isEmpty) {
       return ListView(

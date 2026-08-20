@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'base_service.dart';
@@ -9,25 +10,28 @@ class TransactionService extends BaseService {
   final ProfessionService _professionService = ProfessionService();
 
   Future<void> addTransaction(model.Transaction transaction) async {
+    // 1. Save locally first
     await transactionsBox?.put(transaction.id, transaction);
     await _accountService.recalculateAccountBalance(transaction.accountId);
     if (transaction.professionId != null) await _professionService.recalculateProfessionFinance(transaction.professionId!);
+    notifyListeners();
     
-    // Explicit Cloud Sync
+    // 2. Background Cloud Sync
     if (auth.currentUser != null) {
-      await firestore
+      firestore
           .collection('users')
           .doc(auth.currentUser!.uid)
           .collection('transactions')
           .doc(transaction.id)
-          .set(transaction.toMap());
+          .set(transaction.toMap())
+          .catchError((e) => debugPrint("Offline Sync: Transaction addition delayed"));
     }
-    
-    notifyListeners();
   }
 
   Future<void> updateTransaction(model.Transaction transaction) async {
     final oldTransaction = transactionsBox?.get(transaction.id);
+    
+    // 1. Update locally
     await transactionsBox?.put(transaction.id, transaction);
     await _accountService.recalculateAccountBalance(transaction.accountId);
     
@@ -35,18 +39,18 @@ class TransactionService extends BaseService {
     if (oldTransaction?.professionId != null && oldTransaction?.professionId != transaction.professionId) {
       await _professionService.recalculateProfessionFinance(oldTransaction!.professionId!);
     }
+    notifyListeners();
 
-    // Explicit Cloud Update
+    // 2. Background Cloud Update
     if (auth.currentUser != null) {
-      await firestore
+      firestore
           .collection('users')
           .doc(auth.currentUser!.uid)
           .collection('transactions')
           .doc(transaction.id)
-          .update(transaction.toMap());
+          .update(transaction.toMap())
+          .catchError((e) => debugPrint("Offline Sync: Transaction update delayed"));
     }
-
-    notifyListeners();
   }
 
   Future<void> deleteTransaction(String transactionId) async {
@@ -56,7 +60,13 @@ class TransactionService extends BaseService {
       await _accountService.recalculateAccountBalance(transaction.accountId);
       if (transaction.professionId != null) await _professionService.recalculateProfessionFinance(transaction.professionId!);
       if (auth.currentUser != null) {
-        await firestore.collection('users').doc(auth.currentUser!.uid).collection('transactions').doc(transactionId).delete();
+        firestore
+            .collection('users')
+            .doc(auth.currentUser!.uid)
+            .collection('transactions')
+            .doc(transactionId)
+            .delete()
+            .catchError((e) => debugPrint("Offline Sync: Transaction deletion delayed"));
       }
       notifyListeners();
     }

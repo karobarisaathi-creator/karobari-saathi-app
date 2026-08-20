@@ -81,6 +81,9 @@ class ArtisanWorkOrder extends HiveObject {
   @HiveField(24)
   final String? disputeStatus;
 
+  @HiveField(25)
+  final String? lockedScope;
+
   ArtisanWorkOrder({
     required this.id,
     required this.artisanId,
@@ -107,6 +110,7 @@ class ArtisanWorkOrder extends HiveObject {
     this.customerAcceptedTerms = false,
     this.artisanAcceptedTerms = false,
     this.disputeStatus,
+    this.lockedScope,
   });
 
   Map<String, dynamic> toMap() {
@@ -136,6 +140,7 @@ class ArtisanWorkOrder extends HiveObject {
       'customerAcceptedTerms': customerAcceptedTerms,
       'artisanAcceptedTerms': artisanAcceptedTerms,
       'disputeStatus': disputeStatus,
+      'lockedScope': lockedScope,
     };
   }
 
@@ -173,6 +178,66 @@ class ArtisanWorkOrder extends HiveObject {
       customerAcceptedTerms: map['customerAcceptedTerms'] ?? false,
       artisanAcceptedTerms: map['artisanAcceptedTerms'] ?? false,
       disputeStatus: map['disputeStatus'],
+      lockedScope: map['lockedScope'],
+    );
+  }
+
+  ArtisanWorkOrder copyWith({
+    String? id,
+    String? artisanId,
+    String? customerId,
+    String? customerName,
+    String? customerPhone,
+    String? workDescription,
+    String? workImages,
+    String? status,
+    DateTime? createdAt,
+    DateTime? completedAt,
+    DateTime? ratedAt,
+    double? rating,
+    String? review,
+    double? amount,
+    String? location,
+    bool? isRated,
+    bool? customerAgreed,
+    bool? artisanAgreed,
+    DateTime? agreedAt,
+    String? contractTerms,
+    String? paymentTerms,
+    String? cancellationPolicy,
+    bool? customerAcceptedTerms,
+    bool? artisanAcceptedTerms,
+    String? disputeStatus,
+    String? lockedScope,
+  }) {
+    return ArtisanWorkOrder(
+      id: id ?? this.id,
+      artisanId: artisanId ?? this.artisanId,
+      customerId: customerId ?? this.customerId,
+      customerName: customerName ?? this.customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
+      workDescription: workDescription ?? this.workDescription,
+      workImages: workImages ?? this.workImages,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      completedAt: completedAt ?? this.completedAt,
+      ratedAt: ratedAt ?? this.ratedAt,
+      rating: rating ?? this.rating,
+      review: review ?? this.review,
+      amount: amount ?? this.amount,
+      location: location ?? this.location,
+      isRated: isRated ?? this.isRated,
+      customerAgreed: customerAgreed ?? this.customerAgreed,
+      artisanAgreed: artisanAgreed ?? this.artisanAgreed,
+      agreedAt: agreedAt ?? this.agreedAt,
+      contractTerms: contractTerms ?? this.contractTerms,
+      paymentTerms: paymentTerms ?? this.paymentTerms,
+      cancellationPolicy: cancellationPolicy ?? this.cancellationPolicy,
+      customerAcceptedTerms:
+          customerAcceptedTerms ?? this.customerAcceptedTerms,
+      artisanAcceptedTerms: artisanAcceptedTerms ?? this.artisanAcceptedTerms,
+      disputeStatus: disputeStatus ?? this.disputeStatus,
+      lockedScope: lockedScope ?? this.lockedScope,
     );
   }
 }
