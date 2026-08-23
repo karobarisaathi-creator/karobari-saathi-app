@@ -12,7 +12,7 @@ import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/voice_comment_player.dart';
-import 'package:account_app/core/widgets/image_grid_viewer.dart';
+import 'package:account_app/core/widgets/image_gallery_viewer.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'add_transaction_screen.dart';
@@ -334,7 +334,7 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                             child: VoiceCommentPlayer(audioUrl: widget.transaction.voiceNote!),
                           ),
                         if (widget.transaction.billImage != null && widget.transaction.billImage!.isNotEmpty)
-                          ImageGridViewer(
+                          ImageGalleryViewer(
                             imagePaths: widget.transaction.billImage!.split(','),
                           ),
                       ],

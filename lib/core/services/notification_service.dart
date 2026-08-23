@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert';
 import 'dart:async';
 import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/models/account_model.dart';
@@ -146,7 +147,7 @@ class NotificationService with ChangeNotifier {
     await _localNotifications.initialize(
       settings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        _handleNotificationTap(response.payload);
+        _handleLocalNotificationTap(response.payload);
       },
     );
 
@@ -233,12 +234,18 @@ class NotificationService with ChangeNotifier {
       final status = data?['status'];
       if (status == 'negotiating' && orderId != null && artisanUid != null) {
         // Fetch the work order first
-        final doc = await _firestore.collection('artisans').doc(artisanUid).collection('work_orders').doc(orderId).get();
+        final doc = await _firestore
+            .collection('artisans')
+            .doc(artisanUid)
+            .collection('work_orders')
+            .doc(orderId)
+            .get();
         if (doc.exists) {
           final order = ArtisanWorkOrder.fromMap(doc.data()!);
           showDialog(
             context: _navigatorKey!.currentContext!,
-            builder: (context) => WorkNegotiationPopup(workOrder: order, isDirect: true),
+            builder: (context) =>
+                WorkNegotiationPopup(workOrder: order, isDirect: true),
           );
         }
         return;
@@ -294,7 +301,8 @@ class NotificationService with ChangeNotifier {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
             if (snapshot.hasData && snapshot.data!.exists) {
-              final job = JobPost.fromMap(snapshot.data!.data() as Map<String, dynamic>);
+              final job = JobPost.fromMap(
+                  snapshot.data!.data() as Map<String, dynamic>);
               return JobDetailScreen(job: job);
             } else {
               return Scaffold(
@@ -374,12 +382,11 @@ class NotificationService with ChangeNotifier {
       iOS: DarwinNotificationDetails(),
     );
 
-    String fullPayload = payload;
-    if (dataPayload != null) {
-      String accId =
-          dataPayload['accountId'] ?? dataPayload['relatedAccountId'] ?? '';
-      if (accId.isNotEmpty) fullPayload = "$payload|$accId";
-    }
+    final notificationType = dataPayload?['type']?.toString() ?? payload;
+    final fullPayload = jsonEncode({
+      'type': notificationType,
+      'data': dataPayload ?? <String, dynamic>{},
+    });
 
     await _localNotifications.show(
       DateTime.now().millisecondsSinceEpoch.remainder(100000),
@@ -387,6 +394,30 @@ class NotificationService with ChangeNotifier {
       body,
       details,
       payload: fullPayload,
+    );
+  }
+
+  void _handleLocalNotificationTap(String? payload) {
+    if (payload == null || payload.isEmpty) return;
+
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        _handleNotificationTap(
+          decoded['type']?.toString(),
+          data is Map ? Map<String, dynamic>.from(data) : null,
+        );
+        return;
+      }
+    } catch (_) {
+      // Fall back to the payload format used by older notifications.
+    }
+
+    final parts = payload.split('|');
+    _handleNotificationTap(
+      parts.first,
+      parts.length > 1 ? {'accountId': parts[1]} : null,
     );
   }
 
@@ -425,9 +456,15 @@ class NotificationService with ChangeNotifier {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
+    if (artisanUid == currentUser.uid) {
+      throw Exception('You cannot send a work request to yourself');
+    }
+
     try {
       final String requestId = "${currentUser.uid}_$artisanUid";
-      final String formattedDate = expectedDate != null ? "${expectedDate.day}/${expectedDate.month}/${expectedDate.year}" : "";
+      final String formattedDate = expectedDate != null
+          ? "${expectedDate.day}/${expectedDate.month}/${expectedDate.year}"
+          : "";
 
       await _firestore.collection('artisan_requests').doc(requestId).set({
         'customerUid': currentUser.uid,
@@ -439,8 +476,9 @@ class NotificationService with ChangeNotifier {
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      String budgetText = budget != null ? " (بجٹ: Rs. ${budget.toStringAsFixed(0)})" : "";
-      
+      String budgetText =
+          budget != null ? " (بجٹ: Rs. ${budget.toStringAsFixed(0)})" : "";
+
       final notifId = "artisan_req_${DateTime.now().millisecondsSinceEpoch}";
       final notification = AppNotification(
         id: notifId,
@@ -474,6 +512,7 @@ class NotificationService with ChangeNotifier {
           .set(notification.toMap());
     } catch (e) {
       debugPrint('Error sending artisan request: $e');
+      rethrow;
     }
   }
 
@@ -488,23 +527,26 @@ class NotificationService with ChangeNotifier {
 
     try {
       final String requestId = "${customerUid}_${currentUser.uid}";
-      final requestDoc = await _firestore.collection('artisan_requests').doc(requestId).get();
+      final requestDoc =
+          await _firestore.collection('artisan_requests').doc(requestId).get();
       final requestData = requestDoc.data();
 
       bool isAccepted = response == 'accepted';
       bool isInquiry = response == 'inquiry';
 
       await _firestore.collection('artisan_requests').doc(requestId).set({
-        'status': response == 'rejected' ? 'rejected' : (isInquiry ? 'negotiating' : 'accepted'),
+        'status': response == 'rejected'
+            ? 'rejected'
+            : (isInquiry ? 'negotiating' : 'accepted'),
         'respondedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      updateNotificationData(
-          notificationId, {
-            'responded': true, 
-            'accepted': isAccepted,
-            'status': isInquiry ? 'negotiating' : (isAccepted ? 'accepted' : 'rejected')
-          });
+      updateNotificationData(notificationId, {
+        'responded': true,
+        'accepted': isAccepted,
+        'status':
+            isInquiry ? 'negotiating' : (isAccepted ? 'accepted' : 'rejected')
+      });
 
       if (isAccepted || isInquiry) {
         // خودکار آرڈر بنائیں (اگر پہلے سے نہیں بنا)
@@ -516,7 +558,7 @@ class NotificationService with ChangeNotifier {
           customerName: requestData?['customerName'] ?? 'گاہک',
           customerPhone: requestData?['customerPhone'] ?? '',
           workDescription: requestData?['workDescription'] ?? 'کام کی تفصیل',
-          status: 'negotiating', 
+          status: 'negotiating',
           createdAt: DateTime.now(),
           artisanAgreed: true,
         );
@@ -532,20 +574,23 @@ class NotificationService with ChangeNotifier {
           // خودکار پیغام بھیجیں
           final negService = JobNegotiationService();
           await negService.sendNegotiationMessage(
-            jobId: orderId, 
-            artisanId: currentUser.uid, 
-            message: 'السلام علیکم! کیا آپ اس کام کے بارے میں مزید تفصیل بتا سکتے ہیں؟',
+            jobId: orderId,
+            artisanId: currentUser.uid,
+            message:
+                'السلام علیکم! کیا آپ اس کام کے بارے میں مزید تفصیل بتا سکتے ہیں؟',
             isDirect: true,
           );
         }
       }
 
       final notifId = "artisan_res_${DateTime.now().millisecondsSinceEpoch}";
-      String title = response == 'rejected' ? 'معذرت' : (isInquiry ? 'پوچھ گچھ' : 'کام کی منظوری!');
-      String message = response == 'rejected' 
+      String title = response == 'rejected'
+          ? 'معذرت'
+          : (isInquiry ? 'پوچھ گچھ' : 'کام کی منظوری!');
+      String message = response == 'rejected'
           ? '$artisanName اس وقت کام کے لیے دستیاب نہیں ہیں۔'
-          : (isInquiry 
-              ? '$artisanName آپ سے کام کی تفصیل پوچھ رہے ہیں۔' 
+          : (isInquiry
+              ? '$artisanName آپ سے کام کی تفصیل پوچھ رہے ہیں۔'
               : '$artisanName نے آپ کی کام کی درخواست قبول کر لی ہے۔ اب آپ رابطہ کر سکتے ہیں۔');
 
       final notification = AppNotification(
@@ -561,9 +606,13 @@ class NotificationService with ChangeNotifier {
           'artisanUid': currentUser.uid,
           'customerUid': customerUid,
           'accepted': isAccepted,
-          'status': isInquiry ? 'negotiating' : (isAccepted ? 'accepted' : 'rejected'),
+          'status': isInquiry
+              ? 'negotiating'
+              : (isAccepted ? 'accepted' : 'rejected'),
           'requestId': requestId,
-          'orderId': isAccepted || isInquiry ? "order_${DateTime.now().millisecondsSinceEpoch}" : null, // This is a bit risky but let's use the one generated above if needed
+          'orderId': isAccepted || isInquiry
+              ? "order_${DateTime.now().millisecondsSinceEpoch}"
+              : null, // This is a bit risky but let's use the one generated above if needed
         },
       );
 
@@ -592,7 +641,8 @@ class NotificationService with ChangeNotifier {
       final notification = AppNotification(
         id: notifId,
         title: '💰 قیمت دی گئی ہے!',
-        message: '$artisanName نے آپ کے کام کے لیے Rs. $amount کی قیمت بتائی ہے۔',
+        message:
+            '$artisanName نے آپ کے کام کے لیے Rs. $amount کی قیمت بتائی ہے۔',
         type: NotificationType.general,
         isRead: false,
         timestamp: DateTime.now(),
@@ -622,7 +672,8 @@ class NotificationService with ChangeNotifier {
     required bool accepted,
   }) async {
     try {
-      final notifId = "bid_${accepted ? 'acc' : 'rej'}_${DateTime.now().millisecondsSinceEpoch}";
+      final notifId =
+          "bid_${accepted ? 'acc' : 'rej'}_${DateTime.now().millisecondsSinceEpoch}";
       final notification = AppNotification(
         id: notifId,
         title: accepted ? 'بولی قبول کر لی گئی!' : 'بولی مسترد',

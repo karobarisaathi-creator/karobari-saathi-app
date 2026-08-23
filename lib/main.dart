@@ -6,6 +6,7 @@ import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
 import 'package:firebase_messaging/firebase_messaging.dart'; // Added for background handler
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'firebase_options.dart'; // Import generated options
@@ -41,20 +42,20 @@ import 'package:account_app/core/services/database/job_service.dart';
 import 'package:account_app/core/services/security_service.dart';
 import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/core/widgets/simple_spinning_ring.dart';
-import './helpers/migration_helper.dart';  // ✅ یہ import کریں
-
+import './helpers/migration_helper.dart'; // ✅ یہ import کریں
 
 // Screens
 import 'package:account_app/features/settings/login_screen.dart';
 import 'package:account_app/features/dashboard/dashboard_screen.dart';
-import 'package:account_app/features/settings/profile_setup_screen.dart';
+import 'package:account_app/features/settings/master_profile_screen.dart'; // Updated
 import 'package:account_app/features/accounts/add_party_screen.dart';
 import 'package:account_app/features/accounts/reports_screen.dart';
 import 'package:account_app/features/notifications/notifications_screen.dart';
 import 'package:account_app/features/professions/professions_screen.dart';
 import 'package:account_app/features/accounts/add_transaction_screen.dart';
-import 'package:account_app/features/settings/app_lock_screen.dart' as real_lock; // Import the real screen
-import 'package:account_app/features/dashboard/main_navigation_screen.dart'; 
+import 'package:account_app/features/settings/app_lock_screen.dart'
+    as real_lock; // Import the real screen
+import 'package:account_app/features/dashboard/main_navigation_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart'; // نئی تھیم فائل شامل کی
 
 // Localization
@@ -72,7 +73,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Load environment variables
   try {
     await dotenv.load(fileName: ".env");
@@ -88,11 +89,13 @@ void main() async {
     // Register Hive adapters
     Hive.registerAdapter(AccountAdapter());
     Hive.registerAdapter(TransactionAdapter());
-    Hive.registerAdapter(TransactionItemAdapter()); // ✅ Register TransactionItemAdapter (TypeId 20)
+    Hive.registerAdapter(
+        TransactionItemAdapter()); // ✅ Register TransactionItemAdapter (TypeId 20)
     Hive.registerAdapter(CategoryAdapter());
     Hive.registerAdapter(CategoryTypeAdapter());
     Hive.registerAdapter(ProfessionAdapter());
-    Hive.registerAdapter(ProfessionCategoryAdapter()); // ✅ Register the new adapter
+    Hive.registerAdapter(
+        ProfessionCategoryAdapter()); // ✅ Register the new adapter
     Hive.registerAdapter(AppNotificationAdapter());
     Hive.registerAdapter(NotificationTypeAdapter());
     Hive.registerAdapter(ArtisanProfileAdapter());
@@ -108,7 +111,8 @@ void main() async {
         options: DefaultFirebaseOptions.currentPlatform,
       );
       // Register background handler
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      FirebaseMessaging.onBackgroundMessage(
+          _firebaseMessagingBackgroundHandler);
       print("Firebase Initialized Successfully with DefaultOptions");
     } catch (e) {
       print("Firebase Initialization Failed: $e");
@@ -142,7 +146,6 @@ void main() async {
       if (health['issues'].isNotEmpty) {
         print("⚠️ Issues found: ${health['issues']}");
       }
-
     } catch (e) {
       print("❌ Migration/Health check failed: $e");
       // Continue anyway - app should still work
@@ -174,20 +177,22 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => DatabaseService()),
-        ChangeNotifierProvider(create: (_) => AuthService()), // Added AuthService provider
+        ChangeNotifierProvider(
+            create: (_) => AuthService()), // Added AuthService provider
         ChangeNotifierProvider(create: (_) => LanguageService()),
         ChangeNotifierProvider(create: (_) => ThemeService()),
         ChangeNotifierProvider(create: (_) => AutoSyncService()),
         ChangeNotifierProvider(create: (_) {
-           // Pass navigator key to NotificationService
-           final service = NotificationService();
-           service.setNavigatorKey(navigatorKey);
-           return service;
+          // Pass navigator key to NotificationService
+          final service = NotificationService();
+          service.setNavigatorKey(navigatorKey);
+          return service;
         }),
         ChangeNotifierProvider(create: (_) => FirebaseService()),
         ChangeNotifierProvider(create: (_) => BalanceService()),
         ChangeNotifierProvider(create: (_) => PdfService()),
-        ChangeNotifierProvider(create: (_) => ExcelService()), // Added ExcelService provider
+        ChangeNotifierProvider(
+            create: (_) => ExcelService()), // Added ExcelService provider
         ChangeNotifierProvider(create: (_) => BackupService()),
         ChangeNotifierProvider(create: (_) => JobService()),
         ChangeNotifierProvider(create: (_) => ArtisanService()),
@@ -223,7 +228,7 @@ class MyApp extends StatelessWidget {
             // RTL/LTR Support
             builder: (context, child) {
               final mediaQueryData = MediaQuery.of(context);
-              
+
               return MediaQuery(
                 data: mediaQueryData.copyWith(
                   // Lock text scale to exactly 1.0 to prevent "Zoom" issues
@@ -247,7 +252,8 @@ class MyApp extends StatelessWidget {
             routes: {
               '/dashboard': (context) => DashboardScreen(),
               '/login': (context) => LoginScreen(),
-              '/profileSetup': (context) => const ProfileSetupScreen(),
+              '/profileSetup': (context) =>
+                  const MasterProfileScreen(), // Updated
               '/addParty': (context) => AddPartyScreen(),
               '/reports': (context) => ReportsScreen(),
               '/notifications': (context) => NotificationsScreen(),
@@ -269,6 +275,7 @@ class AppWrapper extends StatefulWidget {
 class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
   bool _isLoading = true;
   bool _needsLogin = true;
+  bool _needsProfileSetup = false;
   bool _isUnlocked = false; // Tracks session unlock status
 
   // Colors for loading screen (Matches AppTheme)
@@ -320,7 +327,8 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
       Provider.of<NotificationService>(context, listen: false);
 
       // 1. Initialize Database Service fully
-      final databaseService = Provider.of<DatabaseService>(context, listen: false);
+      final databaseService =
+          Provider.of<DatabaseService>(context, listen: false);
       if (!databaseService.isInitialized) {
         await databaseService.init().timeout(const Duration(seconds: 15));
       }
@@ -330,9 +338,20 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
 
       if (user != null) {
         _needsLogin = false;
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get()
+            .timeout(const Duration(seconds: 8));
+        final userData = userDoc.data();
+        final storedName = userData?['displayName'] ?? userData?['name'];
+        _needsProfileSetup =
+            storedName == null || storedName.toString().trim().isEmpty;
         // 3. Auto Restore from Cloud (with timeout)
         try {
-          await databaseService.fetchFromFirebase().timeout(const Duration(seconds: 10));
+          await databaseService
+              .fetchFromFirebase()
+              .timeout(const Duration(seconds: 10));
         } catch (e) {
           print("Auto restore failed or timed out: $e");
         }
@@ -363,7 +382,8 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
 
     // 2. Check App Lock
     return FutureBuilder<bool>(
-      future: Provider.of<SecurityService>(context, listen: false).isAppLockEnabled(),
+      future: Provider.of<SecurityService>(context, listen: false)
+          .isAppLockEnabled(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return _buildLoadingScreen();
@@ -383,7 +403,12 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
           );
         }
 
-        // 3. Main Navigation
+        // 3. Every account needs a basic profile; artisan mode is optional.
+        if (_needsProfileSetup) {
+          return const MasterProfileScreen(); // Updated
+        }
+
+        // 4. Main Navigation
         return MainNavigationScreen();
       },
     );
@@ -407,7 +432,8 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
                 height: 120,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
-                  return const Icon(Icons.account_balance_wallet, size: 80, color: Colors.white70);
+                  return const Icon(Icons.account_balance_wallet,
+                      size: 80, color: Colors.white70);
                 },
               ),
               const SizedBox(height: 40),

@@ -10,19 +10,22 @@ import 'package:account_app/core/widgets/artisan_card.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/features/artisans/artisan_detail_screen.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 
 class ArtisansTab extends StatefulWidget {
   final String selectedProfession;
-  const ArtisansTab({super.key, required this.selectedProfession});
+  final String searchQuery;
+  const ArtisansTab({
+    super.key,
+    required this.selectedProfession,
+    this.searchQuery = '',
+  });
 
   @override
   State<ArtisansTab> createState() => _ArtisansTabState();
 }
 
 class _ArtisansTabState extends State<ArtisansTab> {
-  final TextEditingController _artisanSearchController =
-      TextEditingController();
-  String _artisanSearchQuery = '';
   String _artisanSortBy = 'rating';
   Position? _currentPosition;
   int _currentArtisanPage = 1;
@@ -36,7 +39,6 @@ class _ArtisansTabState extends State<ArtisansTab> {
 
   @override
   void dispose() {
-    _artisanSearchController.dispose();
     super.dispose();
   }
 
@@ -60,6 +62,38 @@ class _ArtisansTabState extends State<ArtisansTab> {
         1000;
   }
 
+  int _calculateArtisanScore(ArtisanProfile artisan) {
+    int score = 0;
+
+    // 1. Available: +30 points
+    if (artisan.availability == 'available') {
+      score += 30;
+    }
+
+    // 2. Distance < 5km: +25 points
+    final distance = _calculateDistance(artisan.latitude, artisan.longitude);
+    if (distance != null && distance < 5.0) {
+      score += 25;
+    }
+
+    // 3. Verified: +20 points
+    if (artisan.isVerified) {
+      score += 20;
+    }
+
+    // 4. Rating 4.5+: +15 points
+    if (artisan.rating >= 4.5) {
+      score += 15;
+    }
+
+    // 5. Experience 5+ years: +10 points
+    if (artisan.experience >= 5) {
+      score += 10;
+    }
+
+    return score;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isUrdu = Provider.of<LanguageService>(context).isUrdu;
@@ -67,18 +101,6 @@ class _ArtisansTabState extends State<ArtisansTab> {
 
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: SearchSortBar(
-            controller: _artisanSearchController,
-            padding: EdgeInsets.zero,
-            hintText: isUrdu ? 'کاریگر تلاش کریں...' : 'Search artisans...',
-            onSearchChanged: (value) {
-              setState(() => _artisanSearchQuery = value);
-            },
-            showVoiceSearch: true,
-          ),
-        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
@@ -95,6 +117,8 @@ class _ArtisansTabState extends State<ArtisansTab> {
               _buildArtisanSortChip(
                   'rating', isUrdu ? 'ریٹنگ' : 'Rating', fontFamily),
               _buildArtisanSortChip(
+                  'distance', isUrdu ? 'قریب' : 'Nearby', fontFamily),
+              _buildArtisanSortChip(
                   'experience', isUrdu ? 'تجربہ' : 'Experience', fontFamily),
               _buildArtisanSortChip(
                   'reviews', isUrdu ? 'ریویوز' : 'Reviews', fontFamily),
@@ -107,14 +131,16 @@ class _ArtisansTabState extends State<ArtisansTab> {
                 limit: _currentArtisanPage * _artisanPageSize),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return _buildShimmerLoading();
               }
 
               final allArtisans = snapshot.data ?? [];
               final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-              
+
               // Always hide the current user's own profile from the Artisans list
-              var filtered = allArtisans.where((a) => a.id != currentUserId).toList();
+              var filtered = allArtisans
+                  .where((a) => a.id != currentUserId && a.isActive)
+                  .toList();
 
               if (widget.selectedProfession != 'all') {
                 filtered = filtered
@@ -122,27 +148,44 @@ class _ArtisansTabState extends State<ArtisansTab> {
                     .toList();
               }
 
-              if (_artisanSearchQuery.isNotEmpty) {
-                final query = _artisanSearchQuery.toLowerCase();
+              if (widget.searchQuery.isNotEmpty) {
+                final query = widget.searchQuery.toLowerCase();
                 filtered = filtered.where((a) {
+                  final matchesSkills = a.skills.any((s) => s.toLowerCase().contains(query));
                   return a.name.toLowerCase().contains(query) ||
                       a.profession.toLowerCase().contains(query) ||
-                      a.description.toLowerCase().contains(query);
+                      a.description.toLowerCase().contains(query) ||
+                      matchesSkills;
                 }).toList();
               }
 
-              switch (_artisanSortBy) {
-                case 'rating':
-                  filtered.sort((a, b) => b.rating.compareTo(a.rating));
-                  break;
-                case 'experience':
-                  filtered.sort((a, b) => b.experience.compareTo(a.experience));
-                  break;
-                case 'reviews':
-                  filtered
-                      .sort((a, b) => b.totalReviews.compareTo(a.totalReviews));
-                  break;
-              }
+              filtered.sort((a, b) {
+                final scoreA = _calculateArtisanScore(a);
+                final scoreB = _calculateArtisanScore(b);
+
+                if (scoreA != scoreB) {
+                  return scoreB.compareTo(scoreA); // Higher score first
+                }
+
+                // Tie-breaker: Use the user selected sort criteria
+                if (_artisanSortBy == 'distance') {
+                  final distA =
+                      _calculateDistance(a.latitude, a.longitude) ?? 9999.0;
+                  final distB =
+                      _calculateDistance(b.latitude, b.longitude) ?? 9999.0;
+                  return distA.compareTo(distB);
+                }
+
+                switch (_artisanSortBy) {
+                  case 'experience':
+                    return b.experience.compareTo(a.experience);
+                  case 'reviews':
+                    return b.totalReviews.compareTo(a.totalReviews);
+                  case 'rating':
+                  default:
+                    return b.rating.compareTo(a.rating);
+                }
+              });
 
               if (filtered.isEmpty) {
                 return _buildArtisanEmptyState(isUrdu, fontFamily);
@@ -261,6 +304,33 @@ class _ArtisansTabState extends State<ArtisansTab> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildShimmerLoading() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: 6,
+      itemBuilder: (context, index) => SkeletonCard(
+        child: Row(
+          children: [
+            const SkeletonShimmer(width: 70, height: 70, borderRadius: 12),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SkeletonShimmer(width: 120, height: 16, borderRadius: 4),
+                  const SizedBox(height: 8),
+                  const SkeletonShimmer(width: 80, height: 12, borderRadius: 4),
+                  const SizedBox(height: 8),
+                  const SkeletonShimmer(width: 150, height: 12, borderRadius: 4),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -88,7 +88,9 @@ class _WorkNegotiationPopupState extends State<WorkNegotiationPopup> {
     final text = _messageController.text.trim();
     final rateText = _rateController.text.trim();
     
+    // اگر ریٹ دیا ہے تو میسج خالی ہو سکتا ہے، لیکن اگر میسج دیا ہے تو کم از کم 20 حروف ہوں
     if (text.isEmpty && rateText.isEmpty) return;
+    if (text.isNotEmpty && text.length < 20) return;
 
     double? proposedAmount = double.tryParse(rateText);
 
@@ -419,14 +421,19 @@ class _WorkNegotiationPopupState extends State<WorkNegotiationPopup> {
                       style: TextStyle(fontFamily: fontFamily, fontSize: 14),
                       maxLines: 2,
                       minLines: 1,
+                      onChanged: (val) => setState(() {}),
                       decoration: InputDecoration(
                         hintText: isUrdu ? 'تفصیل یا پیغام...' : 'Write details or message...',
                         hintStyle: TextStyle(fontSize: 13, color: Colors.grey[500], fontFamily: fontFamily),
+                        errorText: _messageController.text.isNotEmpty && _messageController.text.length < 20
+                            ? (isUrdu ? 'کم از کم 20 حروف لکھیں' : 'Min 20 characters required')
+                            : null,
+                        counterText: '${_messageController.text.length}/200',
                         border: InputBorder.none,
                         focusedBorder: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         filled: false,
-                        contentPadding: const EdgeInsets.fromLTRB(16, 8, 45, 12), // Adjusted
+                        contentPadding: const EdgeInsets.fromLTRB(16, 8, 45, 12),
                       ),
                     ),
                   ],
@@ -436,18 +443,22 @@ class _WorkNegotiationPopupState extends State<WorkNegotiationPopup> {
                   bottom: 6,
                   right: 6,
                   child: GestureDetector(
-                    onTap: _sendMessage,
+                    onTap: (_messageController.text.isNotEmpty && _messageController.text.length < 20) 
+                        ? null 
+                        : _sendMessage,
                     child: Container(
-                      width: 28, // Smaller Background
-                      height: 28, // Smaller Background
-                      decoration: const BoxDecoration(
-                        color: AppTheme.themeColor,
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: (_messageController.text.isNotEmpty && _messageController.text.length < 20)
+                            ? Colors.grey
+                            : AppTheme.themeColor,
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.arrow_upward, 
                         color: Colors.white, 
-                        size: 20, // Keep Arrow Size Normal/Visible
+                        size: 20,
                       ),
                     ),
                   ),

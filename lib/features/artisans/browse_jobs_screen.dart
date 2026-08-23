@@ -4,10 +4,12 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/services/artisan_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/features/artisans/post_job_screen.dart';
 import 'package:account_app/features/artisans/widgets/tabs/jobs_tab.dart';
 import 'package:account_app/features/artisans/widgets/tabs/artisans_tab.dart';
+import 'package:account_app/core/widgets/search_sort_bar.dart';
 
 class BrowseJobsScreen extends StatefulWidget {
   const BrowseJobsScreen({super.key});
@@ -19,17 +21,31 @@ class BrowseJobsScreen extends StatefulWidget {
 class _BrowseJobsScreenState extends State<BrowseJobsScreen>
     with TickerProviderStateMixin {
   late TabController _mainTabController;
+  final TextEditingController _searchController = TextEditingController();
   String _selectedProfession = 'all';
+  String _searchQuery = '';
+  bool _isSearching = false;
 
   @override
   void initState() {
     super.initState();
     _mainTabController = TabController(length: 2, vsync: this);
+    _selectRoleBasedTab();
+  }
+
+  Future<void> _selectRoleBasedTab() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    final profile = await ArtisanService().getProfile(userId);
+    if (!mounted) return;
+    _mainTabController.index = profile != null && profile.isActive ? 0 : 1;
   }
 
   @override
   void dispose() {
     _mainTabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -39,12 +55,29 @@ class _BrowseJobsScreenState extends State<BrowseJobsScreen>
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
 
     return Scaffold(
-      backgroundColor: AppTheme.scaffoldBackground,
+      backgroundColor: const Color(0xFFE8EAF0), // Even darker for better contrast
       appBar: CustomAppBar(
         title: isUrdu ? 'کمیونٹی مرکز' : 'Community Hub',
         showBackButton: false,
+        leading: _buildProfessionPickerButton(isUrdu, fontFamily),
+        leadingWidth: 120, // Increased to avoid overflow
+        centerTitle: true,
         actions: [
           IconButton(
+            key: const ValueKey('search_btn_fixed'),
+            onPressed: () {
+              setState(() {
+                _isSearching = !_isSearching;
+                if (!_isSearching) {
+                  _searchQuery = '';
+                  _searchController.clear();
+                }
+              });
+            },
+            icon: Icon(_isSearching ? Icons.close : Icons.search, color: Colors.white),
+          ),
+          IconButton(
+            key: const ValueKey('add_job_btn_fixed'),
             onPressed: () {
               Navigator.push(
                 context,
@@ -52,30 +85,55 @@ class _BrowseJobsScreenState extends State<BrowseJobsScreen>
               );
             },
             icon: const Icon(Icons.add_circle_outline, color: Colors.white),
-            tooltip: isUrdu ? 'نیا کام پوسٹ کریں' : 'Post New Job',
           ),
-          _buildProfessionPickerButton(isUrdu, fontFamily),
           const SizedBox(width: 8),
         ],
-        bottom: TabBar(
-          controller: _mainTabController,
-          indicatorColor: Colors.white,
-          indicatorWeight: 3,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          labelStyle: TextStyle(
-              fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 13),
-          tabs: [
-            Tab(text: isUrdu ? 'دستیاب کام' : 'Jobs'),
-            Tab(text: isUrdu ? 'ماہرین / کاریگر' : 'Artisans'),
-          ],
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(_isSearching ? 100 : 48),
+          child: Column(
+            children: [
+              if (_isSearching)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: SearchSortBar(
+                    controller: _searchController,
+                    hintText: isUrdu ? 'تلاش کریں...' : 'Search...',
+                    showVoiceSearch: false,
+                    onSearchChanged: (val) {
+                      setState(() => _searchQuery = val);
+                    },
+                  ),
+                ),
+              TabBar(
+                controller: _mainTabController,
+                indicatorColor: Colors.white,
+                indicatorWeight: 3,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white60,
+                labelStyle: TextStyle(
+                    fontFamily: fontFamily,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13),
+                tabs: [
+                  Tab(text: isUrdu ? 'دستیاب کام' : 'Jobs'),
+                  Tab(text: isUrdu ? 'ماہرین / کاریگر' : 'Artisans'),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
       body: TabBarView(
         controller: _mainTabController,
         children: [
-          JobsTab(selectedCategory: _selectedProfession),
-          ArtisansTab(selectedProfession: _selectedProfession),
+          JobsTab(
+            selectedCategory: _selectedProfession,
+            searchQuery: _searchQuery,
+          ),
+          ArtisansTab(
+            selectedProfession: _selectedProfession,
+            searchQuery: _searchQuery,
+          ),
         ],
       ),
     );
@@ -95,30 +153,37 @@ class _BrowseJobsScreenState extends State<BrowseJobsScreen>
     }
 
     return Center(
-      child: InkWell(
-        onTap: () => _showGlobalProfessionPicker(isUrdu, fontFamily),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.3)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                name,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11,
-                  fontFamily: fontFamily,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 12, right: 8), // کنارے سے فاصلہ
+        child: InkWell(
+          onTap: () => _showGlobalProfessionPicker(isUrdu, fontFamily),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withOpacity(0.3)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                      fontFamily: fontFamily,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              const Icon(Icons.arrow_drop_down, size: 16, color: Colors.white),
-            ],
+                const SizedBox(width: 4),
+                const Icon(Icons.arrow_drop_down, size: 16, color: Colors.white),
+              ],
+            ),
           ),
         ),
       ),

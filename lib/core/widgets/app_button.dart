@@ -72,15 +72,19 @@ class AppButton extends StatelessWidget {
           )
         else ...[
           if (icon != null) ...[
-            Icon(icon, size: size == AppButtonSize.small ? 16 : 20),
-            const SizedBox(width: 8),
+            Icon(icon, size: size == AppButtonSize.small ? 16 : (size == AppButtonSize.mini ? 14 : 20)),
+            const SizedBox(width: 6), // Slightly reduced from 8
           ],
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: FontWeight.bold,
-              fontFamily: fontFamily,
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.bold,
+                fontFamily: fontFamily,
+              ),
             ),
           ),
         ],

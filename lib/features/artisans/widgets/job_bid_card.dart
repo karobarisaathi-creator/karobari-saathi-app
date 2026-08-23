@@ -84,24 +84,31 @@ class _JobBidCardState extends State<JobBidCard> {
           Row(
             children: [
               Expanded(
-                child: ProfileInfoWidget(
-                  name: bid.artisanName,
-                  phone: '',
-                  profileImage: bid.artisanPhotoUrl,
-                  customSize: 42,
-                  borderRadius: 6,
-                  bottom: Row(
-                    children: [
-                      Icon(Icons.star, size: 12, color: Colors.amber[700]),
-                      const SizedBox(width: 2),
-                      Text(bid.artisanRating.toStringAsFixed(1), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${bid.artisanExperience} ${widget.isUrdu ? 'سال تجربہ' : 'yrs exp'}', 
-                        style: TextStyle(fontSize: 11, color: Colors.grey[600], fontFamily: widget.fontFamily)
-                      ),
-                    ],
-                  ),
+                child: FutureBuilder<ArtisanProfile?>(
+                  future: ArtisanService().getProfile(bid.artisanId),
+                  builder: (context, profileSnapshot) {
+                    final profile = profileSnapshot.data;
+                    final profession = widget.isUrdu 
+                        ? (profile?.professionUrdu ?? '') 
+                        : (profile?.profession ?? '');
+                    
+                    return StreamBuilder<bool>(
+                      stream: ArtisanService().isFavorite(bid.artisanId),
+                      builder: (context, favSnapshot) {
+                        final isFav = favSnapshot.data ?? false;
+                        return ProfileInfoWidget(
+                          name: bid.artisanName,
+                          phone: '',
+                          category: profession,
+                          profileImage: bid.artisanPhotoUrl,
+                          customSize: 42,
+                          borderRadius: 6,
+                          isFavorite: isFav,
+                          isVerticalCategory: true,
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
               Column(
@@ -132,7 +139,7 @@ class _JobBidCardState extends State<JobBidCard> {
                     bid.message,
                     maxLines: _isExpanded ? null : 4,
                     overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 13, color: Colors.grey[800], fontFamily: widget.fontFamily, height: 1.4),
+                    style: TextStyle(fontSize: 16, color: Colors.grey[800], fontFamily: widget.fontFamily, height: 1.5),
                   ),
                   if (bid.message.length > 120)
                     Padding(
@@ -141,7 +148,7 @@ class _JobBidCardState extends State<JobBidCard> {
                         _isExpanded 
                             ? (widget.isUrdu ? 'کم دکھائیں' : 'Show Less') 
                             : (widget.isUrdu ? 'مزید پڑھیں...' : 'Read More...'),
-                        style: TextStyle(color: AppTheme.themeColor, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: widget.fontFamily),
+                        style: TextStyle(color: AppTheme.themeColor, fontSize: 13, fontWeight: FontWeight.bold, fontFamily: widget.fontFamily),
                       ),
                     ),
                 ],
@@ -151,7 +158,7 @@ class _JobBidCardState extends State<JobBidCard> {
 
           // 🆕 ایکشن بٹنز (صرف جاب کے مالک کے لیے جب کام کھلا ہو)
           if (widget.isOwner && widget.isJobOpen) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 4), // Reduced from 16
             FutureBuilder<ArtisanProfile?>(
               future: ArtisanService().getProfile(bid.artisanId),
               builder: (context, snapshot) {
@@ -160,6 +167,7 @@ class _JobBidCardState extends State<JobBidCard> {
                 final bool isPending = bid.status == 'pending';
 
                 return Row(
+                  mainAxisAlignment: MainAxisAlignment.end, // Align buttons to the right
                   children: [
                     // واٹس ایپ بٹن
                     if (showWhatsApp) ...[
@@ -168,15 +176,17 @@ class _JobBidCardState extends State<JobBidCard> {
                         color: isPending ? const Color(0xFF25D366) : Colors.grey,
                         onTap: isPending ? _whatsappArtisan : () {},
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                     ],
                     // کام فائنل کریں بٹن
-                    Expanded(
+                    SizedBox(
+                      width: 90, // Fixed reduced width
                       child: AppButton(
                         text: isPending 
-                          ? (widget.isUrdu ? 'کام فائنل کریں' : 'Finalize Work')
+                          ? (widget.isUrdu ? 'فائنل کریں' : 'Finalize')
                           : (bid.status == 'accepted' ? (widget.isUrdu ? 'منظور شدہ' : 'Accepted') : (widget.isUrdu ? 'مسترد' : 'Rejected')),
-                        size: AppButtonSize.small,
+                        size: AppButtonSize.mini,
+                        isFullWidth: true,
                         color: isPending ? AppTheme.themeColor : Colors.grey,
                         onPressed: isPending ? widget.onAccept : null,
                       ),
@@ -201,15 +211,16 @@ class _JobBidCardState extends State<JobBidCard> {
   Widget _buildCircularActionButton({required IconData icon, required Color color, required VoidCallback onTap}) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(30),
+      borderRadius: BorderRadius.circular(15),
       child: Container(
-        padding: const EdgeInsets.all(8),
+        width: 30, // Fixed size to match mini button height
+        height: 30,
         decoration: BoxDecoration(
           color: color.withOpacity(0.1),
           shape: BoxShape.circle,
           border: Border.all(color: color.withOpacity(0.2)),
         ),
-        child: Icon(icon, color: color, size: 20),
+        child: Icon(icon, color: color, size: 16), // Smaller icon
       ),
     );
   }

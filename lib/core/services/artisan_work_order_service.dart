@@ -172,6 +172,39 @@ class ArtisanWorkOrderService extends BaseService {
   }
 
   // ============================================================
+  // 4.5. کام کی تصاویر اپ ڈیٹ کریں
+  // ============================================================
+
+  Future<void> updateWorkImages(
+    String artisanId,
+    String orderId,
+    List<String> imageUrls,
+  ) async {
+    final orderRef = firestore
+        .collection('artisans')
+        .doc(artisanId)
+        .collection('work_orders')
+        .doc(orderId);
+
+    await orderRef.update({
+      'workImages': imageUrls,
+    });
+
+    // کاریگر کی مین گیلری میں بھی شامل کریں (اگر پہلے سے موجود نہ ہوں)
+    final artisanRef = firestore.collection('artisans').doc(artisanId);
+    await artisanRef.update({
+      'workImages': FieldValue.arrayUnion(imageUrls),
+    });
+
+    final localOrder = workOrdersBox?.get(orderId);
+    if (localOrder != null) {
+      final updatedOrder = localOrder.copyWith(workImages: imageUrls);
+      await workOrdersBox?.put(orderId, updatedOrder);
+      notifyListeners();
+    }
+  }
+
+  // ============================================================
   // 5. کام کی تفصیل حاصل کریں
   // ============================================================
 

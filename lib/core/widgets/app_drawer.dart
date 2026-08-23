@@ -17,10 +17,8 @@ import 'package:account_app/core/services/pdf_service.dart';
 import 'package:account_app/core/services/excel_service.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/app_button.dart';
-import 'package:account_app/features/artisans/artisan_profile_screen.dart';
-import 'package:account_app/features/artisans/artisan_detail_screen.dart';
+import 'package:account_app/features/settings/master_profile_screen.dart';
 import 'package:account_app/features/artisans/customer_orders_screen.dart';
-import 'package:account_app/features/artisans/artisan_work_orders_screen.dart';
 import 'package:account_app/features/artisans/favorite_artisans_screen.dart';
 import 'package:account_app/features/settings/verification_request_screen.dart';
 import 'package:account_app/features/settings/app_lock_screen.dart';
@@ -49,7 +47,8 @@ class _AppDrawerState extends State<AppDrawer> {
 
   Future<void> _loadDrawerData() async {
     final packageInfo = await PackageInfo.fromPlatform();
-    final securityService = Provider.of<SecurityService>(context, listen: false);
+    final securityService =
+        Provider.of<SecurityService>(context, listen: false);
     final isLockEnabled = await securityService.isAppLockEnabled();
     final isBioEnabled = await securityService.isBiometricEnabled();
     final isBioAvailable = await securityService.isBiometricsAvailable();
@@ -58,7 +57,10 @@ class _AppDrawerState extends State<AppDrawer> {
     bool isAdmin = false;
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       if (doc.exists) {
         isAdmin = VerificationService.canAccessAdminPanel(
           userData: doc.data(),
@@ -68,7 +70,7 @@ class _AppDrawerState extends State<AppDrawer> {
         );
       }
     }
-    
+
     if (mounted) {
       setState(() {
         _appVersion = packageInfo.version;
@@ -93,25 +95,27 @@ class _AppDrawerState extends State<AppDrawer> {
         children: [
           // Drawer Header
           _buildHeader(context, user, isUrdu, fontFamily),
-          
+
           // Drawer Items
           Expanded(
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
                 _buildVerificationStatus(context, isUrdu, fontFamily),
-                
-                _buildSectionHeader(isUrdu ? 'پروفائل اور ریکارڈ' : 'Profile & Records', fontFamily, isUrdu),
+                _buildSectionHeader(
+                    isUrdu ? 'پروفائل اور ریکارڈ' : 'Profile & Records',
+                    fontFamily,
+                    isUrdu),
                 _buildDrawerItem(
                   icon: PhosphorIcons.user(),
-                  title: isUrdu ? 'میری پروفائل' : 'My Profile',
+                  title: isUrdu ? 'ماسٹر پروفائل' : 'Master Profile',
                   onTap: () {
                     Navigator.pop(context);
                     if (user != null) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => ArtisanDetailScreen(artisanId: user.uid),
+                          builder: (context) => const MasterProfileScreen(),
                         ),
                       );
                     }
@@ -123,7 +127,11 @@ class _AppDrawerState extends State<AppDrawer> {
                   title: isUrdu ? 'میری پوسٹ کی گئی جابز' : 'My Posted Jobs',
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const CustomerOrdersScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) =>
+                                const CustomerOrdersScreen()));
                   },
                   fontFamily: fontFamily,
                 ),
@@ -134,14 +142,17 @@ class _AppDrawerState extends State<AppDrawer> {
                     Navigator.pop(context);
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const FavoriteArtisansScreen()),
+                      MaterialPageRoute(
+                          builder: (context) => const FavoriteArtisansScreen()),
                     );
                   },
                   fontFamily: fontFamily,
                 ),
-
                 _buildDivider(),
-                _buildSectionHeader(isUrdu ? 'ڈیٹا اور رپورٹ' : 'Data & Reports', fontFamily, isUrdu),
+                _buildSectionHeader(
+                    isUrdu ? 'ڈیٹا اور رپورٹ' : 'Data & Reports',
+                    fontFamily,
+                    isUrdu),
                 _buildDrawerItem(
                   icon: PhosphorIcons.cloudArrowUp(),
                   title: isUrdu ? 'ڈیٹا سنک کریں' : 'Sync Data',
@@ -160,17 +171,23 @@ class _AppDrawerState extends State<AppDrawer> {
                   onTap: () => _showBackupDialog(context, isUrdu),
                   fontFamily: fontFamily,
                 ),
-
                 _buildDivider(),
-                _buildSectionHeader(isUrdu ? 'سیکیورٹی اور زبان' : 'Security & Language', fontFamily, isUrdu),
+                _buildSectionHeader(
+                    isUrdu ? 'سیکیورٹی اور زبان' : 'Security & Language',
+                    fontFamily,
+                    isUrdu),
                 _buildDrawerItem(
                   icon: PhosphorIcons.translate(),
                   title: isUrdu ? 'زبان تبدیل کریں' : 'Change Language',
-                  onTap: () => languageService.changeLanguage(isUrdu ? 'en' : 'ur'),
+                  onTap: () =>
+                      languageService.changeLanguage(isUrdu ? 'en' : 'ur'),
                   fontFamily: fontFamily,
                   trailing: Text(
                     isUrdu ? 'اردو' : 'English',
-                    style: TextStyle(color: AppTheme.themeColor, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+                    style: TextStyle(
+                        color: AppTheme.themeColor,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: fontFamily),
                   ),
                 ),
                 _buildDrawerItem(
@@ -204,36 +221,49 @@ class _AppDrawerState extends State<AppDrawer> {
                       ),
                     ),
                 ],
-
                 if (_isAdmin) ...[
                   _buildDivider(),
-                  _buildSectionHeader(isUrdu ? 'انتظامیہ' : 'Admin Panel', fontFamily, isUrdu),
+                  _buildSectionHeader(
+                      isUrdu ? 'انتظامیہ' : 'Admin Panel', fontFamily, isUrdu),
                   StreamBuilder<List<Map<String, dynamic>>>(
-                    stream: Provider.of<VerificationService>(context, listen: false).getPendingRequests(),
-                    builder: (context, snapshot) {
-                      final int count = snapshot.data?.length ?? 0;
-                      return _buildDrawerItem(
-                        icon: PhosphorIcons.shieldStar(),
-                        title: isUrdu ? 'ایڈمن کنٹرول پینل' : 'Admin Control Panel',
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminVerificationScreen()));
-                        },
-                        fontFamily: fontFamily,
-                        trailing: count > 0 
-                          ? Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                              child: Text('$count', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                            )
-                          : null,
-                      );
-                    }
-                  ),
+                      stream: Provider.of<VerificationService>(context,
+                              listen: false)
+                          .getPendingRequests(),
+                      builder: (context, snapshot) {
+                        final int count = snapshot.data?.length ?? 0;
+                        return _buildDrawerItem(
+                          icon: PhosphorIcons.shieldStar(),
+                          title: isUrdu
+                              ? 'ایڈمن کنٹرول پینل'
+                              : 'Admin Control Panel',
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                        const AdminVerificationScreen()));
+                          },
+                          fontFamily: fontFamily,
+                          trailing: count > 0
+                              ? Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle),
+                                  child: Text('$count',
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold)),
+                                )
+                              : null,
+                        );
+                      }),
                 ],
-
                 _buildDivider(),
-                _buildSectionHeader(isUrdu ? 'ایپ کے بارے میں' : 'About App', fontFamily, isUrdu),
+                _buildSectionHeader(isUrdu ? 'ایپ کے بارے میں' : 'About App',
+                    fontFamily, isUrdu),
                 _buildDrawerItem(
                   icon: PhosphorIcons.info(),
                   title: isUrdu ? 'ایپ کے بارے میں' : 'About App',
@@ -258,7 +288,6 @@ class _AppDrawerState extends State<AppDrawer> {
                   onTap: () => _contactUs(context, isUrdu),
                   fontFamily: fontFamily,
                 ),
-                
                 _buildDivider(),
                 const SizedBox(height: 10),
                 Padding(
@@ -270,7 +299,8 @@ class _AppDrawerState extends State<AppDrawer> {
                     color: Colors.red,
                     isFullWidth: true,
                     size: AppButtonSize.small,
-                    onPressed: () => _showLogoutDialog(context, isUrdu, fontFamily),
+                    onPressed: () =>
+                        _showLogoutDialog(context, isUrdu, fontFamily),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -283,14 +313,15 @@ class _AppDrawerState extends State<AppDrawer> {
                     color: Colors.red.withValues(alpha: 0.7),
                     isFullWidth: true,
                     size: AppButtonSize.mini,
-                    onPressed: () => _showDeactivateDialog(context, isUrdu, fontFamily),
+                    onPressed: () =>
+                        _showDeactivateDialog(context, isUrdu, fontFamily),
                   ),
                 ),
                 const SizedBox(height: 30),
               ],
             ),
           ),
-          
+
           // Version Info
           Container(
             padding: const EdgeInsets.all(16.0),
@@ -299,7 +330,10 @@ class _AppDrawerState extends State<AppDrawer> {
             child: Text(
               'Karobari Saathi v$_appVersion',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                  color: Colors.grey,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -307,14 +341,21 @@ class _AppDrawerState extends State<AppDrawer> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, User? user, bool isUrdu, String fontFamily) {
+  Widget _buildHeader(
+      BuildContext context, User? user, bool isUrdu, String fontFamily) {
     return Consumer<VerificationService>(
       builder: (context, vService, _) {
         return Container(
-          padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 20, bottom: 20, left: 16, right: 16),
+          padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 20,
+              bottom: 20,
+              left: 16,
+              right: 16),
           decoration: BoxDecoration(
             color: AppTheme.darkColor,
-            borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(20), bottomRight: Radius.circular(20)),
+            borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(20),
+                bottomRight: Radius.circular(20)),
           ),
           child: ProfileInfoWidget(
             name: user?.displayName ?? (isUrdu ? 'صارف' : 'User'),
@@ -367,17 +408,20 @@ class _AppDrawerState extends State<AppDrawer> {
           color: textColor ?? Colors.black87,
         ),
       ),
-      trailing: trailing ?? const Icon(Icons.arrow_forward_ios, size: 12, color: Colors.grey),
+      trailing: trailing ??
+          const Icon(Icons.arrow_forward_ios, size: 12, color: Colors.grey),
       onTap: onTap,
       dense: true,
     );
   }
 
   Widget _buildDivider() {
-    return const Divider(height: 1, indent: 16, endIndent: 16, color: Color(0xFFEEEEEE));
+    return const Divider(
+        height: 1, indent: 16, endIndent: 16, color: Color(0xFFEEEEEE));
   }
 
-  Widget _buildVerificationStatus(BuildContext context, bool isUrdu, String fontFamily) {
+  Widget _buildVerificationStatus(
+      BuildContext context, bool isUrdu, String fontFamily) {
     return Consumer<VerificationService>(
       builder: (context, vService, _) {
         Color color = AppTheme.verifiedGold;
@@ -408,21 +452,35 @@ class _AppDrawerState extends State<AppDrawer> {
               const SizedBox(width: 10),
               Text(
                 text,
-                style: TextStyle(color: color, fontWeight: FontWeight.bold, fontFamily: fontFamily, fontSize: 13),
+                style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: fontFamily,
+                    fontSize: 13),
               ),
               const Spacer(),
-              if (vService.currentStatus == VerificationStatus.none || vService.currentStatus == VerificationStatus.rejected)
+              if (vService.currentStatus == VerificationStatus.none ||
+                  vService.currentStatus == VerificationStatus.rejected)
                 InkWell(
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const VerificationRequestScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) =>
+                                const VerificationRequestScreen()));
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                        color: color, borderRadius: BorderRadius.circular(6)),
                     child: Text(
                       isUrdu ? 'اپلائی' : 'Apply',
-                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
@@ -436,35 +494,44 @@ class _AppDrawerState extends State<AppDrawer> {
   // --- Logic Helper Methods ---
 
   Future<void> _toggleAppLock(BuildContext context, bool isUrdu) async {
-    final securityService = Provider.of<SecurityService>(context, listen: false);
+    final securityService =
+        Provider.of<SecurityService>(context, listen: false);
 
     if (_isAppLockEnabled) {
       await securityService.setAppLockEnabled(false);
       setState(() => _isAppLockEnabled = false);
-      _showSnackBar(context, isUrdu ? 'ایپ لاک غیر فعال کر دیا گیا' : 'App Lock disabled', isUrdu);
+      _showSnackBar(context,
+          isUrdu ? 'ایپ لاک غیر فعال کر دیا گیا' : 'App Lock disabled', isUrdu);
     } else {
       final result = await Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const AppLockScreen(isSettingUp: true)),
+        MaterialPageRoute(
+            builder: (context) => const AppLockScreen(isSettingUp: true)),
       );
 
       if (result == true) {
         final isEnabled = await securityService.isAppLockEnabled();
         setState(() => _isAppLockEnabled = isEnabled);
         if (isEnabled) {
-          _showSnackBar(context, isUrdu ? 'ایپ لاک فعال کر دیا گیا' : 'App Lock enabled', isUrdu);
+          _showSnackBar(context,
+              isUrdu ? 'ایپ لاک فعال کر دیا گیا' : 'App Lock enabled', isUrdu);
         }
       }
     }
   }
 
   Future<void> _toggleBiometric(BuildContext context, bool isUrdu) async {
-    final securityService = Provider.of<SecurityService>(context, listen: false);
+    final securityService =
+        Provider.of<SecurityService>(context, listen: false);
 
     if (!_isBiometricEnabled) {
       final available = await securityService.isBiometricsAvailable();
       if (!available) {
-        _showSnackBar(context, isUrdu ? 'بائیو میٹرک دستیاب نہیں' : 'Biometrics not available', isUrdu, isError: true);
+        _showSnackBar(
+            context,
+            isUrdu ? 'بائیو میٹرک دستیاب نہیں' : 'Biometrics not available',
+            isUrdu,
+            isError: true);
         return;
       }
     }
@@ -473,25 +540,34 @@ class _AppDrawerState extends State<AppDrawer> {
     setState(() {
       _isBiometricEnabled = !_isBiometricEnabled;
     });
-    _showSnackBar(context, isUrdu ? 'ترتیب اپڈیٹ ہوگئی' : 'Setting updated', isUrdu);
+    _showSnackBar(
+        context, isUrdu ? 'ترتیب اپڈیٹ ہوگئی' : 'Setting updated', isUrdu);
   }
 
   Future<void> _changePin(BuildContext context, bool isUrdu) async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const AppLockScreen(isChangingPin: true)),
+      MaterialPageRoute(
+          builder: (context) => const AppLockScreen(isChangingPin: true)),
     );
     if (result == true) {
-      _showSnackBar(context, isUrdu ? 'پن کوڈ کامیابی سے تبدیل ہو گیا' : 'PIN changed successfully', isUrdu);
+      _showSnackBar(
+          context,
+          isUrdu
+              ? 'پن کوڈ کامیابی سے تبدیل ہو گیا'
+              : 'PIN changed successfully',
+          isUrdu);
     }
   }
 
   void _syncData(BuildContext context, bool isUrdu) async {
     final syncService = Provider.of<AutoSyncService>(context, listen: false);
-    _showSnackBar(context, isUrdu ? 'ڈیٹا سنک ہو رہا ہے...' : 'Syncing data...', isUrdu);
+    _showSnackBar(
+        context, isUrdu ? 'ڈیٹا سنک ہو رہا ہے...' : 'Syncing data...', isUrdu);
     try {
       await syncService.syncAllDataToCloud();
-      _showSnackBar(context, isUrdu ? 'ڈیٹا سنک ہوگیا' : 'Data synced successfully', isUrdu);
+      _showSnackBar(context,
+          isUrdu ? 'ڈیٹا سنک ہوگیا' : 'Data synced successfully', isUrdu);
     } catch (e) {
       _showSnackBar(context, 'Error: $e', isUrdu, isError: true);
     }
@@ -502,7 +578,8 @@ class _AppDrawerState extends State<AppDrawer> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(isUrdu ? 'رپورٹ ایکسپورٹ کریں' : 'Export Report', style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '')),
+        title: Text(isUrdu ? 'رپورٹ ایکسپورٹ کریں' : 'Export Report',
+            style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -510,10 +587,18 @@ class _AppDrawerState extends State<AppDrawer> {
               text: 'PDF Report',
               onPressed: () async {
                 Navigator.pop(dialogContext);
-                _showSnackBar(context, isUrdu ? 'پی ڈی ایف بن رہی ہے...' : 'Generating PDF...', isUrdu);
-                final pdfService = Provider.of<PdfService>(context, listen: false);
-                final databaseService = Provider.of<DatabaseService>(context, listen: false);
-                await pdfService.generateAllAccountsReport(databaseService.accounts, databaseService.transactions, isUrdu);
+                _showSnackBar(
+                    context,
+                    isUrdu ? 'پی ڈی ایف بن رہی ہے...' : 'Generating PDF...',
+                    isUrdu);
+                final pdfService =
+                    Provider.of<PdfService>(context, listen: false);
+                final databaseService =
+                    Provider.of<DatabaseService>(context, listen: false);
+                await pdfService.generateAllAccountsReport(
+                    databaseService.accounts,
+                    databaseService.transactions,
+                    isUrdu);
               },
               icon: PhosphorIcons.filePdf(),
               isFullWidth: true,
@@ -523,10 +608,16 @@ class _AppDrawerState extends State<AppDrawer> {
               text: 'Excel / CSV',
               onPressed: () async {
                 Navigator.pop(dialogContext);
-                _showSnackBar(context, isUrdu ? 'ایکسل فائل بن رہی ہے...' : 'Generating Excel...', isUrdu);
-                final excelService = Provider.of<ExcelService>(context, listen: false);
-                final databaseService = Provider.of<DatabaseService>(context, listen: false);
-                await excelService.generateAndShareAllAccountsCsv(databaseService.accounts, isUrdu);
+                _showSnackBar(
+                    context,
+                    isUrdu ? 'ایکسل فائل بن رہی ہے...' : 'Generating Excel...',
+                    isUrdu);
+                final excelService =
+                    Provider.of<ExcelService>(context, listen: false);
+                final databaseService =
+                    Provider.of<DatabaseService>(context, listen: false);
+                await excelService.generateAndShareAllAccountsCsv(
+                    databaseService.accounts, isUrdu);
               },
               icon: PhosphorIcons.fileCsv(),
               isFullWidth: true,
@@ -542,7 +633,8 @@ class _AppDrawerState extends State<AppDrawer> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(isUrdu ? 'بیک اپ اور بحالی' : 'Backup & Restore', style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '')),
+        title: Text(isUrdu ? 'بیک اپ اور بحالی' : 'Backup & Restore',
+            style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -550,8 +642,10 @@ class _AppDrawerState extends State<AppDrawer> {
               text: isUrdu ? 'بیک اپ بنائیں' : 'Create Backup',
               onPressed: () async {
                 Navigator.pop(dialogContext);
-                await Provider.of<BackupService>(context, listen: false).createBackup();
-                _showSnackBar(context, isUrdu ? 'بیک اپ مکمل ہو گیا' : 'Backup completed', isUrdu);
+                await Provider.of<BackupService>(context, listen: false)
+                    .createBackup();
+                _showSnackBar(context,
+                    isUrdu ? 'بیک اپ مکمل ہو گیا' : 'Backup completed', isUrdu);
               },
               icon: PhosphorIcons.cloudArrowUp(),
               isFullWidth: true,
@@ -561,8 +655,10 @@ class _AppDrawerState extends State<AppDrawer> {
               text: isUrdu ? 'بیک اپ بحال کریں' : 'Restore Backup',
               onPressed: () async {
                 Navigator.pop(dialogContext);
-                await Provider.of<BackupService>(context, listen: false).restoreBackup();
-                _showSnackBar(context, isUrdu ? 'ڈیٹا بحال ہو گیا' : 'Data restored', isUrdu);
+                await Provider.of<BackupService>(context, listen: false)
+                    .restoreBackup();
+                _showSnackBar(context,
+                    isUrdu ? 'ڈیٹا بحال ہو گیا' : 'Data restored', isUrdu);
               },
               icon: PhosphorIcons.cloudArrowDown(),
               isFullWidth: true,
@@ -573,7 +669,8 @@ class _AppDrawerState extends State<AppDrawer> {
     );
   }
 
-  void _showAboutAppDialog(BuildContext context, bool isUrdu, String fontFamily) {
+  void _showAboutAppDialog(
+      BuildContext context, bool isUrdu, String fontFamily) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -584,14 +681,33 @@ class _AppDrawerState extends State<AppDrawer> {
           children: [
             Container(
               padding: const EdgeInsets.symmetric(vertical: 24),
-              decoration: const BoxDecoration(color: AppTheme.themeColor, borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
+              decoration: const BoxDecoration(
+                  color: AppTheme.themeColor,
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(12))),
               child: Center(
                 child: Column(
                   children: [
-                    Icon(PhosphorIcons.wallet(PhosphorIconsStyle.fill), color: Colors.white, size: 48),
+                    Container(
+                      height: 70,
+                      width: 70,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      padding: const EdgeInsets.all(8),
+                      child: Image.asset('assets/images/icons/zalooq.png'),
+                    ),
                     const SizedBox(height: 12),
-                    Text(isUrdu ? 'کاروباری ساتھی' : 'Karobari Saathi', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, fontFamily: fontFamily)),
-                    Text('Version $_appVersion', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    Text(isUrdu ? 'کاروباری ساتھی' : 'Karobari Saathi',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: fontFamily)),
+                    Text('Version $_appVersion',
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 12)),
                   ],
                 ),
               ),
@@ -600,17 +716,39 @@ class _AppDrawerState extends State<AppDrawer> {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  _buildAboutItem(PhosphorIcons.shieldCheck(), isUrdu ? 'محفوظ ڈیٹا' : 'Secure Data', isUrdu ? 'آپ کا ڈیٹا مکمل طور پر محفوظ ہے' : 'Your data is completely secure', isUrdu, fontFamily),
+                  _buildAboutItem(
+                      PhosphorIcons.shieldCheck(),
+                      isUrdu ? 'محفوظ ڈیٹا' : 'Secure Data',
+                      isUrdu
+                          ? 'آپ کا ڈیٹا مکمل طور پر محفوظ ہے'
+                          : 'Your data is completely secure',
+                      isUrdu,
+                      fontFamily),
                   const Divider(),
-                  _buildAboutItem(PhosphorIcons.cloudArrowUp(), isUrdu ? 'آٹو کلاؤڈ سنک' : 'Auto Cloud Sync', isUrdu ? 'آن لائن بیک اپ کی سہولت' : 'Online backup facility', isUrdu, fontFamily),
+                  _buildAboutItem(
+                      PhosphorIcons.cloudArrowUp(),
+                      isUrdu ? 'آٹو کلاؤڈ سنک' : 'Auto Cloud Sync',
+                      isUrdu
+                          ? 'آن لائن بیک اپ کی سہولت'
+                          : 'Online backup facility',
+                      isUrdu,
+                      fontFamily),
                   const Divider(),
-                  _buildAboutItem(PhosphorIcons.code(), isUrdu ? 'تیار کردہ' : 'Developed By', 'Zalooq Tech Solutions', isUrdu, fontFamily),
+                  _buildAboutItem(
+                      PhosphorIcons.code(),
+                      isUrdu ? 'تیار کردہ' : 'Developed By',
+                      'Zalooq Tech Solutions',
+                      isUrdu,
+                      fontFamily),
                 ],
               ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: AppButton(text: isUrdu ? 'بند کریں' : 'Close', onPressed: () => Navigator.pop(context), isFullWidth: true),
+              child: AppButton(
+                  text: isUrdu ? 'بند کریں' : 'Close',
+                  onPressed: () => Navigator.pop(context),
+                  isFullWidth: true),
             ),
             const SizedBox(height: 10),
           ],
@@ -619,40 +757,56 @@ class _AppDrawerState extends State<AppDrawer> {
     );
   }
 
-  Widget _buildAboutItem(IconData icon, String title, String sub, bool isUrdu, String fontFamily) {
+  Widget _buildAboutItem(
+      IconData icon, String title, String sub, bool isUrdu, String fontFamily) {
     return Row(
       children: [
         Icon(icon, color: AppTheme.themeColor, size: 24),
         const SizedBox(width: 12),
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, fontFamily: fontFamily)),
-          Text(sub, style: TextStyle(color: Colors.grey, fontSize: 12, fontFamily: fontFamily)),
+          Text(title,
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  fontFamily: fontFamily)),
+          Text(sub,
+              style: TextStyle(
+                  color: Colors.grey, fontSize: 12, fontFamily: fontFamily)),
         ]),
       ],
     );
   }
 
-  void _showPrivacyPolicy(BuildContext context, bool isUrdu, String fontFamily) {
+  void _showPrivacyPolicy(
+      BuildContext context, bool isUrdu, String fontFamily) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(isUrdu ? 'پرائیویسی پالیسی' : 'Privacy Policy', style: TextStyle(fontFamily: fontFamily)),
+        title: Text(isUrdu ? 'پرائیویسی پالیسی' : 'Privacy Policy',
+            style: TextStyle(fontFamily: fontFamily)),
         content: SingleChildScrollView(
           child: Text(
-            isUrdu 
-              ? 'ہم آپ کے ڈیٹا کی رازداری کا مکمل احترام کرتے ہیں۔\n\n1. ڈیٹا کی حفاظت: آپ کے کھاتوں اور لین دین کا تمام ریکارڈ کلاؤڈ پر محفوظ اور خفیہ رکھا جاتا ہے۔\n2. کاروباری رابطہ: آپ کا فون نمبر صرف ان لوگوں کو نظر آئے گا جن کے ساتھ آپ خود رابطہ کریں گے یا چیٹ شروع کریں گے۔\n3. خودکار بیک اپ: آپ کا ڈیٹا ہر وقت محفوظ ہے تاکہ موبائل تبدیل کرنے کی صورت میں بھی ریکارڈ ضائع نہ ہو۔'
-              : 'We respect your data privacy.\n\n1. Data Security: All your account records and transactions are stored securely and encrypted on the cloud.\n2. Business Contact: Your phone number is only visible to those you choose to contact or start a chat with.\n3. Auto Backup: Your data is always backed up so you never lose your records even if you change your phone.',
-            style: TextStyle(fontFamily: isUrdu ? fontFamily : '', fontSize: 14),
+            isUrdu
+                ? 'ہم آپ کے ڈیٹا کی رازداری کا مکمل احترام کرتے ہیں۔\n\n1. ڈیٹا کی حفاظت: آپ کے کھاتوں اور لین دین کا تمام ریکارڈ کلاؤڈ پر محفوظ اور خفیہ رکھا جاتا ہے۔\n2. کاروباری رابطہ: آپ کا فون نمبر صرف ان لوگوں کو نظر آئے گا جن کے ساتھ آپ خود رابطہ کریں گے یا چیٹ شروع کریں گے۔\n3. خودکار بیک اپ: آپ کا ڈیٹا ہر وقت محفوظ ہے تاکہ موبائل تبدیل کرنے کی صورت میں بھی ریکارڈ ضائع نہ ہو۔'
+                : 'We respect your data privacy.\n\n1. Data Security: All your account records and transactions are stored securely and encrypted on the cloud.\n2. Business Contact: Your phone number is only visible to those you choose to contact or start a chat with.\n3. Auto Backup: Your data is always backed up so you never lose your records even if you change your phone.',
+            style:
+                TextStyle(fontFamily: isUrdu ? fontFamily : '', fontSize: 14),
           ),
         ),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(isUrdu ? 'بند کریں' : 'Close'))],
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(isUrdu ? 'بند کریں' : 'Close'))
+        ],
       ),
     );
   }
 
   void _shareApp(BuildContext context, bool isUrdu) {
-    Share.share(isUrdu ? 'کاروباری ساتھی ایپ ڈاؤن لوڈ کریں!' : 'Download Karobari Saathi app now!');
+    Share.share(isUrdu
+        ? 'کاروباری ساتھی ایپ ڈاؤن لوڈ کریں!'
+        : 'Download Karobari Saathi app now!');
   }
 
   void _contactUs(BuildContext context, bool isUrdu) async {
@@ -664,7 +818,8 @@ class _AppDrawerState extends State<AppDrawer> {
     if (await canLaunchUrl(emailUri)) {
       await launchUrl(emailUri);
     } else {
-      _showSnackBar(context, 'Could not launch email app', isUrdu, isError: true);
+      _showSnackBar(context, 'Could not launch email app', isUrdu,
+          isError: true);
     }
   }
 
@@ -672,46 +827,63 @@ class _AppDrawerState extends State<AppDrawer> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isUrdu ? 'لاگ آؤٹ' : 'Logout', style: TextStyle(fontFamily: fontFamily)),
-        content: Text(isUrdu ? 'کیا آپ واقعی لاگ آؤٹ کرنا چاہتے ہیں؟' : 'Are you sure you want to logout?'),
+        title: Text(isUrdu ? 'لاگ آؤٹ' : 'Logout',
+            style: TextStyle(fontFamily: fontFamily)),
+        content: Text(isUrdu
+            ? 'کیا آپ واقعی لاگ آؤٹ کرنا چاہتے ہیں؟'
+            : 'Are you sure you want to logout?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text(isUrdu ? 'نہیں' : 'No')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(isUrdu ? 'نہیں' : 'No')),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              await Provider.of<AuthService>(context, listen: false).signOut(context);
+              await Provider.of<AuthService>(context, listen: false)
+                  .signOut(context);
             },
-            child: Text(isUrdu ? 'ہاں' : 'Yes', style: const TextStyle(color: Colors.red)),
+            child: Text(isUrdu ? 'ہاں' : 'Yes',
+                style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
   }
 
-  void _showDeactivateDialog(BuildContext context, bool isUrdu, String fontFamily) {
+  void _showDeactivateDialog(
+      BuildContext context, bool isUrdu, String fontFamily) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isUrdu ? 'اکاؤنٹ ختم کریں' : 'Deactivate', style: TextStyle(fontFamily: fontFamily, color: Colors.red)),
-        content: Text(isUrdu ? 'کیا آپ واقعی اپنا اکاؤنٹ عارضی طور پر ختم کرنا چاہتے ہیں؟' : 'Are you sure you want to deactivate your account?'),
+        title: Text(isUrdu ? 'اکاؤنٹ ختم کریں' : 'Deactivate',
+            style: TextStyle(fontFamily: fontFamily, color: Colors.red)),
+        content: Text(isUrdu
+            ? 'کیا آپ واقعی اپنا اکاؤنٹ عارضی طور پر ختم کرنا چاہتے ہیں؟'
+            : 'Are you sure you want to deactivate your account?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text(isUrdu ? 'نہیں' : 'No')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(isUrdu ? 'نہیں' : 'No')),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              await Provider.of<AuthService>(context, listen: false).deactivateAccount(context);
+              await Provider.of<AuthService>(context, listen: false)
+                  .deactivateAccount(context);
             },
-            child: Text(isUrdu ? 'ہاں' : 'Yes', style: const TextStyle(color: Colors.red)),
+            child: Text(isUrdu ? 'ہاں' : 'Yes',
+                style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
   }
 
-  void _showSnackBar(BuildContext context, String msg, bool isUrdu, {bool isError = false}) {
+  void _showSnackBar(BuildContext context, String msg, bool isUrdu,
+      {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg, style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '')),
+        content: Text(msg,
+            style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '')),
         backgroundColor: isError ? Colors.red : AppTheme.darkColor,
         behavior: SnackBarBehavior.floating,
       ),

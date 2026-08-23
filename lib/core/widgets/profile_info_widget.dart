@@ -30,8 +30,10 @@ class ProfileInfoWidget extends StatefulWidget {
   final Color? categoryColor;
   final bool hasUpdate;
   final bool isVerified;
+  final bool isFavorite;
   final Widget? suffix;
   final Widget? bottom;
+  final Widget? categorySuffix;
   final double? customSize;
   final double? borderRadius;
   final String? reputationLabel;
@@ -58,8 +60,10 @@ class ProfileInfoWidget extends StatefulWidget {
     this.categoryColor,
     this.hasUpdate = false,
     this.isVerified = false,
+    this.isFavorite = false,
     this.suffix,
     this.bottom,
+    this.categorySuffix,
     this.customSize,
     this.borderRadius,
     this.reputationLabel,
@@ -252,6 +256,7 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                     ),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Flexible(
                         child: Row(
@@ -290,21 +295,32 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                 ],
               ),
               if (widget.isVerticalCategory && displayCategory.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  displayCategory,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: widget.categoryColor ?? AppTheme.themeColor,
-                    fontFamily: fontFamily,
-                    fontWeight: fontWeight,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        displayCategory,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: widget.categoryColor ?? AppTheme.themeColor,
+                          fontFamily: fontFamily,
+                          fontWeight: fontWeight,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (widget.categorySuffix != null) ...[
+                      const SizedBox(width: 8),
+                      widget.categorySuffix!,
+                    ],
+                  ],
                 ),
               ],
               if (widget.phone.isNotEmpty) ...[
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
                   Formatters.formatPhoneNumber(widget.phone),
                   style: TextStyle(
@@ -315,7 +331,7 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                 ),
               ],
               if (widget.address != null && widget.address!.isNotEmpty) ...[
-                const SizedBox(height: 1),
+                const SizedBox(height: 4),
                 Text(
                   widget.address!,
                   style: TextStyle(

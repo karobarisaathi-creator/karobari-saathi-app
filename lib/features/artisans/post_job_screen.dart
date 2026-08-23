@@ -16,7 +16,6 @@ import 'package:account_app/core/services/database/job_service.dart';
 import 'package:account_app/core/models/job_post_model.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter/services.dart';
 
 class PostJobScreen extends StatefulWidget {
@@ -31,37 +30,33 @@ class _PostJobScreenState extends State<PostJobScreen> {
   final _formKey = GlobalKey<FormState>();
   
   // کنٹرولرز
+  final TextEditingController _titleController = TextEditingController();
   final TextEditingController _categoryController = TextEditingController();
   final TextEditingController _areaController = TextEditingController();
   final TextEditingController _deadlineController = TextEditingController();
   final TextEditingController _daysController = TextEditingController();
   final TextEditingController _budgetController = TextEditingController();
+  final TextEditingController _timeInController = TextEditingController();
+  final TextEditingController _timeOutController = TextEditingController();
   
-  // تفصیل کے لیے ایک ہی بڑا کنٹرولر
-  final TextEditingController _detailsController = TextEditingController();
+  // تفصیل کے لیے کنٹرولرز
+  final List<TextEditingController> _detailControllers = [];
   final List<TextEditingController> _exclusionControllers = [];
-  
-  // وائس ٹو ٹیکسٹ (Speech to Text)
-  final stt.SpeechToText _speech = stt.SpeechToText();
-  bool _isListening = false;
-  String _textBeforeListening = ''; // آواز شروع ہونے سے پہلے کا متن
   
   List<String> _selectedCategories = [];
   DateTime? _selectedDeadline;
   List<dynamic> _images = []; // Can contain File (new) or String (existing URL)
   bool _isLoading = false;
   
-  // اضافی معلومات
-  bool _isComplex = false;
-  bool _requiresHeightWork = false;
-  bool _requiresSpecialTools = false;
+  double? _jobLatitude;
+  double? _jobLongitude;
 
   @override
   void initState() {
     super.initState();
     
-    // شروع میں 2 استثناء والے خانے
-    _addExclusionField();
+    // شروع میں 1 تفصیل اور 1 استثناء والا خانہ
+    _addDetailField();
     _addExclusionField();
     
     if (widget.jobToEdit != null) {
@@ -69,8 +64,22 @@ class _PostJobScreenState extends State<PostJobScreen> {
     }
   }
 
+  void _addDetailField() {
+    setState(() {
+      _detailControllers.add(TextEditingController());
+    });
+  }
+
+  void _removeDetailField(int index) {
+    if (_detailControllers.length <= 1) return;
+    setState(() {
+      _detailControllers.removeAt(index);
+    });
+  }
+
   void _loadJobData() {
     final job = widget.jobToEdit!;
+    _titleController.text = job.title;
     _selectedCategories = List.from(job.categories);
     _categoryController.text = _selectedCategories.join(', ');
     _areaController.text = job.location;
@@ -80,9 +89,20 @@ class _PostJobScreenState extends State<PostJobScreen> {
     }
     _budgetController.text = job.estimatedBudget?.toStringAsFixed(0) ?? '';
     _daysController.text = job.estimatedDays?.toString() ?? '';
+    _timeInController.text = job.timeIn ?? '';
+    _timeOutController.text = job.timeOut ?? '';
     
     // تفصیلات لوڈ کریں
-    _detailsController.text = job.detailedScope ?? job.description;
+    final detailsText = job.detailedScope ?? job.description;
+    final details = detailsText.split('\n');
+    _detailControllers.clear();
+    for (var d in details) {
+      final text = d.replaceAll(RegExp(r'^•\s*'), '').trim();
+      if (text.isNotEmpty) {
+        _detailControllers.add(TextEditingController(text: text));
+      }
+    }
+    if (_detailControllers.isEmpty) _addDetailField();
 
     // تصاویر لوڈ کریں
     _images = List.from(job.images);
@@ -100,9 +120,8 @@ class _PostJobScreenState extends State<PostJobScreen> {
       if (_exclusionControllers.isEmpty) _addExclusionField();
     }
     
-    _isComplex = job.isComplex ?? false;
-    _requiresHeightWork = job.requiresHeightWork ?? false;
-    _requiresSpecialTools = job.requiresSpecialTools ?? false;
+    _jobLatitude = job.latitude;
+    _jobLongitude = job.longitude;
   }
 
   void _addExclusionField() {
@@ -120,13 +139,16 @@ class _PostJobScreenState extends State<PostJobScreen> {
 
   @override
   void dispose() {
-    _detailsController.dispose();
+    _titleController.dispose();
+    for (var c in _detailControllers) c.dispose();
     for (var c in _exclusionControllers) c.dispose();
     _categoryController.dispose();
     _areaController.dispose();
     _deadlineController.dispose();
     _daysController.dispose();
     _budgetController.dispose();
+    _timeInController.dispose();
+    _timeOutController.dispose();
     super.dispose();
   }
 
@@ -160,8 +182,8 @@ class _PostJobScreenState extends State<PostJobScreen> {
 
               const SizedBox(height: 20),
 
-              // سیکشن 3: اضافی معلومات
-              _buildAdditionalInfoSection(isUrdu, fontFamily),
+              // سیکشن 3: شعبہ (Category) - Moved here
+              _buildCategorySection(isUrdu, fontFamily),
 
               const SizedBox(height: 32),
 
@@ -178,6 +200,31 @@ class _PostJobScreenState extends State<PostJobScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildCategorySection(bool isUrdu, String fontFamily) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+            isUrdu ? 'کام کا شعبہ / پروفشن' : 'Job Category / Profession',
+            fontFamily
+          ),
+          const SizedBox(height: 12),
+          _buildCategorySelector(isUrdu, fontFamily),
+        ],
       ),
     );
   }
@@ -202,9 +249,6 @@ class _PostJobScreenState extends State<PostJobScreen> {
           ),
           const SizedBox(height: 16),
 
-          _buildCategorySelector(isUrdu, fontFamily),
-          const SizedBox(height: 16),
-
           _buildTextField(
             controller: _areaController,
             label: isUrdu ? 'کام کا علاقہ' : 'Work Area',
@@ -222,20 +266,29 @@ class _PostJobScreenState extends State<PostJobScreen> {
           Row(
             children: [
               Expanded(
-                flex: 2,
                 child: _buildDeadlinePicker(isUrdu, fontFamily),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          Row(
+            children: [
+              Expanded(
+                child: _buildTimePicker(
+                  controller: _timeInController,
+                  label: isUrdu ? 'ٹائم ان (اختیاری)' : 'Time In (Optional)',
+                  isUrdu: isUrdu,
+                  fontFamily: fontFamily,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                flex: 1,
-                child: _buildTextField(
-                  controller: _daysController,
-                  label: isUrdu ? 'دن (اختیاری)' : 'Days (Optional)',
-                  hint: isUrdu ? 'مثال: 5' : 'e.g. 5',
-                  icon: PhosphorIcons.clock(),
+                child: _buildTimePicker(
+                  controller: _timeOutController,
+                  label: isUrdu ? 'ٹائم آؤٹ (اختیاری)' : 'Time Out (Optional)',
                   isUrdu: isUrdu,
                   fontFamily: fontFamily,
-                  isNumber: true,
                 ),
               ),
             ],
@@ -244,7 +297,9 @@ class _PostJobScreenState extends State<PostJobScreen> {
 
           _buildTextField(
             controller: _budgetController,
-            label: isUrdu ? 'تخمینی بجٹ (اختیاری)' : 'Estimated Budget (Optional)',
+            label: isUrdu
+                ? 'تخمینی بجٹ / تنخواہ (اختیاری)'
+                : 'Budget / Salary (Optional)',
             hint: isUrdu ? 'مثال: 50000' : 'e.g. 50000',
             icon: PhosphorIcons.money(),
             isUrdu: isUrdu,
@@ -256,6 +311,34 @@ class _PostJobScreenState extends State<PostJobScreen> {
           // 🆕 ہاریزنٹل امیج پیکر (5 بکس بٹن)
           _buildHorizontalImagePicker(isUrdu, fontFamily),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTimePicker({
+    required TextEditingController controller,
+    required String label,
+    required bool isUrdu,
+    required String fontFamily,
+  }) {
+    return InkWell(
+      onTap: () async {
+        final time = await showTimePicker(
+          context: context,
+          initialTime: TimeOfDay.now(),
+        );
+        if (time != null) {
+          if (mounted) controller.text = time.format(context);
+        }
+      },
+      child: IgnorePointer(
+        child: _buildTextField(
+          controller: controller,
+          label: label,
+          icon: PhosphorIcons.clockAfternoon(),
+          isUrdu: isUrdu,
+          fontFamily: fontFamily,
+        ),
       ),
     );
   }
@@ -360,132 +443,51 @@ class _PostJobScreenState extends State<PostJobScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFFEF3C7), // Slightly darker amber background
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
-          BoxShadow(
-            color: Colors.amber.withOpacity(0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // اسٹام پیپر ہیڈر ڈیزائن
-          Center(
-            child: Column(
-              children: [
-                Text(
-                  isUrdu ? 'اسٹام پیپر' : 'STAMP PAPER',
-                  style: TextStyle(
-                    fontSize: 16,
-                    letterSpacing: 2,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.amber.shade900,
-                    fontFamily: fontFamily,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isUrdu ? 'کام کی تفصیل' : 'WORK DETAILS',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.amber.shade800,
-                    fontFamily: fontFamily,
-                  ),
-                ),
-                Container(
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  height: 2,
-                  width: 60,
-                  color: Colors.amber.shade800,
-                ),
-              ],
-            ),
+          _buildTextField(
+            controller: _titleController,
+            label: isUrdu ? 'کام کا عنوان' : 'Job Title',
+            hint: isUrdu ? 'مثال: آفس اسسٹنٹ کی ضرورت ہے' : 'e.g. Need Office Assistant',
+            icon: PhosphorIcons.textT(),
+            isUrdu: isUrdu,
+            fontFamily: fontFamily,
           ),
-          const SizedBox(height: 8),
-          Text(
-            isUrdu 
-              ? 'یہ تفصیلات حتمی معاہدے کا حصہ ہوں گی۔ کاریگر انھی شرائط پر کام کرنے کا پابند ہوگا۔ سوچ سمجھ کر درج کریں!'
-              : 'These details will be part of the final contract. Enter carefully!',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.red.shade700,
-              fontWeight: FontWeight.bold,
-              fontFamily: fontFamily,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // 🆕 ایک ہی بڑی تفصیل والی فیلڈ (وائس سپورٹ کے ساتھ)
-          Stack(
-            alignment: Alignment.bottomRight,
-            children: [
-              TextFormField(
-                controller: _detailsController,
-                maxLines: 10,
-                style: TextStyle(fontFamily: fontFamily, fontSize: 16, height: 1.6),
-                decoration: InputDecoration(
-                  hintText: isUrdu ? 'کام کی مکمل تفصیل یہاں لکھیں یا مائیک دبائیں...' : 'Write job details here or press mic...',
-                  hintStyle: TextStyle(fontSize: 14, color: Colors.grey[400]),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.all(16),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: GestureDetector(
-                  onLongPressStart: (_) => _listen(),
-                  onLongPressEnd: (_) => _stopListening(),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: _isListening ? Colors.red : AppTheme.themeColor,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: (_isListening ? Colors.red : AppTheme.themeColor).withOpacity(0.3),
-                          blurRadius: 10,
-                          spreadRadius: 2
-                        )
-                      ],
-                    ),
-                    child: Icon(
-                      _isListening ? PhosphorIcons.microphone(PhosphorIconsStyle.fill) : PhosphorIcons.microphone(),
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          const SizedBox(height: 20),
           
-          if (_isListening)
-             Padding(
-               padding: const EdgeInsets.only(top: 8),
-               child: Center(
-                 child: Text(
-                   isUrdu ? 'بولیں، ہم سن رہے ہیں...' : 'Listening, please speak...',
-                   style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12, fontFamily: fontFamily),
-                 ),
-               ),
-             ),
+          ..._buildDetailFields(isUrdu, fontFamily),
+          
+          Center(
+            child: TextButton.icon(
+              onPressed: _addDetailField,
+              style: TextButton.styleFrom(
+                backgroundColor: AppTheme.themeColor.withOpacity(0.05),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              ),
+              icon: Icon(PhosphorIcons.plusCircle(), color: AppTheme.themeColor, size: 20),
+              label: Text(
+                isUrdu ? 'نئی تفصیل شامل کریں' : 'Add New Detail',
+                style: TextStyle(
+                  color: AppTheme.themeColor, 
+                  fontFamily: fontFamily,
+                  fontWeight: FontWeight.bold
+                ),
+              ),
+            ),
+          ),
           
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 20),
-            child: Divider(thickness: 1, color: Colors.amber),
+            child: Divider(thickness: 1, color: Colors.grey),
           ),
           
           Text(
@@ -493,7 +495,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
-              color: Colors.red.shade700,
+              color: AppTheme.darkColor,
               fontFamily: fontFamily,
             ),
           ),
@@ -509,15 +511,15 @@ class _PostJobScreenState extends State<PostJobScreen> {
             child: TextButton.icon(
               onPressed: _addExclusionField,
               style: TextButton.styleFrom(
-                backgroundColor: Colors.red.withOpacity(0.05),
+                backgroundColor: AppTheme.themeColor.withOpacity(0.05),
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               ),
-              icon: Icon(PhosphorIcons.plusCircle(), color: Colors.red.shade400, size: 20),
+              icon: Icon(PhosphorIcons.plusCircle(), color: AppTheme.themeColor, size: 20),
               label: Text(
                 isUrdu ? 'نیا استثناء شامل کریں' : 'Add New Exclusion',
                 style: TextStyle(
-                  color: Colors.red.shade700, 
+                  color: AppTheme.themeColor, 
                   fontFamily: fontFamily,
                   fontWeight: FontWeight.bold
                 ),
@@ -529,36 +531,61 @@ class _PostJobScreenState extends State<PostJobScreen> {
     );
   }
 
-  List<Widget> _buildExclusionFields(bool isUrdu, String fontFamily) {
+  List<Widget> _buildDetailFields(bool isUrdu, String fontFamily) {
     final List<Widget> fields = [];
-    for (int i = 0; i < _exclusionControllers.length; i++) {
+    for (int i = 0; i < _detailControllers.length; i++) {
       fields.add(
         Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
+          padding: const EdgeInsets.only(bottom: 16, top: 8),
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _exclusionControllers[i],
-                  maxLines: 2,
-                  style: TextStyle(fontFamily: fontFamily, fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: isUrdu ? 'استثناء درج کریں...' : 'Enter exclusion...',
-                    hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              TextFormField(
+                controller: _detailControllers[i],
+                maxLines: 2,
+                style: TextStyle(fontFamily: fontFamily, fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: i == 0 ? (isUrdu ? 'کام کی تفصیل' : 'Work Detail') : null,
+                  hintText: isUrdu ? 'تفصیل درج کریں...' : 'Enter detail...',
+                  hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                  labelStyle: TextStyle(
+                    fontFamily: isUrdu ? 'NooriNastaleeq' : '', 
+                    color: Colors.grey.shade600, 
+                    fontSize: 13, 
+                    fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal
                   ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFFF5F7F9),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
               ),
-              if (_exclusionControllers.length > 1)
-                IconButton(
-                  icon: Icon(Icons.remove_circle_outline, color: Colors.red.shade300),
-                  onPressed: () => _removeExclusionField(i),
+              if (_detailControllers.length > 1)
+                Positioned(
+                  top: -10,
+                  right: isUrdu ? null : -5,
+                  left: isUrdu ? -5 : null,
+                  child: GestureDetector(
+                    onTap: () => _removeDetailField(i),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade400,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))
+                        ],
+                      ),
+                      child: const Icon(Icons.close, size: 14, color: Colors.white),
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -568,58 +595,64 @@ class _PostJobScreenState extends State<PostJobScreen> {
     return fields;
   }
 
-  Widget _buildAdditionalInfoSection(bool isUrdu, String fontFamily) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSectionHeader(
-            isUrdu ? 'اضافی معلومات' : 'Additional Info',
-            fontFamily
+  List<Widget> _buildExclusionFields(bool isUrdu, String fontFamily) {
+    final List<Widget> fields = [];
+    for (int i = 0; i < _exclusionControllers.length; i++) {
+      fields.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16, top: 8),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              TextFormField(
+                controller: _exclusionControllers[i],
+                maxLines: 2,
+                style: TextStyle(fontFamily: fontFamily, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: isUrdu ? 'استثناء درج کریں...' : 'Enter exclusion...',
+                  hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFFF5F7F9),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+              if (_exclusionControllers.length > 1)
+                Positioned(
+                  top: -10,
+                  right: isUrdu ? null : -5,
+                  left: isUrdu ? -5 : null,
+                  child: GestureDetector(
+                    onTap: () => _removeExclusionField(i),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade400,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))
+                        ],
+                      ),
+                      child: const Icon(Icons.close, size: 14, color: Colors.white),
+                    ),
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(height: 12),
-
-          _buildCheckboxTile(
-            value: _isComplex,
-            onChanged: (val) => setState(() => _isComplex = val ?? false),
-            title: isUrdu ? 'کیا یہ مشکل کام ہے؟' : 'Is this a complex job?',
-            icon: PhosphorIcons.wrench(),
-            isUrdu: isUrdu,
-            fontFamily: fontFamily,
-          ),
-          const SizedBox(height: 8),
-
-          _buildCheckboxTile(
-            value: _requiresHeightWork,
-            onChanged: (val) => setState(() => _requiresHeightWork = val ?? false),
-            title: isUrdu ? 'کیا اس میں اونچائی پر کام ہے؟' : 'Does it involve height work?',
-            icon: PhosphorIcons.stairs(),
-            isUrdu: isUrdu,
-            fontFamily: fontFamily,
-          ),
-          const SizedBox(height: 8),
-
-          _buildCheckboxTile(
-            value: _requiresSpecialTools,
-            onChanged: (val) => setState(() => _requiresSpecialTools = val ?? false),
-            title: isUrdu ? 'کیا خصوصی آلات درکار ہیں؟' : 'Does it require special tools?',
-            icon: PhosphorIcons.toolbox(),
-            isUrdu: isUrdu,
-            fontFamily: fontFamily,
-          ),
-        ],
-      ),
-    );
+        ),
+      );
+    }
+    return fields;
   }
+
+
 
   Widget _buildSectionHeader(String title, String fontFamily) {
     return Text(
@@ -633,33 +666,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
     );
   }
 
-  Widget _buildCheckboxTile({
-    required bool value,
-    required void Function(bool?) onChanged,
-    required String title,
-    required IconData icon,
-    required bool isUrdu,
-    required String fontFamily,
-  }) {
-    return Row(
-      children: [
-        Checkbox(
-          value: value,
-          onChanged: onChanged,
-          activeColor: AppTheme.themeColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        ),
-        Icon(icon, size: 18, color: AppTheme.darkColor),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            title,
-            style: TextStyle(fontFamily: fontFamily, fontSize: 14),
-          ),
-        ),
-      ],
-    );
-  }
+
 
   Widget _buildTextField({
     required TextEditingController controller,
@@ -959,73 +966,31 @@ class _PostJobScreenState extends State<PostJobScreen> {
   Future<void> _getCurrentLocation() async {
     try {
       final pos = await Geolocator.getCurrentPosition();
+      setState(() {
+        _jobLatitude = pos.latitude;
+        _jobLongitude = pos.longitude;
+      });
       final p = await placemarkFromCoordinates(pos.latitude, pos.longitude);
       if (p.isNotEmpty) setState(() => _areaController.text = "${p[0].locality}, ${p[0].subLocality}");
     } catch (e) { debugPrint(e.toString()); }
   }
 
-  void _listen() async {
-    if (!_isListening) {
-      bool available = await _speech.initialize(
-        onStatus: (val) {
-          debugPrint('Speech Status: $val');
-          if (val == 'done' || val == 'notListening') {
-            if (mounted) setState(() => _isListening = false);
-          }
-        },
-        onError: (val) {
-          debugPrint('Speech Error: $val');
-          if (mounted) setState(() => _isListening = false);
-        },
-      );
 
-      if (available) {
-        HapticFeedback.mediumImpact();
-        // پہلے سے موجود ٹیکسٹ کو محفوظ کر لیں
-        _textBeforeListening = _detailsController.text.trim();
-        
-        setState(() => _isListening = true);
-        final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-        
-        _speech.listen(
-          onResult: (val) => setState(() {
-            String recognized = val.recognizedWords;
-            if (recognized.isNotEmpty) {
-              // پہلے والا ٹیکسٹ + نیا بولا گیا ٹیکسٹ
-              _detailsController.text = _textBeforeListening.isEmpty 
-                  ? recognized 
-                  : "$_textBeforeListening $recognized";
-              
-              // کرسر کو آخر میں لے جائیں
-              _detailsController.selection = TextSelection.fromPosition(
-                TextPosition(offset: _detailsController.text.length)
-              );
-            }
-          }),
-          localeId: isUrdu ? 'ur_PK' : 'en_US',
-          listenFor: const Duration(minutes: 2), // 2 منٹ تک سنتا رہے گا
-          pauseFor: const Duration(minutes: 1),  // خاموشی پر بھی بند نہیں ہوگا (1 منٹ تک)
-        );
-      }
-    }
-  }
-
-  void _stopListening() {
-    if (_isListening) {
-      _speech.stop();
-      setState(() => _isListening = false);
-    }
-  }
 
   Future<void> _postJob() async {
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
     if (!_formKey.currentState!.validate()) return;
     
     // چیک کریں کہ تفصیل لکھی ہوئی ہے
-    if (_detailsController.text.trim().isEmpty) {
+    final details = _detailControllers
+        .where((c) => c.text.trim().isNotEmpty)
+        .map((c) => '• ${c.text.trim()}')
+        .join('\n');
+
+    if (details.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(isUrdu ? 'براہ کرم کام کی تفصیل درج کریں' : 'Please enter job details'),
+          content: Text(isUrdu ? 'براہ کرم کم از کم ایک تفصیل درج کریں' : 'Please enter at least one detail'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -1062,7 +1027,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
         }
       }
       
-      final details = _detailsController.text.trim();
+      // final details is already defined at the top of this method
       
       final exclusions = _exclusionControllers
           .where((c) => c.text.trim().isNotEmpty)
@@ -1075,7 +1040,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
         customerName: user.displayName ?? 'User',
         customerPhone: user.phoneNumber ?? '',
         customerPhotoUrl: user.photoURL,
-        title: _selectedCategories.isNotEmpty ? _selectedCategories.first : '',
+        title: _titleController.text.trim(),
         description: details,
         location: _areaController.text.trim(),
         categories: _selectedCategories,
@@ -1088,10 +1053,11 @@ class _PostJobScreenState extends State<PostJobScreen> {
         detailedScope: details,
         scopeOfWork: details,
         exclusions: exclusions.isNotEmpty ? exclusions : null,
-        isComplex: _isComplex,
         estimatedDays: int.tryParse(_daysController.text),
-        requiresHeightWork: _requiresHeightWork,
-        requiresSpecialTools: _requiresSpecialTools,
+        latitude: _jobLatitude,
+        longitude: _jobLongitude,
+        timeIn: _timeInController.text.trim(),
+        timeOut: _timeOutController.text.trim(),
       );
       
       await JobService().postJob(job);

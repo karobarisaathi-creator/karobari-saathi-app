@@ -13,8 +13,10 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Color? foregroundColor;
   final double elevation;
   final Widget? leading;
+  final double? leadingWidth;
   final bool? centerTitle;
   final PreferredSizeWidget? bottom;
+  final ShapeBorder? shape;
 
   const CustomAppBar({
     super.key,
@@ -26,8 +28,10 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.foregroundColor,
     this.elevation = 4,
     this.leading,
+    this.leadingWidth,
     this.centerTitle,
     this.bottom,
+    this.shape,
   });
 
   @override
@@ -53,6 +57,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       leading:
           leading ??
           (showBackButton ? _buildBackButton(context, isUrdu) : null),
+      leadingWidth: leadingWidth,
       automaticallyImplyLeading: false,
       actions: actions,
       backgroundColor:
@@ -113,6 +118,7 @@ class GradientAppBar extends CustomAppBar {
       leading:
           leading ??
           (showBackButton ? _buildBackButton(context, isUrdu) : null),
+      leadingWidth: leadingWidth,
       automaticallyImplyLeading: false,
       actions: actions,
       flexibleSpace: Container(

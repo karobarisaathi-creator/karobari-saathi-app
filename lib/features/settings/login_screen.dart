@@ -10,7 +10,7 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/features/dashboard/dashboard_screen.dart';
 import 'package:account_app/features/dashboard/main_navigation_screen.dart';
-import 'profile_setup_screen.dart';
+import 'package:account_app/features/settings/master_profile_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -45,29 +45,63 @@ class _LoginScreenState extends State<LoginScreen> {
             SizedBox(width: 10),
             Text(
               isUrdu ? 'شرائط و ضوابط' : 'Terms & Conditions',
-              style: TextStyle(fontFamily: fontFamily, color: _darkColor, fontWeight: isUrdu ? fontWeight : FontWeight.bold),
+              style: TextStyle(
+                  fontFamily: fontFamily,
+                  color: _darkColor,
+                  fontWeight: isUrdu ? fontWeight : FontWeight.bold),
             ),
           ],
         ),
         content: SingleChildScrollView(
           child: Text.rich(
             TextSpan(
-              style: TextStyle(fontFamily: fontFamily, color: Colors.grey.shade700, fontSize: 14, fontWeight: fontWeight),
+              style: TextStyle(
+                  fontFamily: fontFamily,
+                  color: Colors.grey.shade700,
+                  fontSize: 14,
+                  fontWeight: fontWeight),
               children: [
                 TextSpan(
-                  text: isUrdu 
-                      ? 'اس ایپ کو استعمال کرکے، آپ درج ذیل شرائط سے اتفاق کرتے ہیں:\n\n' 
+                  text: isUrdu
+                      ? 'اس ایپ کو استعمال کرکے، آپ درج ذیل شرائط سے اتفاق کرتے ہیں:\n\n'
                       : 'By using this app, you agree to the following terms:\n\n',
                 ),
-                _buildTermPoint(isUrdu ? 'ڈیٹا کی ذمہ داری: ' : 'Data Responsibility: ', isUrdu ? 'آپ اپنے درج کردہ تمام ڈیٹا (آمدنی، اخراجات، لین دین) کی درستگی اور قانونی حیثیت کے مکمل طور پر خود ذمہ دار ہیں۔' : 'You are solely responsible for the accuracy and legality of all data you enter (income, expenses, transactions).', isUrdu, fontFamily),
-                _buildTermPoint(isUrdu ? 'قانونی مشورہ نہیں: ' : 'Not Legal Advice: ', isUrdu ? 'یہ ایپ صرف حساب کتاب اور ریکارڈ رکھنے کے لیے ہے۔ اس میں فراہم کردہ کوئی بھی معلومات، رپورٹس یا تجزیہ قانونی، مالی یا ٹیکس سے متعلق مشورہ نہیں ہے۔' : 'This app is for accounting and record-keeping purposes only. No information, reports, or analysis provided constitutes legal, financial, or tax advice.', isUrdu, fontFamily),
-                _buildTermPoint(isUrdu ? 'ڈیٹا کا نقصان: ' : 'Data Loss: ', isUrdu ? 'ہم آپ کے ڈیٹا کی حفاظت کی کوشش کرتے ہیں، لیکن ہم ڈیٹا کے کسی بھی قسم کے نقصان (حذف ہونے، کرپشن) کے ذمہ دار نہیں ہوں گے۔ اپنے ریکارڈ کا باقاعدگی سے بیک اپ بنانا آپ کی ذمہ داری ہے۔' : 'We strive to protect your data, but we are not liable for any data loss (deletion, corruption). It is your responsibility to maintain regular backups of your records.', isUrdu, fontFamily),
-                _buildTermPoint(isUrdu ? 'استعمال کی حدود: ' : 'Limitation of Use: ', isUrdu ? 'اس ایپ کو کسی بھی غیر قانونی سرگرمی کے لیے استعمال نہیں کیا جا سکتا۔ ایپ کے غلط استعمال کی صورت میں آپ کے اکاؤنٹ کو بغیر اطلاع کے معطل کیا جا سکتا ہے۔' : 'This app may not be used for any illegal activities. Your account may be suspended without notice for misuse of the app.', isUrdu, fontFamily),
+                _buildTermPoint(
+                    isUrdu ? 'ڈیٹا کی ذمہ داری: ' : 'Data Responsibility: ',
+                    isUrdu
+                        ? 'آپ اپنے درج کردہ تمام ڈیٹا (آمدنی، اخراجات، لین دین) کی درستگی اور قانونی حیثیت کے مکمل طور پر خود ذمہ دار ہیں۔'
+                        : 'You are solely responsible for the accuracy and legality of all data you enter (income, expenses, transactions).',
+                    isUrdu,
+                    fontFamily),
+                _buildTermPoint(
+                    isUrdu ? 'قانونی مشورہ نہیں: ' : 'Not Legal Advice: ',
+                    isUrdu
+                        ? 'یہ ایپ صرف حساب کتاب اور ریکارڈ رکھنے کے لیے ہے۔ اس میں فراہم کردہ کوئی بھی معلومات، رپورٹس یا تجزیہ قانونی، مالی یا ٹیکس سے متعلق مشورہ نہیں ہے۔'
+                        : 'This app is for accounting and record-keeping purposes only. No information, reports, or analysis provided constitutes legal, financial, or tax advice.',
+                    isUrdu,
+                    fontFamily),
+                _buildTermPoint(
+                    isUrdu ? 'ڈیٹا کا نقصان: ' : 'Data Loss: ',
+                    isUrdu
+                        ? 'ہم آپ کے ڈیٹا کی حفاظت کی کوشش کرتے ہیں، لیکن ہم ڈیٹا کے کسی بھی قسم کے نقصان (حذف ہونے، کرپشن) کے ذمہ دار نہیں ہوں گے۔ اپنے ریکارڈ کا باقاعدگی سے بیک اپ بنانا آپ کی ذمہ داری ہے۔'
+                        : 'We strive to protect your data, but we are not liable for any data loss (deletion, corruption). It is your responsibility to maintain regular backups of your records.',
+                    isUrdu,
+                    fontFamily),
+                _buildTermPoint(
+                    isUrdu ? 'استعمال کی حدود: ' : 'Limitation of Use: ',
+                    isUrdu
+                        ? 'اس ایپ کو کسی بھی غیر قانونی سرگرمی کے لیے استعمال نہیں کیا جا سکتا۔ ایپ کے غلط استعمال کی صورت میں آپ کے اکاؤنٹ کو بغیر اطلاع کے معطل کیا جا سکتا ہے۔'
+                        : 'This app may not be used for any illegal activities. Your account may be suspended without notice for misuse of the app.',
+                    isUrdu,
+                    fontFamily),
                 TextSpan(
-                  text: isUrdu 
-                      ? '\nایپ کا استعمال جاری رکھ کر آپ ان تمام شرائط کو قبول کرتے ہیں۔' 
+                  text: isUrdu
+                      ? '\nایپ کا استعمال جاری رکھ کر آپ ان تمام شرائط کو قبول کرتے ہیں۔'
                       : '\nBy continuing to use the app, you accept all these terms.',
-                  style: TextStyle(color: _darkColor, fontFamily: fontFamily, fontWeight: isUrdu ? fontWeight : FontWeight.bold),
+                  style: TextStyle(
+                      color: _darkColor,
+                      fontFamily: fontFamily,
+                      fontWeight: isUrdu ? fontWeight : FontWeight.bold),
                 ),
               ],
             ),
@@ -76,19 +110,31 @@ class _LoginScreenState extends State<LoginScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text(isUrdu ? 'قبول ہے' : 'Accept', style: TextStyle(fontFamily: fontFamily, color: _themeColor, fontWeight: isUrdu ? fontWeight : FontWeight.bold)),
+            child: Text(isUrdu ? 'قبول ہے' : 'Accept',
+                style: TextStyle(
+                    fontFamily: fontFamily,
+                    color: _themeColor,
+                    fontWeight: isUrdu ? fontWeight : FontWeight.bold)),
           ),
         ],
       ),
     );
   }
 
-  InlineSpan _buildTermPoint(String title, String description, bool isUrdu, String fontFamily) {
+  InlineSpan _buildTermPoint(
+      String title, String description, bool isUrdu, String fontFamily) {
     final fontWeight = FontWeight.normal;
     return TextSpan(
       children: [
-        TextSpan(text: '\n• $title', style: TextStyle(fontWeight: fontWeight, color: _darkColor, fontFamily: fontFamily)),
-        TextSpan(text: description, style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight)),
+        TextSpan(
+            text: '\n• $title',
+            style: TextStyle(
+                fontWeight: fontWeight,
+                color: _darkColor,
+                fontFamily: fontFamily)),
+        TextSpan(
+            text: description,
+            style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight)),
       ],
     );
   }
@@ -215,7 +261,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             SizedBox(height: 8),
                             Text(
-                              isUrdu ? 'اپنے اکاؤنٹ تک رسائی حاصل کریں' : 'Sign in to access your account',
+                              isUrdu
+                                  ? 'اپنے اکاؤنٹ تک رسائی حاصل کریں'
+                                  : 'Sign in to access your account',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: _darkColor.withOpacity(0.6),
@@ -229,14 +277,26 @@ class _LoginScreenState extends State<LoginScreen> {
                             TextFormField(
                               controller: _phoneController,
                               keyboardType: TextInputType.phone,
-                              autofillHints: const [AutofillHints.telephoneNumber],
-                              style: TextStyle(fontSize: 18, color: _darkColor, fontWeight: FontWeight.bold, fontFamily: ''),
+                              autofillHints: const [
+                                AutofillHints.telephoneNumber
+                              ],
+                              style: TextStyle(
+                                  fontSize: 18,
+                                  color: _darkColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: ''),
                               decoration: InputDecoration(
                                 labelText: isUrdu ? 'فون نمبر' : 'Phone Number',
-                                labelStyle: TextStyle(color: _darkColor.withOpacity(0.6), fontFamily: fontFamily, fontWeight: fontWeight),
+                                labelStyle: TextStyle(
+                                    color: _darkColor.withOpacity(0.6),
+                                    fontFamily: fontFamily,
+                                    fontWeight: fontWeight),
                                 hintText: '03001234567',
-                                hintStyle: TextStyle(color: _darkColor.withOpacity(0.3), fontFamily: ''),
-                                prefixIcon: Icon(PhosphorIcons.phone(), color: _themeColor),
+                                hintStyle: TextStyle(
+                                    color: _darkColor.withOpacity(0.3),
+                                    fontFamily: ''),
+                                prefixIcon: Icon(PhosphorIcons.phone(),
+                                    color: _themeColor),
                                 filled: true,
                                 fillColor: Colors.white,
                                 border: OutlineInputBorder(
@@ -249,18 +309,29 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: _themeColor, width: 2),
+                                  borderSide:
+                                      BorderSide(color: _themeColor, width: 2),
                                 ),
-                                errorStyle: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight),
-                                contentPadding: EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+                                errorStyle: TextStyle(
+                                    fontFamily: fontFamily,
+                                    fontWeight: fontWeight),
+                                contentPadding: EdgeInsets.symmetric(
+                                    vertical: 18, horizontal: 20),
                               ),
                               validator: (value) {
-                                if (value == null || value.isEmpty) return isUrdu ? 'نمبر درج کریں' : 'Enter number';
+                                if (value == null || value.isEmpty)
+                                  return isUrdu
+                                      ? 'نمبر درج کریں'
+                                      : 'Enter number';
                                 // Normalize and validate for Pakistan numbers (10 digits after prefix)
-                                String cleaned = value.replaceAll(RegExp(r'[^0-9]'), '');
-                                if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
+                                String cleaned =
+                                    value.replaceAll(RegExp(r'[^0-9]'), '');
+                                if (cleaned.startsWith('0'))
+                                  cleaned = cleaned.substring(1);
                                 if (cleaned.length != 10) {
-                                  return isUrdu ? 'درست نمبر لکھیں (10 ہندسے)' : 'Enter valid 10-digit number';
+                                  return isUrdu
+                                      ? 'درست نمبر لکھیں (10 ہندسے)'
+                                      : 'Enter valid 10-digit number';
                                 }
                                 return null;
                               },
@@ -271,30 +342,45 @@ class _LoginScreenState extends State<LoginScreen> {
                               duration: Duration(milliseconds: 400),
                               curve: Curves.easeInOut,
                               height: _verificationId.isNotEmpty ? 80 : 0,
-                              margin: EdgeInsets.only(top: _verificationId.isNotEmpty ? 20 : 0),
+                              margin: EdgeInsets.only(
+                                  top: _verificationId.isNotEmpty ? 20 : 0),
                               child: _verificationId.isNotEmpty
                                   ? TextFormField(
                                       controller: _otpController,
                                       keyboardType: TextInputType.number,
-                                      autofillHints: const [AutofillHints.oneTimeCode],
+                                      autofillHints: const [
+                                        AutofillHints.oneTimeCode
+                                      ],
                                       textAlign: TextAlign.center,
                                       onChanged: (value) {
                                         if (value.length == 6) {
                                           _handleLogin();
                                         }
                                       },
-                                      style: TextStyle(fontSize: 22, letterSpacing: 12, fontWeight: FontWeight.bold, color: _darkColor, fontFamily: ''),
+                                      style: TextStyle(
+                                          fontSize: 22,
+                                          letterSpacing: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: _darkColor,
+                                          fontFamily: ''),
                                       decoration: InputDecoration(
                                         hintText: '------',
-                                        hintStyle: TextStyle(letterSpacing: 12, color: _darkColor.withOpacity(0.3), fontFamily: ''),
+                                        hintStyle: TextStyle(
+                                            letterSpacing: 12,
+                                            color: _darkColor.withOpacity(0.3),
+                                            fontFamily: ''),
                                         filled: true,
                                         fillColor: Colors.white,
                                         border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                           borderSide: BorderSide.none,
                                         ),
-                                        errorStyle: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight),
-                                        contentPadding: EdgeInsets.symmetric(vertical: 16),
+                                        errorStyle: TextStyle(
+                                            fontFamily: fontFamily,
+                                            fontWeight: fontWeight),
+                                        contentPadding:
+                                            EdgeInsets.symmetric(vertical: 16),
                                       ),
                                     )
                                   : SizedBox(),
@@ -308,27 +394,44 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ? (isUrdu ? 'کوڈ بھیجیں' : 'Send Code')
                                   : (isUrdu ? 'تصدیق کریں' : 'Verify & Login'),
                               onPressed: _handleLogin,
-                              icon: _verificationId.isEmpty ? PhosphorIcons.arrowRight() : null,
+                              icon: _verificationId.isEmpty
+                                  ? PhosphorIcons.arrowRight()
+                                  : null,
                               isLoading: _isLoading,
                               isFullWidth: true,
                               size: AppButtonSize.large,
                               color: _themeColor,
                             ),
-                            
+
                             SizedBox(height: 24),
 
                             Center(
                               child: Text.rich(
                                 TextSpan(
-                                  style: TextStyle(color: _darkColor.withOpacity(0.5), fontSize: 12, fontFamily: fontFamily, fontWeight: fontWeight),
+                                  style: TextStyle(
+                                      color: _darkColor.withOpacity(0.5),
+                                      fontSize: 12,
+                                      fontFamily: fontFamily,
+                                      fontWeight: fontWeight),
                                   children: [
-                                    TextSpan(text: isUrdu ? 'جاری رکھنے پر آپ ' : 'By continuing, you agree to our '),
                                     TextSpan(
-                                      text: isUrdu ? 'شرائط و ضوابط' : 'Terms & Conditions',
-                                      style: TextStyle(color: _themeColor, fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
-                                      recognizer: TapGestureRecognizer()..onTap = () => _showTermsDialog(isUrdu, fontFamily),
+                                        text: isUrdu
+                                            ? 'جاری رکھنے پر آپ '
+                                            : 'By continuing, you agree to our '),
+                                    TextSpan(
+                                      text: isUrdu
+                                          ? 'شرائط و ضوابط'
+                                          : 'Terms & Conditions',
+                                      style: TextStyle(
+                                          color: _themeColor,
+                                          fontWeight: FontWeight.bold,
+                                          decoration: TextDecoration.underline),
+                                      recognizer: TapGestureRecognizer()
+                                        ..onTap = () => _showTermsDialog(
+                                            isUrdu, fontFamily),
                                     ),
-                                    TextSpan(text: isUrdu ? ' سے متفق ہیں' : ''),
+                                    TextSpan(
+                                        text: isUrdu ? ' سے متفق ہیں' : ''),
                                   ],
                                 ),
                                 textAlign: TextAlign.center,
@@ -357,7 +460,7 @@ class _LoginScreenState extends State<LoginScreen> {
     String input = _phoneController.text.trim();
     String cleaned = input.replaceAll(RegExp(r'[^0-9]'), '');
     if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
-    
+
     String phoneNumber = '+92$cleaned';
 
     try {
@@ -387,7 +490,8 @@ class _LoginScreenState extends State<LoginScreen> {
               errorMessage = 'The phone number is invalid.';
             }
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+              SnackBar(
+                  content: Text(errorMessage), backgroundColor: Colors.red),
             );
           },
           codeSent: (String verificationId, int? resendToken) {
@@ -401,7 +505,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 content: Text('OTP code sent'),
                 backgroundColor: _darkColor,
                 behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
             );
           },
@@ -438,11 +543,17 @@ class _LoginScreenState extends State<LoginScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         // فائر بیس سے چیک کرنا کہ کیا صارف کا نام پہلے سے موجود ہے
-        final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
         final userData = userDoc.data();
-        
+
         // اگر ڈاکیومنٹ موجود نہیں یا نام خالی ہے، تو یہ نیا صارف ہے
-        if (!userDoc.exists || userData == null || userData['name'] == null || userData['name'].toString().trim().isEmpty) {
+        final storedName = userData?['displayName'] ?? userData?['name'];
+        final hasBasicProfile =
+            storedName != null && storedName.toString().trim().isNotEmpty;
+        if (!userDoc.exists || !hasBasicProfile) {
           isNewUser = true;
         }
 
@@ -471,15 +582,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _navigateToProfileSetup() {
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
+      MaterialPageRoute(builder: (context) => const MasterProfileScreen()),
       (route) => false,
     );
   }
 
   Future<void> _restoreUserData() async {
     if (!mounted) return;
-    final databaseService = Provider.of<DatabaseService>(context, listen: false);
-    
+    final databaseService =
+        Provider.of<DatabaseService>(context, listen: false);
+
     if (!databaseService.isInitialized) {
       await databaseService.init();
     }
@@ -495,12 +607,13 @@ class _LoginScreenState extends State<LoginScreen> {
           content: Text('Data restored successfully'),
           backgroundColor: _darkColor,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     } catch (e) {
       if (!mounted) return;
-       ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to restore data: $e'),
           backgroundColor: Colors.red,

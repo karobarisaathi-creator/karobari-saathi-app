@@ -14,6 +14,8 @@ import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
+import 'package:account_app/core/models/job_post_model.dart';
+import 'package:account_app/features/artisans/job_detail_screen.dart';
 import 'package:account_app/features/artisans/widgets/work_negotiation_popup.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/version_check_service.dart';
@@ -105,7 +107,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final notificationService = Provider.of<NotificationService>(context);
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-    
+
     return Consumer<NotificationService>(
       builder: (context, notificationService, child) {
         final notifications = notificationService.notifications;
@@ -160,18 +162,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 color: Colors.white,
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                    color: AppTheme.darkColor.withOpacity(0.05))),
+                                    color:
+                                        AppTheme.darkColor.withOpacity(0.05))),
                             child: Icon(PhosphorIcons.bellSlash(),
                                 size: 48,
                                 color: AppTheme.darkColor.withOpacity(0.5)),
                           ),
                           const SizedBox(height: 24),
-                          Text(isUrdu ? 'کوئی نوٹیفیکیشن نہیں' : 'No Notifications',
+                          Text(
+                              isUrdu
+                                  ? 'کوئی نوٹیفیکیشن نہیں'
+                                  : 'No Notifications',
                               style: TextStyle(
                                   fontSize: 18,
                                   color: AppTheme.darkColor,
-                                  fontWeight:
-                                      isUrdu ? FontWeight.bold : FontWeight.normal,
+                                  fontWeight: isUrdu
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                                   fontFamily: fontFamily)),
                           const SizedBox(height: 8),
                           Text(
@@ -189,7 +196,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       child: ListView.builder(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 12),
-                        itemCount: (notifications.length) + (_updateData != null ? 1 : 0),
+                        itemCount: (notifications.length) +
+                            (_updateData != null ? 1 : 0),
                         itemBuilder: (context, index) {
                           if (_updateData != null && index == 0) {
                             return Column(
@@ -199,14 +207,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               ],
                             );
                           }
-                          
-                          final nIndex = _updateData != null ? index - 1 : index;
-                          if (nIndex < 0 || nIndex >= notifications.length) return const SizedBox.shrink();
-                          
+
+                          final nIndex =
+                              _updateData != null ? index - 1 : index;
+                          if (nIndex < 0 || nIndex >= notifications.length)
+                            return const SizedBox.shrink();
+
                           final n = notifications[nIndex];
-                          
+
                           return _buildNotificationCard(
-                            n, isUrdu, fontFamily, notificationService);
+                              n, isUrdu, fontFamily, notificationService);
                         },
                       ),
                     ),
@@ -381,12 +391,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     final type = data['type'];
 
+    if (type == 'new_bid') {
+      final jobId = data['jobId']?.toString();
+      if (jobId == null || jobId.isEmpty) return;
+
+      final jobDoc =
+          await FirebaseFirestore.instance.collection('jobs').doc(jobId).get();
+      if (!jobDoc.exists || jobDoc.data() == null || !mounted) return;
+
+      final jobData = jobDoc.data()!;
+      final job = JobPost.fromMap({...jobData, 'id': jobDoc.id});
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => JobDetailScreen(job: job)),
+      );
+      return;
+    }
+
     if (type == 'artisan_request' || type == 'artisan_response') {
       final status = data['status'];
       if (status == 'negotiating') {
         final orderId = data['orderId'];
-        final artisanUid = data['artisanUid'] ?? FirebaseAuth.instance.currentUser?.uid;
-        
+        final artisanUid =
+            data['artisanUid'] ?? FirebaseAuth.instance.currentUser?.uid;
+
         if (orderId != null && artisanUid != null) {
           // Fetch work order
           final doc = await FirebaseFirestore.instance
@@ -395,12 +423,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               .collection('work_orders')
               .doc(orderId)
               .get();
-          
+
           if (doc.exists && mounted) {
             final order = ArtisanWorkOrder.fromMap(doc.data()!);
             showDialog(
               context: context,
-              builder: (context) => WorkNegotiationPopup(workOrder: order, isDirect: true),
+              builder: (context) =>
+                  WorkNegotiationPopup(workOrder: order, isDirect: true),
             );
           }
         }
@@ -580,9 +609,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     // 🆕 انتہائی مضبوط طریقہ: آخری 10 ہندسوں سے میچ کریں
     String normalize(String p) {
       String clean = p.replaceAll(RegExp(r'\D'), '');
-      return clean.length >= 10 
-          ? clean.substring(clean.length - 10) 
-          : clean;
+      return clean.length >= 10 ? clean.substring(clean.length - 10) : clean;
     }
 
     final lookupSuffix = normalize(senderPhone);

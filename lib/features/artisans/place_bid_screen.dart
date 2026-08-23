@@ -212,6 +212,7 @@ class _PlaceBidScreenState extends State<PlaceBidScreen> {
             maxLines: 10,
             isUrdu: isUrdu,
             fontFamily: fontFamily,
+            minLength: 20,
           ),
         ],
       ),
@@ -270,11 +271,13 @@ class _PlaceBidScreenState extends State<PlaceBidScreen> {
     int maxLines = 1,
     required bool isUrdu,
     required String fontFamily,
+    int? minLength,
   }) {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      onChanged: (val) => setState(() {}),
       style: TextStyle(
         color: AppTheme.darkColor, 
         fontFamily: isNumber ? '' : fontFamily, 
@@ -293,12 +296,20 @@ class _PlaceBidScreenState extends State<PlaceBidScreen> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         fillColor: const Color(0xFFF5F7F9),
         filled: true,
+        counterText: minLength != null ? '${controller.text.length} characters' : null,
+        errorText: minLength != null && controller.text.isNotEmpty && controller.text.length < minLength
+            ? (isUrdu ? 'کم از کم $minLength حروف لکھیں' : 'Min $minLength characters required')
+            : null,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0), borderSide: BorderSide(color: Colors.grey.shade400)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0), borderSide: BorderSide(color: Colors.grey.shade400)),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0), borderSide: const BorderSide(color: AppTheme.themeColor, width: 1)),
         prefixIcon: Icon(icon, color: AppTheme.themeColor, size: 20),
       ),
-      validator: (val) => val == null || val.isEmpty ? (isUrdu ? 'ضروری ہے' : 'Required') : null,
+      validator: (val) {
+        if (val == null || val.isEmpty) return (isUrdu ? 'ضروری ہے' : 'Required');
+        if (minLength != null && val.length < minLength) return (isUrdu ? 'مزید تفصیل لکھیں' : 'Provide more details');
+        return null;
+      },
     );
   }
 

@@ -1,6 +1,7 @@
 // lib/features/artisans/widgets/artisan_rating_stars.dart
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/theme/app_theme.dart';
 
 class ArtisanRatingStars extends StatelessWidget {
   final double rating;
@@ -16,7 +17,7 @@ class ArtisanRatingStars extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final starColor = color ?? Colors.amber;
+    final starColor = color ?? AppTheme.darkColor;
 
     return Directionality(
       textDirection: TextDirection.ltr,

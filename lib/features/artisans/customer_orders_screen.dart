@@ -77,7 +77,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
 
-          // 🆕 صرف وہ کام دکھائیں جو فائنل (Confirmed) ہو چکے ہوں
+          // صرف وہ کام دکھائیں جو فائنل (Confirmed) ہو چکے ہوں
           final orders = snapshot.data
                   ?.where(
                       (o) => o.status != 'negotiating' && o.status != 'quoted')
@@ -98,14 +98,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
                 isArtisanMode: false,
                 isUrdu: isUrdu,
                 fontFamily: fontFamily,
-                onTap: () {
-                  // Finalized orders might still need discussion
-                  showDialog(
-                    context: context,
-                    builder: (context) =>
-                        WorkNegotiationPopup(workOrder: order, isDirect: true),
-                  );
-                },
+                onTap: null, // Removed popup on tap
                 onAction: () {
                   if (order.status == 'completed') {
                     _showRatingDialog(order, isUrdu);
@@ -297,7 +290,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
                     ),
                   if (needsCustomerApproval)
                     AppButton(
-                      text: isUrdu ? '✅ ڈیل فائنل کریں' : 'Finalize Deal',
+                      text: isUrdu ? 'ڈیل فائنل کریں' : 'Finalize Deal',
                       onPressed: () => _finalizeDeal(order, isUrdu),
                       icon: PhosphorIcons.checkCircle(),
                       color: AppTheme.incomeColor,
@@ -305,7 +298,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
                     ),
                   if (order.status == 'completed')
                     AppButton(
-                      text: isUrdu ? '⭐ ریٹنگ دیں' : 'Rate Now',
+                      text: isUrdu ? 'ریٹنگ دیں' : 'Rate Now',
                       onPressed: () => _showRatingDialog(order, isUrdu),
                       icon: PhosphorIcons.star(),
                       color: AppTheme.verifiedGold,
@@ -334,21 +327,21 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppTheme.goldColor.withOpacity(0.1),
+        color: AppTheme.darkColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.goldColor),
+        border: Border.all(color: AppTheme.darkColor.withOpacity(0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(PhosphorIcons.star(PhosphorIconsStyle.fill),
-              color: AppTheme.goldColor, size: 14),
+              color: AppTheme.darkColor, size: 14),
           const SizedBox(width: 4),
           Text('${rating ?? 0}',
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.goldColor)),
+                  color: AppTheme.darkColor)),
         ],
       ),
     );
@@ -426,7 +419,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
             'customerAgreed': true,
             'customerAcceptedTerms': true,
             'agreedAt': FieldValue.serverTimestamp(),
-            'status': 'confirmed', // ✅ confirmed
+            'status': 'confirmed', // confirmed
           });
         }
       });
@@ -437,7 +430,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isUrdu ? '✅ ڈیل فائنل ہو گئی!' : '✅ Deal finalized!'),
+            content: Text(isUrdu ? 'ڈیل فائنل ہو گئی!' : 'Deal finalized!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -464,7 +457,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
         .doc(customerNotifId)
         .set({
       'id': customerNotifId,
-      'title': isUrdu ? '✅ ڈیل فائنل ہو گئی!' : '✅ Deal Finalized!',
+      'title': isUrdu ? 'ڈیل فائنل ہو گئی!' : 'Deal Finalized!',
       'message': isUrdu
           ? 'آپ نے کاریگر کے ساتھ ڈیل فائنل کر لی ہے۔ کاریگر جلد کام شروع کرے گا۔'
           : 'You have finalized the deal with the artisan. They will start work soon.',
@@ -488,7 +481,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
         .doc(artisanNotifId)
         .set({
       'id': artisanNotifId,
-      'title': isUrdu ? '🆕 نیا کام ملا!' : '🆕 New Work Order!',
+      'title': isUrdu ? 'نیا کام ملا!' : 'New Work Order!',
       'message': isUrdu
           ? 'گاہک نے آپ کے ساتھ ڈیل فائنل کر لی ہے۔ براہ کرم "میرے کام" میں جا کر کام شروع کریں۔'
           : 'Customer has finalized the deal with you. Please go to "My Work" to start.',
@@ -506,6 +499,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
   void _showRatingDialog(ArtisanWorkOrder order, bool isUrdu) {
     double selectedRating = 5.0;
     final commentController = TextEditingController();
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
 
     showDialog(
       context: context,
@@ -514,15 +508,15 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text(
-            isUrdu ? '⭐ اپنی رائے دیں' : 'Write a Review',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            isUrdu ? 'اپنی رائے دیں' : 'Write a Review',
+            style: TextStyle(fontWeight: FontWeight.bold, fontFamily: fontFamily),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 isUrdu ? 'کاریگر کا کام کیسا رہا؟' : 'How was the work?',
-                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                style: TextStyle(fontSize: 14, color: Colors.grey[600], fontFamily: fontFamily),
               ),
               const SizedBox(height: 20),
               Row(
@@ -535,7 +529,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
                       index < selectedRating
                           ? PhosphorIcons.star(PhosphorIconsStyle.fill)
                           : PhosphorIcons.star(),
-                      color: Colors.amber,
+                      color: AppTheme.darkColor,
                       size: 32,
                     ),
                   );
@@ -545,10 +539,18 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
               TextField(
                 controller: commentController,
                 maxLines: 3,
+                maxLength: 500,
+                style: TextStyle(fontFamily: fontFamily),
+                onChanged: (val) => setDialogState(() {}),
                 decoration: InputDecoration(
                   hintText: isUrdu
                       ? 'اپنا تجربہ لکھیں...'
                       : 'Write your experience...',
+                  hintStyle: TextStyle(fontFamily: fontFamily, fontSize: 13),
+                  counterText: '${commentController.text.length}/500',
+                  errorText: commentController.text.isNotEmpty && commentController.text.trim().length < 5
+                      ? (isUrdu ? 'کم از کم 5 حروف لکھیں' : 'Min 5 characters required')
+                      : null,
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
@@ -558,31 +560,22 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(isUrdu ? 'کینسل' : 'Cancel'),
+              child: Text(isUrdu ? 'کینسل' : 'Cancel', style: TextStyle(fontFamily: fontFamily)),
             ),
             AppButton(
               text: isUrdu ? 'جمع کریں' : 'Submit',
               color: AppTheme.goldColor,
               size: AppButtonSize.small,
-              onPressed: () async {
-                final comment = commentController.text.trim();
-                if (comment.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text(isUrdu
-                            ? 'براہ کرم تبصرہ لکھیں'
-                            : 'Please write a comment')),
-                  );
-                  return;
-                }
-
+              onPressed: commentController.text.trim().length < 5
+                  ? null
+                  : () async {
                 try {
                   // ریویو جمع کریں
                   await ArtisanService().addReview(
                     artisanId: order.artisanId,
                     workOrderId: order.id,
                     rating: selectedRating,
-                    comment: comment,
+                    comment: commentController.text.trim(),
                   );
 
                   if (mounted) {
@@ -591,7 +584,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(isUrdu
-                            ? '✅ آپ کا فیڈ بیک جمع ہوگیا، شکریہ!'
+                            ? 'آپ کا فیڈ بیک جمع ہوگیا، شکریہ!'
                             : 'Thank you for your feedback!'),
                         backgroundColor: Colors.green,
                       ),

@@ -25,9 +25,7 @@ class JobPostAdapter extends TypeAdapter<JobPost> {
       title: fields[4] as String,
       description: fields[5] as String,
       location: fields[6] as String,
-      categories: fields[7] is List 
-          ? (fields[7] as List).cast<String>() 
-          : (fields[7] is String ? [fields[7] as String] : []),
+      categories: (fields[7] as List).cast<String>(),
       estimatedBudget: fields[8] as double?,
       deadline: fields[9] as DateTime?,
       images: (fields[10] as List).cast<String>(),
@@ -43,13 +41,17 @@ class JobPostAdapter extends TypeAdapter<JobPost> {
       estimatedDays: fields[21] as int?,
       requiresHeightWork: fields[22] as bool?,
       requiresSpecialTools: fields[23] as bool?,
+      latitude: fields[24] as double?,
+      longitude: fields[25] as double?,
+      timeIn: fields[26] as String?,
+      timeOut: fields[27] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, JobPost obj) {
     writer
-      ..writeByte(24)
+      ..writeByte(28)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -97,7 +99,15 @@ class JobPostAdapter extends TypeAdapter<JobPost> {
       ..writeByte(22)
       ..write(obj.requiresHeightWork)
       ..writeByte(23)
-      ..write(obj.requiresSpecialTools);
+      ..write(obj.requiresSpecialTools)
+      ..writeByte(24)
+      ..write(obj.latitude)
+      ..writeByte(25)
+      ..write(obj.longitude)
+      ..writeByte(26)
+      ..write(obj.timeIn)
+      ..writeByte(27)
+      ..write(obj.timeOut);
   }
 
   @override

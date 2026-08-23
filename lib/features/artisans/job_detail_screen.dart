@@ -35,6 +35,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   final FocusNode _focusNode = FocusNode();
   bool _isBidPanelOpen = false;
   bool _isSubmittingBid = false;
+  bool _canBid = false;
 
   @override
   void initState() {
@@ -42,6 +43,16 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     _focusNode.addListener(() {
       if (mounted) setState(() {});
     });
+    _loadBidPermission();
+  }
+
+  Future<void> _loadBidPermission() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    final profile = await ArtisanService().getProfile(userId);
+    if (!mounted) return;
+    setState(() => _canBid = profile != null && profile.isActive);
   }
 
   @override
@@ -67,77 +78,218 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         actions: isOwner ? [_buildOptionsMenu(isUrdu, fontFamily)] : null,
       ),
       body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('jobs').doc(widget.job.id).snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          
-          final jobData = snapshot.data!.data() as Map<String, dynamic>?;
-          if (jobData == null) return const Center(child: Text('Job not found'));
-          
-          final freshJob = JobPost.fromMap(jobData);
+          stream: FirebaseFirestore.instance
+              .collection('jobs')
+              .doc(widget.job.id)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData)
+              return const Center(child: CircularProgressIndicator());
 
-          return Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // 1. Customer Info Header + Category
-                            _buildCustomerHeader(isUrdu, fontFamily, freshJob),
-                            const SizedBox(height: 16),
+            final jobData = snapshot.data!.data() as Map<String, dynamic>?;
+            if (jobData == null)
+              return const Center(child: Text('Job not found'));
 
-                            // 🆕 1.5 Category (شعبہ) + Location
-                            _buildCategoryAndLocationRow(isUrdu, fontFamily, freshJob),
-                            const SizedBox(height: 16),
+            final freshJob = JobPost.fromMap(jobData);
 
-                            // 🆕 2. Additional Info (مشکل، اونچائی، آلات)
-                            _buildAdditionalInfoRow(isUrdu, fontFamily, freshJob),
-                            const SizedBox(height: 24),
+            return Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // 1. Customer Info Header
+                              _buildCustomerHeader(
+                                  isUrdu, fontFamily, freshJob),
+                              const SizedBox(height: 16),
 
-                            // 🆕 3. تصاویر کی گیلری
-                            _buildImageGallery(context, freshJob),
-                            const SizedBox(height: 24),
+                              // 2. Title
+                              if (freshJob.title.isNotEmpty) ...[
+                                Text(
+                                  freshJob.title,
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.black,
+                                    fontFamily: fontFamily,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
 
-                            // 4. The "Stamp Paper" Details
-                            _buildStampPaperSection(isUrdu, fontFamily, freshJob),
+                              // 3. Detailed Description
+                              const SizedBox(height: 12),
+                              Text(
+                                freshJob.detailedScope ?? freshJob.description,
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  height: 1.7,
+                                  color: Colors.black,
+                                  fontFamily: fontFamily,
+                                ),
+                              ),
 
-                            const SizedBox(height: 32),
+                              // 4. Exclusions (If present)
+                              if (freshJob.exclusions != null &&
+                                  freshJob.exclusions!.isNotEmpty) ...[
+                                const SizedBox(height: 24),
+                                Text(
+                                  isUrdu
+                                      ? 'اس کام میں شامل نہیں ہے:'
+                                      : 'Not Included:',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red.shade700,
+                                    fontFamily: fontFamily,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  freshJob.exclusions!,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.red.shade900,
+                                    height: 1.6,
+                                    fontFamily: fontFamily,
+                                  ),
+                                ),
+                              ],
 
-                            // 🆕 11. Bids Section (List of Bids)
-                            _buildBidsSection(isUrdu, fontFamily, currentUserId, isOwner, freshJob),
-                            
-                            const SizedBox(height: 100), // Extra space
-                          ],
+                              const SizedBox(height: 24),
+                              const Divider(height: 1),
+                              const SizedBox(height: 24),
+
+                              // 5. Category & Location Row (Moved below divider)
+                              _buildCategoryAndLocationRow(
+                                  isUrdu, fontFamily, freshJob),
+                              const SizedBox(height: 24),
+
+                              // 6. Job Terms (Deadline, Timings, Duration, Budget)
+                              _buildJobTerms(isUrdu, fontFamily, freshJob),
+
+                              const SizedBox(height: 24),
+
+                              // 7. Additional Info Icons (Complex, Height, etc.)
+                              _buildAdditionalInfoRow(
+                                  isUrdu, fontFamily, freshJob),
+
+                              const SizedBox(height: 32),
+
+                              // 8. Images Gallery
+                              _buildImageGallery(context, freshJob),
+
+                              const SizedBox(height: 40),
+
+                              // 9. Bids Section
+                              _buildBidsSection(isUrdu, fontFamily,
+                                  currentUserId, isOwner, freshJob),
+
+                              const SizedBox(height: 100),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              
-              // 🆕 8. Comment Input Area (Chat Style) - Hide for owner
-              if (!_isBidPanelOpen && !isOwner)
-                _buildCommentArea(isUrdu, fontFamily),
-              
-              // 🆕 10. Bid Input Panel (Opens Upwards)
-              if (_isBidPanelOpen)
-                _buildBidInputPanel(isUrdu, fontFamily, freshJob),
-            ],
-          );
-        }
-      ),
-      // 🆕 9. Bottom Action Bar (Rate/Bid Button) - Shown only for artisans (non-owners)
-      bottomSheet: !_isBidPanelOpen && !isOwner ? _buildBottomActionBar(context, isUrdu, fontFamily) : null,
+
+                // Bid Input Panel
+                if (_isBidPanelOpen)
+                  _buildBidInputPanel(isUrdu, fontFamily, freshJob),
+
+                // Bottom Action Bar
+                if (!_isBidPanelOpen && !isOwner && _canBid)
+                  _buildBottomActionBar(context, isUrdu, fontFamily, freshJob),
+              ],
+            );
+          }),
     );
   }
 
-  Widget _buildBidsSection(bool isUrdu, String fontFamily, String currentUserId, bool isOwner, JobPost job) {
+  Widget _buildJobTerms(bool isUrdu, String fontFamily, JobPost job) {
+    return Column(
+      children: [
+        _buildTermItem(
+          icon: PhosphorIcons.calendar(),
+          label: isUrdu ? 'آخری تاریخ' : 'Deadline',
+          value: Formatters.formatDate(job.deadline),
+          fontFamily: fontFamily,
+        ),
+        if (job.timeIn != null && job.timeIn!.isNotEmpty)
+          _buildTermItem(
+            icon: PhosphorIcons.clock(),
+            label: isUrdu ? 'ڈیوٹی ٹائمنگ' : 'Duty Timings',
+            value: '${job.timeIn} - ${job.timeOut}',
+            fontFamily: fontFamily,
+          ),
+        if (job.estimatedBudget != null)
+          _buildTermItem(
+            icon: PhosphorIcons.money(),
+            label: isUrdu ? 'بجٹ / تنخواہ' : 'Budget / Salary',
+            value: 'Rs. ${job.estimatedBudget!.toStringAsFixed(0)}',
+            fontFamily: fontFamily,
+            valueColor: Colors.green.shade700,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildTermItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    required String fontFamily,
+    Color? valueColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.themeColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 20, color: AppTheme.themeColor),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontFamily: fontFamily,
+                ),
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: valueColor ?? Colors.black,
+                  fontFamily: fontFamily,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBidsSection(bool isUrdu, String fontFamily, String currentUserId,
+      bool isOwner, JobPost job) {
     return StreamBuilder<List<JobBid>>(
       stream: JobService().getJobBids(job.id),
       builder: (context, snapshot) {
@@ -146,8 +298,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         }
 
         final allBids = snapshot.data!;
-        // مالک کو تمام بولیاں دکھائیں، کاریگر کو صرف اپنی
-        final visibleBids = isOwner ? allBids : allBids.where((b) => b.artisanId == currentUserId).toList();
+        final visibleBids = isOwner
+            ? allBids
+            : allBids.where((b) => b.artisanId == currentUserId).toList();
 
         if (visibleBids.isEmpty) return const SizedBox.shrink();
 
@@ -156,17 +309,29 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           children: [
             Row(
               children: [
-                Icon(PhosphorIcons.gavel(), size: 20, color: AppTheme.themeColor),
+                Icon(PhosphorIcons.gavel(),
+                    size: 20, color: AppTheme.themeColor),
                 const SizedBox(width: 8),
                 Text(
                   isUrdu ? 'موصولہ بولیاں (ریٹس)' : 'Received Bids (Rates)',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: fontFamily, color: AppTheme.darkColor),
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: fontFamily,
+                      color: AppTheme.darkColor),
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(color: AppTheme.themeColor, borderRadius: BorderRadius.circular(10)),
-                  child: Text(visibleBids.length.toString(), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: AppTheme.themeColor,
+                      borderRadius: BorderRadius.circular(10)),
+                  child: Text(visibleBids.length.toString(),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -182,7 +347,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   isJobOpen: job.status == 'open',
                   isUrdu: isUrdu,
                   fontFamily: fontFamily,
-                  onAccept: () => _showBargainingDialog(visibleBids[index], isUrdu, fontFamily, job),
+                  onAccept: () => _showBargainingDialog(
+                      visibleBids[index], isUrdu, fontFamily, job),
                 );
               },
             ),
@@ -194,12 +360,16 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
   Widget _buildBidInputPanel(bool isUrdu, String fontFamily, JobPost job) {
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).padding.bottom + 20),
+      padding: EdgeInsets.fromLTRB(
+          20, 20, 20, MediaQuery.of(context).padding.bottom + 20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, -10)),
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 20,
+              offset: const Offset(0, -10)),
         ],
       ),
       child: Column(
@@ -210,7 +380,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             children: [
               IconButton(
                 onPressed: () => setState(() => _isBidPanelOpen = false),
-                icon: Icon(PhosphorIcons.caretDown(), color: Colors.grey[600]), // ڈاؤن ایرو بند کرنے کے لیے
+                icon: Icon(PhosphorIcons.caretDown(),
+                    color: Colors.grey[600]),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
@@ -218,7 +389,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               Expanded(
                 child: Text(
                   isUrdu ? 'اپنی بولی (ریٹ) درج کریں' : 'Enter Your Bid (Rate)',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, fontFamily: fontFamily, color: AppTheme.darkColor),
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: fontFamily,
+                      color: AppTheme.darkColor),
                 ),
               ),
               AppButton(
@@ -230,45 +405,68 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          
-          // ریٹ فیلڈ
+
           TextField(
             controller: _bidAmountController,
             keyboardType: TextInputType.number,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+            style: const TextStyle(
+                fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
             textAlign: TextAlign.center,
             decoration: InputDecoration(
-              hintText: isUrdu ? 'رقم درج کریں (مثال: 5000)' : 'Enter Amount (e.g. 5000)',
-              hintStyle: TextStyle(fontSize: 14, fontWeight: FontWeight.normal, color: Colors.grey[400], fontFamily: fontFamily),
+              hintText: isUrdu
+                  ? 'رقم درج کریں (مثال: 5000)'
+                  : 'Enter Amount (e.g. 5000)',
+              hintStyle: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                  color: Colors.grey[400],
+                  fontFamily: fontFamily),
               prefixText: 'Rs. ',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[200]!)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[200]!)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.themeColor)),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[200]!)),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[200]!)),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppTheme.themeColor)),
               filled: true,
               fillColor: const Color(0xFFF5F7F9),
-              contentPadding: const EdgeInsets.symmetric(vertical: 10), // Reduced height
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: 10),
             ),
           ),
-          
-          const SizedBox(height: 16), // Replaced Divider with simple spacing
-          
-          // تفصیل فیلڈ
+
+          const SizedBox(height: 16),
+
           TextField(
             controller: _bidMessageController,
             maxLines: 3,
             style: TextStyle(fontSize: 15, fontFamily: fontFamily),
             decoration: InputDecoration(
-              hintText: isUrdu ? 'اپنا پیغام یا مختصر تفصیل لکھیں...' : 'Enter your message or short details...',
-              hintStyle: TextStyle(fontSize: 14, color: Colors.grey[400], fontFamily: fontFamily),
-              border: InputBorder.none,
+              hintText: isUrdu
+                  ? 'اپنا پیغام یا مختصر تفصیل لکھیں...'
+                  : 'Enter your message or short details...',
+              hintStyle: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[400],
+                  fontFamily: fontFamily),
               filled: true,
               fillColor: const Color(0xFFF5F7F9),
               contentPadding: const EdgeInsets.all(16),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.themeColor)),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppTheme.themeColor)),
             ),
           ),
-          
+
           const SizedBox(height: 12),
         ],
       ),
@@ -277,7 +475,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
   Future<void> _submitBidLocally(JobPost job) async {
     final amountText = _bidAmountController.text.trim();
-    if (amountText.isEmpty) return;
+    final messageText = _bidMessageController.text.trim();
+
+    if (amountText.isEmpty && messageText.isEmpty) return;
 
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
     setState(() => _isSubmittingBid = true);
@@ -285,7 +485,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser!;
       final artisan = await ArtisanService().getProfile(user.uid);
-      
+
       final bid = JobBid(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         jobId: job.id,
@@ -293,8 +493,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         artisanName: user.displayName ?? 'Artisan',
         artisanPhone: user.phoneNumber ?? '',
         artisanPhotoUrl: user.photoURL,
-        amount: double.parse(amountText),
-        message: _bidMessageController.text.trim(),
+        amount:
+            double.tryParse(amountText) ?? 0.0,
+        message: messageText,
         estimatedDays: job.estimatedDays ?? 1,
         createdAt: DateTime.now(),
         artisanRating: artisan?.rating ?? 0.0,
@@ -303,7 +504,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       );
 
       await JobService().placeBid(bid);
-      
+
       if (mounted) {
         setState(() {
           _isSubmittingBid = false;
@@ -311,9 +512,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           _bidAmountController.clear();
           _bidMessageController.clear();
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isUrdu ? 'آپ کی بولی جمع کر دی گئی ہے' : 'Your bid has been submitted'))
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(isUrdu
+                ? (amountText.isNotEmpty
+                    ? 'آپ کی بولی جمع کر دی گئی ہے'
+                    : 'آپ کا کمنٹ جمع کر دیا گیا ہے')
+                : (amountText.isNotEmpty
+                    ? 'Your bid has been submitted'
+                    : 'Your comment has been submitted'))));
       }
     } catch (e) {
       if (mounted) setState(() => _isSubmittingBid = false);
@@ -345,7 +551,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             children: [
               Icon(PhosphorIcons.pencilLine(), color: Colors.blue, size: 18),
               const SizedBox(width: 10),
-              Text(isUrdu ? 'ترمیم کریں' : 'Edit', style: TextStyle(fontFamily: fontFamily)),
+              Text(isUrdu ? 'ترمیم کریں' : 'Edit',
+                  style: TextStyle(fontFamily: fontFamily)),
             ],
           ),
         ),
@@ -355,7 +562,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             children: [
               Icon(PhosphorIcons.info(), color: Colors.orange, size: 18),
               const SizedBox(width: 10),
-              Text(isUrdu ? 'مزید تفصیل دیں' : 'Add Detail', style: TextStyle(fontFamily: fontFamily)),
+              Text(isUrdu ? 'مزید تفصیل دیں' : 'Add Detail',
+                  style: TextStyle(fontFamily: fontFamily)),
             ],
           ),
         ),
@@ -365,7 +573,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             children: [
               Icon(PhosphorIcons.trash(), color: Colors.red, size: 18),
               const SizedBox(width: 10),
-              Text(isUrdu ? 'ڈیلیٹ کریں' : 'Delete', style: TextStyle(fontFamily: fontFamily, color: Colors.red)),
+              Text(isUrdu ? 'ڈیلیٹ کریں' : 'Delete',
+                  style: TextStyle(fontFamily: fontFamily, color: Colors.red)),
             ],
           ),
         ),
@@ -378,21 +587,26 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(isUrdu ? 'حذف کریں؟' : 'Delete?'),
-        content: Text(isUrdu ? 'کیا آپ واقعی اس کام کو حذف کرنا چاہتے ہیں؟' : 'Are you sure you want to delete this job?'),
+        content: Text(isUrdu
+            ? 'کیا آپ واقعی اس کام کو حذف کرنا چاہتے ہیں؟'
+            : 'Are you sure you want to delete this job?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text(isUrdu ? 'نہیں' : 'No')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(isUrdu ? 'نہیں' : 'No')),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
               await JobService().deleteJob(widget.job.id);
               if (mounted && context.mounted) {
-                Navigator.pop(context); // Go back to list
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(isUrdu ? 'کام حذف کر دیا گیا' : 'Job deleted'))
-                );
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content:
+                        Text(isUrdu ? 'کام حذف کر دیا گیا' : 'Job deleted')));
               }
             },
-            child: Text(isUrdu ? 'ہاں' : 'Yes', style: const TextStyle(color: Colors.red)),
+            child: Text(isUrdu ? 'ہاں' : 'Yes',
+                style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -405,28 +619,33 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(isUrdu ? 'مزید تفصیل (سب کے لیے)' : 'Add Detail (For All)', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold)),
+        title: Text(isUrdu ? 'مزید تفصیل (سب کے لیے)' : 'Add Detail (For All)',
+            style:
+                TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold)),
         content: TextField(
           controller: controller,
           maxLines: 4,
           style: TextStyle(fontFamily: fontFamily),
           decoration: InputDecoration(
-            hintText: isUrdu ? 'یہاں کام کی مزید وضاحت لکھیں...' : 'Enter more details here...',
+            hintText: isUrdu
+                ? 'یہاں کام کی مزید وضاحت لکھیں...'
+                : 'Enter more details here...',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text(isUrdu ? 'کینسل' : 'Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(isUrdu ? 'کینسل' : 'Cancel')),
           AppButton(
             text: isUrdu ? 'پوسٹ کریں' : 'Post',
             size: AppButtonSize.small,
             onPressed: () async {
               final text = controller.text.trim();
               if (text.isEmpty) return;
-              
-              final updatedClarifications = List<String>.from(widget.job.clarifications)..add(text);
-              await JobService().updateJobClarifications(widget.job.id, updatedClarifications);
-              
+
+              await JobService().appendJobDetail(widget.job.id, text);
+
               if (context.mounted) Navigator.pop(context);
             },
           ),
@@ -435,26 +654,38 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
-  Widget _buildBottomActionBar(BuildContext context, bool isUrdu, String fontFamily) {
-    final bool isOpen = widget.job.status == 'open';
+  Widget _buildBottomActionBar(
+      BuildContext context, bool isUrdu, String fontFamily, JobPost job) {
+    final bool isOpen = job.status == 'open';
 
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+      padding: EdgeInsets.fromLTRB(
+          16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -5))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -5))
+        ],
       ),
       child: Row(
         children: [
-          if (widget.job.estimatedBudget != null) ...[
+          if (job.estimatedBudget != null) ...[
             Expanded(
               flex: 1,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(isUrdu ? 'تخمینی بجٹ' : 'Est. Budget', style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                  Text('Rs. ${widget.job.estimatedBudget!.toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green)),
+                  Text(isUrdu ? 'تخمینی بجٹ' : 'Est. Budget',
+                      style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                  Text('Rs. ${job.estimatedBudget!.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green)),
                 ],
               ),
             ),
@@ -469,9 +700,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               color: isOpen ? AppTheme.darkColor : Colors.grey,
               size: AppButtonSize.large,
               isFullWidth: true,
-              onPressed: isOpen
-                  ? () => setState(() => _isBidPanelOpen = true)
-                  : null,
+              onPressed:
+                  isOpen ? () => setState(() => _isBidPanelOpen = true) : null,
             ),
           ),
         ],
@@ -479,129 +709,47 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
-  Widget _buildCommentArea(bool isUrdu, String fontFamily) {
-    final bool isFocused = _focusNode.hasFocus;
-
-    return Container(
-      padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFFF5F7F9),
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(
-            color: isFocused ? AppTheme.themeColor : Colors.transparent,
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          children: [
-            const SizedBox(width: 16),
-            Expanded(
-              child: TextField(
-                controller: _commentController,
-                focusNode: _focusNode,
-                maxLines: 4,
-                minLines: 1,
-                style: const TextStyle(fontSize: 15),
-                decoration: InputDecoration(
-                  hintText: isUrdu ? 'مزید معلومات حاصل کریں یا کمنٹ کریں...' : 'Ask for info or comment...',
-                  hintStyle: TextStyle(
-                    fontFamily: fontFamily,
-                    fontSize: 13,
-                    color: Colors.grey[500],
-                  ),
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-            
-            // بھیجیں بٹن
-            Padding(
-              padding: const EdgeInsets.all(4.0),
-              child: GestureDetector(
-                onTap: () {
-                  _commentController.clear();
-                  _focusNode.unfocus();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(isUrdu ? 'آپ کا پیغام بھیج دیا گیا ہے' : 'Your message has been sent'))
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(
-                    color: AppTheme.themeColor,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    isUrdu ? PhosphorIcons.arrowLeft() : PhosphorIcons.arrowRight(),
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showBargainingDialog(JobBid bid, bool isUrdu, String fontFamily, JobPost job) {
+  void _showBargainingDialog(
+      JobBid bid, bool isUrdu, String fontFamily, JobPost job) {
     showDialog(
       context: context,
       builder: (context) => WorkNegotiationPopup(job: job, bid: bid),
     );
   }
 
-  // ============================================================
-  // 1. تصاویر کی گیلری (Card-style Boxes)
-  // ============================================================
-
   Widget _buildImageGallery(BuildContext context, JobPost job) {
-    final List<String> displayImages = job.images.isNotEmpty 
-        ? job.images 
-        : [
-            'https://picsum.photos/500/300?random=1', // Landscape
-            'https://picsum.photos/300/500?random=2', // Portrait
-            'https://picsum.photos/500/300?random=3', // Landscape
-            'https://picsum.photos/300/500?random=4', // Portrait
-          ];
-
-    return SizedBox(
-      height: 150,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.zero,
-        itemCount: displayImages.length,
-        itemBuilder: (context, index) {
-          return _SmartImageFrame(
-            imageUrl: displayImages[index],
-            tag: "job_img_${job.id}_$index",
-            onTap: () => _openFullScreenGallery(context, displayImages, index),
-            isDetail: true,
-          );
-        },
-      ),
+    if (job.images.isEmpty) return const SizedBox.shrink();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          Provider.of<LanguageService>(context).isUrdu ? 'تصاویر:' : 'Images:',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 150,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.zero,
+            itemCount: job.images.length,
+            itemBuilder: (context, index) {
+              return _SmartImageFrame(
+                imageUrl: job.images[index],
+                tag: "job_img_${job.id}_$index",
+                onTap: () => _openFullScreenGallery(context, job.images, index),
+                isDetail: true,
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
-  // ============================================================
-  // تصاویر کی فل سکرین گیلری
-  // ============================================================
-
-  void _openFullScreenGallery(BuildContext context, List<String> images, int initialIndex) {
+  void _openFullScreenGallery(
+      BuildContext context, List<String> images, int initialIndex) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -623,7 +771,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     initialScale: PhotoViewComputedScale.contained,
                     minScale: PhotoViewComputedScale.contained * 0.8,
                     maxScale: PhotoViewComputedScale.covered * 2,
-                    heroAttributes: PhotoViewHeroAttributes(tag: "job_img_${widget.job.id}_$index"),
+                    heroAttributes: PhotoViewHeroAttributes(
+                        tag: "job_img_${widget.job.id}_$index"),
                   );
                 },
                 scrollPhysics: const BouncingScrollPhysics(),
@@ -633,7 +782,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               Positioned(
                 bottom: 20,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(20),
@@ -651,36 +801,36 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
-  // ============================================================
-  // 2. گاہک کا ہیڈر + شعبہ
-  // ============================================================
-
   Widget _buildCustomerHeader(bool isUrdu, String fontFamily, JobPost job) {
-    return ProfileInfoWidget(
-      name: job.customerName,
-      phone: '',
-      profileImage: job.customerPhotoUrl,
-      customSize: 42,
-      borderRadius: 6,
-      bottom: Text(
-        Formatters.formatDate(job.createdAt),
-        style: TextStyle(fontSize: 12, color: Colors.grey[600], fontFamily: fontFamily),
-      ),
+    return StreamBuilder<bool>(
+      stream: ArtisanService().isFavorite(job.customerId),
+      builder: (context, favSnapshot) {
+        final isFav = favSnapshot.data ?? false;
+        return ProfileInfoWidget(
+          name: job.customerName,
+          phone: '',
+          profileImage: job.customerPhotoUrl,
+          customSize: 42,
+          borderRadius: 6,
+          isFavorite: isFav,
+          bottom: Text(
+            Formatters.formatDate(job.createdAt),
+            style: TextStyle(
+                fontSize: 12, color: Colors.grey[600], fontFamily: fontFamily),
+          ),
+        );
+      },
     );
   }
 
-  // ============================================================
-  // 🆕 2.5 شعبہ (Category) + لوکیشن
-  // ============================================================
-
-  Widget _buildCategoryAndLocationRow(bool isUrdu, String fontFamily, JobPost job) {
+  Widget _buildCategoryAndLocationRow(
+      bool isUrdu, String fontFamily, JobPost job) {
     final professions = ArtisanService.getProfessions();
 
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        // Category Chips
         ...job.categories.map((catId) {
           final prof = professions.firstWhere(
             (p) => p['id'] == catId,
@@ -691,7 +841,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             decoration: BoxDecoration(
               color: AppTheme.themeColor.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppTheme.themeColor.withValues(alpha: 0.2)),
+              border:
+                  Border.all(color: AppTheme.themeColor.withValues(alpha: 0.2)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -712,7 +863,6 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           );
         }),
 
-        // Location Chip
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
@@ -723,7 +873,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(PhosphorIcons.mapPin(PhosphorIconsStyle.fill), size: 16, color: Colors.red[400]),
+              Icon(PhosphorIcons.mapPin(PhosphorIconsStyle.fill),
+                  size: 16, color: Colors.red[400]),
               const SizedBox(width: 8),
               Text(
                 job.location,
@@ -741,10 +892,6 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
-  // ============================================================
-  // 🆕 3.5 اضافی معلومات (مشکل، اونچائی، آلات)
-  // ============================================================
-
   Widget _buildAdditionalInfoRow(bool isUrdu, String fontFamily, JobPost job) {
     final List<Map<String, dynamic>> items = [];
 
@@ -752,7 +899,6 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       items.add({
         'icon': PhosphorIcons.wrench(),
         'label': isUrdu ? 'مشکل کام' : 'Complex Job',
-        'color': Colors.purple,
       });
     }
 
@@ -760,7 +906,6 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       items.add({
         'icon': PhosphorIcons.stairs(),
         'label': isUrdu ? 'اونچائی پر کام' : 'Height Work',
-        'color': Colors.orange,
       });
     }
 
@@ -768,7 +913,6 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       items.add({
         'icon': PhosphorIcons.toolbox(),
         'label': isUrdu ? 'خصوصی آلات' : 'Special Tools',
-        'color': Colors.blue,
       });
     }
 
@@ -781,21 +925,24 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.white, // White background
+            color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.themeColor.withValues(alpha: 0.8), width: 1.2), // Dark border
+            border: Border.all(
+                color: AppTheme.themeColor.withValues(alpha: 0.8),
+                width: 1.2),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(item['icon'], size: 14, color: AppTheme.darkColor), // Dark icon
+              Icon(item['icon'],
+                  size: 14, color: AppTheme.darkColor),
               const SizedBox(width: 6),
               Text(
                 item['label'],
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.darkColor, // Dark text
+                  color: AppTheme.darkColor,
                   fontFamily: fontFamily,
                 ),
               ),
@@ -803,135 +950,6 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           ),
         );
       }).toList(),
-    );
-  }
-
-  // ============================================================
-  // 4. اسٹام پیپر (مکمل تفصیل)
-  // ============================================================
-
-  Widget _buildStampPaperSection(bool isUrdu, String fontFamily, JobPost job) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFEF3C7), // Darker amber like PostJobScreen
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Column(
-              children: [
-                Text(
-                  isUrdu ? 'اسٹام پیپر' : 'STAMP PAPER',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
-                    color: Colors.amber.shade900,
-                    fontFamily: fontFamily,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isUrdu ? 'کام کی تفصیل' : 'WORK DETAILS',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.amber.shade800,
-                    fontFamily: fontFamily,
-                  ),
-                ),
-                const Divider(thickness: 1.5, color: Colors.amber, indent: 60, endIndent: 60),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          Text(
-            job.detailedScope ?? job.description,
-            style: TextStyle(
-              fontSize: 16,
-              height: 1.8,
-              color: Colors.brown.shade900,
-              fontFamily: fontFamily,
-            ),
-          ),
-
-          // 🆕 استثناء (Exclusions) - اسٹام پیپر کے اندر ہی نیچے ریڈ کلر میں
-          if (job.exclusions != null && job.exclusions!.isNotEmpty) ...[
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Divider(thickness: 1, color: Colors.amber),
-            ),
-            Text(
-              isUrdu ? 'اس کام میں شامل نہیں ہے:' : 'Not Included:',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.red.shade700,
-                fontFamily: fontFamily,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              job.exclusions!,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.red.shade800,
-                height: 1.6,
-                fontFamily: fontFamily,
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 24),
-          const Divider(thickness: 1, color: Colors.amber),
-          const SizedBox(height: 12),
-
-          // 🆕 Job Terms (Deadline, Deadline, Days, Budget) at the very Bottom as plain text
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildStampTextItem(
-                label: isUrdu ? 'آخری تاریخ' : 'Deadline',
-                value: Formatters.formatDate(job.deadline),
-                fontFamily: fontFamily,
-              ),
-              _buildStampTextItem(
-                label: isUrdu ? 'دورانیہ' : 'Duration',
-                value: job.estimatedDays != null ? '${job.estimatedDays} ${isUrdu ? 'دن' : 'Days'}' : 'N/A',
-                fontFamily: fontFamily,
-              ),
-              _buildStampTextItem(
-                label: isUrdu ? 'بجٹ' : 'Budget',
-                value: job.estimatedBudget != null ? 'Rs. ${job.estimatedBudget!.toStringAsFixed(0)}' : 'N/A',
-                fontFamily: fontFamily,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStampTextItem({required String label, required String value, required String fontFamily}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(fontSize: 10, color: Colors.amber.shade900, fontWeight: FontWeight.bold, fontFamily: fontFamily)),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
-            color: Colors.brown.shade900,
-            fontFamily: value.contains('Rs') || RegExp(r'^\d+$').hasMatch(value.split(' ')[0]) ? '' : fontFamily,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -977,15 +995,12 @@ class _SmartImageFrameState extends State<_SmartImageFrame> {
 
   @override
   Widget build(BuildContext context) {
-    // ڈیفالٹ سائز (جب تک لوڈ نہ ہو)
     double width = widget.isDetail ? 180 : 100;
-    
+
     if (_aspectRatio != null) {
       if (_aspectRatio! > 1.1) {
-        // Landscape
         width = widget.isDetail ? 260 : 150;
       } else {
-        // Portrait
         width = widget.isDetail ? 110 : 70;
       }
     }

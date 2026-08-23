@@ -1,4 +1,4 @@
-// lib/features/artisans/screens/artisan_profile_screen.dart
+// Unified basic user and artisan profile screen.
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -7,20 +7,16 @@ import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:hive/hive.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
-import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/utils/image_utils.dart';
 import 'package:account_app/core/services/artisan_service.dart';
-import 'package:account_app/core/services/auth_service.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/models/account_model.dart';
-import 'package:account_app/core/widgets/artisan_rating_stars.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/utils/artisan_validators.dart';
@@ -28,24 +24,29 @@ import 'package:account_app/core/services/logging_service.dart';
 
 import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/features/settings/verification_request_screen.dart';
+import 'package:account_app/features/dashboard/main_navigation_screen.dart';
 
-class ArtisanProfileScreen extends StatefulWidget {
-  const ArtisanProfileScreen({super.key});
+class MasterProfileScreen extends StatefulWidget {
+  const MasterProfileScreen({super.key});
 
   @override
-  State<ArtisanProfileScreen> createState() => _ArtisanProfileScreenState();
+  State<MasterProfileScreen> createState() => _MasterProfileScreenState();
 }
 
-class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
+class _MasterProfileScreenState extends State<MasterProfileScreen> {
   final _logger = LoggingService();
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
+  final TextEditingController _qualificationController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _experienceController = TextEditingController();
+  final TextEditingController _rateController = TextEditingController();
+  final TextEditingController _skillInputController = TextEditingController();
 
   String _selectedProfession = 'electrician';
+  String _rateUnit = 'fixed'; // 'hour', 'day', 'fixed', 'month'
   String _availability = 'available';
   String _verificationStatus = 'none';
   bool _showPhone = true;
@@ -54,6 +55,7 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
   bool _isEditing = false;
   bool _isVerified = false;
   bool _showExpertFields = false; // To toggle expert section
+  List<String> _customSkills = [];
 
   String? _remoteProfileImage;
   List<String> _remoteWorkImages = [];
@@ -71,6 +73,19 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
     super.initState();
     _loadExistingProfile();
     _getCurrentLocation();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _locationController.dispose();
+    _qualificationController.dispose();
+    _descriptionController.dispose();
+    _experienceController.dispose();
+    _rateController.dispose();
+    _skillInputController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadExistingProfile() async {
@@ -97,8 +112,11 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
             _remoteWorkImages = profile.workImages;
             if (profile.phone.isNotEmpty) _phoneController.text = profile.phone;
             _locationController.text = profile.location;
+            _qualificationController.text = profile.qualification ?? '';
             _descriptionController.text = profile.description;
             _experienceController.text = profile.experience.toString();
+            _rateController.text = profile.rate ?? '';
+            _rateUnit = profile.rateUnit ?? 'fixed';
             _selectedProfession = profile.profession;
             _availability = profile.availability;
             _showPhone = profile.showPhone;
@@ -106,6 +124,7 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
             _verificationStatus = profile.verificationStatus;
             _isVerified = profile.isVerified;
             _showExpertFields = true;
+            _customSkills = List.from(profile.skills);
           });
         }
       } else {
@@ -243,57 +262,80 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
     try {
       final service = ArtisanService();
       
-      // 1. Update Personal Info in Firebase Auth
-      await user.updateDisplayName(_nameController.text.trim());
-
-      // 2. Upload Images
+      // 1. Upload Profile Image (Always allowed)
       String? profileImageUrl = _remoteProfileImage;
       if (_profileImage != null) {
         profileImageUrl = await service.uploadImage(user.uid, _profileImage!, 'profile');
       }
 
-      List<String> finalWorkImages = List.from(_remoteWorkImages);
-      for (var file in _workImages) {
-        final url = await service.uploadImage(user.uid, file, 'work');
-        if (url != null) finalWorkImages.add(url);
+      // 2. Upload Work Images (ONLY if Expert mode is ON)
+      List<String> finalWorkImages = [];
+      if (_showExpertFields) {
+        finalWorkImages = List.from(_remoteWorkImages);
+        for (var file in _workImages) {
+          final url = await service.uploadImage(user.uid, file, 'work');
+          if (url != null) finalWorkImages.add(url);
+        }
       }
 
-      // 3. موجودہ پروفائل چیک کریں
-      final existingProfile = await service.getProfile(user.uid);
+      // 3. Update Personal Info in Firebase Auth and Users Collection
+      await user.updateDisplayName(_nameController.text.trim());
+      
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'displayName': _nameController.text.trim(),
+        'photoURL': profileImageUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
-      final profile = ArtisanProfile(
-        id: user.uid,
-        name: _nameController.text.trim(),
-        profession: _selectedProfession,
-        professionUrdu: _getProfessionUrdu(_selectedProfession),
-        location: _locationController.text.trim(),
-        experience: int.tryParse(_experienceController.text) ?? 0,
-        rate: null, // Removed rate field
-        availability: _availability,
-        phone: _phoneController.text.trim(),
-        showPhone: _showPhone,
-        showWhatsApp: _showWhatsApp,
-        description: _descriptionController.text.trim(),
-        profileImage: profileImageUrl,
-        workImages: finalWorkImages,
-        rating: existingProfile?.rating ?? 0.0,
-        totalReviews: existingProfile?.totalReviews ?? 0,
-        isVerified: existingProfile?.isVerified ?? false,
-        isActive: true,
-        createdAt: existingProfile?.createdAt ?? DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+      // 3. اگر ایکسپرٹ فیلڈز آن ہیں تو کاریگر پروفائل سیو کریں
+      if (_showExpertFields) {
+        final existingProfile = await service.getProfile(user.uid);
 
-      await service.saveProfile(profile);
+        final profile = ArtisanProfile(
+          id: user.uid,
+          name: _nameController.text.trim(),
+          profession: _selectedProfession,
+          professionUrdu: _getProfessionUrdu(_selectedProfession),
+          location: _locationController.text.trim(),
+          experience: int.tryParse(_experienceController.text) ?? 0,
+          rate: _rateController.text.trim().isEmpty ? null : _rateController.text.trim(),
+          rateUnit: _rateUnit,
+          availability: _availability,
+          qualification: _qualificationController.text.trim().isEmpty ? null : _qualificationController.text.trim(),
+          phone: _phoneController.text.trim(),
+          showPhone: _showPhone,
+          showWhatsApp: _showWhatsApp,
+          description: _descriptionController.text.trim(),
+          profileImage: profileImageUrl,
+          workImages: finalWorkImages,
+          rating: existingProfile?.rating ?? 0.0,
+          totalReviews: existingProfile?.totalReviews ?? 0,
+          isVerified: existingProfile?.isVerified ?? false,
+          isActive: true,
+          createdAt: existingProfile?.createdAt ?? DateTime.now(),
+          updatedAt: DateTime.now(),
+          skills: _customSkills,
+        );
+
+        await service.saveProfile(profile);
+      }
 
       if (mounted) {
+        setState(() => _isEditing = true);
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(isUrdu ? 'پروفائل محفوظ ہوگیا' : 'Profile saved successfully'),
             backgroundColor: AppTheme.incomeColor,
           ),
         );
-        Navigator.pop(context);
+        
+        // اگر یہ لاگ ان کے فوراً بعد ہے تو ڈیش بورڈ پر لے جائیں، ورنہ پاپ کریں
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        } else {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const MainNavigationScreen()));
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -337,8 +379,27 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
               try {
                 final user = FirebaseAuth.instance.currentUser;
                 if (user != null) {
+                  // 1. کاریگر کلیکشن سے پروفائل ڈیلیٹ کریں
                   await ArtisanService().deleteProfile(user.uid);
+
+                  // 2. صارفین (users) کلیکشن میں کاریگر کا نشان ختم کریں
+                  await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+                    'isArtisan': false,
+                    'artisanProfileId': FieldValue.delete(),
+                  });
+
                   if (mounted) {
+                    setState(() {
+                      _showExpertFields = false;
+                      _remoteWorkImages = [];
+                      _workImages = [];
+                      _descriptionController.clear();
+                      _experienceController.clear();
+                      _locationController.clear();
+                      _verificationStatus = 'none';
+                      _isVerified = false;
+                    });
+
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(isUrdu ? 'پروفائل ختم کر دی گئی' : 'Profile deleted successfully'),
@@ -533,6 +594,46 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
 
                                   const SizedBox(height: 16),
 
+                                  // ریٹ (Rate)
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        flex: 2,
+                                        child: _buildTextField(
+                                          controller: _rateController,
+                                          label: isUrdu ? 'اجرت / ریٹ' : 'Rate / Price',
+                                          icon: PhosphorIcons.currencyCircleDollar(),
+                                          fontFamily: fontFamily,
+                                          isUrdu: isUrdu,
+                                          isNumber: true,
+                                          hint: '1000',
+                                          validator: (val) => null, // Optional
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        flex: 2,
+                                        child: _buildRateUnitDropdown(isUrdu, fontFamily),
+                                      ),
+                                    ],
+                                  ),
+
+                                  const SizedBox(height: 16),
+
+                                  // کوالیفیکیشن (Qualification)
+                                  _buildTextField(
+                                    controller: _qualificationController,
+                                    label: isUrdu ? 'تعلیمی قابلیت / کوالیفیکیشن' : 'Qualification',
+                                    icon: PhosphorIcons.graduationCap(),
+                                    fontFamily: fontFamily,
+                                    isUrdu: isUrdu,
+                                    hint: isUrdu ? 'مثلاً: میٹرک، ڈپلومہ ہولڈر' : 'e.g. Matric, Diploma',
+                                    validator: (val) => null, // Optional
+                                  ),
+
+                                  const SizedBox(height: 16),
+
                                   // تفصیل
                                   _buildTextField(
                                     controller: _descriptionController,
@@ -563,6 +664,9 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
                                     onRemoteRemoved: (index) => setState(() => _remoteWorkImages.removeAt(index)),
                                     maxTotal: 6,
                                   ),
+
+                                  const SizedBox(height: 24),
+                                  _buildSkillsSection(isUrdu, fontFamily),
                                 ],
                               ),
                             ),
@@ -643,59 +747,46 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
                     color: AppTheme.themeColor.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(PhosphorIcons.megaphone(PhosphorIconsStyle.fill), color: AppTheme.themeColor, size: 24),
+                  child: Icon(
+                    _showExpertFields ? PhosphorIcons.briefcase(PhosphorIconsStyle.fill) : PhosphorIcons.megaphone(PhosphorIconsStyle.fill), 
+                    color: AppTheme.themeColor, 
+                    size: 24
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    isUrdu ? 'اپنے ہنر کو پہچان دلائیں!' : 'Get Recognized for Your Skills!',
+                    isUrdu ? 'کیا آپ ایک ماہر کاریگر ہیں؟' : 'Are you an Expert Artisan?',
                     style: TextStyle(
-                      fontSize: 18, // Larger font
+                      fontSize: 17, 
                       fontWeight: FontWeight.bold,
                       color: AppTheme.themeColor,
                       fontFamily: fontFamily,
                     ),
                   ),
                 ),
-                Icon(
-                  _showExpertFields ? PhosphorIcons.caretUp() : PhosphorIcons.caretDown(),
-                  color: AppTheme.themeColor,
+                Switch(
+                  value: _showExpertFields,
+                  onChanged: (val) => setState(() => _showExpertFields = val),
+                  activeColor: AppTheme.themeColor,
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Text(
-              isUrdu 
-                ? 'ماہرین کی فہرست میں شامل ہونے اور زیادہ کام حاصل کرنے کے لیے اپنی پیشہ ورانہ تفصیلات یہاں درج کریں۔ اس سے آپ کا پروفائل پبلش ہو جائے گا اور گاہک آپ تک آسانی سے پہنچ سکیں گے۔' 
-                : 'Enter your professional details here to join our expert directory and get more work. This will publish your profile for potential customers.',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.darkColor.withOpacity(0.9),
-                fontFamily: fontFamily,
-                height: 1.4,
-              ),
-            ),
-            if (!_showExpertFields)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Row(
-                  children: [
-                    Text(
-                      isUrdu ? 'تفصیلات درج کرنے کے لیے یہاں کلک کریں' : 'Click here to enter details',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.themeColor,
-                        fontFamily: fontFamily,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(PhosphorIcons.arrowRight(), size: 14, color: AppTheme.themeColor),
-                  ],
+            if (!_showExpertFields) ...[
+              const SizedBox(height: 10),
+              Text(
+                isUrdu 
+                  ? 'اگر آپ بجلی، پلمبنگ، پینٹ یا کسی بھی ہنر کے ماہر ہیں، تو اسے آن کریں تاکہ گاہک آپ کو ڈھونڈ سکیں اور آپ کو کام مل سکے۔' 
+                  : 'If you are an expert in electricity, plumbing, painting or any skill, turn this on so customers can find you and you get work.',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppTheme.darkColor.withOpacity(0.7),
+                  fontFamily: fontFamily,
+                  height: 1.4,
                 ),
               ),
+            ],
           ],
         ),
       ),
@@ -885,6 +976,84 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
     );
   }
 
+  Widget _buildSkillsSection(bool isUrdu, String fontFamily) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(
+          isUrdu ? 'تکنیکی مہارتیں (Skills)' : 'Technical Skills',
+          fontFamily,
+          isUrdu,
+          topPadding: 0,
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _buildTextField(
+                controller: _skillInputController,
+                label: isUrdu ? 'مہارت لکھیں' : 'Add a skill',
+                icon: PhosphorIcons.hammer(),
+                fontFamily: fontFamily,
+                isUrdu: isUrdu,
+                validator: (_) => null, // Optional
+              ),
+            ),
+            const SizedBox(width: 12),
+            IconButton.filled(
+              onPressed: () {
+                final skill = _skillInputController.text.trim();
+                if (skill.isNotEmpty && !_customSkills.contains(skill)) {
+                  setState(() {
+                    _customSkills.add(skill);
+                    _skillInputController.clear();
+                  });
+                }
+              },
+              icon: Icon(PhosphorIcons.plus()),
+              style: IconButton.styleFrom(
+                backgroundColor: AppTheme.themeColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(16),
+              ),
+            ),
+          ],
+        ),
+        if (_customSkills.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _customSkills.map((skill) {
+              return Chip(
+                label: Text(
+                  skill,
+                  style: TextStyle(
+                    fontFamily: fontFamily,
+                    fontSize: 12,
+                    color: AppTheme.themeColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                backgroundColor: AppTheme.themeColor.withOpacity(0.1),
+                side: BorderSide(color: AppTheme.themeColor.withOpacity(0.3)),
+                deleteIcon: Icon(PhosphorIcons.xCircle(), size: 16, color: Colors.red),
+                onDeleted: () {
+                  setState(() => _customSkills.remove(skill));
+                },
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ],
+    );
+  }
+
   void _showAllProfessionsPicker(bool isUrdu, String fontFamily) {
     final professions = ArtisanService.getProfessions();
     
@@ -1012,5 +1181,42 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
     );
   }
 
+  Widget _buildRateUnitDropdown(bool isUrdu, String fontFamily) {
+    final units = [
+      {'id': 'fixed', 'en': 'Fixed', 'ur': 'مکمل کام'},
+      {'id': 'hour', 'en': 'Per Hour', 'ur': 'فی گھنٹہ'},
+      {'id': 'day', 'en': 'Per Day', 'ur': 'فی دیہاڑی'},
+      {'id': 'month', 'en': 'Per Month', 'ur': 'فی مہینہ'},
+    ];
 
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _rateUnit,
+          isExpanded: true,
+          icon: Icon(PhosphorIcons.caretDown(), size: 16, color: Colors.grey),
+          onChanged: (String? newValue) {
+            if (newValue != null) {
+              setState(() => _rateUnit = newValue);
+            }
+          },
+          items: units.map<DropdownMenuItem<String>>((Map<String, String> unit) {
+            return DropdownMenuItem<String>(
+              value: unit['id'],
+              child: Text(
+                isUrdu ? unit['ur']! : unit['en']!,
+                style: TextStyle(fontFamily: fontFamily, fontSize: 14),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
 }

@@ -77,6 +77,18 @@ class JobPost extends HiveObject {
   @HiveField(23)
   final bool? requiresSpecialTools;
 
+  @HiveField(24)
+  final double? latitude;
+
+  @HiveField(25)
+  final double? longitude;
+
+  @HiveField(26)
+  final String? timeIn;
+
+  @HiveField(27)
+  final String? timeOut;
+
   JobPost({
     required this.id,
     required this.customerId,
@@ -102,6 +114,10 @@ class JobPost extends HiveObject {
     this.estimatedDays,
     this.requiresHeightWork,
     this.requiresSpecialTools,
+    this.latitude,
+    this.longitude,
+    this.timeIn,
+    this.timeOut,
   });
 
   Map<String, dynamic> toMap() {
@@ -130,6 +146,10 @@ class JobPost extends HiveObject {
       'estimatedDays': estimatedDays,
       'requiresHeightWork': requiresHeightWork,
       'requiresSpecialTools': requiresSpecialTools,
+      'latitude': latitude,
+      'longitude': longitude,
+      'timeIn': timeIn,
+      'timeOut': timeOut,
     };
   }
 
@@ -168,6 +188,10 @@ class JobPost extends HiveObject {
       estimatedDays: (map['estimatedDays'] as num?)?.toInt(),
       requiresHeightWork: map['requiresHeightWork'],
       requiresSpecialTools: map['requiresSpecialTools'],
+      latitude: (map['latitude'] as num?)?.toDouble(),
+      longitude: (map['longitude'] as num?)?.toDouble(),
+      timeIn: map['timeIn'],
+      timeOut: map['timeOut'],
     );
   }
 
@@ -196,6 +220,10 @@ class JobPost extends HiveObject {
     int? estimatedDays,
     bool? requiresHeightWork,
     bool? requiresSpecialTools,
+    double? latitude,
+    double? longitude,
+    String? timeIn,
+    String? timeOut,
   }) {
     return JobPost(
       id: id ?? this.id,
@@ -222,6 +250,10 @@ class JobPost extends HiveObject {
       estimatedDays: estimatedDays ?? this.estimatedDays,
       requiresHeightWork: requiresHeightWork ?? this.requiresHeightWork,
       requiresSpecialTools: requiresSpecialTools ?? this.requiresSpecialTools,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      timeIn: timeIn ?? this.timeIn,
+      timeOut: timeOut ?? this.timeOut,
     );
   }
 }

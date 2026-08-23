@@ -6,6 +6,7 @@ import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // L10n
 import 'l10n/app_localizations.dart';
@@ -40,8 +41,9 @@ import 'package:account_app/core/services/security_service.dart';
 import 'package:account_app/features/settings/login_screen.dart';
 import 'package:account_app/features/dashboard/dashboard_screen.dart';
 import 'package:account_app/features/dashboard/main_navigation_screen.dart';
-import 'package:account_app/features/settings/profile_setup_screen.dart';
-import 'package:account_app/features/settings/app_lock_screen.dart' as real_lock;
+import 'package:account_app/features/settings/master_profile_screen.dart'; // Updated
+import 'package:account_app/features/settings/app_lock_screen.dart'
+    as real_lock;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -110,7 +112,8 @@ class MyApp extends StatelessWidget {
           return MaterialApp(
             title: 'Karobari Saathi',
             debugShowCheckedModeBanner: false,
-            navigatorKey: GlobalKey<NavigatorState>(), // Add this if not already present and needed by NotificationService
+            navigatorKey: GlobalKey<
+                NavigatorState>(), // Add this if not already present and needed by NotificationService
 
             // Theme Configuration
             theme: themeService.currentThemeData,
@@ -133,11 +136,14 @@ class MyApp extends StatelessWidget {
             // RTL/LTR Support
             builder: (context, child) {
               // Pass navigator key to notification service if needed
-              final navigatorKey = (context as Element).findAncestorWidgetOfExactType<MaterialApp>()?.navigatorKey;
+              final navigatorKey = (context as Element)
+                  .findAncestorWidgetOfExactType<MaterialApp>()
+                  ?.navigatorKey;
               if (navigatorKey != null) {
-                 Provider.of<NotificationService>(context, listen: false).setNavigatorKey(navigatorKey);
+                Provider.of<NotificationService>(context, listen: false)
+                    .setNavigatorKey(navigatorKey);
               }
-              
+
               return Directionality(
                 textDirection: languageService.textDirection,
                 child: child!,
@@ -149,7 +155,7 @@ class MyApp extends StatelessWidget {
             routes: {
               '/dashboard': (context) => DashboardScreen(),
               '/login': (context) => LoginScreen(),
-              '/profileSetup': (context) => ProfileSetupScreen(),
+              '/profileSetup': (context) => const MasterProfileScreen(),
             },
           );
         },
@@ -200,16 +206,18 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
 
       if (_isLoggedIn) {
         // Check if user needs profile setup
-        final securityService = Provider.of<SecurityService>(
-          context,
-          listen: false,
-        );
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user!.uid)
+            .get();
+        final userData = userDoc.data();
+        final storedName = userData?['displayName'] ?? userData?['name'];
+        final hasProfileData =
+            storedName != null && storedName.toString().trim().isNotEmpty;
+        final hasDisplayName =
+            user.displayName != null && user.displayName!.isNotEmpty;
 
-        // Check if profile data exists
-        final hasProfileData = await securityService.getSensitiveData('user_profile') != null;
-        final hasDisplayName = user!.displayName != null && user.displayName!.isNotEmpty;
-
-        _needsProfileSetup = !hasDisplayName && !hasProfileData;
+        _needsProfileSetup = !hasProfileData && !hasDisplayName;
       }
 
       if (mounted) {
@@ -264,7 +272,7 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
 
         // 3. Check Profile Setup
         if (_needsProfileSetup) {
-          return ProfileSetupScreen();
+          return const MasterProfileScreen();
         } else {
           return const MainNavigationScreen();
         }

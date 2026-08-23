@@ -25,7 +25,7 @@ class ArtisanWorkOrder extends HiveObject {
   final String workDescription;
 
   @HiveField(6)
-  final String? workImages;
+  final List<String>? workImages;
 
   @HiveField(7)
   final String status;
@@ -159,7 +159,7 @@ class ArtisanWorkOrder extends HiveObject {
       customerName: map['customerName']?.toString() ?? '',
       customerPhone: map['customerPhone']?.toString() ?? '',
       workDescription: map['workDescription']?.toString() ?? '',
-      workImages: map['workImages']?.toString(),
+      workImages: map['workImages'] != null ? List<String>.from(map['workImages']) : null,
       status: map['status']?.toString() ?? 'pending',
       createdAt: parseDate(map['createdAt']),
       completedAt: map['completedAt'] != null ? parseDate(map['completedAt']) : null,
@@ -189,7 +189,7 @@ class ArtisanWorkOrder extends HiveObject {
     String? customerName,
     String? customerPhone,
     String? workDescription,
-    String? workImages,
+    List<String>? workImages,
     String? status,
     DateTime? createdAt,
     DateTime? completedAt,

@@ -1,19 +1,10 @@
 // lib/features/artisans/widgets/artisan_card.dart
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
-import 'package:account_app/core/services/notification_service.dart';
-import 'package:account_app/core/widgets/app_button.dart';
-import 'artisan_rating_stars.dart';
-
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/services/artisan_service.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/theme/app_theme.dart';
 
 class ArtisanCard extends StatefulWidget {
   final ArtisanProfile artisan;
@@ -36,257 +27,223 @@ class ArtisanCard extends StatefulWidget {
 }
 
 class _ArtisanCardState extends State<ArtisanCard> {
-  bool _isSending = false;
-  String? _requestStatus; // 'pending', 'accepted', 'rejected' or null
-  StreamSubscription<String?>? _requestStatusSub;
-
-  @override
-  void initState() {
-    super.initState();
-    _listenRequestStatus();
-  }
-
-  @override
-  void dispose() {
-    _requestStatusSub?.cancel();
-    super.dispose();
-  }
-
-  void _listenRequestStatus() {
-    final nService = Provider.of<NotificationService>(context, listen: false);
-    _requestStatusSub =
-        nService.artisanRequestStatusStream(widget.artisan.id).listen((status) {
-      if (mounted) {
-        setState(() {
-          _requestStatus = status;
-        });
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    final isMe = widget.artisan.id == FirebaseAuth.instance.currentUser?.uid;
-    final distanceText = widget.distanceKm != null
-        ? ' \u200E(${widget.distanceKm!.toStringAsFixed(1)} km)'
-        : ' \u200E(0.0 km)';
-
-    final bool isAvailable = widget.artisan.availability == 'available';
+    final String rateText = widget.artisan.rate != null && widget.artisan.rate!.isNotEmpty
+        ? (widget.isUrdu
+            ? 'Rs. ${widget.artisan.rate} / ${_getUnitUr(widget.artisan.rateUnit)}'
+            : 'Rs. ${widget.artisan.rate} / ${_getUnitEn(widget.artisan.rateUnit)}')
+        : (widget.isUrdu ? 'ریٹ دستیاب نہیں' : 'N/A');
 
     return GestureDetector(
       onTap: widget.onTap,
-      child: Stack(
-        children: [
-          Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4), 
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                  color: AppTheme.themeColor.withOpacity(0.3), width: 1.2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
-            child: Column(
-              children: [
-                ProfileInfoWidget(
-                  name: widget.artisan.name,
-                  phone: '',
-                  profileImage: widget.artisan.profileImage,
-                  category: widget.artisan.professionUrdu,
-                  address: '${widget.artisan.location}$distanceText',
-                  isVerified: widget.artisan.isVerified ||
-                      widget.artisan.verificationStatus == 'approved',
-                  customSize: 70,
-                  isVerticalCategory: true,
-                  suffix: null, // Removed Heart from here
-                ),
-                const Divider(height: 4, thickness: 0.5),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        ArtisanRatingStars(
-                          rating: widget.artisan.rating,
-                          size: 14,
-                          color: AppTheme.darkColor,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          '${widget.artisan.rating}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.darkColor,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          '(${widget.artisan.totalReviews} ${widget.isUrdu ? 'ریویوز' : 'Reviews'})',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[600],
-                            fontFamily: widget.fontFamily,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (!isMe)
-                      StreamBuilder<bool>(
-                        stream: ArtisanService().isFavorite(widget.artisan.id),
-                        builder: (context, snapshot) {
-                          final isFav = snapshot.data ?? false;
-                          return IconButton(
-                            icon: Icon(
-                              isFav
-                                  ? PhosphorIcons.heart(PhosphorIconsStyle.fill)
-                                  : PhosphorIcons.heart(),
-                              color: isFav ? Colors.red : Colors.grey,
-                              size: 24,
-                            ),
-                            onPressed: () => ArtisanService()
-                                .toggleFavorite(widget.artisan.id),
-                          );
-                        },
+          ],
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: StreamBuilder<bool>(
+                stream: ArtisanService().isFavorite(widget.artisan.id),
+                builder: (context, favSnapshot) {
+                  final isFav = favSnapshot.data ?? false;
+                  return Column(
+                    children: [
+                      ProfileInfoWidget(
+                        name: widget.artisan.name,
+                        phone: '',
+                        profileImage: widget.artisan.profileImage,
+                        category: widget.isUrdu ? widget.artisan.professionUrdu : widget.artisan.profession,
+                        isVerified: widget.artisan.isVerified || widget.artisan.verificationStatus == 'approved',
+                        isFavorite: false,
+                        customSize: 70,
+                        isVerticalCategory: true,
+                        textColor: Colors.black87,
+                        subtitleColor: Colors.grey.shade600,
+                        categoryColor: Colors.grey.shade600,
+                    suffix: Text(
+                      rateText,
+                      style: TextStyle(
+                        fontSize: widget.isUrdu ? 14 : 15,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.black87,
+                        fontFamily: widget.isUrdu ? widget.fontFamily : null,
                       ),
-                    if (isMe)
-                      Icon(PhosphorIcons.caretRight(),
-                          size: 16, color: Colors.grey),
-                  ],
-                ),
-              ],
+                    ),
+                        bottom: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 6),
+                            // ریٹنگ (Rating)
+                            Row(
+                              children: [
+                                const Icon(Icons.star, color: AppTheme.darkColor, size: 16),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${widget.artisan.rating} (${widget.artisan.totalReviews} ${widget.isUrdu ? 'ریٹنگز' : 'ratings'})',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                    fontFamily: widget.isUrdu ? widget.fontFamily : null,
+                                  ),
+                                ),
+                                if (widget.artisan.rating >= 4.5) ...[
+                                  const SizedBox(width: 8),
+                                  _buildBadge(
+                                    widget.isUrdu ? 'بہترین سروس' : 'GREAT VALUE', 
+                                    AppTheme.incomeColor.withOpacity(0.15), 
+                                    AppTheme.incomeColor,
+                                    widget.fontFamily
+                                  ),
+                                ],
+                                if (isFav) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.themeColor.withOpacity(0.15),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      PhosphorIcons.heart(PhosphorIconsStyle.fill),
+                                      size: 12,
+                                      color: AppTheme.themeColor,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // ٹاسک کی معلومات اور بیجز (Tasks Stats & Badges)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${widget.artisan.workCount} ${widget.isUrdu ? 'خدمات فراہم کیں' : 'tasks completed'}',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                color: const Color(0xFF27AE60),
+                                fontFamily: widget.isUrdu ? widget.fontFamily : null,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '•',
+                            style: TextStyle(color: Colors.grey.shade400),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${widget.artisan.workCount + 20} ${widget.isUrdu ? 'کل خدمات' : 'tasks overall'}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                              fontFamily: widget.isUrdu ? widget.fontFamily : null,
+                            ),
+                          ),
+                          const Spacer(),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
-          // Status Badge for others
-          if (!isMe)
-            Positioned.directional(
-              textDirection:
-                  widget.isUrdu ? TextDirection.rtl : TextDirection.ltr,
-              top: 0,
-              end: 0,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isAvailable ? Colors.green : Colors.red,
-                  borderRadius: BorderRadius.only(
-                    topRight:
-                        widget.isUrdu ? Radius.zero : const Radius.circular(16),
-                    bottomLeft:
-                        widget.isUrdu ? Radius.zero : const Radius.circular(16),
-                    topLeft:
-                        widget.isUrdu ? const Radius.circular(16) : Radius.zero,
-                    bottomRight:
-                        widget.isUrdu ? const Radius.circular(16) : Radius.zero,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.black.withOpacity(0.1), blurRadius: 4)
-                  ],
-                ),
-                child: Text(
-                  isAvailable
-                      ? (widget.isUrdu ? 'دستیاب' : 'Available')
-                      : (widget.isUrdu ? 'مصروف' : 'Busy'),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
+            const SizedBox(height: 6),
+
+            // بائیو باکس (Bio Section)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                widget.artisan.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.5,
+                  color: Colors.grey.shade700,
+                  fontFamily: widget.isUrdu ? widget.fontFamily : null,
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBadge(String text, Color bgColor, Color textColor, String fontFamily) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (text == 'ELITE' || text == 'تصدیق شدہ')
+             Icon(PhosphorIcons.sealCheck(PhosphorIconsStyle.fill), size: 12, color: textColor),
+          if (text == 'GREAT VALUE' || text == 'بہترین سروس')
+             Icon(PhosphorIcons.star(PhosphorIconsStyle.fill), size: 12, color: textColor),
+          if (text == 'ELITE' || text == 'تصدیق شدہ' || text == 'GREAT VALUE' || text == 'بہترین سروس')
+             const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              color: textColor,
+              fontFamily: widget.isUrdu ? fontFamily : null,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildWorkRequestButton(
-      BuildContext context, bool isUrdu, String fontFamily) {
-    final bool isPending = _requestStatus == 'pending';
-    final bool isAccepted = _requestStatus == 'accepted';
-    final bool isRejected = _requestStatus == 'rejected';
-
-    Color btnColor = AppTheme.themeColor;
-    String btnText = isUrdu ? 'کیا کام کریں گے؟' : 'Available?';
-    IconData? icon;
-
-    if (isPending) {
-      btnColor = Colors.orange.shade700;
-      btnText = isUrdu ? 'جواب کا انتظار' : 'Waiting...';
-      icon = PhosphorIcons.clock();
-    } else if (isAccepted) {
-      btnColor = Colors.green.shade700;
-      btnText = isUrdu ? 'منظور شدہ' : 'Accepted';
-      icon = PhosphorIcons.checkCircle();
-    } else if (isRejected) {
-      btnColor = Colors.red.shade700;
-      btnText = isUrdu ? 'دوبارہ پوچھیں' : 'Ask Again';
-      icon = PhosphorIcons.arrowClockwise();
+  String _getUnitUr(String? unit) {
+    switch (unit) {
+      case 'hour': return 'فی گھنٹہ';
+      case 'day': return 'فی دیہاڑی';
+      case 'month': return 'فی مہینہ';
+      case 'fixed': return 'مکمل کام';
+      default: return 'کام';
     }
-
-    return AppButton(
-      text: btnText,
-      icon: icon,
-      variant: AppButtonVariant.outlined,
-      size: AppButtonSize.mini, // 🔥 Changed to Mini (30px)
-      color: btnColor,
-      onPressed: (_isSending || isPending || isAccepted)
-          ? null
-          : () => _sendRequest(context, isUrdu),
-    );
   }
 
-  void _sendRequest(BuildContext context, bool isUrdu) async {
-    setState(() => _isSending = true);
-
-    final nService = Provider.of<NotificationService>(context, listen: false);
-    final user = FirebaseAuth.instance.currentUser;
-
-    try {
-      await nService.sendArtisanWorkRequest(
-        artisanUid: widget.artisan.id,
-        customerName: user?.displayName ?? (isUrdu ? 'ایک گاہک' : 'A Customer'),
-        workDescription: isUrdu ? 'دستیابی کے بارے میں پوچھ گچھ' : 'General availability inquiry',
-      );
-
-      if (mounted) {
-        setState(() {
-          _isSending = false;
-          _requestStatus = 'pending';
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isUrdu
-                ? 'درخواست کامیابی سے بھیج دی گئی!'
-                : 'Request sent successfully!'),
-            backgroundColor: Colors.green.shade700,
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isSending = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isUrdu
-                ? 'درخواست بھیجنے میں غلطی ہوئی'
-                : 'Failed to send request'),
-            backgroundColor: AppTheme.expenseColor,
-          ),
-        );
-      }
+  String _getUnitEn(String? unit) {
+    switch (unit) {
+      case 'hour': return 'Hr';
+      case 'day': return 'Day';
+      case 'month': return 'Mo';
+      case 'fixed': return 'Fixed';
+      default: return 'Job';
     }
   }
 }

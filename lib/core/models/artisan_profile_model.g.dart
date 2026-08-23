@@ -26,9 +26,13 @@ class ArtisanProfileAdapter extends TypeAdapter<ArtisanProfile> {
       longitude: fields[6] as double?,
       experience: fields[7] as int,
       rate: fields[8] as String?,
+      rateUnit: fields[26] as String?,
       availability: fields[9] as String,
+      qualification: fields[27] as String?,
       phone: fields[10] as String,
       showPhone: fields[11] as bool,
+      showWhatsApp: fields[22] as bool,
+      workCount: fields[23] as int,
       description: fields[12] as String,
       profileImage: fields[13] as String?,
       workImages: (fields[14] as List).cast<String>(),
@@ -39,13 +43,15 @@ class ArtisanProfileAdapter extends TypeAdapter<ArtisanProfile> {
       isActive: fields[19] as bool,
       createdAt: fields[20] as DateTime,
       updatedAt: fields[21] as DateTime,
+      skills: (fields[24] as List).cast<String>(),
+      skillsUrdu: (fields[25] as List).cast<String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, ArtisanProfile obj) {
     writer
-      ..writeByte(22)
+      ..writeByte(28)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -64,12 +70,20 @@ class ArtisanProfileAdapter extends TypeAdapter<ArtisanProfile> {
       ..write(obj.experience)
       ..writeByte(8)
       ..write(obj.rate)
+      ..writeByte(26)
+      ..write(obj.rateUnit)
       ..writeByte(9)
       ..write(obj.availability)
+      ..writeByte(27)
+      ..write(obj.qualification)
       ..writeByte(10)
       ..write(obj.phone)
       ..writeByte(11)
       ..write(obj.showPhone)
+      ..writeByte(22)
+      ..write(obj.showWhatsApp)
+      ..writeByte(23)
+      ..write(obj.workCount)
       ..writeByte(12)
       ..write(obj.description)
       ..writeByte(13)
@@ -89,7 +103,11 @@ class ArtisanProfileAdapter extends TypeAdapter<ArtisanProfile> {
       ..writeByte(20)
       ..write(obj.createdAt)
       ..writeByte(21)
-      ..write(obj.updatedAt);
+      ..write(obj.updatedAt)
+      ..writeByte(24)
+      ..write(obj.skills)
+      ..writeByte(25)
+      ..write(obj.skillsUrdu);
   }
 
   @override

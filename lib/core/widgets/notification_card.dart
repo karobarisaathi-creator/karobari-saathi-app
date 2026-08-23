@@ -77,10 +77,13 @@ class NotificationCard extends StatelessWidget {
                           ? _buildSystemIdentity(isUrdu)
                           : ProfileInfoWidget(
                               name: data?['senderName'] ?? data?['artisanName'] ?? (isUrdu ? 'صارف' : 'User'),
-                              phone: data?['senderPhone'] ?? '',
-                              profileImage: data?['senderPhotoUrl'],
+                              phone: data?['senderPhone'] ?? data?['artisanPhone'] ?? '',
+                              category: data?['artisanProfession'],
+                              profileImage: data?['senderPhotoUrl'] ?? data?['artisanPhotoUrl'],
                               isVerified: data?['isSenderVerified'] == true || data?['isSenderVerified'] == 'true',
-                              customSize: 36, // Reduced size
+                              customSize: 42, // Match party card
+                              borderRadius: 6,
+                              isVerticalCategory: true,
                             ),
                       ),
                       const SizedBox(width: 8),

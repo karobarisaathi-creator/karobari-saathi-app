@@ -264,12 +264,17 @@ class ArtisanService extends BaseService {
   }) async {
     var query = firestore
         .collection('artisans')
-        .where('profession', isEqualTo: profession)
         .where('isActive', isEqualTo: true);
 
     final snapshot = await query.get();
     var results =
         snapshot.docs.map((doc) => ArtisanProfile.fromMap(doc.data())).toList();
+    
+    // Filter by profession OR skills
+    results = results.where((p) => 
+      p.profession == profession || 
+      p.skills.contains(profession)
+    ).toList();
 
     // قریبی لوکیشن کے حساب سے فلٹر
     if (latitude != null && longitude != null) {

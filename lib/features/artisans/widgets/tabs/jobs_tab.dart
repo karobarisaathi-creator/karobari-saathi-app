@@ -6,39 +6,58 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database/job_service.dart';
+import 'package:account_app/core/services/artisan_service.dart';
 import 'package:account_app/core/models/job_post_model.dart';
 import 'package:account_app/features/artisans/widgets/job_post_card.dart';
 import 'package:account_app/features/artisans/job_detail_screen.dart';
 import 'package:account_app/core/services/job_algorithm_service.dart';
+import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 
 class JobsTab extends StatefulWidget {
   final String selectedCategory;
-  const JobsTab({super.key, required this.selectedCategory});
+  final String searchQuery;
+  const JobsTab({
+    super.key,
+    required this.selectedCategory,
+    this.searchQuery = '',
+  });
 
   @override
   State<JobsTab> createState() => _JobsTabState();
 }
 
-class _JobsTabState extends State<JobsTab> with SingleTickerProviderStateMixin {
+class _JobsTabState extends State<JobsTab> {
   final ScrollController _scrollController = ScrollController();
   List<JobPost> _jobs = [];
   DocumentSnapshot? _lastJobDocument;
   bool _isLoadingMoreJobs = false;
   bool _hasMoreJobs = true;
   bool _isInitialJobsLoading = true;
-  late AnimationController _shimmerController;
+  String? _artisanProfession;
+  double? _artisanLat;
+  double? _artisanLng;
   final int _batchSize = 10;
 
   @override
   void initState() {
     super.initState();
-    _shimmerController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat();
-
     _scrollController.addListener(_onScroll);
+    _loadArtisanProfile();
     _fetchJobs(isRefresh: true);
+  }
+
+  Future<void> _loadArtisanProfile() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    final profile = await ArtisanService().getProfile(userId);
+    if (!mounted) return;
+    setState(() {
+      _artisanProfession =
+          profile != null && profile.isActive ? profile.profession : null;
+      _artisanLat = profile?.latitude;
+      _artisanLng = profile?.longitude;
+    });
   }
 
   @override
@@ -52,7 +71,6 @@ class _JobsTabState extends State<JobsTab> with SingleTickerProviderStateMixin {
   @override
   void dispose() {
     _scrollController.dispose();
-    _shimmerController.dispose();
     super.dispose();
   }
 
@@ -108,7 +126,9 @@ class _JobsTabState extends State<JobsTab> with SingleTickerProviderStateMixin {
 
         final validJobs = newJobs
             .where((j) =>
-                j.customerId == currentUserId || j.deadline == null || j.deadline!.isAfter(now))
+                j.customerId == currentUserId ||
+                j.deadline == null ||
+                j.deadline!.isAfter(now))
             .toList();
 
         if (mounted) {
@@ -147,21 +167,45 @@ class _JobsTabState extends State<JobsTab> with SingleTickerProviderStateMixin {
       builder: (context, service, child) {
         final currentUserId = FirebaseAuth.instance.currentUser?.uid;
         final now = DateTime.now();
-        
+
         // Filter jobs from local cache reactively
         var jobs = service.jobsBox?.values.where((j) {
-          // If 'all' is selected, show everything (including own). 
-          // If a specific category is selected, hide own to focus on others' jobs.
-          bool isNotMine = widget.selectedCategory == 'all' || j.customerId != currentUserId;
-          bool matchesCategory = widget.selectedCategory == 'all' || j.categories.contains(widget.selectedCategory);
-          bool isNotExpired = j.customerId == currentUserId || j.deadline == null || j.deadline!.isAfter(now);
-          
-          return isNotMine && matchesCategory && isNotExpired;
-        }).toList() ?? [];
+              // If 'all' is selected, show everything (including own).
+              // If a specific category is selected, hide own to focus on others' jobs.
+              bool isNotMine = widget.selectedCategory == 'all' ||
+                  j.customerId != currentUserId;
+              bool matchesCategory = widget.selectedCategory == 'all' ||
+                  j.categories.contains(widget.selectedCategory);
+              bool isNotExpired = j.customerId == currentUserId ||
+                  j.deadline == null ||
+                  j.deadline!.isAfter(now);
+              bool isOpen = j.status == 'open' || j.customerId == currentUserId;
+
+              bool matchesSearch = true;
+              if (widget.searchQuery.isNotEmpty) {
+                final query = widget.searchQuery.toLowerCase();
+                matchesSearch = j.title.toLowerCase().contains(query) ||
+                    j.description.toLowerCase().contains(query) ||
+                    j.location.toLowerCase().contains(query);
+              }
+
+              return isNotMine &&
+                  matchesCategory &&
+                  isNotExpired &&
+                  isOpen &&
+                  matchesSearch;
+            }).toList() ??
+            [];
 
         // Apply algorithm sorting
         final algorithm = JobAlgorithmService();
-        jobs = algorithm.applySmartSort(jobs, widget.selectedCategory, currentUserId);
+        jobs = algorithm.applySmartSort(
+          jobs: jobs,
+          artisanProfession: _artisanProfession,
+          currentUserId: currentUserId,
+          artisanLat: _artisanLat,
+          artisanLng: _artisanLng,
+        );
 
         return RefreshIndicator(
           onRefresh: () => _fetchJobs(isRefresh: true),
@@ -233,79 +277,26 @@ class _JobsTabState extends State<JobsTab> with SingleTickerProviderStateMixin {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: 5,
-      itemBuilder: (context, index) => _buildShimmerCard(),
-    );
-  }
-
-  Widget _buildShimmerCard() {
-    return AnimatedBuilder(
-      animation: _shimmerController,
-      builder: (context, child) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey[200]!),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  _shimmerBox(width: 40, height: 40, radius: 10),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _shimmerBox(width: 120, height: 12),
-                      const SizedBox(height: 6),
-                      _shimmerBox(width: 80, height: 10),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              _shimmerBox(width: double.infinity, height: 16),
-              const SizedBox(height: 8),
-              _shimmerBox(width: double.infinity, height: 16),
-              const SizedBox(height: 8),
-              _shimmerBox(width: 150, height: 16),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _shimmerBox(width: 100, height: 35, radius: 20),
-                  _shimmerBox(width: 100, height: 35, radius: 20),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _shimmerBox(
-      {required double width, required double height, double radius = 4}) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          stops: [
-            _shimmerController.value - 0.3,
-            _shimmerController.value,
-            _shimmerController.value + 0.3,
-          ],
-          colors: [
-            Colors.grey[200]!,
-            Colors.grey[100]!,
-            Colors.grey[200]!,
+      itemBuilder: (context, index) => SkeletonCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SkeletonShimmer(width: 150, height: 18, borderRadius: 4),
+            const SizedBox(height: 8),
+            const SkeletonShimmer(width: 100, height: 12, borderRadius: 4),
+            const SizedBox(height: 16),
+            const SkeletonShimmer(
+                width: double.infinity, height: 14, borderRadius: 4),
+            const SizedBox(height: 8),
+            const SkeletonShimmer(width: 200, height: 14, borderRadius: 4),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const SkeletonShimmer(width: 80, height: 24, borderRadius: 12),
+                const SkeletonShimmer(width: 80, height: 24, borderRadius: 12),
+              ],
+            ),
           ],
         ),
       ),

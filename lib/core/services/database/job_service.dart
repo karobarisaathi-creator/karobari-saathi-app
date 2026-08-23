@@ -5,6 +5,7 @@ import 'package:account_app/core/models/job_bid_model.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
 import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/services/notification_service.dart';
+import 'package:account_app/core/services/artisan_service.dart';
 import 'package:account_app/core/services/database/base_service.dart';
 import 'package:flutter/foundation.dart';
 
@@ -84,10 +85,22 @@ class JobService extends BaseService {
     }
   }
 
-  Future<void> updateJobClarifications(
-      String jobId, List<String> clarifications) async {
-    await _firestore.collection('jobs').doc(jobId).update({
-      'clarifications': clarifications,
+  Future<void> appendJobDetail(String jobId, String newDetail) async {
+    final docRef = _firestore.collection('jobs').doc(jobId);
+    final snapshot = await docRef.get();
+    if (!snapshot.exists) return;
+
+    final data = snapshot.data()!;
+    String currentScope = data['detailedScope'] ?? data['description'] ?? '';
+
+    // Just append with a double newline
+    final updatedScope = "$currentScope\n\n$newDetail";
+
+    await docRef.update({
+      'description':
+          updatedScope, // Update main description too so cards show it
+      'detailedScope': updatedScope,
+      'clarifications': FieldValue.arrayUnion([newDetail]),
     });
   }
 
@@ -154,6 +167,11 @@ class JobService extends BaseService {
       throw ArgumentError('Invalid bid');
     }
 
+    final artisanProfile = await ArtisanService().getProfile(user.uid);
+    if (artisanProfile == null || !artisanProfile.isActive) {
+      throw StateError('An active artisan profile is required to bid');
+    }
+
     final jobDoc = await _firestore.collection('jobs').doc(bid.jobId).get();
     final jobData = jobDoc.data();
     if (!jobDoc.exists || jobData?['status'] != 'open') {
@@ -195,6 +213,21 @@ class JobService extends BaseService {
           if (jobDoc.exists) {
             final jobData = jobDoc.data()!;
             final customerId = jobData['customerId'] as String;
+
+            // 🆕 کاریگر کی معلومات حاصل کریں تاکہ نوٹیفکیشن میں دکھائی جا سکیں
+            final artisanDoc = await _firestore
+                .collection('artisans')
+                .doc(bid.artisanId)
+                .get();
+            String artisanProfession = '';
+            String? artisanPhotoUrl = bid.artisanPhotoUrl;
+            if (artisanDoc.exists) {
+              artisanProfession = artisanDoc.data()?['professionUrdu'] ??
+                  artisanDoc.data()?['profession'] ??
+                  '';
+              artisanPhotoUrl ??= artisanDoc.data()?['profileImage'];
+            }
+
             final jobTitle = jobData['categories'] != null &&
                     (jobData['categories'] as List).isNotEmpty
                 ? (jobData['categories'] as List).first as String
@@ -202,14 +235,10 @@ class JobService extends BaseService {
 
             final notifId = "bid_recv_${DateTime.now().millisecondsSinceEpoch}";
 
-            String messageBody =
-                '${bid.artisanName} نے آپ کے "$jobTitle" کے کام پر Rs. ${bid.amount.toStringAsFixed(0)} کا ریٹ دیا ہے۔';
-
+            // 🆕 پیغام میں صرف رقم اور کمنٹ دکھائیں (کیونکہ گاہک کو کام کا پتہ ہوتا ہے)
+            String messageBody = 'ریٹ: Rs. ${bid.amount.toStringAsFixed(0)}';
             if (bid.message.isNotEmpty) {
-              String snippet = bid.message.length > 40
-                  ? "${bid.message.substring(0, 40)}..."
-                  : bid.message;
-              messageBody += "\nتفصیل: $snippet";
+              messageBody += "\n${bid.message}";
             }
 
             final notification = AppNotification(
@@ -224,7 +253,11 @@ class JobService extends BaseService {
                 'jobId': bid.jobId,
                 'jobTitle': jobTitle,
                 'artisanName': bid.artisanName,
+                'artisanPhone': bid.artisanPhone,
+                'artisanProfession': artisanProfession,
+                'artisanPhotoUrl': artisanPhotoUrl,
                 'amount': bid.amount.toString(),
+                'bidComment': bid.message,
               },
             );
 
@@ -306,6 +339,9 @@ class JobService extends BaseService {
       }
       if (!bidSnapshot.exists || bidData?['status'] != 'pending') {
         throw StateError('This bid is no longer available');
+      }
+      if (bidData?['artisanId'] == user.uid) {
+        throw StateError('You cannot hire yourself');
       }
 
       // 1. Update the accepted bid status

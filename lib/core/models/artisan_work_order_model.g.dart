@@ -23,7 +23,7 @@ class ArtisanWorkOrderAdapter extends TypeAdapter<ArtisanWorkOrder> {
       customerName: fields[3] as String,
       customerPhone: fields[4] as String,
       workDescription: fields[5] as String,
-      workImages: fields[6] as String?,
+      workImages: (fields[6] as List?)?.cast<String>(),
       status: fields[7] as String,
       createdAt: fields[8] as DateTime,
       completedAt: fields[9] as DateTime?,

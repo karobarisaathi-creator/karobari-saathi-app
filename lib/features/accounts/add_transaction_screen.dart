@@ -14,7 +14,7 @@ import 'package:account_app/core/models/transaction_item_model.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/image_grid_viewer.dart';
+import 'package:account_app/core/widgets/image_gallery_viewer.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';

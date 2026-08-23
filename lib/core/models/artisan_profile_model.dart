@@ -33,8 +33,14 @@ class ArtisanProfile extends HiveObject {
   @HiveField(8)
   final String? rate;
 
+  @HiveField(26)
+  final String? rateUnit; // 'hour', 'day', 'fixed', 'month'
+
   @HiveField(9)
   final String availability;
+
+  @HiveField(27)
+  final String? qualification;
 
   @HiveField(10)
   final String phone;
@@ -78,6 +84,12 @@ class ArtisanProfile extends HiveObject {
   @HiveField(21)
   final DateTime updatedAt;
 
+  @HiveField(24)
+  final List<String> skills;
+
+  @HiveField(25)
+  final List<String> skillsUrdu;
+
   ArtisanProfile({
     required this.id,
     required this.name,
@@ -88,7 +100,9 @@ class ArtisanProfile extends HiveObject {
     this.longitude,
     this.experience = 0,
     this.rate,
+    this.rateUnit,
     this.availability = 'available',
+    this.qualification,
     required this.phone,
     this.showPhone = true,
     this.showWhatsApp = true,
@@ -103,6 +117,8 @@ class ArtisanProfile extends HiveObject {
     this.isActive = true,
     required this.createdAt,
     required this.updatedAt,
+    this.skills = const [],
+    this.skillsUrdu = const [],
   });
 
   Map<String, dynamic> toMap() {
@@ -116,7 +132,9 @@ class ArtisanProfile extends HiveObject {
       'longitude': longitude,
       'experience': experience,
       'rate': rate,
+      'rateUnit': rateUnit,
       'availability': availability,
+      'qualification': qualification,
       'phone': phone,
       'showPhone': showPhone,
       'showWhatsApp': showWhatsApp,
@@ -131,6 +149,8 @@ class ArtisanProfile extends HiveObject {
       'isActive': isActive,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'skills': skills,
+      'skillsUrdu': skillsUrdu,
     };
   }
 
@@ -152,7 +172,9 @@ class ArtisanProfile extends HiveObject {
       longitude: (map['longitude'] as num?)?.toDouble(),
       experience: (map['experience'] as num?)?.toInt() ?? 0,
       rate: map['rate']?.toString(),
+      rateUnit: map['rateUnit']?.toString(),
       availability: map['availability']?.toString() ?? 'available',
+      qualification: map['qualification']?.toString(),
       phone: map['phone']?.toString() ?? '',
       showPhone: map['showPhone'] ?? true,
       showWhatsApp: map['showWhatsApp'] ?? true,
@@ -167,6 +189,8 @@ class ArtisanProfile extends HiveObject {
       isActive: map['isActive'] ?? true,
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
+      skills: List<String>.from(map['skills'] ?? []),
+      skillsUrdu: List<String>.from(map['skillsUrdu'] ?? []),
     );
   }
 
@@ -179,7 +203,9 @@ class ArtisanProfile extends HiveObject {
     double? longitude,
     int? experience,
     String? rate,
+    String? rateUnit,
     String? availability,
+    String? qualification,
     String? phone,
     bool? showPhone,
     bool? showWhatsApp,
@@ -193,6 +219,8 @@ class ArtisanProfile extends HiveObject {
     String? verificationStatus,
     bool? isActive,
     DateTime? updatedAt,
+    List<String>? skills,
+    List<String>? skillsUrdu,
   }) {
     return ArtisanProfile(
       id: id,
@@ -204,7 +232,9 @@ class ArtisanProfile extends HiveObject {
       longitude: longitude ?? this.longitude,
       experience: experience ?? this.experience,
       rate: rate ?? this.rate,
+      rateUnit: rateUnit ?? this.rateUnit,
       availability: availability ?? this.availability,
+      qualification: qualification ?? this.qualification,
       phone: phone ?? this.phone,
       showPhone: showPhone ?? this.showPhone,
       showWhatsApp: showWhatsApp ?? this.showWhatsApp,
@@ -219,6 +249,8 @@ class ArtisanProfile extends HiveObject {
       isActive: isActive ?? this.isActive,
       createdAt: createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
+      skills: skills ?? this.skills,
+      skillsUrdu: skillsUrdu ?? this.skillsUrdu,
     );
   }
 }

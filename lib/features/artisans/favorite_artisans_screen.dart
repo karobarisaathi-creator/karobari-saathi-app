@@ -85,15 +85,9 @@ class FavoriteArtisansScreen extends StatelessWidget {
                                 category: artisan.professionUrdu,
                                 isVerticalCategory: true,
                                 isVerified: artisan.isVerified,
+                                isFavorite: true,
                                 customSize: 50,
                               ),
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                PhosphorIcons.heart(PhosphorIconsStyle.fill),
-                                color: Colors.red,
-                              ),
-                              onPressed: () => artisanService.toggleFavorite(artisan.id),
                             ),
                           ],
                         ),
