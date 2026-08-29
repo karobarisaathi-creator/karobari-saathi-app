@@ -36,9 +36,12 @@ class ProfileInfoWidget extends StatefulWidget {
   final Widget? categorySuffix;
   final double? customSize;
   final double? borderRadius;
+  final double verticalSpacing;
   final String? reputationLabel;
   final Color? reputationColor;
   final Color? reputationBgColor;
+  final bool isAddressBold;
+  final Color? addressColor;
 
   const ProfileInfoWidget({
     super.key,
@@ -66,9 +69,12 @@ class ProfileInfoWidget extends StatefulWidget {
     this.categorySuffix,
     this.customSize,
     this.borderRadius,
+    this.verticalSpacing = 4.0,
     this.reputationLabel,
     this.reputationColor,
     this.reputationBgColor,
+    this.isAddressBold = false,
+    this.addressColor,
   });
 
   @override
@@ -295,7 +301,7 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                 ],
               ),
               if (widget.isVerticalCategory && displayCategory.isNotEmpty) ...[
-                const SizedBox(height: 4),
+                SizedBox(height: widget.verticalSpacing),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -307,6 +313,7 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                           color: widget.categoryColor ?? AppTheme.themeColor,
                           fontFamily: fontFamily,
                           fontWeight: fontWeight,
+                          height: 1.0,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -320,7 +327,7 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                 ),
               ],
               if (widget.phone.isNotEmpty) ...[
-                const SizedBox(height: 4),
+                SizedBox(height: widget.verticalSpacing),
                 Text(
                   Formatters.formatPhoneNumber(widget.phone),
                   style: TextStyle(
@@ -331,20 +338,21 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                 ),
               ],
               if (widget.address != null && widget.address!.isNotEmpty) ...[
-                const SizedBox(height: 4),
+                SizedBox(height: widget.verticalSpacing),
                 Text(
                   widget.address!,
                   style: TextStyle(
                       fontSize: 13,
-                      color: effectiveSubtitleColor,
+                      color: widget.addressColor ?? effectiveSubtitleColor,
                       fontFamily: fontFamily,
-                      fontWeight: fontWeight),
+                      fontWeight: widget.isAddressBold ? FontWeight.w900 : fontWeight,
+                      height: 1.0),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
               if (widget.bottom != null) ...[
-                const SizedBox(height: 4),
+                SizedBox(height: widget.verticalSpacing),
                 widget.bottom!,
               ],
             ],

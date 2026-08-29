@@ -7,6 +7,7 @@ import 'package:account_app/core/services/artisan_service.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
+import 'package:account_app/core/widgets/artisan_card.dart';
 import 'artisan_detail_screen.dart';
 
 class FavoriteArtisansScreen extends StatelessWidget {
@@ -46,53 +47,21 @@ class FavoriteArtisansScreen extends StatelessWidget {
                   if (!artisanSnapshot.hasData) return const SizedBox.shrink();
                   final artisan = artisanSnapshot.data!;
 
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey[200]!),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.02),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: InkWell(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ArtisanDetailScreen(
-                              artisanId: artisan.id,
-                              initialArtisan: artisan,
-                            ),
+                  return ArtisanCard(
+                    artisan: artisan,
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ArtisanDetailScreen(
+                            artisanId: artisan.id,
+                            initialArtisan: artisan,
                           ),
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: ProfileInfoWidget(
-                                name: artisan.name,
-                                phone: '',
-                                profileImage: artisan.profileImage,
-                                category: artisan.professionUrdu,
-                                isVerticalCategory: true,
-                                isVerified: artisan.isVerified,
-                                isFavorite: true,
-                                customSize: 50,
-                              ),
-                            ),
-                          ],
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   );
                 },
               );

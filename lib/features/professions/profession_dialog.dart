@@ -8,11 +8,13 @@ import 'package:account_app/core/widgets/app_button.dart';
 class ProfessionDialog extends StatefulWidget {
   final bool isUrdu;
   final Profession? profession;
-  final Future<void> Function(String name, List<String> categories, String? description, double totalProduction, String productionUnit, String season, double targetProduction, Map<String, double>? budgetLimits, double benchmarkCostPerUnit) onSave;
+  final String? parentId; // Added parentId for seasons
+  final Future<void> Function(String name, List<String> categories, String? description, double totalProduction, String productionUnit, String season, double targetProduction, Map<String, double>? budgetLimits, double benchmarkCostPerUnit, bool isMaster, String? parentId) onSave;
 
   const ProfessionDialog({
     required this.isUrdu,
     this.profession,
+    this.parentId,
     required this.onSave,
   });
 
@@ -232,11 +234,12 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
                   // Description
                   _buildTextField(
                     controller: _descriptionController,
-                    label: widget.isUrdu ? 'تفصیل (اختیاری)' : 'Description (Optional)',
+                    label: widget.isUrdu ? 'تفصیل (لازمی)' : 'Description (Required)',
+                    hint: widget.isUrdu ? 'کم از کم 3 سے 4 لائنوں کی تفصیل لکھیں۔' : 'Enter 3-4 lines of description.',
                     icon: PhosphorIcons.note(),
                     fontFamily: fontFamily,
                     fontWeight: fontWeight,
-                    maxLines: 3,
+                    maxLines: 4,
                   ),
                 ],
               ),
@@ -248,7 +251,7 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
             AppButton(
               text: widget.isUrdu ? 'محفوظ کریں' : 'Save Profession',
               onPressed: () async {
-                if (_nameController.text.isNotEmpty) {
+                if (_nameController.text.isNotEmpty && _descriptionController.text.isNotEmpty) {
                   setState(() {
                     _isSaving = true;
                   });
@@ -266,6 +269,8 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
                       widget.profession?.targetProduction ?? 0.0,
                       widget.profession?.budgetLimits,
                       widget.profession?.benchmarkCostPerUnit ?? 0.0,
+                      widget.parentId == null && widget.profession == null ? true : (widget.profession?.isMaster ?? false),
+                      widget.parentId ?? widget.profession?.parentId,
                     );
                   } finally {
                     if (mounted) {

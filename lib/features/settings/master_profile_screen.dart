@@ -18,13 +18,16 @@ import 'package:account_app/core/services/artisan_service.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
+import 'package:account_app/core/services/location_service.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/utils/artisan_validators.dart';
 import 'package:account_app/core/services/logging_service.dart';
-
 import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/features/settings/verification_request_screen.dart';
 import 'package:account_app/features/dashboard/main_navigation_screen.dart';
+
+const String _defaultProfileImage =
+    'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png';
 
 class MasterProfileScreen extends StatefulWidget {
   const MasterProfileScreen({super.key});
@@ -39,7 +42,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
-  final TextEditingController _qualificationController = TextEditingController();
+  final TextEditingController _qualificationController =
+      TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _experienceController = TextEditingController();
   final TextEditingController _rateController = TextEditingController();
@@ -56,6 +60,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
   bool _isVerified = false;
   bool _showExpertFields = false; // To toggle expert section
   List<String> _customSkills = [];
+  double? _jobLatitude;
+  double? _jobLongitude;
 
   String? _remoteProfileImage;
   List<String> _remoteWorkImages = [];
@@ -98,7 +104,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
     _phoneController.text = user.phoneNumber ?? '';
 
     final service = ArtisanService();
-    
+
     try {
       // 1. Try fetching existing Artisan Profile
       final profile = await service.getProfile(user.uid);
@@ -112,6 +118,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
             _remoteWorkImages = profile.workImages;
             if (profile.phone.isNotEmpty) _phoneController.text = profile.phone;
             _locationController.text = profile.location;
+            _jobLatitude = profile.latitude;
+            _jobLongitude = profile.longitude;
             _qualificationController.text = profile.qualification ?? '';
             _descriptionController.text = profile.description;
             _experienceController.text = profile.experience.toString();
@@ -136,9 +144,12 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
             });
           }
         }
-        
+
         // 3. Try fetching from Firestore users collection
-        final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
         if (userDoc.exists) {
           final data = userDoc.data();
           final name = data?['displayName'] ?? data?['name'] ?? '';
@@ -185,6 +196,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
         final p = placemarks[0];
         setState(() {
           _locationController.text = "${p.locality}, ${p.subLocality}";
+          _jobLatitude = position.latitude;
+          _jobLongitude = position.longitude;
         });
       }
     } catch (e, stack) {
@@ -205,7 +218,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
           aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
           uiSettings: [
             AndroidUiSettings(
-              toolbarTitle: isProfile ? 'Crop Profile Image' : 'Crop Work Image',
+              toolbarTitle:
+                  isProfile ? 'Crop Profile Image' : 'Crop Work Image',
               toolbarColor: AppTheme.darkColor,
               toolbarWidgetColor: Colors.white,
               lockAspectRatio: true,
@@ -256,16 +270,61 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    if (_showExpertFields) {
+      // 🆕 اگر لوکیشن منتخب نہیں ہے تو لکھے ہوئے پتے سے کوآرڈینیٹس نکالنے کی کوشش کریں
+      if ((_jobLatitude == null || _jobLongitude == null) &&
+          _locationController.text.isNotEmpty) {
+        try {
+          final locations =
+              await locationFromAddress(_locationController.text.trim());
+          if (locations.isNotEmpty) {
+            _jobLatitude = locations.first.latitude;
+            _jobLongitude = locations.first.longitude;
+          }
+        } catch (_) {}
+      }
+
+      final hasSkill = _customSkills.any((skill) => skill.trim().isNotEmpty);
+      final hasLocation = ArtisanValidators.isValidLocation(
+        _jobLatitude,
+        _jobLongitude,
+      );
+
+      String? requirementMessage;
+      if (!hasSkill) {
+        requirementMessage = isUrdu
+            ? 'براہ کرم کم از کم ایک ہنر شامل کریں'
+            : 'Please add at least one skill';
+      } else if (!hasLocation) {
+        requirementMessage = isUrdu
+            ? 'براہ کرم درست مقام منتخب کریں'
+            : 'Please select a valid location';
+      }
+
+      if (requirementMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(requirementMessage)),
+        );
+        return;
+      }
+    }
+
+    setState(() => _isLoading = true);
 
     try {
       final service = ArtisanService();
-      
+
       // 1. Upload Profile Image (Always allowed)
       String? profileImageUrl = _remoteProfileImage;
       if (_profileImage != null) {
-        profileImageUrl = await service.uploadImage(user.uid, _profileImage!, 'profile');
+        profileImageUrl =
+            await service.uploadImage(user.uid, _profileImage!, 'profile');
+      }
+
+      // اگر تصویر موجود نہیں ہے تو ڈیفالٹ تصویر استعمال کریں
+      if (profileImageUrl == null || profileImageUrl.trim().isEmpty) {
+        profileImageUrl = _defaultProfileImage;
       }
 
       // 2. Upload Work Images (ONLY if Expert mode is ON)
@@ -280,7 +339,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
 
       // 3. Update Personal Info in Firebase Auth and Users Collection
       await user.updateDisplayName(_nameController.text.trim());
-      
+
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'displayName': _nameController.text.trim(),
         'photoURL': profileImageUrl,
@@ -297,11 +356,17 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
           profession: _selectedProfession,
           professionUrdu: _getProfessionUrdu(_selectedProfession),
           location: _locationController.text.trim(),
+          latitude: _jobLatitude,
+          longitude: _jobLongitude,
           experience: int.tryParse(_experienceController.text) ?? 0,
-          rate: _rateController.text.trim().isEmpty ? null : _rateController.text.trim(),
+          rate: _rateController.text.trim().isEmpty
+              ? null
+              : _rateController.text.trim(),
           rateUnit: _rateUnit,
           availability: _availability,
-          qualification: _qualificationController.text.trim().isEmpty ? null : _qualificationController.text.trim(),
+          qualification: _qualificationController.text.trim().isEmpty
+              ? null
+              : _qualificationController.text.trim(),
           phone: _phoneController.text.trim(),
           showPhone: _showPhone,
           showWhatsApp: _showWhatsApp,
@@ -322,19 +387,23 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
 
       if (mounted) {
         setState(() => _isEditing = true);
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isUrdu ? 'پروفائل محفوظ ہوگیا' : 'Profile saved successfully'),
+            content: Text(
+                isUrdu ? 'پروفائل محفوظ ہوگیا' : 'Profile saved successfully'),
             backgroundColor: AppTheme.incomeColor,
           ),
         );
-        
+
         // اگر یہ لاگ ان کے فوراً بعد ہے تو ڈیش بورڈ پر لے جائیں، ورنہ پاپ کریں
         if (Navigator.canPop(context)) {
           Navigator.pop(context);
         } else {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const MainNavigationScreen()));
+          Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => const MainNavigationScreen()));
         }
       }
     } catch (e) {
@@ -358,18 +427,22 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           isUrdu ? 'پروفائل ختم کریں؟' : 'Delete Profile?',
-          style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, color: Colors.red),
+          style: TextStyle(
+              fontFamily: fontFamily,
+              fontWeight: FontWeight.bold,
+              color: Colors.red),
         ),
         content: Text(
-          isUrdu 
-            ? 'کیا آپ واقعی اپنا کاریگر پروفائل ختم کرنا چاہتے ہیں؟ اس سے آپ کی تمام پیشہ ورانہ معلومات مٹ جائیں گی۔' 
-            : 'Are you sure you want to delete your artisan profile? All your professional details will be removed.',
+          isUrdu
+              ? 'کیا آپ واقعی اپنا کاریگر پروفائل ختم کرنا چاہتے ہیں؟ اس سے آپ کی تمام پیشہ ورانہ معلومات مٹ جائیں گی۔'
+              : 'Are you sure you want to delete your artisan profile? All your professional details will be removed.',
           style: TextStyle(fontFamily: fontFamily),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(isUrdu ? 'کینسل' : 'Cancel', style: TextStyle(fontFamily: fontFamily)),
+            child: Text(isUrdu ? 'کینسل' : 'Cancel',
+                style: TextStyle(fontFamily: fontFamily)),
           ),
           AppButton(
             text: isUrdu ? 'ہاں، ڈیلیٹ کریں' : 'Yes, Delete',
@@ -383,7 +456,10 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                   await ArtisanService().deleteProfile(user.uid);
 
                   // 2. صارفین (users) کلیکشن میں کاریگر کا نشان ختم کریں
-                  await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .update({
                     'isArtisan': false,
                     'artisanProfileId': FieldValue.delete(),
                   });
@@ -402,7 +478,9 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
 
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(isUrdu ? 'پروفائل ختم کر دی گئی' : 'Profile deleted successfully'),
+                        content: Text(isUrdu
+                            ? 'پروفائل ختم کر دی گئی'
+                            : 'Profile deleted successfully'),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -412,7 +490,9 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                    SnackBar(
+                        content: Text('Error: $e'),
+                        backgroundColor: Colors.red),
                   );
                 }
               } finally {
@@ -459,21 +539,30 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (_isEditing) ...[
-                      _buildVerificationBanner(isUrdu, fontFamily, verificationService),
+                      _buildVerificationBanner(
+                          isUrdu, fontFamily, verificationService),
                       const SizedBox(height: 16),
                     ],
-                    // پروفائل تصویر
+                    // پروفائل تصویر (اب یہ اختیاری ہے)
                     ImageSelectorField(
                       isProfile: true,
-                      selectedFiles: _profileImage != null ? [_profileImage!] : [],
-                      remoteUrls: _remoteProfileImage != null && _remoteProfileImage!.isNotEmpty ? [_remoteProfileImage!] : [],
+                      selectedFiles:
+                          _profileImage != null ? [_profileImage!] : [],
+                      remoteUrls: _remoteProfileImage != null &&
+                              _remoteProfileImage!.isNotEmpty
+                          ? [_remoteProfileImage!]
+                          : (_profileImage == null
+                              ? [_defaultProfileImage]
+                              : []),
                       onFilesChanged: (files) {
                         setState(() {
                           _profileImage = files.isNotEmpty ? files.first : null;
                         });
                       },
-                      onRemoteRemoved: (_) => setState(() => _remoteProfileImage = null),
+                      onRemoteRemoved: (_) =>
+                          setState(() => _remoteProfileImage = null),
                     ),
+
 
                     const SizedBox(height: 24),
 
@@ -483,7 +572,9 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.themeColor.withOpacity(0.3), width: 1.5),
+                        border: Border.all(
+                            color: AppTheme.themeColor.withOpacity(0.3),
+                            width: 1.5),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.05),
@@ -495,7 +586,13 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildSectionHeader(isUrdu ? 'ذاتی معلومات (کھاتہ اکاؤنٹ)' : 'Personal Account Info', fontFamily, isUrdu, topPadding: 0),
+                          _buildSectionHeader(
+                              isUrdu
+                                  ? 'ذاتی معلومات (کھاتہ اکاؤنٹ)'
+                                  : 'Personal Account Info',
+                              fontFamily,
+                              isUrdu,
+                              topPadding: 0),
                           const SizedBox(height: 12),
                           _buildTextField(
                             controller: _nameController,
@@ -517,10 +614,15 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                           ),
                           const SizedBox(height: 16),
                           _buildSwitchTile(
-                            title: isUrdu ? 'واٹس ایپ بٹن دکھائیں' : 'Show WhatsApp Button',
-                            subtitle: isUrdu ? 'بولی کارڈ پر واٹس ایپ کا نشان نظر آئے گا' : 'Show WhatsApp icon on bid cards',
+                            title: isUrdu
+                                ? 'واٹس ایپ بٹن دکھائیں'
+                                : 'Show WhatsApp Button',
+                            subtitle: isUrdu
+                                ? 'بولی کارڈ پر واٹس ایپ کا نشان نظر آئے گا'
+                                : 'Show WhatsApp icon on bid cards',
                             value: _showWhatsApp,
-                            onChanged: (val) => setState(() => _showWhatsApp = val),
+                            onChanged: (val) =>
+                                setState(() => _showWhatsApp = val),
                             fontFamily: fontFamily,
                           ),
                         ],
@@ -534,7 +636,9 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.themeColor.withOpacity(0.3), width: 1.5),
+                        border: Border.all(
+                            color: AppTheme.themeColor.withOpacity(0.3),
+                            width: 1.5),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.05),
@@ -547,7 +651,6 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildInvitationHeader(isUrdu, fontFamily),
-                          
                           if (_showExpertFields)
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -557,36 +660,33 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                                   _buildProfessionSelector(isUrdu, fontFamily),
                                   const SizedBox(height: 16),
 
-                                  // لوکیشن
-                                  _buildTextField(
-                                    controller: _locationController,
-                                    label: isUrdu ? 'شہر / علاقہ' : 'City / Area',
-                                    icon: PhosphorIcons.mapPin(),
-                                    fontFamily: fontFamily,
-                                    isUrdu: isUrdu,
-                                    suffixIcon: IconButton(
-                                      icon: Icon(Icons.my_location, color: AppTheme.themeColor),
-                                      onPressed: _getCurrentLocation,
-                                    ),
-                                  ),
+                                  // لوکیشن (آٹو کمپلیٹ کے ساتھ)
+                                  _buildLocationField(isUrdu, fontFamily),
 
                                   const SizedBox(height: 16),
 
                                   // تجربہ
                                   _buildTextField(
                                     controller: _experienceController,
-                                    label: isUrdu ? 'تجربہ (سال)' : 'Exp (Years)',
+                                    label:
+                                        isUrdu ? 'تجربہ (سال)' : 'Exp (Years)',
                                     icon: PhosphorIcons.calendar(),
                                     fontFamily: fontFamily,
                                     isUrdu: isUrdu,
                                     isNumber: true,
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
-                                        return isUrdu ? 'یہ فیلڈ ضروری ہے' : 'This field is required';
+                                        return isUrdu
+                                            ? 'یہ فیلڈ ضروری ہے'
+                                            : 'This field is required';
                                       }
                                       final years = int.tryParse(value);
-                                      if (years == null || !ArtisanValidators.isValidExperience(years)) {
-                                        return ArtisanValidators.getErrorMessage('experience', isUrdu: isUrdu);
+                                      if (years == null ||
+                                          !ArtisanValidators.isValidExperience(
+                                              years)) {
+                                        return ArtisanValidators
+                                            .getErrorMessage('experience',
+                                                isUrdu: isUrdu);
                                       }
                                       return null;
                                     },
@@ -596,14 +696,18 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
 
                                   // ریٹ (Rate)
                                   Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Expanded(
                                         flex: 2,
                                         child: _buildTextField(
                                           controller: _rateController,
-                                          label: isUrdu ? 'اجرت / ریٹ' : 'Rate / Price',
-                                          icon: PhosphorIcons.currencyCircleDollar(),
+                                          label: isUrdu
+                                              ? 'اجرت / ریٹ'
+                                              : 'Rate / Price',
+                                          icon: PhosphorIcons
+                                              .currencyCircleDollar(),
                                           fontFamily: fontFamily,
                                           isUrdu: isUrdu,
                                           isNumber: true,
@@ -614,7 +718,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                                       const SizedBox(width: 12),
                                       Expanded(
                                         flex: 2,
-                                        child: _buildRateUnitDropdown(isUrdu, fontFamily),
+                                        child: _buildRateUnitDropdown(
+                                            isUrdu, fontFamily),
                                       ),
                                     ],
                                   ),
@@ -624,11 +729,15 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                                   // کوالیفیکیشن (Qualification)
                                   _buildTextField(
                                     controller: _qualificationController,
-                                    label: isUrdu ? 'تعلیمی قابلیت / کوالیفیکیشن' : 'Qualification',
+                                    label: isUrdu
+                                        ? 'تعلیمی قابلیت / کوالیفیکیشن'
+                                        : 'Qualification',
                                     icon: PhosphorIcons.graduationCap(),
                                     fontFamily: fontFamily,
                                     isUrdu: isUrdu,
-                                    hint: isUrdu ? 'مثلاً: میٹرک، ڈپلومہ ہولڈر' : 'e.g. Matric, Diploma',
+                                    hint: isUrdu
+                                        ? 'مثلاً: میٹرک، ڈپلومہ ہولڈر'
+                                        : 'e.g. Matric, Diploma',
                                     validator: (val) => null, // Optional
                                   ),
 
@@ -637,17 +746,24 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                                   // تفصیل
                                   _buildTextField(
                                     controller: _descriptionController,
-                                    label: isUrdu ? 'اپنے کام کی تفصیل' : 'Work Description',
+                                    label: isUrdu
+                                        ? 'اپنے کام کی تفصیل'
+                                        : 'Work Description',
                                     icon: PhosphorIcons.note(),
                                     fontFamily: fontFamily,
                                     isUrdu: isUrdu,
                                     maxLines: 4,
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
-                                        return isUrdu ? 'یہ فیلڈ ضروری ہے' : 'This field is required';
+                                        return isUrdu
+                                            ? 'یہ فیلڈ ضروری ہے'
+                                            : 'This field is required';
                                       }
-                                      if (!ArtisanValidators.isValidDescription(value)) {
-                                        return ArtisanValidators.getErrorMessage('description', isUrdu: isUrdu);
+                                      if (!ArtisanValidators.isValidDescription(
+                                          value)) {
+                                        return ArtisanValidators
+                                            .getErrorMessage('description',
+                                                isUrdu: isUrdu);
                                       }
                                       return null;
                                     },
@@ -657,11 +773,15 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
 
                                   // کام کی تصاویر
                                   ImageSelectorField(
-                                    label: isUrdu ? 'کام کی تصاویر (اختیاری)' : 'Work Images (Optional)',
+                                    label: isUrdu
+                                        ? 'کام کی تصاویر (اختیاری)'
+                                        : 'Work Images (Optional)',
                                     selectedFiles: _workImages,
                                     remoteUrls: _remoteWorkImages,
-                                    onFilesChanged: (files) => setState(() => _workImages = files),
-                                    onRemoteRemoved: (index) => setState(() => _remoteWorkImages.removeAt(index)),
+                                    onFilesChanged: (files) =>
+                                        setState(() => _workImages = files),
+                                    onRemoteRemoved: (index) => setState(() =>
+                                        _remoteWorkImages.removeAt(index)),
                                     maxTotal: 6,
                                   ),
 
@@ -691,12 +811,15 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                     if (_isEditing) ...[
                       const SizedBox(height: 16),
                       AppButton(
-                        text: isUrdu ? 'کاریگر پروفائل ختم کریں' : 'Delete Artisan Profile',
+                        text: isUrdu
+                            ? 'کاریگر پروفائل ختم کریں'
+                            : 'Delete Artisan Profile',
                         icon: Icons.delete_forever,
                         color: Colors.red,
                         variant: AppButtonVariant.ghost,
                         isFullWidth: true,
-                        onPressed: () => _showDeleteConfirmation(isUrdu, fontFamily),
+                        onPressed: () =>
+                            _showDeleteConfirmation(isUrdu, fontFamily),
                       ),
                     ],
                   ],
@@ -720,8 +843,14 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: SwitchListTile(
-        title: Text(title, style: TextStyle(fontFamily: fontFamily, fontSize: 14, fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle, style: TextStyle(fontFamily: fontFamily, fontSize: 11, color: Colors.grey[600])),
+        title: Text(title,
+            style: TextStyle(
+                fontFamily: fontFamily,
+                fontSize: 14,
+                fontWeight: FontWeight.bold)),
+        subtitle: Text(subtitle,
+            style: TextStyle(
+                fontFamily: fontFamily, fontSize: 11, color: Colors.grey[600])),
         value: value,
         onChanged: onChanged,
         activeColor: AppTheme.themeColor,
@@ -748,17 +877,20 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    _showExpertFields ? PhosphorIcons.briefcase(PhosphorIconsStyle.fill) : PhosphorIcons.megaphone(PhosphorIconsStyle.fill), 
-                    color: AppTheme.themeColor, 
-                    size: 24
-                  ),
+                      _showExpertFields
+                          ? PhosphorIcons.briefcase(PhosphorIconsStyle.fill)
+                          : PhosphorIcons.megaphone(PhosphorIconsStyle.fill),
+                      color: AppTheme.themeColor,
+                      size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    isUrdu ? 'کیا آپ ایک ماہر کاریگر ہیں؟' : 'Are you an Expert Artisan?',
+                    isUrdu
+                        ? 'کیا آپ ایک ماہر کاریگر ہیں؟'
+                        : 'Are you an Expert Artisan?',
                     style: TextStyle(
-                      fontSize: 17, 
+                      fontSize: 17,
                       fontWeight: FontWeight.bold,
                       color: AppTheme.themeColor,
                       fontFamily: fontFamily,
@@ -775,9 +907,9 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
             if (!_showExpertFields) ...[
               const SizedBox(height: 10),
               Text(
-                isUrdu 
-                  ? 'اگر آپ بجلی، پلمبنگ، پینٹ یا کسی بھی ہنر کے ماہر ہیں، تو اسے آن کریں تاکہ گاہک آپ کو ڈھونڈ سکیں اور آپ کو کام مل سکے۔' 
-                  : 'If you are an expert in electricity, plumbing, painting or any skill, turn this on so customers can find you and you get work.',
+                isUrdu
+                    ? 'اگر آپ بجلی، پلمبنگ، پینٹ یا کسی بھی ہنر کے ماہر ہیں، تو اسے آن کریں تاکہ گاہک آپ کو ڈھونڈ سکیں اور آپ کو کام مل سکے۔'
+                    : 'If you are an expert in electricity, plumbing, painting or any skill, turn this on so customers can find you and you get work.',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
@@ -793,7 +925,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title, String fontFamily, bool isUrdu, {double topPadding = 20}) {
+  Widget _buildSectionHeader(String title, String fontFamily, bool isUrdu,
+      {double topPadding = 20}) {
     return Padding(
       padding: EdgeInsets.only(top: topPadding, bottom: 8),
       child: Text(
@@ -808,9 +941,10 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
     );
   }
 
-  Widget _buildVerificationBanner(bool isUrdu, String fontFamily, VerificationService service) {
+  Widget _buildVerificationBanner(
+      bool isUrdu, String fontFamily, VerificationService service) {
     final status = service.artisanStatus;
-    
+
     Color bgColor;
     Color iconColor;
     String text;
@@ -820,15 +954,19 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
     if (status == VerificationStatus.approved || _isVerified) {
       bgColor = Colors.green[50]!;
       iconColor = Colors.green;
-      text = isUrdu ? 'آپ کا پروفائل ویریفائیڈ ہے!' : 'Your profile is verified!';
+      text =
+          isUrdu ? 'آپ کا پروفائل ویریفائیڈ ہے!' : 'Your profile is verified!';
       icon = PhosphorIcons.sealCheck(PhosphorIconsStyle.fill);
-    } else if (status == VerificationStatus.pending || _verificationStatus == 'pending') {
+    } else if (status == VerificationStatus.pending ||
+        _verificationStatus == 'pending') {
       bgColor = Colors.amber[50]!;
       iconColor = Colors.amber[800]!;
-      text = isUrdu ? 'تصدیق کا عمل جاری ہے...' : 'Verification is in progress...';
+      text =
+          isUrdu ? 'تصدیق کا عمل جاری ہے...' : 'Verification is in progress...';
       icon = PhosphorIcons.clock();
       showButton = true;
-    } else if (status == VerificationStatus.rejected || _verificationStatus == 'rejected') {
+    } else if (status == VerificationStatus.rejected ||
+        _verificationStatus == 'rejected') {
       bgColor = Colors.red[50]!;
       iconColor = Colors.red;
       text = isUrdu ? 'تصدیق مسترد کر دی گئی ہے' : 'Verification was rejected';
@@ -907,7 +1045,10 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
       keyboardType: isNumber
           ? TextInputType.number
           : (isPhone ? TextInputType.phone : TextInputType.text),
-      style: TextStyle(fontFamily: fontFamily, fontSize: 15, color: readOnly ? Colors.grey : AppTheme.darkColor),
+      style: TextStyle(
+          fontFamily: fontFamily,
+          fontSize: 15,
+          color: readOnly ? Colors.grey : AppTheme.darkColor),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
@@ -915,7 +1056,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
           fontFamily: isUrdu ? fontFamily : '',
           color: Colors.grey[600],
         ),
-        prefixIcon: Icon(icon, size: 20, color: readOnly ? Colors.grey : AppTheme.themeColor),
+        prefixIcon: Icon(icon,
+            size: 20, color: readOnly ? Colors.grey : AppTheme.themeColor),
         suffixIcon: suffixIcon,
         filled: true,
         fillColor: Colors.white,
@@ -931,14 +1073,16 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppTheme.themeColor, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
-      validator: validator ?? (value) {
-        if (value == null || value.isEmpty) {
-          return isUrdu ? 'یہ فیلڈ ضروری ہے' : 'This field is required';
-        }
-        return null;
-      },
+      validator: validator ??
+          (value) {
+            if (value == null || value.isEmpty) {
+              return isUrdu ? 'یہ فیلڈ ضروری ہے' : 'This field is required';
+            }
+            return null;
+          },
     );
   }
 
@@ -961,7 +1105,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
         ),
         child: Row(
           children: [
-            Icon(currentProfession['icon'], color: AppTheme.themeColor, size: 22),
+            Icon(currentProfession['icon'],
+                color: AppTheme.themeColor, size: 22),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -1039,7 +1184,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                 ),
                 backgroundColor: AppTheme.themeColor.withOpacity(0.1),
                 side: BorderSide(color: AppTheme.themeColor.withOpacity(0.3)),
-                deleteIcon: Icon(PhosphorIcons.xCircle(), size: 16, color: Colors.red),
+                deleteIcon:
+                    Icon(PhosphorIcons.xCircle(), size: 16, color: Colors.red),
                 onDeleted: () {
                   setState(() => _customSkills.remove(skill));
                 },
@@ -1056,7 +1202,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
 
   void _showAllProfessionsPicker(bool isUrdu, String fontFamily) {
     final professions = ArtisanService.getProfessions();
-    
+
     // Group professions by category
     final Map<String, List<Map<String, dynamic>>> groupedProfessions = {};
     for (var p in professions) {
@@ -1086,11 +1232,16 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                 margin: const EdgeInsets.symmetric(vertical: 12),
                 width: 40,
                 height: 4,
-                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2)),
               ),
               Text(
                 isUrdu ? 'پیشہ منتخب کریں' : 'Select Profession',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: fontFamily),
               ),
               const SizedBox(height: 16),
               Expanded(
@@ -1106,7 +1257,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 4),
                           child: Text(
                             category,
                             style: TextStyle(
@@ -1120,7 +1272,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                         GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 3,
                             childAspectRatio: 0.85,
                             mainAxisSpacing: 12,
@@ -1137,17 +1290,25 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                               },
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: isSelected ? AppTheme.themeColor.withOpacity(0.1) : Colors.white,
+                                  color: isSelected
+                                      ? AppTheme.themeColor.withOpacity(0.1)
+                                      : Colors.white,
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                    color: isSelected ? AppTheme.themeColor : Colors.grey[200]!,
+                                    color: isSelected
+                                        ? AppTheme.themeColor
+                                        : Colors.grey[200]!,
                                     width: 1.5,
                                   ),
                                 ),
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(p['icon'], color: isSelected ? AppTheme.themeColor : Colors.grey[700], size: 28),
+                                    Icon(p['icon'],
+                                        color: isSelected
+                                            ? AppTheme.themeColor
+                                            : Colors.grey[700],
+                                        size: 28),
                                     const SizedBox(height: 8),
                                     Text(
                                       isUrdu ? p['name']! : p['id']!,
@@ -1156,9 +1317,13 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontSize: 11,
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.w600,
                                         fontFamily: fontFamily,
-                                        color: isSelected ? AppTheme.themeColor : Colors.black87,
+                                        color: isSelected
+                                            ? AppTheme.themeColor
+                                            : Colors.black87,
                                       ),
                                     ),
                                   ],
@@ -1206,7 +1371,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
               setState(() => _rateUnit = newValue);
             }
           },
-          items: units.map<DropdownMenuItem<String>>((Map<String, String> unit) {
+          items:
+              units.map<DropdownMenuItem<String>>((Map<String, String> unit) {
             return DropdownMenuItem<String>(
               value: unit['id'],
               child: Text(
@@ -1217,6 +1383,114 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
           }).toList(),
         ),
       ),
+    );
+  }
+
+  Widget _buildLocationField(bool isUrdu, String fontFamily) {
+    return RawAutocomplete<Map<String, dynamic>>(
+      optionsBuilder: (TextEditingValue textEditingValue) async {
+        if (textEditingValue.text.length < 3) {
+          return const Iterable<Map<String, dynamic>>.empty();
+        }
+        return await LocationService.searchLocations(textEditingValue.text);
+      },
+      displayStringForOption: (option) => option['display_name'],
+      onSelected: (option) {
+        setState(() {
+          _locationController.text = option['display_name'];
+          _jobLatitude = option['lat'];
+          _jobLongitude = option['lon'];
+        });
+      },
+      fieldViewBuilder:
+          (context, controller, focusNode, onEditingComplete) {
+        if (controller.text != _locationController.text && _locationController.text.isNotEmpty && controller.text.isEmpty) {
+           controller.text = _locationController.text;
+        }
+        
+        return TextFormField(
+          controller: controller,
+          focusNode: focusNode,
+          onEditingComplete: onEditingComplete,
+          style: TextStyle(color: AppTheme.darkColor, fontFamily: fontFamily, fontSize: 16),
+          decoration: InputDecoration(
+            labelText: isUrdu ? 'شہر / علاقہ' : 'City / Area',
+            hintText: isUrdu ? 'مثال: لاہور، گلبرگ' : 'e.g. Lahore, Gulberg',
+            labelStyle: TextStyle(
+                fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+                color: Colors.grey.shade600,
+                fontSize: 13,
+                fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            fillColor: const Color(0xFFF5F7F9),
+            filled: true,
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.0),
+                borderSide: BorderSide(color: Colors.grey.shade400)),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.0),
+                borderSide: BorderSide(color: Colors.grey.shade400)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.0),
+                borderSide: const BorderSide(color: AppTheme.themeColor, width: 1)),
+            prefixIcon: Icon(PhosphorIcons.mapPin(), color: AppTheme.themeColor, size: 20),
+            suffixIcon: IconButton(
+              icon: Icon(Icons.my_location, color: AppTheme.themeColor),
+              onPressed: () async {
+                await _getCurrentLocation();
+                controller.text = _locationController.text;
+              },
+            ),
+          ),
+          onChanged: (val) {
+             _locationController.text = val;
+             if (_jobLatitude != null || _jobLongitude != null) {
+                setState(() {
+                  _jobLatitude = null;
+                  _jobLongitude = null;
+                });
+             }
+          },
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return isUrdu ? 'یہ فیلڈ ضروری ہے' : 'Required';
+            }
+            return null;
+          },
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: isUrdu ? Alignment.topLeft : Alignment.topRight,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: MediaQuery.of(context).size.width - 72,
+              constraints: const BoxConstraints(maxHeight: 250),
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                separatorBuilder: (context, index) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final option = options.elementAt(index);
+                  return ListTile(
+                    title: Text(
+                      option['display_name'],
+                      style: TextStyle(fontSize: 13, fontFamily: fontFamily),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: () => onSelected(option),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

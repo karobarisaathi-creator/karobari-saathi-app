@@ -6,7 +6,6 @@ import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/profession_model.dart';
-import 'package:account_app/features/professions/season_comparison_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 
@@ -343,42 +342,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ),
 
             const SizedBox(height: 20),
-
-            // If a specific profession is selected, show Season Comparison Button
-            if (widget.selectedProfession != null && widget.selectedProfession!.season.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 20.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SeasonComparisonScreen(
-                            professionName: widget.selectedProfession!.name,
-                          ),
-                        ),
-                      );
-                    },
-                    icon: Icon(PhosphorIcons.arrowsLeftRight(), color: Colors.white),
-                    label: Text(
-                      isUrdu ? 'سیزن کا موازنہ' : 'Season Comparison',
-                      style: TextStyle(
-                        fontFamily: fontFamily,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.darkColor,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ),
-              ),
 
             // 1. Cost Per Unit Analysis (Only if relevant professions exist)
             _buildCostPerUnitAnalysis(isUrdu, fontFamily, fontWeight),

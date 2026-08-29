@@ -6,6 +6,7 @@ class NegotiationMessage {
   final String message;
   final double? proposedAmount;
   final DateTime timestamp;
+  final bool isRead;
 
   NegotiationMessage({
     required this.id,
@@ -13,6 +14,7 @@ class NegotiationMessage {
     required this.message,
     this.proposedAmount,
     required this.timestamp,
+    this.isRead = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -22,6 +24,7 @@ class NegotiationMessage {
       'message': message,
       'proposedAmount': proposedAmount,
       'timestamp': timestamp.toIso8601String(),
+      'isRead': isRead,
     };
   }
 
@@ -39,6 +42,7 @@ class NegotiationMessage {
       message: map['message'] ?? '',
       proposedAmount: (map['proposedAmount'] as num?)?.toDouble(),
       timestamp: parseDate(map['timestamp']),
+      isRead: map['isRead'] ?? false,
     );
   }
 }

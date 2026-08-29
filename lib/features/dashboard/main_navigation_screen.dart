@@ -15,8 +15,14 @@ import 'package:account_app/core/services/notification_service.dart';
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
 
+  static final GlobalKey<_MainNavigationScreenState> navigationKey = GlobalKey<_MainNavigationScreenState>();
+
+  static void switchTab(int index) {
+    navigationKey.currentState?.onItemTapped(index);
+  }
+
   static _MainNavigationScreenState? of(BuildContext context) {
-    return context.findAncestorStateOfType<_MainNavigationScreenState>();
+    return navigationKey.currentState ?? context.findAncestorStateOfType<_MainNavigationScreenState>();
   }
 
   @override

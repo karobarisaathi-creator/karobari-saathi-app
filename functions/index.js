@@ -66,3 +66,44 @@ exports.sendNotificationOnCreate = onDocumentCreated("users/{userId}/notificatio
       console.log('Error sending message:', error);
     }
 });
+
+exports.sendNegotiationMessageNotification = onDocumentCreated(
+  "artisans/{artisanId}/work_orders/{orderId}/negotiations/{messageId}",
+  async (event) => {
+    const messageSnapshot = event.data;
+    if (!messageSnapshot) return null;
+
+    const message = messageSnapshot.data();
+    const { artisanId, orderId, messageId } = event.params;
+    const workOrderSnapshot = await admin.firestore()
+      .doc(`artisans/${artisanId}/work_orders/${orderId}`)
+      .get();
+
+    if (!workOrderSnapshot.exists) return null;
+    const workOrder = workOrderSnapshot.data();
+    const senderId = message.senderId;
+    const recipientId = senderId === artisanId ? workOrder.customerId : artisanId;
+
+    if (!recipientId || recipientId === senderId) return null;
+
+    await admin.firestore()
+      .collection('users')
+      .doc(recipientId)
+      .collection('notifications')
+      .add({
+        title: 'New negotiation message',
+        message: message.message || 'You have a new message about a job.',
+        type: 'negotiation_message',
+        isRead: false,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        data: {
+          type: 'negotiation_message',
+          artisanUid: artisanId,
+          orderId,
+          messageId,
+        },
+      });
+
+    return null;
+  },
+);

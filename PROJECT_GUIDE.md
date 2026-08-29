@@ -138,3 +138,31 @@ This document provides a detailed overview of each screen and its functionality 
     *   **فوری اپ ڈیٹ:** نئے میسج آتے ہی اسکرین خود بخود اپ ڈیٹ ہو جاتی ہے۔
 
 ---
+
+## 10. Professions & Seasons (پیشے اور سیزن)
+**Advanced Business Tracking / کاروباری حساب کتاب کا مکمل نظام**
+
+*   **English:**
+    *   **Master-Season Hierarchy:** Group multiple cyclical projects (Seasons) under one Master Profession (e.g., "Wheat Farming" -> 2023, 2024).
+    *   **How to Start:** Click the "+" button, choose a professional icon, and write a detailed 4-line description for your record.
+    *   **The Dashboard:** Top header shows your **Total Income, Expense, and Net Profit**.
+    *   **Active Season:** Stays at the top with a dedicated card. All its transactions are listed directly inside this card for quick viewing.
+    *   **Adding Records:** Use the floating (+) button at the bottom right to add daily expenses or income for the active season.
+    *   **Legacy Data:** Records created before this update will appear as a **"Base Record"** under the completed list.
+    *   **Silent New Season:** Click "Start New Season" to auto-create a new record for the current year. It copies your settings automatically.
+    *   **Reactivate (Long Press):** Long-press any old season to make it "Active" again. Note: This will automatically mark your current active season as "Completed".
+    *   **Delete (Long Press):** Long-press and confirm via checkbox to delete a season and all its linked transactions.
+    *   **Category Management:** Click the Gear icon to set custom labels (e.g., Seeds, Wages). These apply to all future seasons you start.
+*   **اردو:**
+    *   **ماسٹر-سیزن سسٹم:** ایک بڑے پیشے کے تحت اپنے ہر سال یا ہر باری کا الگ حساب رکھیں (مثلاً: "گندم" کے اندر 2023 اور 2024 کا الگ حساب)۔
+    *   **آغاز کیسے کریں:** پلس (+) بٹن دبائیں، ایک خوبصورت آئیکن چنیں اور 4 لائنوں میں اپنے کام کی تفصیل لکھیں تاکہ ریکارڈ یاد رہے۔
+    *   **ڈیش بورڈ:** اوپر پٹی میں پورے پیشے کی **کل آمدنی، خرچ اور بچت** دیکھیں۔ 
+    *   **جاری سیزن:** یہ ہمیشہ سکرین پر سب سے اوپر ایک بڑے کارڈ میں نظر آئے گا۔ اس کی تمام ٹرانزیکشنز اسی کارڈ کے اندر ہی شو ہوں گی۔
+    *   **اندراج:** نیچے دائیں طرف موجود پلس (+) بٹن سے صرف جاری سیزن کے اخراجات یا آمدنی ڈالیں۔ 
+    *   **پرانا ڈیٹا:** اس اپ ڈیٹ سے پہلے کی تمام ٹرانزیکشنز آپ کو **"بنیادی ریکارڈ"** کے نام سے پرانی لسٹ میں ملیں گی۔
+    *   **نیا سال/سیزن:** سال ختم ہونے پر صرف ایک کلک سے نیا سیزن شروع کریں، نام اور کیٹیگریز خود بخود پرانے ریکارڈ سے آ جائیں گی۔
+    *   **دوبارہ فعال کریں (لانگ پریس):** کسی بھی پرانے سیزن کو تھوڑی دیر دبا کر رکھیں تو وہ دوبارہ "جاری" ہو جائے گا۔ (یاد رہے: ایسا کرنے سے موجودہ جاری سیزن خود بخود "مکمل" ہو جائے گا)۔
+    *   **حفاظتی ڈیلیٹ (لانگ پریس):** سیزن کو دبا کر رکھیں اور ڈیلیٹ منتخب کریں۔ غلطی سے بچنے کے لیے پہلے چیک باکس پر ٹک کرنا لازمی ہے۔
+    *   **زمرہ سیٹنگز:** اوپر سیٹنگز (Gear) بٹن سے اپنی مرضی کے زمرے بنائیں (مثلاً: بیج، ڈیزل، مزدوری) جو ہر نئے سیزن میں کام آئیں گے۔
+
+---

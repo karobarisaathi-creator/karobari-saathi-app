@@ -13,7 +13,7 @@ class JobPostCard extends StatefulWidget {
   final JobPost job;
   final bool isUrdu;
   final String fontFamily;
-  final VoidCallback onBidTap;
+  final VoidCallback onTap;
   final String currentUserId;
 
   const JobPostCard({
@@ -21,7 +21,7 @@ class JobPostCard extends StatefulWidget {
     required this.job,
     required this.isUrdu,
     required this.fontFamily,
-    required this.onBidTap,
+    required this.onTap,
     required this.currentUserId,
   });
 
@@ -50,7 +50,7 @@ class _JobPostCardState extends State<JobPostCard> {
       child: Stack(
         children: [
           InkWell(
-            onTap: widget.onBidTap,
+            onTap: widget.onTap,
             borderRadius: BorderRadius.circular(20),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -73,20 +73,14 @@ class _JobPostCardState extends State<JobPostCard> {
 
                   const SizedBox(height: 2),
 
-                  // تاریخ اور ایمرجنسی ٹیگ
-                  Row(
-                    children: [
-                      Text(
-                        Formatters.formatDate(widget.job.createdAt),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildUrgencyLabel(),
-                    ],
+                  // تاریخ
+                  Text(
+                    Formatters.formatDate(widget.job.createdAt),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[700],
+                    ),
                   ),
 
                   const SizedBox(height: 12),
@@ -173,15 +167,42 @@ class _JobPostCardState extends State<JobPostCard> {
                           ),
                         ),
 
-                      // بجٹ
-                      if (widget.job.estimatedBudget != null)
-                        Text(
-                          'Rs. ${widget.job.estimatedBudget!.toStringAsFixed(0)}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            color: Colors.green.shade800,
-                            fontSize: 14,
-                          ),
+                      // بجٹ اور مدت
+                      if (widget.job.estimatedBudget != null ||
+                          widget.job.estimatedDays != null)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (widget.job.estimatedBudget != null)
+                              Text(
+                                'Rs. ${widget.job.estimatedBudget!.toStringAsFixed(0)}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.green.shade800,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            if (widget.job.estimatedBudget != null &&
+                                widget.job.estimatedDays != null)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                child: Text('|',
+                                    style: TextStyle(
+                                        color: Colors.grey.shade300,
+                                        fontSize: 12)),
+                              ),
+                            if (widget.job.estimatedDays != null)
+                              Text(
+                                '${widget.job.estimatedDays} ${widget.isUrdu ? 'دن' : 'Days'}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange.shade900,
+                                  fontFamily: widget.fontFamily,
+                                ),
+                              ),
+                          ],
                         ),
                     ],
                   ),
@@ -233,28 +254,7 @@ class _JobPostCardState extends State<JobPostCard> {
     );
   }
 
-  Widget _buildUrgencyLabel() {
-    final urgency = JobAlgorithmService()
-        .getUrgencyLabel(widget.job.deadline, widget.isUrdu);
-    if (urgency.isEmpty) return const SizedBox.shrink();
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(PhosphorIcons.clock(), size: 12, color: Colors.red),
-        const SizedBox(width: 4),
-        Text(
-          urgency,
-          style: TextStyle(
-            color: Colors.red,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            fontFamily: widget.fontFamily,
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildOptionsMenu() {
     return PopupMenuButton<String>(

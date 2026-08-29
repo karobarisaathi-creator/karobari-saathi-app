@@ -69,6 +69,8 @@ class DatabaseService extends ChangeNotifier {
   Future<void> updateProfession(Profession p) async { await _professionService.updateProfession(p); notifyListeners(); _triggerSync(); }
   Future<void> deleteProfession(String id) async { await _professionService.deleteProfession(id); notifyListeners(); _triggerSync(); }
   List<Profession> getProfessions() => _professionService.getProfessions();
+  List<Profession> getMasterProfessions() => _professionService.getMasterProfessions();
+  List<Profession> getSeasons(String parentId) => _professionService.getSeasons(parentId);
   Profession? getProfession(String id) => _professionService.getProfession(id);
   Future<void> recalculateProfessionFinance(String id) async { await _professionService.recalculateProfessionFinance(id); notifyListeners(); _triggerSync(); }
   List<model.Transaction> getProfessionTransactions(String pId) => _professionService.getProfessionTransactions(pId);

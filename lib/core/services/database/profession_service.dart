@@ -67,6 +67,16 @@ class ProfessionService extends BaseService {
   }
 
   List<Profession> getProfessions() => professionsBox?.values.toList() ?? [];
+  
+  List<Profession> getMasterProfessions() {
+    // ہر وہ پیشہ جس کا کوئی پیرنٹ نہیں ہے اسے ماسٹر سمجھا جائے گا (پرانے ڈیٹا کے لیے بھی)
+    return professionsBox?.values.where((p) => p.parentId == null).toList() ?? [];
+  }
+
+  List<Profession> getSeasons(String parentId) {
+    return professionsBox?.values.where((p) => p.parentId == parentId).toList() ?? [];
+  }
+
   Profession? getProfession(String id) => professionsBox?.get(id);
 
   Future<void> recalculateProfessionFinance(String professionId) async {

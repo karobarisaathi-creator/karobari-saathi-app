@@ -44,12 +44,6 @@ class JobPost extends HiveObject {
   @HiveField(12)
   final DateTime createdAt;
 
-  @HiveField(13)
-  final String? selectedBidId;
-
-  @HiveField(14)
-  final int bidCount;
-
   @HiveField(15)
   final String? customerPhotoUrl;
 
@@ -104,8 +98,6 @@ class JobPost extends HiveObject {
     this.images = const [],
     this.status = 'open',
     required this.createdAt,
-    this.selectedBidId,
-    this.bidCount = 0,
     this.clarifications = const [],
     this.detailedScope,
     this.scopeOfWork,
@@ -136,8 +128,6 @@ class JobPost extends HiveObject {
       'images': images,
       'status': status,
       'createdAt': createdAt.toIso8601String(),
-      'selectedBidId': selectedBidId,
-      'bidCount': bidCount,
       'clarifications': clarifications,
       'detailedScope': detailedScope,
       'scopeOfWork': scopeOfWork,
@@ -170,16 +160,14 @@ class JobPost extends HiveObject {
       title: map['title'] ?? '',
       description: map['description'] ?? '',
       location: map['location'] ?? '',
-      categories: map['categories'] != null 
-          ? List<String>.from(map['categories']) 
+      categories: map['categories'] != null
+          ? List<String>.from(map['categories'])
           : (map['category'] != null ? [map['category']] : []),
       estimatedBudget: (map['estimatedBudget'] as num?)?.toDouble(),
       deadline: map['deadline'] != null ? parseDate(map['deadline']) : null,
       images: List<String>.from(map['images'] ?? []),
       status: map['status'] ?? 'open',
       createdAt: parseDate(map['createdAt']),
-      selectedBidId: map['selectedBidId'],
-      bidCount: (map['bidCount'] as num?)?.toInt() ?? 0,
       clarifications: List<String>.from(map['clarifications'] ?? []),
       detailedScope: map['detailedScope'],
       scopeOfWork: map['scopeOfWork'],
@@ -210,8 +198,6 @@ class JobPost extends HiveObject {
     List<String>? images,
     String? status,
     DateTime? createdAt,
-    String? selectedBidId,
-    int? bidCount,
     List<String>? clarifications,
     String? detailedScope,
     String? scopeOfWork,
@@ -240,8 +226,6 @@ class JobPost extends HiveObject {
       images: images ?? this.images,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
-      selectedBidId: selectedBidId ?? this.selectedBidId,
-      bidCount: bidCount ?? this.bidCount,
       clarifications: clarifications ?? this.clarifications,
       detailedScope: detailedScope ?? this.detailedScope,
       scopeOfWork: scopeOfWork ?? this.scopeOfWork,

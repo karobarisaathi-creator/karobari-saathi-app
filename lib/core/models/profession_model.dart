@@ -88,6 +88,12 @@ class Profession {
   @HiveField(17)
   final Map<String, dynamic>? customMetrics;
 
+  @HiveField(18)
+  final bool isMaster;
+
+  @HiveField(19)
+  final String? parentId;
+
   Profession({
     required this.id,
     required this.name,
@@ -107,6 +113,8 @@ class Profession {
     this.benchmarkCostPerUnit = 0.0,
     this.categoryType = ProfessionCategory.general,
     this.customMetrics,
+    this.isMaster = false,
+    this.parentId,
   });
 
   // Map میں تبدیل
@@ -130,6 +138,8 @@ class Profession {
       'benchmarkCostPerUnit': benchmarkCostPerUnit,
       'categoryType': categoryType.name,
       'customMetrics': customMetrics,
+      'isMaster': isMaster,
+      'parentId': parentId,
     };
   }
 
@@ -173,6 +183,8 @@ class Profession {
       customMetrics: map['customMetrics'] != null
           ? Map<String, dynamic>.from(map['customMetrics'])
           : null,
+      isMaster: map['isMaster'] ?? false,
+      parentId: map['parentId'],
     );
   }
 
@@ -196,6 +208,8 @@ class Profession {
     double? benchmarkCostPerUnit,
     ProfessionCategory? categoryType,
     Map<String, dynamic>? customMetrics,
+    bool? isMaster,
+    String? parentId,
   }) {
     return Profession(
       id: id ?? this.id,
@@ -216,6 +230,8 @@ class Profession {
       benchmarkCostPerUnit: benchmarkCostPerUnit ?? this.benchmarkCostPerUnit,
       categoryType: categoryType ?? this.categoryType,
       customMetrics: customMetrics ?? this.customMetrics,
+      isMaster: isMaster ?? this.isMaster,
+      parentId: parentId ?? this.parentId,
     );
   }
 

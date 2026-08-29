@@ -69,6 +69,7 @@ class _ArtisanCardState extends State<ArtisanCard> {
                         isFavorite: false,
                         customSize: 70,
                         isVerticalCategory: true,
+                        verticalSpacing: 6.0,
                         textColor: Colors.black87,
                         subtitleColor: Colors.grey.shade600,
                         categoryColor: Colors.grey.shade600,
@@ -84,7 +85,6 @@ class _ArtisanCardState extends State<ArtisanCard> {
                         bottom: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const SizedBox(height: 6),
                             // ریٹنگ (Rating)
                             Row(
                               children: [

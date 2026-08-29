@@ -113,7 +113,6 @@ class _AddProfessionTransactionScreenState extends State<AddProfessionTransactio
 
   Future<void> _pickDate() async {
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-    final fontFamily = isUrdu ? 'NooriNastaleeq' : 'NotoSans';
 
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -147,7 +146,6 @@ class _AddProfessionTransactionScreenState extends State<AddProfessionTransactio
     final languageService = Provider.of<LanguageService>(context);
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : 'NotoSans';
-    final isIncome = _transactionType == 'income';
     final isEditing = widget.transactionToEdit != null;
 
     return Scaffold(
@@ -328,34 +326,6 @@ class _AddProfessionTransactionScreenState extends State<AddProfessionTransactio
                 ),
               ),
             ),
-    );
-  }
-
-  Widget _typeButton({
-    required String label,
-    required bool isSelected,
-    required Color color,
-    required VoidCallback onTap,
-    required String fontFamily,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? color : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : AppTheme.textSecondary,
-            fontWeight: FontWeight.bold,
-            fontFamily: fontFamily,
-          ),
-        ),
-      ),
     );
   }
 

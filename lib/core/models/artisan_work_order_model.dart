@@ -1,6 +1,7 @@
 // lib/features/artisans/models/artisan_work_order_model.dart
 import 'package:hive/hive.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'transaction_item_model.dart';
 
 part 'artisan_work_order_model.g.dart';
 
@@ -11,6 +12,9 @@ class ArtisanWorkOrder extends HiveObject {
 
   @HiveField(1)
   final String artisanId;
+
+  @HiveField(26)
+  final String? artisanName;
 
   @HiveField(2)
   final String customerId;
@@ -32,6 +36,9 @@ class ArtisanWorkOrder extends HiveObject {
 
   @HiveField(8)
   final DateTime createdAt;
+
+  @HiveField(29)
+  final DateTime? updatedAt;
 
   @HiveField(9)
   final DateTime? completedAt;
@@ -84,9 +91,22 @@ class ArtisanWorkOrder extends HiveObject {
   @HiveField(25)
   final String? lockedScope;
 
+  @HiveField(27)
+  final String? lastMessageSenderId;
+
+  @HiveField(28)
+  final bool isLastMessageRead;
+
+  @HiveField(30)
+  final List<TransactionItem>? items;
+
+  @HiveField(31)
+  final double laborFee;
+
   ArtisanWorkOrder({
     required this.id,
     required this.artisanId,
+    this.artisanName,
     required this.customerId,
     required this.customerName,
     required this.customerPhone,
@@ -94,6 +114,7 @@ class ArtisanWorkOrder extends HiveObject {
     this.workImages,
     this.status = 'pending',
     required this.createdAt,
+    this.updatedAt,
     this.completedAt,
     this.ratedAt,
     this.rating,
@@ -111,12 +132,17 @@ class ArtisanWorkOrder extends HiveObject {
     this.artisanAcceptedTerms = false,
     this.disputeStatus,
     this.lockedScope,
+    this.lastMessageSenderId,
+    this.isLastMessageRead = true,
+    this.items,
+    this.laborFee = 0.0,
   });
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
       'artisanId': artisanId,
+      'artisanName': artisanName,
       'customerId': customerId,
       'customerName': customerName,
       'customerPhone': customerPhone,
@@ -124,6 +150,7 @@ class ArtisanWorkOrder extends HiveObject {
       'workImages': workImages,
       'status': status,
       'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
       'completedAt': completedAt?.toIso8601String(),
       'ratedAt': ratedAt?.toIso8601String(),
       'rating': rating,
@@ -141,6 +168,10 @@ class ArtisanWorkOrder extends HiveObject {
       'artisanAcceptedTerms': artisanAcceptedTerms,
       'disputeStatus': disputeStatus,
       'lockedScope': lockedScope,
+      'lastMessageSenderId': lastMessageSenderId,
+      'isLastMessageRead': isLastMessageRead,
+      'items': items?.map((x) => x.toMap()).toList(),
+      'laborFee': laborFee,
     };
   }
 
@@ -155,6 +186,7 @@ class ArtisanWorkOrder extends HiveObject {
     return ArtisanWorkOrder(
       id: map['id']?.toString() ?? '',
       artisanId: map['artisanId']?.toString() ?? '',
+      artisanName: map['artisanName']?.toString(),
       customerId: map['customerId']?.toString() ?? '',
       customerName: map['customerName']?.toString() ?? '',
       customerPhone: map['customerPhone']?.toString() ?? '',
@@ -162,6 +194,7 @@ class ArtisanWorkOrder extends HiveObject {
       workImages: map['workImages'] != null ? List<String>.from(map['workImages']) : null,
       status: map['status']?.toString() ?? 'pending',
       createdAt: parseDate(map['createdAt']),
+      updatedAt: map['updatedAt'] != null ? parseDate(map['updatedAt']) : null,
       completedAt: map['completedAt'] != null ? parseDate(map['completedAt']) : null,
       ratedAt: map['ratedAt'] != null ? parseDate(map['ratedAt']) : null,
       rating: (map['rating'] as num?)?.toDouble(),
@@ -179,12 +212,24 @@ class ArtisanWorkOrder extends HiveObject {
       artisanAcceptedTerms: map['artisanAcceptedTerms'] ?? false,
       disputeStatus: map['disputeStatus'],
       lockedScope: map['lockedScope'],
+      lastMessageSenderId: map['lastMessageSenderId']?.toString(),
+      isLastMessageRead: map['isLastMessageRead'] ?? true,
+      items: map['items'] != null
+          ? (map['items'] as List).map((x) {
+              if (x is Map) {
+                return TransactionItem.fromMap(Map<String, dynamic>.from(x));
+              }
+              return TransactionItem(description: '', quantity: 0, rate: 0, total: 0);
+            }).toList()
+          : null,
+      laborFee: (map['laborFee'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
   ArtisanWorkOrder copyWith({
     String? id,
     String? artisanId,
+    String? artisanName,
     String? customerId,
     String? customerName,
     String? customerPhone,
@@ -209,10 +254,15 @@ class ArtisanWorkOrder extends HiveObject {
     bool? artisanAcceptedTerms,
     String? disputeStatus,
     String? lockedScope,
+    String? lastMessageSenderId,
+    bool? isLastMessageRead,
+    List<TransactionItem>? items,
+    double? laborFee,
   }) {
     return ArtisanWorkOrder(
       id: id ?? this.id,
       artisanId: artisanId ?? this.artisanId,
+      artisanName: artisanName ?? this.artisanName,
       customerId: customerId ?? this.customerId,
       customerName: customerName ?? this.customerName,
       customerPhone: customerPhone ?? this.customerPhone,
@@ -220,6 +270,7 @@ class ArtisanWorkOrder extends HiveObject {
       workImages: workImages ?? this.workImages,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       completedAt: completedAt ?? this.completedAt,
       ratedAt: ratedAt ?? this.ratedAt,
       rating: rating ?? this.rating,
@@ -238,6 +289,10 @@ class ArtisanWorkOrder extends HiveObject {
       artisanAcceptedTerms: artisanAcceptedTerms ?? this.artisanAcceptedTerms,
       disputeStatus: disputeStatus ?? this.disputeStatus,
       lockedScope: lockedScope ?? this.lockedScope,
+      lastMessageSenderId: lastMessageSenderId ?? this.lastMessageSenderId,
+      isLastMessageRead: isLastMessageRead ?? this.isLastMessageRead,
+      items: items ?? this.items,
+      laborFee: laborFee ?? this.laborFee,
     );
   }
 }

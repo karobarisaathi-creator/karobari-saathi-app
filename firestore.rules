@@ -68,24 +68,52 @@ service cloud.firestore {
           (request.auth.uid == artisanId || resource.data.customerId == request.auth.uid);
         allow create: if isSignedIn() &&
           (request.resource.data.artisanId == artisanId &&
-           request.resource.data.customerId == request.auth.uid &&
+           (request.auth.uid == request.resource.data.customerId || request.auth.uid == request.resource.data.artisanId) &&
            request.resource.data.artisanId != request.resource.data.customerId);
         allow update: if isAdmin() ||
+          // Status updates by Artisan
           (request.auth.uid == artisanId &&
             request.resource.data.artisanId == resource.data.artisanId &&
             request.resource.data.customerId == resource.data.customerId &&
             ((resource.data.status == 'negotiating' && request.resource.data.status == 'quoted') ||
              (resource.data.status == 'confirmed' && request.resource.data.status == 'in_progress') ||
              (resource.data.status == 'in_progress' && request.resource.data.status == 'completed'))) ||
+          // Rating by Customer
           (request.auth.uid == resource.data.customerId &&
             resource.data.status == 'completed' &&
             request.resource.data.status == 'rated' &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'review', 'isRated', 'ratedAt', 'status'])) ||
+          // Finalizing by Customer
           (request.auth.uid == resource.data.customerId &&
             (resource.data.status == 'negotiating' || resource.data.status == 'quoted') &&
             request.resource.data.status == 'confirmed' &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customerAgreed', 'customerAcceptedTerms', 'agreedAt', 'status']));
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customerAgreed', 'customerAcceptedTerms', 'agreedAt', 'status'])) ||
+          // Message preview & Work Order updates (Strict roles)
+          (isSignedIn() && (request.auth.uid == artisanId || request.auth.uid == resource.data.customerId) &&
+            request.resource.data.status == resource.data.status &&
+            (
+              // Only artisan can change money/items/labor
+              (request.auth.uid == artisanId &&
+               request.resource.data.diff(resource.data).affectedKeys().hasAny(['amount', 'items', 'laborFee'])) ||
+              // Both can change message read status/sender info
+              (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['amount', 'items', 'laborFee']) &&
+               request.resource.data.diff(resource.data).affectedKeys().hasOnly(['workDescription', 'artisanName', 'lastMessageSenderId', 'isLastMessageRead', 'updatedAt']))
+            ));
         allow delete: if isAdmin() || request.auth.uid == artisanId || resource.data.customerId == request.auth.uid;
+
+        match /negotiations/{messageId} {
+          allow read: if isSignedIn() &&
+            (request.auth.uid == artisanId ||
+             request.auth.uid == get(/databases/$(database)/documents/artisans/$(artisanId)/work_orders/$(orderId)).data.customerId);
+          allow create: if isSignedIn() &&
+            request.resource.data.senderId == request.auth.uid &&
+            (request.auth.uid == artisanId ||
+             request.auth.uid == get(/databases/$(database)/documents/artisans/$(artisanId)/work_orders/$(orderId)).data.customerId);
+          allow update: if false;
+          allow delete: if isSignedIn() &&
+            (request.auth.uid == artisanId ||
+             request.auth.uid == get(/databases/$(database)/documents/artisans/$(artisanId)/work_orders/$(orderId)).data.customerId);
+        }
       }
 
       match /reviews/{reviewId} {
@@ -112,7 +140,14 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.customerId == request.auth.uid;
       allow update: if isAdmin() ||
         (isSignedIn() && request.auth.uid == resource.data.customerId &&
-          request.resource.data.customerId == resource.data.customerId);
+          request.resource.data.customerId == resource.data.customerId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'title', 'description', 'location', 'categories',
+            'estimatedBudget', 'deadline', 'images', 'clarifications',
+            'detailedScope', 'scopeOfWork', 'exclusions', 'isComplex',
+            'estimatedDays', 'requiresHeightWork', 'requiresSpecialTools',
+            'latitude', 'longitude', 'timeIn', 'timeOut'
+          ]));
       allow delete: if isSignedIn() && (request.auth.uid == resource.data.customerId || isAdmin());
 
       match /bids/{bidId} {
@@ -133,6 +168,17 @@ service cloud.firestore {
         allow delete: if isAdmin() ||
           (isSignedIn() && request.auth.uid ==
             get(/databases/$(database)/documents/jobs/$(jobId)).data.customerId);
+
+        match /negotiations/{messageId} {
+          allow read: if isSignedIn() &&
+            (request.auth.uid == get(/databases/$(database)/documents/jobs/$(jobId)).data.customerId ||
+             request.auth.uid == get(/databases/$(database)/documents/jobs/$(jobId)/bids/$(bidId)).data.artisanId);
+          allow create: if isSignedIn() &&
+            request.resource.data.senderId == request.auth.uid &&
+            (request.auth.uid == get(/databases/$(database)/documents/jobs/$(jobId)).data.customerId ||
+             request.auth.uid == get(/databases/$(database)/documents/jobs/$(jobId)/bids/$(bidId)).data.artisanId);
+          allow update, delete: if false;
+        }
       }
     }
 

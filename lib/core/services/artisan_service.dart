@@ -9,6 +9,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:account_app/core/services/database/base_service.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/models/artisan_review_model.dart';
+import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/services/logging_service.dart';
 
 class ArtisanService extends BaseService {
@@ -41,6 +42,55 @@ class ArtisanService extends BaseService {
         .collection('artisans')
         .doc(profile.id)
         .set(profile.toMap(), SetOptions(merge: true));
+
+    // خودکار طور پر "پیشے" سیکشن میں ایک ماسٹر پیشہ بنائیں
+    await _ensureArtisanProfession(profile);
+  }
+
+  /// کاریگر کے منتخب کردہ پیشے کے لیے ایک ماسٹر پیشہ بناتا ہے (اگر موجود نہ ہو)
+  Future<void> _ensureArtisanProfession(ArtisanProfile profile) async {
+    final user = auth.currentUser;
+    if (user == null) return;
+
+    final String professionId = "artisan_prof_${profile.profession}";
+    
+    // اگر یہ پہلے سے موجود ہے تو کچھ نہ کریں
+    if (professionsBox?.containsKey(professionId) ?? false) return;
+
+    final professions = ArtisanService.getProfessions();
+    final pData = professions.firstWhere((p) => p['id'] == profile.profession, orElse: () => {});
+    if (pData.isEmpty) return;
+
+    String iconKey = 'tools'; // Default
+    if (profile.profession == 'mason') iconKey = 'hammer';
+    else if (profile.profession == 'agriculture' || profile.profession == 'agri_expert') iconKey = 'agriculture';
+    else if (profile.profession == 'livestock' || profile.profession == 'livestock_expert') iconKey = 'livestock';
+    else if (profile.profession == 'transport' || profile.profession == 'driver' || profile.profession == 'heavy_driver') iconKey = 'transport';
+    else if (profile.profession == 'shop') iconKey = 'shop';
+
+    final masterProfession = Profession(
+      id: professionId,
+      name: pData['name'] ?? profile.profession,
+      categories: ['INC:کام کی اجرت', 'INC:دیگر آمدنی', 'EXP:مٹیریل', 'EXP:لیبر', 'EXP:ٹرانسپورٹ'],
+      isActive: true,
+      isMaster: true,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      description: "ICON:$iconKey|یہ پیشہ کاریگر پروفائل سے خودکار طور پر بنایا گیا ہے۔",
+      season: "عمومی",
+    );
+
+    await professionsBox?.put(masterProfession.id, masterProfession);
+    
+    // Cloud Sync
+    await firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('professions')
+        .doc(masterProfession.id)
+        .set(masterProfession.toMap());
+    
+    notifyListeners();
   }
 
   // ============================================================

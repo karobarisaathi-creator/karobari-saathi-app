@@ -55,9 +55,10 @@ class _BrowseJobsScreenState extends State<BrowseJobsScreen>
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFE8EAF0), // Even darker for better contrast
+      backgroundColor:
+          const Color(0xFFE8EAF0), // Even darker for better contrast
       appBar: CustomAppBar(
-        title: isUrdu ? 'کمیونٹی مرکز' : 'Community Hub',
+        title: isUrdu ? 'کام اور ماہرین' : 'Browse Services',
         showBackButton: false,
         leading: _buildProfessionPickerButton(isUrdu, fontFamily),
         leadingWidth: 120, // Increased to avoid overflow
@@ -74,17 +75,8 @@ class _BrowseJobsScreenState extends State<BrowseJobsScreen>
                 }
               });
             },
-            icon: Icon(_isSearching ? Icons.close : Icons.search, color: Colors.white),
-          ),
-          IconButton(
-            key: const ValueKey('add_job_btn_fixed'),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const PostJobScreen()),
-              );
-            },
-            icon: const Icon(Icons.add_circle_outline, color: Colors.white),
+            icon: Icon(_isSearching ? Icons.close : Icons.search,
+                color: Colors.white),
           ),
           const SizedBox(width: 8),
         ],
@@ -97,7 +89,9 @@ class _BrowseJobsScreenState extends State<BrowseJobsScreen>
                   padding: const EdgeInsets.only(bottom: 8),
                   child: SearchSortBar(
                     controller: _searchController,
-                    hintText: isUrdu ? 'تلاش کریں...' : 'Search...',
+                    hintText: isUrdu
+                        ? 'کام یا مقام تلاش کریں...'
+                        : 'Search jobs or locations...',
                     showVoiceSearch: false,
                     onSearchChanged: (val) {
                       setState(() => _searchQuery = val);
@@ -181,7 +175,8 @@ class _BrowseJobsScreenState extends State<BrowseJobsScreen>
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Icon(Icons.arrow_drop_down, size: 16, color: Colors.white),
+                const Icon(Icons.arrow_drop_down,
+                    size: 16, color: Colors.white),
               ],
             ),
           ),

@@ -14,11 +14,14 @@ import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/artisan_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:account_app/core/services/database/job_service.dart';
-import 'package:account_app/core/models/job_bid_model.dart';
+import 'package:account_app/core/models/artisan_work_order_model.dart';
+import 'package:account_app/core/services/artisan_work_order_service.dart';
+import 'package:account_app/core/services/database/job_negotiation_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:account_app/core/widgets/location_map_widget.dart';
+import 'package:account_app/core/services/notification_service.dart';
+import 'package:account_app/features/dashboard/main_navigation_screen.dart';
 import 'post_job_screen.dart';
-import 'widgets/job_bid_card.dart';
-import 'widgets/work_negotiation_popup.dart';
 
 class JobDetailScreen extends StatefulWidget {
   final JobPost job;
@@ -30,12 +33,9 @@ class JobDetailScreen extends StatefulWidget {
 
 class _JobDetailScreenState extends State<JobDetailScreen> {
   final TextEditingController _commentController = TextEditingController();
-  final TextEditingController _bidAmountController = TextEditingController();
-  final TextEditingController _bidMessageController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
-  bool _isBidPanelOpen = false;
-  bool _isSubmittingBid = false;
-  bool _canBid = false;
+  bool _isStartingNegotiation = false;
+  bool _canContact = false;
 
   @override
   void initState() {
@@ -43,23 +43,21 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     _focusNode.addListener(() {
       if (mounted) setState(() {});
     });
-    _loadBidPermission();
+    _loadContactPermission();
   }
 
-  Future<void> _loadBidPermission() async {
+  Future<void> _loadContactPermission() async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return;
 
     final profile = await ArtisanService().getProfile(userId);
     if (!mounted) return;
-    setState(() => _canBid = profile != null && profile.isActive);
+    setState(() => _canContact = profile != null && profile.isActive);
   }
 
   @override
   void dispose() {
     _commentController.dispose();
-    _bidAmountController.dispose();
-    _bidMessageController.dispose();
     _focusNode.dispose();
     super.dispose();
   }
@@ -125,14 +123,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
                               // 3. Detailed Description
                               const SizedBox(height: 12),
-                              Text(
+                              _buildBulletPoints(
                                 freshJob.detailedScope ?? freshJob.description,
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  height: 1.7,
-                                  color: Colors.black,
-                                  fontFamily: fontFamily,
-                                ),
+                                isUrdu,
+                                fontFamily,
+                                Colors.black,
                               ),
 
                               // 4. Exclusions (If present)
@@ -151,14 +146,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 8),
-                                Text(
+                                _buildBulletPoints(
                                   freshJob.exclusions!,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.red.shade900,
-                                    height: 1.6,
-                                    fontFamily: fontFamily,
-                                  ),
+                                  isUrdu,
+                                  fontFamily,
+                                  Colors.red.shade900,
                                 ),
                               ],
 
@@ -166,30 +158,27 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               const Divider(height: 1),
                               const SizedBox(height: 24),
 
+                              // 🔥 Location Map (Moved above profession tags)
+                              LocationMapWidget(
+                                latitude: freshJob.latitude,
+                                longitude: freshJob.longitude,
+                                address: freshJob.location,
+                                isUrdu: isUrdu,
+                              ),
+                              const SizedBox(height: 24),
+
                               // 5. Category & Location Row (Moved below divider)
                               _buildCategoryAndLocationRow(
                                   isUrdu, fontFamily, freshJob),
                               const SizedBox(height: 24),
 
-                              // 6. Job Terms (Deadline, Timings, Duration, Budget)
+                              // 6. Job Terms (Timings, Duration, Budget)
                               _buildJobTerms(isUrdu, fontFamily, freshJob),
-
-                              const SizedBox(height: 24),
-
-                              // 7. Additional Info Icons (Complex, Height, etc.)
-                              _buildAdditionalInfoRow(
-                                  isUrdu, fontFamily, freshJob),
 
                               const SizedBox(height: 32),
 
                               // 8. Images Gallery
                               _buildImageGallery(context, freshJob),
-
-                              const SizedBox(height: 40),
-
-                              // 9. Bids Section
-                              _buildBidsSection(isUrdu, fontFamily,
-                                  currentUserId, isOwner, freshJob),
 
                               const SizedBox(height: 100),
                             ],
@@ -200,12 +189,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   ),
                 ),
 
-                // Bid Input Panel
-                if (_isBidPanelOpen)
-                  _buildBidInputPanel(isUrdu, fontFamily, freshJob),
-
                 // Bottom Action Bar
-                if (!_isBidPanelOpen && !isOwner && _canBid)
+                if (!isOwner && _canContact)
                   _buildBottomActionBar(context, isUrdu, fontFamily, freshJob),
               ],
             );
@@ -216,12 +201,6 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   Widget _buildJobTerms(bool isUrdu, String fontFamily, JobPost job) {
     return Column(
       children: [
-        _buildTermItem(
-          icon: PhosphorIcons.calendar(),
-          label: isUrdu ? 'آخری تاریخ' : 'Deadline',
-          value: Formatters.formatDate(job.deadline),
-          fontFamily: fontFamily,
-        ),
         if (job.timeIn != null && job.timeIn!.isNotEmpty)
           _buildTermItem(
             icon: PhosphorIcons.clock(),
@@ -229,14 +208,30 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             value: '${job.timeIn} - ${job.timeOut}',
             fontFamily: fontFamily,
           ),
-        if (job.estimatedBudget != null)
-          _buildTermItem(
-            icon: PhosphorIcons.money(),
-            label: isUrdu ? 'بجٹ / تنخواہ' : 'Budget / Salary',
-            value: 'Rs. ${job.estimatedBudget!.toStringAsFixed(0)}',
-            fontFamily: fontFamily,
-            valueColor: Colors.green.shade700,
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (job.estimatedBudget != null)
+              Expanded(
+                child: _buildTermItem(
+                  icon: PhosphorIcons.money(),
+                  label: isUrdu ? 'بجٹ / تنخواہ' : 'Budget / Salary',
+                  value: 'Rs. ${job.estimatedBudget!.toStringAsFixed(0)}',
+                  fontFamily: fontFamily,
+                  valueColor: Colors.green.shade700,
+                ),
+              ),
+            if (job.estimatedDays != null)
+              Expanded(
+                child: _buildTermItem(
+                  icon: PhosphorIcons.calendarDots(),
+                  label: isUrdu ? 'متوقع مدت' : 'Estimated Duration',
+                  value: '${job.estimatedDays} ${isUrdu ? 'دن' : 'Days'}',
+                  fontFamily: fontFamily,
+                ),
+              ),
+          ],
+        ),
       ],
     );
   }
@@ -288,242 +283,69 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
-  Widget _buildBidsSection(bool isUrdu, String fontFamily, String currentUserId,
-      bool isOwner, JobPost job) {
-    return StreamBuilder<List<JobBid>>(
-      stream: JobService().getJobBids(job.id),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const SizedBox.shrink();
-        }
+  Future<void> _startNegotiation(bool isUrdu, JobPost job) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-        final allBids = snapshot.data!;
-        final visibleBids = isOwner
-            ? allBids
-            : allBids.where((b) => b.artisanId == currentUserId).toList();
+    final artisanId = user.uid;
+    final customerId = job.customerId;
 
-        if (visibleBids.isEmpty) return const SizedBox.shrink();
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(PhosphorIcons.gavel(),
-                    size: 20, color: AppTheme.themeColor),
-                const SizedBox(width: 8),
-                Text(
-                  isUrdu ? 'موصولہ بولیاں (ریٹس)' : 'Received Bids (Rates)',
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: fontFamily,
-                      color: AppTheme.darkColor),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                      color: AppTheme.themeColor,
-                      borderRadius: BorderRadius.circular(10)),
-                  child: Text(visibleBids.length.toString(),
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: visibleBids.length,
-              itemBuilder: (context, index) {
-                return JobBidCard(
-                  bid: visibleBids[index],
-                  isOwner: isOwner,
-                  isJobOpen: job.status == 'open',
-                  isUrdu: isUrdu,
-                  fontFamily: fontFamily,
-                  onAccept: () => _showBargainingDialog(
-                      visibleBids[index], isUrdu, fontFamily, job),
-                );
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildBidInputPanel(bool isUrdu, String fontFamily, JobPost job) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-          20, 20, 20, MediaQuery.of(context).padding.bottom + 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 20,
-              offset: const Offset(0, -10)),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: () => setState(() => _isBidPanelOpen = false),
-                icon: Icon(PhosphorIcons.caretDown(),
-                    color: Colors.grey[600]),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  isUrdu ? 'اپنی بولی (ریٹ) درج کریں' : 'Enter Your Bid (Rate)',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: fontFamily,
-                      color: AppTheme.darkColor),
-                ),
-              ),
-              AppButton(
-                text: isUrdu ? 'جمع کریں' : 'Submit',
-                size: AppButtonSize.small,
-                isLoading: _isSubmittingBid,
-                onPressed: () => _submitBidLocally(job),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          TextField(
-            controller: _bidAmountController,
-            keyboardType: TextInputType.number,
-            style: const TextStyle(
-                fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
-            textAlign: TextAlign.center,
-            decoration: InputDecoration(
-              hintText: isUrdu
-                  ? 'رقم درج کریں (مثال: 5000)'
-                  : 'Enter Amount (e.g. 5000)',
-              hintStyle: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.normal,
-                  color: Colors.grey[400],
-                  fontFamily: fontFamily),
-              prefixText: 'Rs. ',
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[200]!)),
-              enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[200]!)),
-              focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppTheme.themeColor)),
-              filled: true,
-              fillColor: const Color(0xFFF5F7F9),
-              contentPadding:
-                  const EdgeInsets.symmetric(vertical: 10),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          TextField(
-            controller: _bidMessageController,
-            maxLines: 3,
-            style: TextStyle(fontSize: 15, fontFamily: fontFamily),
-            decoration: InputDecoration(
-              hintText: isUrdu
-                  ? 'اپنا پیغام یا مختصر تفصیل لکھیں...'
-                  : 'Enter your message or short details...',
-              hintStyle: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[400],
-                  fontFamily: fontFamily),
-              filled: true,
-              fillColor: const Color(0xFFF5F7F9),
-              contentPadding: const EdgeInsets.all(16),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none),
-              enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none),
-              focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppTheme.themeColor)),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _submitBidLocally(JobPost job) async {
-    final amountText = _bidAmountController.text.trim();
-    final messageText = _bidMessageController.text.trim();
-
-    if (amountText.isEmpty && messageText.isEmpty) return;
-
-    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-    setState(() => _isSubmittingBid = true);
+    setState(() => _isStartingNegotiation = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser!;
-      final artisan = await ArtisanService().getProfile(user.uid);
+      final orderId = 'job_neg_${job.id}';
+      final existingOrder = await FirebaseFirestore.instance
+          .collection('artisans')
+          .doc(artisanId)
+          .collection('work_orders')
+          .doc(orderId)
+          .get();
+      ArtisanWorkOrder order;
+      if (existingOrder.exists && existingOrder.data() != null) {
+        order = ArtisanWorkOrder.fromMap(existingOrder.data()!);
+      } else {
+        order = ArtisanWorkOrder(
+          id: orderId,
+          artisanId: artisanId,
+          artisanName: user.displayName ?? (isUrdu ? 'کاریگر' : 'Artisan'),
+          customerId: customerId,
+          customerName: job.customerName,
+          customerPhone: '',
+          workDescription: job.title.isEmpty ? job.description : job.title,
+          status: 'negotiating',
+          amount: job.estimatedBudget,
+          createdAt: DateTime.now(),
+          artisanAgreed: true,
+        );
 
-      final bid = JobBid(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        jobId: job.id,
-        artisanId: user.uid,
-        artisanName: user.displayName ?? 'Artisan',
-        artisanPhone: user.phoneNumber ?? '',
-        artisanPhotoUrl: user.photoURL,
-        amount:
-            double.tryParse(amountText) ?? 0.0,
-        message: messageText,
-        estimatedDays: job.estimatedDays ?? 1,
-        createdAt: DateTime.now(),
-        artisanRating: artisan?.rating ?? 0.0,
-        artisanExperience: artisan?.experience ?? 0,
-        proposedScope: job.detailedScope,
-      );
+        await ArtisanWorkOrderService().addWorkOrder(order);
 
-      await JobService().placeBid(bid);
+        // Send initial message
+        final negService = JobNegotiationService();
+        await negService.sendNegotiationMessage(
+          jobId: order.id,
+          artisanId: artisanId,
+          message: isUrdu
+              ? 'السلام علیکم! میں آپ کے کام "${job.title}" میں دلچسپی رکھتا ہوں۔ کیا ہم اس بارے میں بات کر سکتے ہیں؟'
+              : 'Salam! I am interested in your job "${job.title}". Can we discuss this?',
+          isDirect: true,
+        );
+      }
 
       if (mounted) {
-        setState(() {
-          _isSubmittingBid = false;
-          _isBidPanelOpen = false;
-          _bidAmountController.clear();
-          _bidMessageController.clear();
-        });
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(isUrdu
-                ? (amountText.isNotEmpty
-                    ? 'آپ کی بولی جمع کر دی گئی ہے'
-                    : 'آپ کا کمنٹ جمع کر دیا گیا ہے')
-                : (amountText.isNotEmpty
-                    ? 'Your bid has been submitted'
-                    : 'Your comment has been submitted'))));
+        // 1. Set the target tab and expansion
+        final notificationService = Provider.of<NotificationService>(context, listen: false);
+        notificationService.setNotificationsTabIndex(1);
+        notificationService.setTargetExpandOrderId(order.id);
+        
+        // 2. Change tab and THEN pop
+        MainNavigationScreen.switchTab(4);
+        Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) setState(() => _isSubmittingBid = false);
-      debugPrint("Error submitting bid: $e");
+      debugPrint("Error starting negotiation: $e");
+    } finally {
+      if (mounted) setState(() => _isStartingNegotiation = false);
     }
   }
 
@@ -695,13 +517,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             flex: 2,
             child: AppButton(
               text: isOpen
-                  ? (isUrdu ? 'ریٹ دیں' : 'Give Rate')
+                  ? (isUrdu ? 'رابطہ کریں' : 'Contact Owner')
                   : (isUrdu ? 'کام جاری ہے' : 'In Progress'),
-              color: isOpen ? AppTheme.darkColor : Colors.grey,
+              color: isOpen ? AppTheme.themeColor : Colors.grey,
               size: AppButtonSize.large,
+              isLoading: _isStartingNegotiation,
               isFullWidth: true,
-              onPressed:
-                  isOpen ? () => setState(() => _isBidPanelOpen = true) : null,
+              onPressed: isOpen ? () => _startNegotiation(isUrdu, job) : null,
             ),
           ),
         ],
@@ -709,17 +531,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
-  void _showBargainingDialog(
-      JobBid bid, bool isUrdu, String fontFamily, JobPost job) {
-    showDialog(
-      context: context,
-      builder: (context) => WorkNegotiationPopup(job: job, bid: bid),
-    );
-  }
-
   Widget _buildImageGallery(BuildContext context, JobPost job) {
     if (job.images.isEmpty) return const SizedBox.shrink();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -801,6 +615,51 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
+  Widget _buildBulletPoints(
+      String text, bool isUrdu, String fontFamily, Color color) {
+    final List<String> lines =
+        text.split('\n').where((l) => l.trim().isNotEmpty).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: lines.map((line) {
+        // نکتہ ہٹائیں اگر پہلے سے موجود ہے تاکہ ہم اپنی مرضی کی سپیس دے سکیں
+        final cleanLine = line.replaceAll(RegExp(r'^•\s*'), '').trim();
+        if (cleanLine.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (lines.length > 1) ...[
+                Text(
+                  "•",
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: color == Colors.black ? AppTheme.themeColor : color,
+                  ),
+                ),
+                const SizedBox(width: 14), // نکتہ اور تحریر کے درمیان سپیس
+              ],
+              Expanded(
+                child: Text(
+                  cleanLine,
+                  style: TextStyle(
+                    fontSize: 17,
+                    height: 1.5,
+                    color: color,
+                    fontFamily: fontFamily,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildCustomerHeader(bool isUrdu, String fontFamily, JobPost job) {
     return StreamBuilder<bool>(
       stream: ArtisanService().isFavorite(job.customerId),
@@ -862,94 +721,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             ),
           );
         }),
-
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.red.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(PhosphorIcons.mapPin(PhosphorIconsStyle.fill),
-                  size: 16, color: Colors.red[400]),
-              const SizedBox(width: 8),
-              Text(
-                job.location,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red[700],
-                  fontFamily: fontFamily,
-                ),
-              ),
-            ],
-          ),
-        ),
       ],
-    );
-  }
-
-  Widget _buildAdditionalInfoRow(bool isUrdu, String fontFamily, JobPost job) {
-    final List<Map<String, dynamic>> items = [];
-
-    if (job.isComplex == true) {
-      items.add({
-        'icon': PhosphorIcons.wrench(),
-        'label': isUrdu ? 'مشکل کام' : 'Complex Job',
-      });
-    }
-
-    if (job.requiresHeightWork == true) {
-      items.add({
-        'icon': PhosphorIcons.stairs(),
-        'label': isUrdu ? 'اونچائی پر کام' : 'Height Work',
-      });
-    }
-
-    if (job.requiresSpecialTools == true) {
-      items.add({
-        'icon': PhosphorIcons.toolbox(),
-        'label': isUrdu ? 'خصوصی آلات' : 'Special Tools',
-      });
-    }
-
-    if (items.isEmpty) return const SizedBox.shrink();
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: items.map((item) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-                color: AppTheme.themeColor.withValues(alpha: 0.8),
-                width: 1.2),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(item['icon'],
-                  size: 14, color: AppTheme.darkColor),
-              const SizedBox(width: 6),
-              Text(
-                item['label'],
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.darkColor,
-                  fontFamily: fontFamily,
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
     );
   }
 }

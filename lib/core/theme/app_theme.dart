@@ -11,6 +11,7 @@ class AppTheme {
   static const Color expenseColor = Color(0xFFC83120); // گہرا سرخ رنگ (Cinnabar Red)
   static const Color verifiedGold = Color(0xFFDAA520); // Richer Darker Gold
   static const Color scaffoldBackground = Color(0xFFFFFFFF);
+  static const Color backgroundColor = Color(0xFFE8EAF0); // ہلکا سرمئی بیک گراؤنڈ
 
   // Dark Mode Colors
   static const Color darkScaffoldBackground = Color(0xFF121212);

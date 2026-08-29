@@ -11,6 +11,7 @@ import 'package:account_app/core/services/auth_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/security_service.dart';
 import 'package:account_app/core/services/verification_service.dart';
+import 'package:account_app/core/services/artisan_service.dart';
 import 'package:account_app/core/services/auto_sync_service.dart';
 import 'package:account_app/core/services/backup_service.dart';
 import 'package:account_app/core/services/pdf_service.dart';
@@ -18,11 +19,12 @@ import 'package:account_app/core/services/excel_service.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/features/settings/master_profile_screen.dart';
+import 'package:account_app/features/artisans/artisan_detail_screen.dart';
 import 'package:account_app/features/artisans/customer_orders_screen.dart';
+import 'package:account_app/features/artisans/post_job_screen.dart';
 import 'package:account_app/features/artisans/favorite_artisans_screen.dart';
 import 'package:account_app/features/settings/verification_request_screen.dart';
 import 'package:account_app/features/settings/app_lock_screen.dart';
-import 'package:account_app/features/settings/admin_verification_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AppDrawer extends StatefulWidget {
@@ -37,7 +39,6 @@ class _AppDrawerState extends State<AppDrawer> {
   bool _isAppLockEnabled = false;
   bool _isBiometricEnabled = false;
   bool _isBiometricAvailable = false;
-  bool _isAdmin = false;
 
   @override
   void initState() {
@@ -53,31 +54,12 @@ class _AppDrawerState extends State<AppDrawer> {
     final isBioEnabled = await securityService.isBiometricEnabled();
     final isBioAvailable = await securityService.isBiometricsAvailable();
 
-    // Admin Check
-    bool isAdmin = false;
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      if (doc.exists) {
-        isAdmin = VerificationService.canAccessAdminPanel(
-          userData: doc.data(),
-          uid: user.uid,
-          email: user.email,
-          phone: user.phoneNumber,
-        );
-      }
-    }
-
     if (mounted) {
       setState(() {
         _appVersion = packageInfo.version;
         _isAppLockEnabled = isLockEnabled;
         _isBiometricEnabled = isBioEnabled;
         _isBiometricAvailable = isBioAvailable;
-        _isAdmin = isAdmin;
       });
     }
   }
@@ -101,27 +83,7 @@ class _AppDrawerState extends State<AppDrawer> {
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                _buildVerificationStatus(context, isUrdu, fontFamily),
-                _buildSectionHeader(
-                    isUrdu ? 'پروفائل اور ریکارڈ' : 'Profile & Records',
-                    fontFamily,
-                    isUrdu),
-                _buildDrawerItem(
-                  icon: PhosphorIcons.user(),
-                  title: isUrdu ? 'ماسٹر پروفائل' : 'Master Profile',
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (user != null) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const MasterProfileScreen(),
-                        ),
-                      );
-                    }
-                  },
-                  fontFamily: fontFamily,
-                ),
+                _buildPostJobAction(context, isUrdu, fontFamily),
                 _buildDrawerItem(
                   icon: PhosphorIcons.clockCounterClockwise(),
                   title: isUrdu ? 'میری پوسٹ کی گئی جابز' : 'My Posted Jobs',
@@ -221,46 +183,6 @@ class _AppDrawerState extends State<AppDrawer> {
                       ),
                     ),
                 ],
-                if (_isAdmin) ...[
-                  _buildDivider(),
-                  _buildSectionHeader(
-                      isUrdu ? 'انتظامیہ' : 'Admin Panel', fontFamily, isUrdu),
-                  StreamBuilder<List<Map<String, dynamic>>>(
-                      stream: Provider.of<VerificationService>(context,
-                              listen: false)
-                          .getPendingRequests(),
-                      builder: (context, snapshot) {
-                        final int count = snapshot.data?.length ?? 0;
-                        return _buildDrawerItem(
-                          icon: PhosphorIcons.shieldStar(),
-                          title: isUrdu
-                              ? 'ایڈمن کنٹرول پینل'
-                              : 'Admin Control Panel',
-                          onTap: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) =>
-                                        const AdminVerificationScreen()));
-                          },
-                          fontFamily: fontFamily,
-                          trailing: count > 0
-                              ? Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: const BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.circle),
-                                  child: Text('$count',
-                                      style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold)),
-                                )
-                              : null,
-                        );
-                      }),
-                ],
                 _buildDivider(),
                 _buildSectionHeader(isUrdu ? 'ایپ کے بارے میں' : 'About App',
                     fontFamily, isUrdu),
@@ -289,33 +211,13 @@ class _AppDrawerState extends State<AppDrawer> {
                   fontFamily: fontFamily,
                 ),
                 _buildDivider(),
-                const SizedBox(height: 10),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: AppButton(
-                    text: isUrdu ? 'لاگ آؤٹ' : 'Logout',
-                    icon: PhosphorIcons.signOut(),
-                    variant: AppButtonVariant.ghost,
-                    color: Colors.red,
-                    isFullWidth: true,
-                    size: AppButtonSize.small,
-                    onPressed: () =>
-                        _showLogoutDialog(context, isUrdu, fontFamily),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: AppButton(
-                    text: isUrdu ? 'اکاؤنٹ ختم کریں' : 'Deactivate Account',
-                    icon: PhosphorIcons.userMinus(),
-                    variant: AppButtonVariant.ghost,
-                    color: Colors.red.withValues(alpha: 0.7),
-                    isFullWidth: true,
-                    size: AppButtonSize.mini,
-                    onPressed: () =>
-                        _showDeactivateDialog(context, isUrdu, fontFamily),
-                  ),
+                _buildDrawerItem(
+                  icon: PhosphorIcons.gearSix(),
+                  title: isUrdu ? 'اکاؤنٹ سیٹنگز (لاگ آؤٹ وغیرہ)' : 'Account Settings (Logout etc.)',
+                  onTap: () => _showAccountActionsDialog(context, isUrdu, fontFamily),
+                  fontFamily: fontFamily,
+                  iconColor: Colors.red.shade400,
+                  textColor: Colors.red.shade700,
                 ),
                 const SizedBox(height: 30),
               ],
@@ -345,27 +247,61 @@ class _AppDrawerState extends State<AppDrawer> {
       BuildContext context, User? user, bool isUrdu, String fontFamily) {
     return Consumer<VerificationService>(
       builder: (context, vService, _) {
-        return Container(
-          padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 20,
-              bottom: 20,
-              left: 16,
-              right: 16),
-          decoration: BoxDecoration(
-            color: AppTheme.darkColor,
-            borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(20),
-                bottomRight: Radius.circular(20)),
-          ),
-          child: ProfileInfoWidget(
-            name: user?.displayName ?? (isUrdu ? 'صارف' : 'User'),
-            phone: user?.phoneNumber ?? '',
-            profileImage: user?.photoURL,
-            isLarge: true,
-            textColor: Colors.white,
-            subtitleColor: Colors.white70,
-            isVerified: vService.currentStatus == VerificationStatus.approved,
-            customSize: 60,
+        return GestureDetector(
+          onTap: () async {
+            if (user == null) return;
+            
+            // کاریگر چیک کریں
+            final artisanService = ArtisanService();
+            final profile = await artisanService.getProfile(user.uid);
+            
+            if (!context.mounted) return;
+            
+            Navigator.pop(context); // ڈراور بند کریں
+            
+            if (profile != null && profile.isActive) {
+              // اگر کاریگر ہے تو کاریگر ڈیٹیل اسکرین
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ArtisanDetailScreen(
+                    artisanId: user.uid,
+                    initialArtisan: profile,
+                  ),
+                ),
+              );
+            } else {
+              // اگر کاریگر نہیں ہے تو ماسٹر پروفائل
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MasterProfileScreen(),
+                ),
+              );
+            }
+          },
+          child: Container(
+            padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 20,
+                bottom: 20,
+                left: 16,
+                right: 16),
+            decoration: BoxDecoration(
+              color: AppTheme.darkColor,
+              borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(20)),
+            ),
+            child: ProfileInfoWidget(
+              name: user?.displayName ?? (isUrdu ? 'صارف' : 'User'),
+              phone: user?.phoneNumber ?? '',
+              profileImage: user?.photoURL,
+              isLarge: true,
+              textColor: Colors.white,
+              subtitleColor: Colors.white70,
+              isVerified: vService.currentStatus == VerificationStatus.approved,
+              customSize: 60,
+            ),
           ),
         );
       },
@@ -418,6 +354,113 @@ class _AppDrawerState extends State<AppDrawer> {
   Widget _buildDivider() {
     return const Divider(
         height: 1, indent: 16, endIndent: 16, color: Color(0xFFEEEEEE));
+  }
+
+  void _showAccountActionsDialog(
+      BuildContext context, bool isUrdu, String fontFamily) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.all(20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isUrdu ? 'اکاؤنٹ مینیجمنٹ' : 'Account Management',
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: fontFamily),
+            ),
+            const SizedBox(height: 24),
+            
+            // 1. تصدیق کروائیں
+            _buildDialogActionBtn(
+              context: context,
+              icon: PhosphorIcons.shieldCheck(),
+              title: isUrdu ? 'تصدیق کروائیں' : 'Verify Account',
+              color: AppTheme.verifiedGold,
+              onTap: () {
+                Navigator.pop(context); // پاپ اپ بند کریں
+                Navigator.pop(context); // ڈراور بند کریں
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const VerificationRequestScreen()));
+              },
+              fontFamily: fontFamily,
+            ),
+            const SizedBox(height: 12),
+
+            // 2. لاگ آؤٹ
+            _buildDialogActionBtn(
+              context: context,
+              icon: PhosphorIcons.signOut(),
+              title: isUrdu ? 'لاگ آؤٹ' : 'Logout',
+              color: Colors.blue,
+              onTap: () {
+                Navigator.pop(context);
+                _showLogoutDialog(context, isUrdu, fontFamily);
+              },
+              fontFamily: fontFamily,
+            ),
+            const SizedBox(height: 12),
+
+            // 3. اکاؤنٹ ختم کریں
+            _buildDialogActionBtn(
+              context: context,
+              icon: PhosphorIcons.userMinus(),
+              title: isUrdu ? 'اکاؤنٹ ختم کریں' : 'Deactivate Account',
+              color: Colors.red,
+              onTap: () {
+                Navigator.pop(context);
+                _showDeactivateDialog(context, isUrdu, fontFamily);
+              },
+              fontFamily: fontFamily,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDialogActionBtn({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required Color color,
+    required VoidCallback onTap,
+    required String fontFamily,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: fontFamily,
+                  fontSize: 14),
+            ),
+            const Spacer(),
+            Icon(Icons.arrow_forward_ios, size: 12, color: color),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildVerificationStatus(
@@ -488,6 +531,46 @@ class _AppDrawerState extends State<AppDrawer> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildPostJobAction(
+      BuildContext context, bool isUrdu, String fontFamily) {
+    Color color = AppTheme.themeColor;
+    return InkWell(
+      onTap: () {
+        Navigator.pop(context);
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const PostJobScreen()),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Icon(PhosphorIcons.plusCircle(), color: color, size: 20),
+            const SizedBox(width: 10),
+            Text(
+              isUrdu ? 'کوئی کام کروانا ہے؟ لکھ کر پوسٹ کریں' : 'Need work done? Write & Post',
+              style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: fontFamily,
+                  fontSize: 11),
+            ),
+            const Spacer(),
+            Icon(Icons.arrow_forward_ios,
+                size: 12, color: color.withOpacity(0.5)),
+          ],
+        ),
+      ),
     );
   }
 
@@ -692,7 +775,7 @@ class _AppDrawerState extends State<AppDrawer> {
                       height: 70,
                       width: 70,
                       decoration: const BoxDecoration(
-                        color: Colors.white,
+                        color: AppTheme.darkColor,
                         shape: BoxShape.circle,
                       ),
                       padding: const EdgeInsets.all(8),

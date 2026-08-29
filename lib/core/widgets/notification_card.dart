@@ -8,6 +8,9 @@ import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/models/artisan_work_order_model.dart';
+import 'package:account_app/features/dashboard/main_navigation_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'profile_info_widget.dart';
 
@@ -40,10 +43,10 @@ class NotificationCard extends StatelessWidget {
     final bool isAccepted = data?['accepted'] == true;
     
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: notification.isRead ? const Color(0xFFF8F9FA) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isSystem ? AppTheme.themeColor.withOpacity(0.2) : AppTheme.darkColor.withOpacity(0.05), 
           width: isSystem ? 1.5 : 1
@@ -58,7 +61,7 @@ class NotificationCard extends StatelessWidget {
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Column(
           children: [
             if (isSystem)
@@ -180,8 +183,8 @@ class NotificationCard extends StatelessWidget {
                     if (data?['type'] == 'artisan_request') ...[
                       if (!isResponded) ...[
                         AppButton(
-                          text: isUrdu ? 'کیا کام ہے؟' : 'What work?',
-                          icon: PhosphorIcons.question(),
+                          text: isUrdu ? 'بات کریں' : 'Reply',
+                          icon: PhosphorIcons.chatCircleText(),
                           variant: AppButtonVariant.outlined,
                           size: AppButtonSize.small,
                           color: AppTheme.themeColor,
@@ -189,8 +192,8 @@ class NotificationCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         AppButton(
-                          text: isUrdu ? 'ناں' : 'No',
-                          icon: PhosphorIcons.x(),
+                          text: isUrdu ? 'منع کریں' : 'Busy',
+                          icon: PhosphorIcons.prohibit(),
                           variant: AppButtonVariant.outlined,
                           size: AppButtonSize.small,
                           color: AppTheme.expenseColor,
@@ -325,7 +328,7 @@ class NotificationCard extends StatelessWidget {
     
     if (data == null || user == null) return;
 
-    await nService.respondToArtisanRequest(
+    final orderId = await nService.respondToArtisanRequest(
       customerUid: data['senderUid'],
       artisanName: user.displayName ?? 'Artisan',
       response: response,
@@ -334,12 +337,20 @@ class NotificationCard extends StatelessWidget {
 
     if (context.mounted) {
       final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isUrdu ? 'جواب بھیج دیا گیا!' : 'Response sent!'),
-          backgroundColor: response != 'rejected' ? Colors.green : Colors.red,
-        ),
-      );
+      
+      if (response != 'rejected' && orderId != null) {
+        // Switch to Notifications -> Negotiations tab and auto-expand this order
+        nService.setNotificationsTabIndex(1);
+        nService.setTargetExpandOrderId(orderId);
+        MainNavigationScreen.switchTab(4);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isUrdu ? 'جواب بھیج دیا گیا!' : 'Response sent!'),
+            backgroundColor: response != 'rejected' ? Colors.green : Colors.red,
+          ),
+        );
+      }
     }
   }
 

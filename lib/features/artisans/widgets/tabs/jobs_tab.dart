@@ -226,7 +226,7 @@ class _JobsTabState extends State<JobsTab> {
                             isUrdu: isUrdu,
                             fontFamily: fontFamily,
                             currentUserId: currentUserId ?? '',
-                            onBidTap: () {
+                            onTap: () {
                               Navigator.push(
                                   context,
                                   MaterialPageRoute(

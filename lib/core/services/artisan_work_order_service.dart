@@ -3,6 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:account_app/core/services/database/base_service.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
+import 'package:account_app/core/models/transaction_model.dart' as model;
+import 'package:account_app/core/services/database/profession_service.dart';
+import 'package:account_app/core/services/database/account_service.dart';
+import 'package:account_app/core/models/artisan_profile_model.dart';
 
 class ArtisanWorkOrderService extends BaseService {
   // ============================================================
@@ -14,15 +18,12 @@ class ArtisanWorkOrderService extends BaseService {
     await workOrdersBox?.put(order.id, order);
     notifyListeners();
 
-    // 2. Background Cloud Sync
-    firestore
+    await firestore
         .collection('artisans')
         .doc(order.artisanId)
         .collection('work_orders')
         .doc(order.id)
-        .set(order.toMap())
-        .catchError(
-            (e) => debugPrint("Offline Sync: WorkOrder addition delayed"));
+        .set(order.toMap());
   }
 
   // ============================================================
@@ -138,7 +139,9 @@ class ArtisanWorkOrderService extends BaseService {
     final validTransition =
         (currentStatus == 'negotiating' && status == 'quoted') ||
             (currentStatus == 'confirmed' && status == 'in_progress') ||
-            (currentStatus == 'in_progress' && status == 'completed');
+            (currentStatus == 'pending' && status == 'in_progress') ||
+            (currentStatus == 'in_progress' && status == 'completed') ||
+            (status == 'completed'); // Allow marking completed from any active state
     if (!orderSnapshot.exists || !validTransition) {
       throw StateError('Invalid work order status transition');
     }
@@ -158,6 +161,9 @@ class ArtisanWorkOrderService extends BaseService {
       firestore.collection('artisans').doc(artisanId).update({
         'workCount': FieldValue.increment(1),
       }).catchError((e) => debugPrint("Error incrementing workCount: $e"));
+
+      // پیشے میں خودکار ٹرانزیکشن شامل کریں
+      await _syncJobToProfession(orderId, artisanId);
     }
 
     await orderRef.update(data);
@@ -168,6 +174,42 @@ class ArtisanWorkOrderService extends BaseService {
       await workOrdersBox?.put(orderId, updatedOrder);
       notifyListeners();
       _sendWorkStatusNotification(updatedOrder);
+    }
+  }
+
+  // ============================================================
+  // 4.1. ریٹنگ اپ ڈیٹ کریں
+  // ============================================================
+
+  Future<void> rateWorkOrder(
+    String artisanId,
+    String orderId,
+    double rating,
+    String review,
+  ) async {
+    final orderRef = firestore
+        .collection('artisans')
+        .doc(artisanId)
+        .collection('work_orders')
+        .doc(orderId);
+
+    await orderRef.update({
+      'rating': rating,
+      'review': review,
+      'isRated': true,
+      'ratedAt': FieldValue.serverTimestamp(),
+    });
+
+    final localOrder = workOrdersBox?.get(orderId);
+    if (localOrder != null) {
+      final updatedOrder = localOrder.copyWith(
+        rating: rating,
+        review: review,
+        isRated: true,
+        ratedAt: DateTime.now(),
+      );
+      await workOrdersBox?.put(orderId, updatedOrder);
+      notifyListeners();
     }
   }
 
@@ -332,6 +374,72 @@ class ArtisanWorkOrderService extends BaseService {
       });
     } catch (e) {
       debugPrint("Error sending work status notification: $e");
+    }
+  }
+
+  /// مکمل شدہ کام کی رقم کو پیشے میں بطور آمدنی شامل کرتا ہے
+  Future<void> _syncJobToProfession(String orderId, String artisanId) async {
+    try {
+      final order = workOrdersBox?.get(orderId);
+      if (order == null || order.amount == null || order.amount! <= 0) return;
+
+      final artisanProfile = artisansBox?.get(artisanId);
+      if (artisanProfile == null) return;
+
+      final String professionId = "artisan_prof_${artisanProfile.profession}";
+      
+      // اگر سیزن اسکرین پر کوئی فعال سیزن ہے تو وہاں بھیجیں، ورنہ ماسٹر پیشے میں
+      String targetId = professionId;
+      final seasons = professionsBox?.values.where((p) => p.parentId == professionId && p.isActive).toList() ?? [];
+      if (seasons.isNotEmpty) {
+        targetId = seasons.first.id;
+      }
+
+      // ایک معتبر اکاؤنٹ تلاش کریں
+      String accountId = "cash_account";
+      final allAccounts = accountsBox?.values.toList() ?? [];
+      if (allAccounts.isNotEmpty) {
+        // پہلے 'cash' والا اکاؤنٹ ڈھونڈیں، ورنہ پہلا والا استعمال کریں
+        final cashAccs = allAccounts.where((a) => a.name.toLowerCase().contains('cash') || a.id == 'cash_account').toList();
+        accountId = cashAccs.isNotEmpty ? cashAccs.first.id : allAccounts.first.id;
+      }
+
+      final transaction = model.Transaction(
+        id: "artisan_job_${order.id}",
+        accountId: accountId, 
+        amount: order.amount!,
+        type: 'income',
+        category: 'کام کی اجرت',
+        date: DateTime.now(),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        description: "کام مکمل: ${order.workDescription}",
+        professionId: targetId,
+      );
+
+      // ٹرانزیکشن کو محفوظ کریں
+      await transactionsBox?.put(transaction.id, transaction);
+      
+      // پیشے کا حساب اپ ڈیٹ کریں
+      final profService = ProfessionService();
+      await profService.recalculateProfessionFinance(targetId);
+      if (targetId != professionId) {
+        await profService.recalculateProfessionFinance(professionId);
+      }
+
+      // اکاؤنٹ کا بیلنس اپ ڈیٹ کریں
+      await AccountService().recalculateAccountBalance(transaction.accountId);
+
+      // Cloud Sync
+      await firestore
+          .collection('users')
+          .doc(artisanId)
+          .collection('transactions')
+          .doc(transaction.id)
+          .set(transaction.toMap());
+          
+    } catch (e) {
+      debugPrint("Error syncing job to profession: $e");
     }
   }
 }

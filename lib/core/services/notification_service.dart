@@ -13,7 +13,7 @@ import 'package:account_app/core/models/job_post_model.dart';
 import 'package:account_app/features/artisans/job_detail_screen.dart';
 import 'package:account_app/core/services/database/job_service.dart';
 import 'package:account_app/core/services/database/job_negotiation_service.dart';
-import 'package:account_app/features/artisans/widgets/work_negotiation_popup.dart';
+import 'package:account_app/features/dashboard/main_navigation_screen.dart';
 import 'database_service.dart';
 import 'auto_sync_service.dart';
 
@@ -29,9 +29,31 @@ class NotificationService with ChangeNotifier {
   StreamSubscription<QuerySnapshot>? _firestoreSubscription;
 
   GlobalKey<NavigatorState>? _navigatorKey;
+  String? _openNegotiationOrderId;
+  String? _targetExpandOrderId;
+  int _notificationsTabIndex = 0;
 
   List<AppNotification> get notifications => _notifications;
-  int get unreadCount => _unreadCount;
+  int get notificationsTabIndex => _notificationsTabIndex;
+  String? get targetExpandOrderId => _targetExpandOrderId;
+
+  void setNotificationsTabIndex(int index) {
+    _notificationsTabIndex = index;
+    notifyListeners();
+  }
+
+  void setTargetExpandOrderId(String? orderId) {
+    _targetExpandOrderId = orderId;
+    notifyListeners();
+  }
+  int get unreadCount => _notifications
+      .where((notification) => !_isHiddenNotification(notification))
+      .where((notification) => !notification.isRead)
+      .length;
+  int get unreadNegotiationCount => _notifications
+      .where((notification) => _isNegotiationNotification(notification))
+      .where((notification) => !notification.isRead)
+      .length;
 
   NotificationService() {
     _initNotifications();
@@ -46,6 +68,10 @@ class NotificationService with ChangeNotifier {
 
   void setNavigatorKey(GlobalKey<NavigatorState> key) {
     _navigatorKey = key;
+  }
+
+  void setOpenNegotiation(String? orderId) {
+    _openNegotiationOrderId = orderId;
   }
 
   Future<void> _initNotifications() async {
@@ -87,30 +113,6 @@ class NotificationService with ChangeNotifier {
       _notifications = newNotifications;
       _updateUnreadCount();
       notifyListeners();
-
-      // Trigger local notification for NEW arrivals while app is foreground
-      for (var change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.added) {
-          try {
-            final data = change.doc.data() as Map<String, dynamic>?;
-            if (data != null) {
-              final notification = AppNotification.fromMap(data);
-              // Only show if it's less than 1 minute old (avoids old data triggering on load)
-              if (DateTime.now().difference(notification.timestamp).inMinutes <
-                  1) {
-                _showLocalNotificationRaw(
-                  title: notification.title,
-                  body: notification.message,
-                  payload: notification.type.name,
-                  dataPayload: notification.data,
-                );
-              }
-            }
-          } catch (e) {
-            debugPrint('Error showing local notification for new arrival: $e');
-          }
-        }
-      }
     }, onError: (e) {
       debugPrint('Firestore Notification Listener Error: $e');
     });
@@ -216,6 +218,16 @@ class NotificationService with ChangeNotifier {
     String? jobId = data?['jobId'];
     String? notificationType = type ?? data?['type'];
 
+    if (notificationType == 'negotiation_message') {
+      final orderId = data?['orderId'];
+      if (orderId != null) {
+        setNotificationsTabIndex(1);
+        setTargetExpandOrderId(orderId.toString());
+        MainNavigationScreen.switchTab(4);
+      }
+      return;
+    }
+
     if (jobId != null || notificationType == 'new_bid') {
       final id = jobId ?? data?['jobId'];
       if (id != null) {
@@ -229,25 +241,12 @@ class NotificationService with ChangeNotifier {
     }
 
     if (notificationType == 'artisan_response') {
-      final artisanUid = data?['artisanUid'];
       final orderId = data?['orderId'];
       final status = data?['status'];
-      if (status == 'negotiating' && orderId != null && artisanUid != null) {
-        // Fetch the work order first
-        final doc = await _firestore
-            .collection('artisans')
-            .doc(artisanUid)
-            .collection('work_orders')
-            .doc(orderId)
-            .get();
-        if (doc.exists) {
-          final order = ArtisanWorkOrder.fromMap(doc.data()!);
-          showDialog(
-            context: _navigatorKey!.currentContext!,
-            builder: (context) =>
-                WorkNegotiationPopup(workOrder: order, isDirect: true),
-          );
-        }
+      if (status == 'negotiating' && orderId != null) {
+        setNotificationsTabIndex(1);
+        setTargetExpandOrderId(orderId.toString());
+        MainNavigationScreen.switchTab(4);
         return;
       }
     }
@@ -343,6 +342,10 @@ class NotificationService with ChangeNotifier {
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
+    if (message.data['type'] == 'negotiation_message' &&
+        message.data['orderId'] == _openNegotiationOrderId) {
+      return;
+    }
     _showLocalNotification(message);
   }
 
@@ -516,14 +519,14 @@ class NotificationService with ChangeNotifier {
     }
   }
 
-  Future<void> respondToArtisanRequest({
+  Future<String?> respondToArtisanRequest({
     required String customerUid,
     required String artisanName,
     required String response, // 'inquiry', 'accepted', 'rejected'
     required String notificationId,
   }) async {
     final currentUser = _auth.currentUser;
-    if (currentUser == null) return;
+    if (currentUser == null) return null;
 
     try {
       final String requestId = "${customerUid}_${currentUser.uid}";
@@ -533,6 +536,8 @@ class NotificationService with ChangeNotifier {
 
       bool isAccepted = response == 'accepted';
       bool isInquiry = response == 'inquiry';
+
+      final orderId = "order_${DateTime.now().millisecondsSinceEpoch}";
 
       await _firestore.collection('artisan_requests').doc(requestId).set({
         'status': response == 'rejected'
@@ -545,12 +550,11 @@ class NotificationService with ChangeNotifier {
         'responded': true,
         'accepted': isAccepted,
         'status':
-            isInquiry ? 'negotiating' : (isAccepted ? 'accepted' : 'rejected')
+            isInquiry ? 'negotiating' : (isAccepted ? 'accepted' : 'rejected'),
+        'orderId': orderId,
       });
 
       if (isAccepted || isInquiry) {
-        // خودکار آرڈر بنائیں (اگر پہلے سے نہیں بنا)
-        final orderId = "order_${DateTime.now().millisecondsSinceEpoch}";
         final order = ArtisanWorkOrder(
           id: orderId,
           artisanId: currentUser.uid,
@@ -571,13 +575,12 @@ class NotificationService with ChangeNotifier {
             .set(order.toMap());
 
         if (isInquiry) {
-          // خودکار پیغام بھیجیں
           final negService = JobNegotiationService();
           await negService.sendNegotiationMessage(
             jobId: orderId,
             artisanId: currentUser.uid,
             message:
-                'السلام علیکم! کیا آپ اس کام کے بارے میں مزید تفصیل بتا سکتے ہیں؟',
+                'السلام علیکم! میں آپ کے کام میں دلچسپی رکھتا ہوں۔ کیا ہم اس بارے میں مزید بات کر سکتے ہیں؟',
             isDirect: true,
           );
         }
@@ -610,9 +613,7 @@ class NotificationService with ChangeNotifier {
               ? 'negotiating'
               : (isAccepted ? 'accepted' : 'rejected'),
           'requestId': requestId,
-          'orderId': isAccepted || isInquiry
-              ? "order_${DateTime.now().millisecondsSinceEpoch}"
-              : null, // This is a bit risky but let's use the one generated above if needed
+          'orderId': orderId,
         },
       );
 
@@ -622,47 +623,11 @@ class NotificationService with ChangeNotifier {
           .collection('notifications')
           .doc(notifId)
           .set(notification.toMap());
+
+      return (isInquiry || isAccepted) ? orderId : null;
     } catch (e) {
       debugPrint('Error responding to artisan request: $e');
-    }
-  }
-
-  Future<void> sendQuoteNotification({
-    required String customerUid,
-    required String artisanName,
-    required double amount,
-    required String workOrderId,
-  }) async {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) return;
-
-    try {
-      final notifId = "quote_${DateTime.now().millisecondsSinceEpoch}";
-      final notification = AppNotification(
-        id: notifId,
-        title: '💰 قیمت دی گئی ہے!',
-        message:
-            '$artisanName نے آپ کے کام کے لیے Rs. $amount کی قیمت بتائی ہے۔',
-        type: NotificationType.general,
-        isRead: false,
-        timestamp: DateTime.now(),
-        data: {
-          'type': 'quote_received',
-          'artisanName': artisanName,
-          'artisanUid': currentUser.uid,
-          'amount': amount,
-          'workOrderId': workOrderId,
-        },
-      );
-
-      await _firestore
-          .collection('users')
-          .doc(customerUid)
-          .collection('notifications')
-          .doc(notifId)
-          .set(notification.toMap());
-    } catch (e) {
-      debugPrint('Error sending quote notification: $e');
+      return null;
     }
   }
 
@@ -797,6 +762,39 @@ class NotificationService with ChangeNotifier {
     }
   }
 
+  void markNegotiationAsRead(String orderId) {
+    final unreadMessages = _notifications.where((notification) {
+      return _isNegotiationNotification(notification) &&
+          notification.data?['orderId']?.toString() == orderId &&
+          !notification.isRead;
+    }).toList();
+
+    for (final notification in unreadMessages) {
+      notification.isRead = true;
+    }
+    if (unreadMessages.isEmpty) return;
+
+    _updateUnreadCount();
+    notifyListeners();
+
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final batch = _firestore.batch();
+    for (final notification in unreadMessages) {
+      batch.update(
+        _firestore
+            .collection('users')
+            .doc(user.uid)
+            .collection('notifications')
+            .doc(notification.id),
+        {'isRead': true},
+      );
+    }
+    batch.commit().catchError(
+        (e) => debugPrint('Error marking negotiation messages read: $e'));
+  }
+
   void markAllAsRead() {
     for (var notification in _notifications) {
       notification.isRead = true;
@@ -833,6 +831,38 @@ class NotificationService with ChangeNotifier {
           .doc(notificationId)
           .delete()
           .catchError((e) => debugPrint("Error deleting notification: $e"));
+    }
+  }
+
+  Future<void> deleteNegotiationNotifications(String orderId) async {
+    final matching = _notifications.where((notification) {
+      return notification.data?['type'] == 'negotiation_message' &&
+          notification.data?['orderId']?.toString() == orderId;
+    }).toList();
+
+    for (final notification in matching) {
+      _notifications.remove(notification);
+    }
+    if (matching.isEmpty) return;
+
+    _updateUnreadCount();
+    notifyListeners();
+
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final batch = _firestore.batch();
+    for (final notification in matching) {
+      batch.delete(_firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('notifications')
+          .doc(notification.id));
+    }
+    try {
+      await batch.commit();
+    } catch (e) {
+      debugPrint('Error deleting negotiation notifications: $e');
     }
   }
 
@@ -891,7 +921,27 @@ class NotificationService with ChangeNotifier {
   }
 
   void _updateUnreadCount() {
-    _unreadCount = _notifications.where((n) => !n.isRead).length;
+    _unreadCount = _notifications
+        .where((notification) => !_isHiddenNotification(notification))
+        .where((notification) => !notification.isRead)
+        .length;
+  }
+
+  bool _isNegotiationNotification(AppNotification notification) {
+    return notification.data?['type'] == 'negotiation_message';
+  }
+
+  bool _isHiddenNotification(AppNotification notification) {
+    const hiddenTypes = {
+      'artisan_request',
+      'artisan_response',
+      'negotiation_message',
+      'quote_received',
+      'bid_status',
+      'new_bid',
+    };
+    return hiddenTypes.contains(notification.data?['type']) ||
+        _isNegotiationNotification(notification);
   }
 
   Future<void> notifyPartyByPhone({

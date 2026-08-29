@@ -3,11 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
-import 'package:account_app/core/services/recommendation_engine.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as transaction_model;
 import 'package:account_app/features/accounts/transaction_receipt_screen.dart';
 import 'add_profession_transaction_screen.dart';
+import 'categories_management_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
@@ -72,7 +72,7 @@ class _ProfessionDetailScreenState extends State<ProfessionDetailScreen> {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
 
     try {
-      final allTransactions = await databaseService.getAllTransactions();
+      final allTransactions = databaseService.getAllTransactions();
       final professionTransactions = allTransactions.where((t) => t.professionId == _profession.id).toList();
       professionTransactions.sort((a, b) => b.date.compareTo(a.date));
 
@@ -163,6 +163,12 @@ class _ProfessionDetailScreenState extends State<ProfessionDetailScreen> {
           appBar: CustomAppBar(
             title: latestProfession.name,
             actions: [
+              if (latestProfession.parentId != null)
+                IconButton(
+                  icon: Icon(PhosphorIcons.calendar()),
+                  onPressed: () => _showSeasonSwitcher(context, databaseService, isUrdu, fontFamily),
+                  tooltip: isUrdu ? 'سیزن تبدیل کریں' : 'Switch Season',
+                ),
               IconButton(
                 icon: Icon(PhosphorIcons.plusCircle()),
                 onPressed: () => _navigateToCategoriesScreen(isUrdu),
@@ -502,6 +508,62 @@ class _ProfessionDetailScreenState extends State<ProfessionDetailScreen> {
     return '${date.day}/${date.month}/${date.year}';
   }
 
+  void _showSeasonSwitcher(BuildContext context, DatabaseService db, bool isUrdu, String fontFamily) {
+    final seasons = db.getSeasons(_profession.parentId!);
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isUrdu ? 'سیزن منتخب کریں' : 'Select Season',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+            ),
+            const SizedBox(height: 15),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: seasons.length,
+                itemBuilder: (context, index) {
+                  final s = seasons[index];
+                  final isCurrent = s.id == _profession.id;
+                  return ListTile(
+                    leading: Icon(
+                      isCurrent ? PhosphorIcons.checkCircle(PhosphorIconsStyle.fill) : PhosphorIcons.calendar(),
+                      color: isCurrent ? AppTheme.themeColor : AppTheme.textSecondary,
+                    ),
+                    title: Text(
+                      s.season,
+                      style: TextStyle(
+                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                        color: isCurrent ? AppTheme.themeColor : AppTheme.darkColor,
+                        fontFamily: fontFamily,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      if (!isCurrent) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => ProfessionDetailScreen(profession: s)),
+                        );
+                      }
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _navigateToCategoriesScreen(bool isUrdu) {
     Navigator.push(
       context,
@@ -541,172 +603,5 @@ class _ProfessionDetailScreenState extends State<ProfessionDetailScreen> {
         ),
       ),
     );
-  }
-}
-
-// Categories Management Screen (Updated Theme)
-class CategoriesManagementScreen extends StatefulWidget {
-  final List<String> incomeCategories;
-  final List<String> expenseCategories;
-  final bool isUrdu;
-  final Function(List<String>, List<String>) onCategoriesUpdated;
-
-  const CategoriesManagementScreen({super.key, required this.incomeCategories, required this.expenseCategories, required this.isUrdu, required this.onCategoriesUpdated});
-
-  @override
-  _CategoriesManagementScreenState createState() => _CategoriesManagementScreenState();
-}
-
-class _CategoriesManagementScreenState extends State<CategoriesManagementScreen> {
-  late List<String> _incomeCategories;
-  late List<String> _expenseCategories;
-  final Color _lightColor = const Color(0xFFE0DFE1);
-  final Color _themeColor = const Color(0xFF387198);
-  final Color _darkColor = const Color(0xFF123248);
-  final Color _goldColor = const Color(0xFFDAAD51);
-
-  @override
-  void initState() {
-    super.initState();
-    _incomeCategories = List.from(widget.incomeCategories);
-    _expenseCategories = List.from(widget.expenseCategories);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final fontFamily = widget.isUrdu ? 'NooriNastaleeq' : '';
-    final fontWeight = widget.isUrdu ? FontWeight.bold : FontWeight.normal;
-
-    return Scaffold(
-      backgroundColor: AppTheme.lightColor,
-      appBar: CustomAppBar(
-        title: widget.isUrdu ? 'زمرے مینج کریں' : 'Manage Categories',
-        actions: [IconButton(icon: Icon(PhosphorIcons.checkCircle()), onPressed: _saveCategories)],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          children: [
-            _buildCategoryCard(isIncome: true, isUrdu: widget.isUrdu, fontFamily: fontFamily),
-            const SizedBox(height: 16),
-            _buildCategoryCard(isIncome: false, isUrdu: widget.isUrdu, fontFamily: fontFamily),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryCard({required bool isIncome, required bool isUrdu, required String fontFamily}) {
-    final categories = isIncome ? _incomeCategories : _expenseCategories;
-    final title = isIncome 
-        ? (isUrdu ? 'آمدنی کے زمرے' : 'Income Categories') 
-        : (isUrdu ? 'خرچ کے زمرے' : 'Expense Categories');
-    final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F7F9),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(title, style: TextStyle(fontSize: 17, fontWeight: fontWeight, color: AppTheme.darkColor, fontFamily: fontFamily)),
-                IconButton(icon: Icon(PhosphorIcons.plusCircle(), color: AppTheme.themeColor), onPressed: () => _showAddCategoryDialog(isIncome, isUrdu)),
-              ],
-            ),
-            const Divider(height: 24, thickness: 0.5),
-            
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: categories.length,
-              separatorBuilder: (context, index) => Divider(color: AppTheme.darkColor.withOpacity(0.05), height: 1),
-              itemBuilder: (context, index) {
-                final cat = categories[index];
-                // Display the category name exactly as it is (No translation)
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    cat, 
-                    style: TextStyle(
-                      color: AppTheme.darkColor, 
-                      fontFamily: fontFamily, 
-                      fontWeight: fontWeight, 
-                      fontSize: 15
-                    )
-                  ),
-                  trailing: IconButton(
-                    icon: Icon(PhosphorIcons.trash(), color: AppTheme.expenseColor, size: 18),
-                    onPressed: () {
-                      setState(() {
-                        if (isIncome) {
-                          _incomeCategories.remove(cat);
-                        } else {
-                          _expenseCategories.remove(cat);
-                        }
-                      });
-                    },
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showAddCategoryDialog(bool isIncome, bool isUrdu) {
-    final TextEditingController controller = TextEditingController();
-    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-    final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(isUrdu ? 'نیا زمرہ شامل کریں' : 'Add New Category', style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight, color: AppTheme.darkColor)),
-        content: TextFormField(
-          controller: controller,
-          autofocus: true,
-          style: TextStyle(color: AppTheme.darkColor, fontFamily: fontFamily, fontWeight: fontWeight),
-          decoration: InputDecoration(
-            labelText: isUrdu ? 'زمرہ کا نام' : 'Category Name',
-            labelStyle: TextStyle(color: AppTheme.textSecondary, fontFamily: fontFamily, fontWeight: fontWeight),
-            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.darkColor.withOpacity(0.1))),
-            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.themeColor)),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text(isUrdu ? 'منسوخ' : 'Cancel', style: TextStyle(color: AppTheme.textSecondary, fontFamily: fontFamily, fontWeight: fontWeight))),
-          ElevatedButton(
-              onPressed: () {
-                if (controller.text.isNotEmpty) {
-                  setState(() {
-                    if (isIncome) {
-                      _incomeCategories.add(controller.text);
-                    } else {
-                      _expenseCategories.add(controller.text);
-                    }
-                  });
-                  Navigator.pop(context);
-                }
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.darkColor, foregroundColor: Colors.white),
-              child: Text(isUrdu ? 'شامل کریں' : 'Add', style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight))),
-        ],
-      ),
-    );
-  }
-
-  void _saveCategories() {
-    widget.onCategoriesUpdated(_incomeCategories, _expenseCategories);
-    Navigator.pop(context);
   }
 }

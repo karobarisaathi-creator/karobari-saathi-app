@@ -21,7 +21,6 @@ import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
 import 'package:account_app/core/models/job_post_model.dart';
-import 'package:account_app/core/models/job_bid_model.dart';
 import 'package:account_app/core/models/dispute_model.dart';
 
 // Services
@@ -101,7 +100,6 @@ void main() async {
     Hive.registerAdapter(ArtisanProfileAdapter());
     Hive.registerAdapter(ArtisanWorkOrderAdapter());
     Hive.registerAdapter(JobPostAdapter());
-    Hive.registerAdapter(JobBidAdapter());
     Hive.registerAdapter(DisputeAdapter());
     Hive.registerAdapter(DisputeMessageAdapter());
 
@@ -124,7 +122,6 @@ void main() async {
     await Hive.openBox<Category>('categories');
     final professionsBox = await Hive.openBox<Profession>('professions');
     await Hive.openBox<JobPost>('jobs');
-    await Hive.openBox<JobBid>('bids');
     await Hive.openBox('settings');
 
     try {
@@ -409,7 +406,7 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
         }
 
         // 4. Main Navigation
-        return MainNavigationScreen();
+        return MainNavigationScreen(key: MainNavigationScreen.navigationKey);
       },
     );
   }

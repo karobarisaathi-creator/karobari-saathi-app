@@ -20,7 +20,6 @@ import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
 import 'package:account_app/core/models/job_post_model.dart';
-import 'package:account_app/core/models/job_bid_model.dart';
 import 'package:account_app/core/models/dispute_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
 
@@ -64,7 +63,6 @@ void main() async {
   Hive.registerAdapter(ArtisanProfileAdapter());
   Hive.registerAdapter(ArtisanWorkOrderAdapter());
   Hive.registerAdapter(JobPostAdapter());
-  Hive.registerAdapter(JobBidAdapter());
   Hive.registerAdapter(DisputeAdapter());
   Hive.registerAdapter(DisputeMessageAdapter());
 
@@ -274,7 +272,7 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
         if (_needsProfileSetup) {
           return const MasterProfileScreen();
         } else {
-          return const MainNavigationScreen();
+          return MainNavigationScreen(key: MainNavigationScreen.navigationKey);
         }
       },
     );
