@@ -41,6 +41,9 @@ class _PostJobScreenState extends State<PostJobScreen> {
   List<dynamic> _images = []; // Can contain File (new) or String (existing URL)
   bool _isLoading = false;
 
+  String _budgetUnit = 'total'; // 'total', 'monthly', 'hourly'
+  String _durationUnit = 'days'; // 'hours', 'days', 'weeks', 'months'
+
   double? _jobLatitude;
   double? _jobLongitude;
 
@@ -77,6 +80,8 @@ class _PostJobScreenState extends State<PostJobScreen> {
     _areaController.text = job.location;
     _budgetController.text = job.estimatedBudget?.toStringAsFixed(0) ?? '';
     _daysController.text = job.estimatedDays?.toString() ?? '';
+    _budgetUnit = job.budgetUnit ?? 'total';
+    _durationUnit = job.durationUnit ?? 'days';
 
     // تفصیلات لوڈ کریں
     final detailsText = job.detailedScope ?? job.description;
@@ -326,6 +331,18 @@ class _PostJobScreenState extends State<PostJobScreen> {
             icon: PhosphorIcons.textT(),
             isUrdu: isUrdu,
             fontFamily: fontFamily,
+            maxLength: 40, // 40 حروف کی حد
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return isUrdu ? 'عنوان لکھنا ضروری ہے' : 'Title is required';
+              }
+              if (value.trim().length > 40) {
+                return isUrdu 
+                  ? 'عنوان 40 حروف سے زیادہ نہیں ہونا چاہیے' 
+                  : 'Title cannot exceed 40 characters';
+              }
+              return null;
+            },
           ),
           const SizedBox(height: 24),
 
@@ -367,33 +384,102 @@ class _PostJobScreenState extends State<PostJobScreen> {
 
           // 4. بجٹ اور مدت (آمنے سامنے)
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: _buildTextField(
-                  controller: _budgetController,
-                  label: isUrdu ? 'بجٹ (اختیاری)' : 'Budget (Optional)',
-                  hint: '5000',
-                  icon: PhosphorIcons.money(),
-                  isUrdu: isUrdu,
-                  fontFamily: fontFamily,
-                  isNumber: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTextField(
+                      controller: _budgetController,
+                      label: isUrdu ? 'بجٹ / رقم' : 'Budget / Price',
+                      hint: '5000',
+                      icon: PhosphorIcons.money(),
+                      isUrdu: isUrdu,
+                      fontFamily: fontFamily,
+                      isNumber: true,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildUnitDropdown(
+                      value: _budgetUnit,
+                      items: [
+                        {'id': 'total', 'en': 'Total', 'ur': 'کل رقم'},
+                        {'id': 'monthly', 'en': 'Monthly', 'ur': 'فی مہینہ'},
+                        {'id': 'hourly', 'en': 'Hourly', 'ur': 'فی گھنٹہ'},
+                        {'id': 'contract', 'en': 'Contract', 'ur': 'ٹھیکہ'},
+                      ],
+                      onChanged: (val) => setState(() => _budgetUnit = val!),
+                      isUrdu: isUrdu,
+                      fontFamily: fontFamily,
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildTextField(
-                  controller: _daysController,
-                  label: isUrdu ? 'مدت (دن)' : 'Days',
-                  hint: '3',
-                  icon: PhosphorIcons.calendarDots(),
-                  isUrdu: isUrdu,
-                  fontFamily: fontFamily,
-                  isNumber: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTextField(
+                      controller: _daysController,
+                      label: isUrdu ? 'مدت (اختیاری)' : 'Duration (Opt)',
+                      hint: '3',
+                      icon: PhosphorIcons.calendarDots(),
+                      isUrdu: isUrdu,
+                      fontFamily: fontFamily,
+                      isNumber: true,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildUnitDropdown(
+                      value: _durationUnit,
+                      items: [
+                        {'id': 'days', 'en': 'Days', 'ur': 'دن'},
+                        {'id': 'hours', 'en': 'Hours', 'ur': 'گھنٹے'},
+                        {'id': 'weeks', 'en': 'Weeks', 'ur': 'ہفتے'},
+                        {'id': 'months', 'en': 'Months', 'ur': 'مہینے'},
+                      ],
+                      onChanged: (val) => setState(() => _durationUnit = val!),
+                      isUrdu: isUrdu,
+                      fontFamily: fontFamily,
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildUnitDropdown({
+    required String value,
+    required List<Map<String, String>> items,
+    required ValueChanged<String?> onChanged,
+    required bool isUrdu,
+    required String fontFamily,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F7F9),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          icon: Icon(PhosphorIcons.caretDown(), size: 16, color: AppTheme.themeColor),
+          style: TextStyle(fontFamily: fontFamily, fontSize: 12, color: AppTheme.darkColor),
+          onChanged: onChanged,
+          items: items.map((item) {
+            return DropdownMenuItem<String>(
+              value: item['id'],
+              child: Text(isUrdu ? item['ur']! : item['en']!),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -476,6 +562,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
     required String fontFamily,
     String? hint,
     int maxLines = 1,
+    int? maxLength,
     bool isNumber = false,
     Widget? suffixIcon,
     ValueChanged<String>? onChanged,
@@ -484,6 +571,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
+      maxLength: maxLength,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       onChanged: onChanged,
       style: TextStyle(
@@ -891,6 +979,8 @@ class _PostJobScreenState extends State<PostJobScreen> {
         scopeOfWork: details,
         exclusions: null,
         estimatedDays: int.tryParse(_daysController.text),
+        budgetUnit: _budgetUnit,
+        durationUnit: _durationUnit,
         latitude: _jobLatitude,
         longitude: _jobLongitude,
       );
@@ -921,13 +1011,19 @@ class _PostJobScreenState extends State<PostJobScreen> {
 
   Widget _buildLocationField(bool isUrdu, String fontFamily) {
     return RawAutocomplete<Map<String, dynamic>>(
+      key: const ValueKey('job_location_autocomplete'),
       optionsBuilder: (TextEditingValue textEditingValue) async {
+        if (!mounted) return const Iterable<Map<String, dynamic>>.empty();
         if (textEditingValue.text.length < 3) {
           return const Iterable<Map<String, dynamic>>.empty();
         }
-        return await LocationService.searchLocations(textEditingValue.text);
+        try {
+          return await LocationService.searchLocations(textEditingValue.text);
+        } catch (e) {
+          return const Iterable<Map<String, dynamic>>.empty();
+        }
       },
-      displayStringForOption: (option) => option['display_name'],
+      displayStringForOption: (option) => option['display_name'] ?? "",
       onSelected: (option) {
         setState(() {
           _areaController.text = option['display_name'];
@@ -937,8 +1033,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
       },
       fieldViewBuilder:
           (context, controller, focusNode, onEditingComplete) {
-        // ہم اپنا کنٹرولر استعمال کریں گے تاکہ بیرونی تبدیلیوں کا اثر پڑے
-        if (controller.text != _areaController.text && _areaController.text.isNotEmpty && controller.text.isEmpty) {
+        if (controller.text.isEmpty && _areaController.text.isNotEmpty) {
            controller.text = _areaController.text;
         }
         

@@ -1,7 +1,8 @@
 // lib/services/recommendation_engine.dart
 import 'package:flutter/material.dart'; // Import Material for Colors and Icons
 import 'package:account_app/core/models/profession_model.dart';
-import 'package:account_app/core/models/transaction_model.dart' as transaction_model;
+import 'package:account_app/core/models/transaction_model.dart'
+    as transaction_model;
 import 'package:account_app/l10n/app_localizations.dart';
 
 // Define BudgetAlert class here or import it if defined elsewhere
@@ -15,11 +16,11 @@ class BudgetAlert {
 class RecommendationEngine {
   // AI سفارشات جنریٹ کریں
   static List<Recommendation> generateRecommendations(
-      BuildContext context,
-      Profession profession,
-      List<transaction_model.Transaction> transactions,
-      List<BudgetAlert> budgetAlerts,
-      ) {
+    BuildContext context,
+    Profession profession,
+    List<transaction_model.Transaction> transactions,
+    List<BudgetAlert> budgetAlerts,
+  ) {
     final recommendations = <Recommendation>[];
     final l10n = AppLocalizations.of(context);
 
@@ -44,15 +45,19 @@ class RecommendationEngine {
     return recommendations.take(5).toList(); // صرف 5 اہم سفارشات
   }
 
-  static void _addCostRecommendations(AppLocalizations l10n, Profession profession, List<Recommendation> recommendations) {
+  static void _addCostRecommendations(AppLocalizations l10n,
+      Profession profession, List<Recommendation> recommendations) {
     if (profession.benchmarkCostPerUnit > 0 && profession.costPerUnit > 0) {
-      final diffPercent = ((profession.costPerUnit - profession.benchmarkCostPerUnit) /
-          profession.benchmarkCostPerUnit * 100);
+      final diffPercent =
+          ((profession.costPerUnit - profession.benchmarkCostPerUnit) /
+              profession.benchmarkCostPerUnit *
+              100);
 
       if (diffPercent > 30) {
         recommendations.add(Recommendation(
           title: l10n.get('recCostHigh'),
-          description: l10n.format('recCostHighDesc', [diffPercent.toStringAsFixed(1)]),
+          description:
+              l10n.format('recCostHighDesc', [diffPercent.toStringAsFixed(1)]),
           category: RecommendationCategory.cost,
           priority: 9,
           actionSteps: [
@@ -64,7 +69,8 @@ class RecommendationEngine {
       } else if (diffPercent > 15) {
         recommendations.add(Recommendation(
           title: l10n.get('recCostMed'),
-          description: l10n.format('recCostMedDesc', [diffPercent.toStringAsFixed(1)]),
+          description:
+              l10n.format('recCostMedDesc', [diffPercent.toStringAsFixed(1)]),
           category: RecommendationCategory.cost,
           priority: 7,
           actionSteps: [
@@ -75,7 +81,8 @@ class RecommendationEngine {
       } else if (diffPercent < -10) {
         recommendations.add(Recommendation(
           title: l10n.get('recCostOk'),
-          description: l10n.format('recCostOkDesc', [diffPercent.abs().toStringAsFixed(1)]),
+          description: l10n
+              .format('recCostOkDesc', [diffPercent.abs().toStringAsFixed(1)]),
           category: RecommendationCategory.cost,
           priority: 3,
           actionSteps: [
@@ -87,14 +94,16 @@ class RecommendationEngine {
     }
   }
 
-  static void _addProductionRecommendations(AppLocalizations l10n, Profession profession, List<Recommendation> recommendations) {
+  static void _addProductionRecommendations(AppLocalizations l10n,
+      Profession profession, List<Recommendation> recommendations) {
     if (profession.targetProduction > 0) {
       final progress = profession.productionProgress;
 
       if (progress < 40) {
         recommendations.add(Recommendation(
           title: l10n.get('recProdLow'),
-          description: l10n.format('recProdLowDesc', [progress.toStringAsFixed(1)]),
+          description:
+              l10n.format('recProdLowDesc', [progress.toStringAsFixed(1)]),
           category: RecommendationCategory.production,
           priority: 8,
           actionSteps: [
@@ -106,7 +115,8 @@ class RecommendationEngine {
       } else if (progress < 70) {
         recommendations.add(Recommendation(
           title: l10n.get('recProdMed'),
-          description: l10n.format('recProdMedDesc', [progress.toStringAsFixed(1)]),
+          description:
+              l10n.format('recProdMedDesc', [progress.toStringAsFixed(1)]),
           category: RecommendationCategory.production,
           priority: 6,
           actionSteps: [
@@ -118,7 +128,8 @@ class RecommendationEngine {
       } else if (progress > 120) {
         recommendations.add(Recommendation(
           title: l10n.get('recProdHigh'),
-          description: l10n.format('recProdHighDesc', [(progress - 100).toStringAsFixed(1)]),
+          description: l10n
+              .format('recProdHighDesc', [(progress - 100).toStringAsFixed(1)]),
           category: RecommendationCategory.production,
           priority: 2,
           actionSteps: [
@@ -131,11 +142,13 @@ class RecommendationEngine {
     }
   }
 
-  static void _addProfitRecommendations(AppLocalizations l10n, Profession profession, List<Recommendation> recommendations) {
+  static void _addProfitRecommendations(AppLocalizations l10n,
+      Profession profession, List<Recommendation> recommendations) {
     if (profession.netProfit < 0) {
       recommendations.add(Recommendation(
         title: l10n.get('recProfitLoss'),
-        description: l10n.format('recProfitLossDesc', [profession.netProfit.abs().toStringAsFixed(0)]),
+        description: l10n.format('recProfitLossDesc',
+            [profession.netProfit.abs().toStringAsFixed(0)]),
         category: RecommendationCategory.profit,
         priority: 10,
         actionSteps: [
@@ -146,12 +159,15 @@ class RecommendationEngine {
         ],
       ));
     } else {
-      final profitMargin = (profession.netProfit / profession.totalIncome.clamp(1, double.infinity)) * 100;
+      final profitMargin = (profession.netProfit /
+              profession.totalIncome.clamp(1, double.infinity)) *
+          100;
 
       if (profitMargin > 40) {
         recommendations.add(Recommendation(
           title: l10n.get('recProfitHigh'),
-          description: l10n.format('recProfitHighDesc', [profitMargin.toStringAsFixed(1)]),
+          description: l10n
+              .format('recProfitHighDesc', [profitMargin.toStringAsFixed(1)]),
           category: RecommendationCategory.profit,
           priority: 1,
           actionSteps: [
@@ -163,7 +179,8 @@ class RecommendationEngine {
       } else if (profitMargin < 10) {
         recommendations.add(Recommendation(
           title: l10n.get('recProfitLow'),
-          description: l10n.format('recProfitLowDesc', [profitMargin.toStringAsFixed(1)]),
+          description: l10n
+              .format('recProfitLowDesc', [profitMargin.toStringAsFixed(1)]),
           category: RecommendationCategory.profit,
           priority: 5,
           actionSteps: [
@@ -176,7 +193,8 @@ class RecommendationEngine {
     }
   }
 
-  static void _addBudgetRecommendations(AppLocalizations l10n, List<BudgetAlert> budgetAlerts, List<Recommendation> recommendations) {
+  static void _addBudgetRecommendations(AppLocalizations l10n,
+      List<BudgetAlert> budgetAlerts, List<Recommendation> recommendations) {
     for (final alert in budgetAlerts) {
       recommendations.add(Recommendation(
         title: l10n.get('recBudgetOver'),
@@ -195,7 +213,8 @@ class RecommendationEngine {
     }
   }
 
-  static void _addPerformanceRecommendations(AppLocalizations l10n, Profession profession, List<Recommendation> recommendations) {
+  static void _addPerformanceRecommendations(AppLocalizations l10n,
+      Profession profession, List<Recommendation> recommendations) {
     final score = profession.performanceScore;
 
     if (score < 40) {
@@ -226,14 +245,16 @@ class RecommendationEngine {
   }
 
   // سفارش کا خلاصہ
-  static String getSummary(BuildContext context, List<Recommendation> recommendations) {
+  static String getSummary(
+      BuildContext context, List<Recommendation> recommendations) {
     final l10n = AppLocalizations.of(context);
     if (recommendations.isEmpty) {
       return l10n.get('recSummaryNone');
     }
 
     final highPriority = recommendations.where((r) => r.priority >= 8).length;
-    final mediumPriority = recommendations.where((r) => r.priority >= 5 && r.priority < 8).length;
+    final mediumPriority =
+        recommendations.where((r) => r.priority >= 5 && r.priority < 8).length;
 
     if (highPriority > 0) {
       return l10n.format('recSummaryHigh', [highPriority]);
@@ -270,20 +291,13 @@ class Recommendation {
   }
 
   IconData get icon {
-    switch (category) {
-      case RecommendationCategory.cost:
-        return Icons.savings;
-      case RecommendationCategory.production:
-        return Icons.agriculture;
-      case RecommendationCategory.profit:
-        return Icons.attach_money;
-      case RecommendationCategory.budget:
-        return Icons.account_balance_wallet;
-      case RecommendationCategory.performance:
-        return Icons.assessment;
-      default:
-        return Icons.lightbulb;
-    }
+    return switch (category) {
+      RecommendationCategory.cost => Icons.savings,
+      RecommendationCategory.production => Icons.agriculture,
+      RecommendationCategory.profit => Icons.attach_money,
+      RecommendationCategory.budget => Icons.account_balance_wallet,
+      RecommendationCategory.performance => Icons.assessment,
+    };
   }
 }
 

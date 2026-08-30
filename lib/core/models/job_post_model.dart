@@ -65,6 +65,12 @@ class JobPost extends HiveObject {
   @HiveField(21)
   final int? estimatedDays;
 
+  @HiveField(28)
+  final String? budgetUnit; // 'total', 'monthly', 'hourly'
+
+  @HiveField(29)
+  final String? durationUnit; // 'hours', 'days', 'weeks', 'months'
+
   @HiveField(22)
   final bool? requiresHeightWork;
 
@@ -104,6 +110,8 @@ class JobPost extends HiveObject {
     this.exclusions,
     this.isComplex,
     this.estimatedDays,
+    this.budgetUnit,
+    this.durationUnit,
     this.requiresHeightWork,
     this.requiresSpecialTools,
     this.latitude,
@@ -134,6 +142,8 @@ class JobPost extends HiveObject {
       'exclusions': exclusions,
       'isComplex': isComplex,
       'estimatedDays': estimatedDays,
+      'budgetUnit': budgetUnit,
+      'durationUnit': durationUnit,
       'requiresHeightWork': requiresHeightWork,
       'requiresSpecialTools': requiresSpecialTools,
       'latitude': latitude,
@@ -174,6 +184,8 @@ class JobPost extends HiveObject {
       exclusions: map['exclusions'],
       isComplex: map['isComplex'],
       estimatedDays: (map['estimatedDays'] as num?)?.toInt(),
+      budgetUnit: map['budgetUnit'],
+      durationUnit: map['durationUnit'],
       requiresHeightWork: map['requiresHeightWork'],
       requiresSpecialTools: map['requiresSpecialTools'],
       latitude: (map['latitude'] as num?)?.toDouble(),
@@ -204,6 +216,8 @@ class JobPost extends HiveObject {
     String? exclusions,
     bool? isComplex,
     int? estimatedDays,
+    String? budgetUnit,
+    String? durationUnit,
     bool? requiresHeightWork,
     bool? requiresSpecialTools,
     double? latitude,
@@ -232,6 +246,8 @@ class JobPost extends HiveObject {
       exclusions: exclusions ?? this.exclusions,
       isComplex: isComplex ?? this.isComplex,
       estimatedDays: estimatedDays ?? this.estimatedDays,
+      budgetUnit: budgetUnit ?? this.budgetUnit,
+      durationUnit: durationUnit ?? this.durationUnit,
       requiresHeightWork: requiresHeightWork ?? this.requiresHeightWork,
       requiresSpecialTools: requiresSpecialTools ?? this.requiresSpecialTools,
       latitude: latitude ?? this.latitude,

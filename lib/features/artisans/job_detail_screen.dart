@@ -199,6 +199,20 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   }
 
   Widget _buildJobTerms(bool isUrdu, String fontFamily, JobPost job) {
+    String budgetLabel = isUrdu ? 'بجٹ / رقم' : 'Budget / Price';
+    if (job.budgetUnit == 'monthly') budgetLabel = isUrdu ? 'ماہانہ تنخواہ' : 'Monthly Salary';
+    if (job.budgetUnit == 'hourly') budgetLabel = isUrdu ? 'فی گھنٹہ اجرت' : 'Hourly Rate';
+    if (job.budgetUnit == 'contract') budgetLabel = isUrdu ? 'ٹھیکہ / ماوضع' : 'Contract Price';
+
+    String durationValue = "";
+    if (job.estimatedDays != null) {
+      String unit = isUrdu ? 'دن' : 'Days';
+      if (job.durationUnit == 'hours') unit = isUrdu ? 'گھنٹے' : 'Hours';
+      if (job.durationUnit == 'weeks') unit = isUrdu ? 'ہفتے' : 'Weeks';
+      if (job.durationUnit == 'months') unit = isUrdu ? 'مہینے' : 'Months';
+      durationValue = '${job.estimatedDays} $unit';
+    }
+
     return Column(
       children: [
         if (job.timeIn != null && job.timeIn!.isNotEmpty)
@@ -215,18 +229,18 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               Expanded(
                 child: _buildTermItem(
                   icon: PhosphorIcons.money(),
-                  label: isUrdu ? 'بجٹ / تنخواہ' : 'Budget / Salary',
+                  label: budgetLabel,
                   value: 'Rs. ${job.estimatedBudget!.toStringAsFixed(0)}',
                   fontFamily: fontFamily,
                   valueColor: Colors.green.shade700,
                 ),
               ),
-            if (job.estimatedDays != null)
+            if (durationValue.isNotEmpty)
               Expanded(
                 child: _buildTermItem(
                   icon: PhosphorIcons.calendarDots(),
                   label: isUrdu ? 'متوقع مدت' : 'Estimated Duration',
-                  value: '${job.estimatedDays} ${isUrdu ? 'دن' : 'Days'}',
+                  value: durationValue,
                   fontFamily: fontFamily,
                 ),
               ),
@@ -311,7 +325,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           customerId: customerId,
           customerName: job.customerName,
           customerPhone: '',
-          workDescription: job.title.isEmpty ? job.description : job.title,
+          title: job.title, // کام کا عنوان یہاں سیو کریں
+          workDescription: job.description, // مکمل تفصیل یہاں
           status: 'negotiating',
           amount: job.estimatedBudget,
           createdAt: DateTime.now(),

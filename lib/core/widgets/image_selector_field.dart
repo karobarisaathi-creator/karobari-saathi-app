@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -276,12 +277,17 @@ class _ImageSelectorFieldState extends State<ImageSelectorField> {
       displayImage = Image.file(widget.selectedFiles.first, fit: BoxFit.cover);
       hasImage = true;
     } else if (widget.remoteUrls.isNotEmpty) {
-      displayImage = CachedNetworkImage(
-        imageUrl: widget.remoteUrls.first,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-        errorWidget: (context, url, error) => Icon(PhosphorIcons.user(), size: size * 0.4, color: Colors.grey[400]),
-      );
+      final url = widget.remoteUrls.first;
+      if (url.startsWith('assets/') && url.endsWith('.svg')) {
+        displayImage = SvgPicture.asset(url, fit: BoxFit.cover);
+      } else {
+        displayImage = CachedNetworkImage(
+          imageUrl: url,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+          errorWidget: (context, url, error) => Icon(PhosphorIcons.user(), size: size * 0.4, color: Colors.grey[400]),
+        );
+      }
       hasImage = true;
     }
 
@@ -323,6 +329,27 @@ class _ImageSelectorFieldState extends State<ImageSelectorField> {
               child: Icon(PhosphorIcons.pencilSimple(), color: Colors.white, size: 14),
             ),
           ),
+          if (hasImage)
+            Positioned(
+              top: 0, right: 0,
+              child: GestureDetector(
+                onTap: () {
+                  if (widget.selectedFiles.isNotEmpty) {
+                    _removeFile(0);
+                  } else {
+                    widget.onRemoteRemoved?.call(0);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.delete_outline, color: Colors.white, size: 14),
+                ),
+              ),
+            ),
         ],
       ),
     );

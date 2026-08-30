@@ -76,6 +76,7 @@ dependencies:
   uuid: ^4.3.3
   speech_to_text: ^7.4.0
   app_links: ^6.3.2
+  flutter_svg: ^2.0.10+1
 
 
 dev_dependencies:
@@ -105,6 +106,7 @@ flutter:
     - assets/images/
     - assets/images/icons/
     - assets/fonts/
+    - assets/avatars/
 
   fonts:
     - family: NooriNastaleeq

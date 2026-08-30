@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -34,6 +35,7 @@ class _NegotiationViewState extends State<NegotiationView> {
   bool _isSending = false;
   bool _hasText = false;
   late Stream<List<NegotiationMessage>> _messagesStream;
+  StreamSubscription? _messageSubscription;
 
   @override
   void initState() {
@@ -41,6 +43,20 @@ class _NegotiationViewState extends State<NegotiationView> {
     _messagesStream = _negotiationService.getNegotiationMessages(
         widget.workOrder.id, widget.workOrder.artisanId,
         isDirect: true);
+    
+    // Move side-effect out of build to improve performance and prevent loops
+    _messageSubscription = _messagesStream.listen((messages) {
+      if (!mounted) return;
+      final hasUnread = messages.any((m) => !m.isRead && m.senderId != _negotiationService.currentUserId);
+      if (hasUnread) {
+        _negotiationService.markConversationAsRead(
+          jobId: widget.workOrder.id,
+          artisanId: widget.workOrder.artisanId,
+          isDirect: true,
+        );
+      }
+    });
+
     _messageController.addListener(_onTextChanged);
   }
 
@@ -60,6 +76,7 @@ class _NegotiationViewState extends State<NegotiationView> {
 
   @override
   void dispose() {
+    _messageSubscription?.cancel();
     _notificationService.setOpenNegotiation(null);
     _messageController.dispose();
     _scrollController.dispose();
@@ -97,7 +114,7 @@ class _NegotiationViewState extends State<NegotiationView> {
 
   void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 300), () {
-      if (_scrollController.hasClients) {
+      if (mounted && _scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 300),
@@ -132,16 +149,6 @@ class _NegotiationViewState extends State<NegotiationView> {
                 final messages = snapshot.data ?? [];
                 if (messages.isEmpty)
                   return _buildInitialGuide(isUrdu, fontFamily);
-
-                // Mark as read if there are unread messages from others
-                final hasUnread = messages.any((m) => !m.isRead && m.senderId != _negotiationService.currentUserId);
-                if (hasUnread) {
-                  _negotiationService.markConversationAsRead(
-                    jobId: widget.workOrder.id,
-                    artisanId: widget.workOrder.artisanId,
-                    isDirect: true,
-                  );
-                }
 
                 // Auto-scroll logic
                 WidgetsBinding.instance
@@ -237,6 +244,7 @@ class _NegotiationViewState extends State<NegotiationView> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: isMe ? AppTheme.themeColor : Colors.white,
+                  border: isMe ? null : Border.all(color: Colors.grey[400]!),
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(20),
                     topRight: const Radius.circular(20),
@@ -325,12 +333,8 @@ class _NegotiationViewState extends State<NegotiationView> {
   }
 
   Widget _buildInput(bool isUrdu, String fontFamily) {
-    return Container(
-      padding: const EdgeInsets.only(top: 8),
-      decoration: BoxDecoration(
-        color: _hasText ? const Color(0xFFF3F4F6) : Colors.transparent,
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
       child: TextField(
         controller: _messageController,
         style: TextStyle(
@@ -338,14 +342,27 @@ class _NegotiationViewState extends State<NegotiationView> {
         maxLines: 4,
         minLines: 1,
         decoration: InputDecoration(
+          filled: true,
+          fillColor: AppTheme.backgroundColor,
           hintText: isUrdu ? 'اپنا پیغام لکھیں...' : 'Write your message...',
           hintStyle: TextStyle(
               color: Colors.grey[500], fontSize: 14, fontFamily: fontFamily),
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          border: InputBorder.none,
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(28),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(28),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(28),
+            borderSide: BorderSide.none,
+          ),
           suffixIcon: Padding(
-            padding: const EdgeInsets.all(6.0),
+            padding: const EdgeInsets.all(4.0),
             child: GestureDetector(
               onTap: _isSending ? null : _sendMessage,
               child: AnimatedContainer(

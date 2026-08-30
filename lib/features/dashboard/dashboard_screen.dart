@@ -124,7 +124,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final dbService = Provider.of<DatabaseService>(context);
     
     return Scaffold(
-      backgroundColor: AppTheme.scaffoldBackground,
+      backgroundColor: AppTheme.backgroundColor,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -182,7 +182,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           double netBalance = totalPayable - totalReceivable;
 
           // --- Professions Logic ---
-          final activeProfessions = professions.where((p) => p.isActive).toList();
+          final activeProfessions = professions.where((p) => p.isActive ?? true).toList();
           double profIncome = 0;
           double profExpense = 0;
           for (var p in activeProfessions) {
@@ -207,7 +207,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               Expanded(
                 child: Container(
-                  color: AppTheme.scaffoldBackground,
+                  color: AppTheme.backgroundColor,
                   child: RefreshIndicator(
                     onRefresh: _refreshData,
                     color: Colors.white,

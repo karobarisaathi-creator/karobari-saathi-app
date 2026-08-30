@@ -19,6 +19,7 @@ class ArtisanWorkOrderAdapter extends TypeAdapter<ArtisanWorkOrder> {
     return ArtisanWorkOrder(
       id: fields[0] as String,
       artisanId: fields[1] as String,
+      artisanName: fields[26] as String?,
       customerId: fields[2] as String,
       customerName: fields[3] as String,
       customerPhone: fields[4] as String,
@@ -26,6 +27,7 @@ class ArtisanWorkOrderAdapter extends TypeAdapter<ArtisanWorkOrder> {
       workImages: (fields[6] as List?)?.cast<String>(),
       status: fields[7] as String,
       createdAt: fields[8] as DateTime,
+      updatedAt: fields[29] as DateTime?,
       completedAt: fields[9] as DateTime?,
       ratedAt: fields[10] as DateTime?,
       rating: fields[11] as double?,
@@ -43,17 +45,26 @@ class ArtisanWorkOrderAdapter extends TypeAdapter<ArtisanWorkOrder> {
       artisanAcceptedTerms: fields[23] as bool,
       disputeStatus: fields[24] as String?,
       lockedScope: fields[25] as String?,
+      lastMessageSenderId: fields[27] as String?,
+      isLastMessageRead: fields[28] as bool,
+      items: (fields[30] as List?)?.cast<TransactionItem>(),
+      laborFee: fields[31] as double,
+      title: fields[32] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ArtisanWorkOrder obj) {
     writer
-      ..writeByte(26)
+      ..writeByte(33)
       ..writeByte(0)
       ..write(obj.id)
+      ..writeByte(32)
+      ..write(obj.title)
       ..writeByte(1)
       ..write(obj.artisanId)
+      ..writeByte(26)
+      ..write(obj.artisanName)
       ..writeByte(2)
       ..write(obj.customerId)
       ..writeByte(3)
@@ -68,6 +79,8 @@ class ArtisanWorkOrderAdapter extends TypeAdapter<ArtisanWorkOrder> {
       ..write(obj.status)
       ..writeByte(8)
       ..write(obj.createdAt)
+      ..writeByte(29)
+      ..write(obj.updatedAt)
       ..writeByte(9)
       ..write(obj.completedAt)
       ..writeByte(10)
@@ -101,7 +114,15 @@ class ArtisanWorkOrderAdapter extends TypeAdapter<ArtisanWorkOrder> {
       ..writeByte(24)
       ..write(obj.disputeStatus)
       ..writeByte(25)
-      ..write(obj.lockedScope);
+      ..write(obj.lockedScope)
+      ..writeByte(27)
+      ..write(obj.lastMessageSenderId)
+      ..writeByte(28)
+      ..write(obj.isLastMessageRead)
+      ..writeByte(30)
+      ..write(obj.items)
+      ..writeByte(31)
+      ..write(obj.laborFee);
   }
 
   @override

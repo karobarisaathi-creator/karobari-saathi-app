@@ -5,7 +5,6 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/models/profession_model.dart';
-import 'package:account_app/features/professions/profession_detail_screen.dart';
 import 'package:account_app/features/professions/profession_dialog.dart';
 import 'package:account_app/features/professions/profession_seasons_screen.dart';
 import 'package:account_app/features/accounts/reports_screen.dart';
@@ -61,15 +60,11 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
         showBackButton: false,
         actions: [
           IconButton(
-            icon: Icon(PhosphorIcons.chartBar()),
-            tooltip: isUrdu ? 'رپورٹس' : 'Reports',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ReportsScreen()),
-              );
-            },
+            onPressed: () => _showAddProfessionDialog(context, isUrdu),
+            icon: Icon(PhosphorIcons.plus(), color: Colors.white, size: 28),
+            tooltip: isUrdu ? 'نیا پیشہ' : 'New Profession',
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Consumer<DatabaseService>(
@@ -79,7 +74,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
           if (professions.isEmpty) {
             // Check for legacy/un-migrated professions
             final allProfessions = databaseService.getProfessions();
-            if (allProfessions.isNotEmpty && allProfessions.every((p) => !p.isMaster && p.parentId == null)) {
+            if (allProfessions.isNotEmpty && allProfessions.every((p) => !(p.isMaster ?? false) && p.parentId == null)) {
                // Show all if none are marked as master yet (Migration helper)
                return _buildProfessionGrid(allProfessions, isUrdu, fontFamily, fontWeight);
             }
@@ -120,16 +115,6 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
             child: _buildProfessionGrid(professions, isUrdu, fontFamily, fontWeight),
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'professions_fab',
-        onPressed: () {
-          _showAddProfessionDialog(context, isUrdu);
-        },
-        backgroundColor: AppTheme.darkColor,
-        shape: const CircleBorder(),
-        tooltip: isUrdu ? 'نیا پیشہ' : 'New Profession',
-        child: Icon(PhosphorIcons.plus(), color: Colors.white, size: 30),
       ),
     );
   }
@@ -277,17 +262,17 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
               ),
               ElevatedButton(
                 onPressed: () {
-                  if (profession.isMaster || profession.parentId == null) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => ProfessionSeasonsScreen(masterProfession: profession)),
-                    );
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => ProfessionDetailScreen(profession: profession)),
-                    );
-                  }
+                  // اب تمام پیشے براہ راست سیزن سکرین پر کھلیں گے تاکہ ایک ہی طرز کا لیجر استعمال ہو
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ProfessionSeasonsScreen(
+                        masterProfession: profession.parentId == null 
+                          ? profession 
+                          : Provider.of<DatabaseService>(context, listen: false).getProfession(profession.parentId!) ?? profession
+                      ),
+                    ),
+                  );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.darkColor,
@@ -328,7 +313,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
 
   void _toggleProfessionStatus(Profession profession, bool isUrdu) {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
-    final updatedProfession = profession.copyWith(isActive: !profession.isActive, updatedAt: DateTime.now());
+    final updatedProfession = profession.copyWith(isActive: !(profession.isActive ?? true), updatedAt: DateTime.now());
     databaseService.updateProfession(updatedProfession);
     _loadProfessions();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(

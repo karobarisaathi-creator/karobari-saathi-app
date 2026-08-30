@@ -37,6 +37,7 @@ class AddTransactionScreen extends StatefulWidget {
 }
 
 class _ItemEntry {
+  final String id = DateTime.now().microsecondsSinceEpoch.toString(); // منفرد آئی ڈی
   final TextEditingController descriptionController = TextEditingController();
   final TextEditingController quantityController = TextEditingController(text: '');
   final TextEditingController subQuantityController = TextEditingController(text: ''); // For KG or Pieces
@@ -234,7 +235,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
     _accounts = await databaseService.getAccounts();
     final allProfessions = await databaseService.getProfessions();
-    _professions = allProfessions.where((p) => p.isActive).toList();
+    _professions = allProfessions.where((p) => p.isActive ?? true).toList();
 
     // Collect unique item names from past transactions
     Set<String> names = {};
@@ -408,6 +409,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               Expanded(
                 flex: 5,
                 child: RawAutocomplete<String>(
+                  key: ValueKey('item_autocomplete_${entry.id}'),
                   focusNode: entry.descriptionFocusNode,
                   textEditingController: entry.descriptionController,
                   optionsBuilder: (TextEditingValue textEditingValue) {

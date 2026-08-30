@@ -95,69 +95,59 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
           items = o.items ?? [];
           laborFee = o.laborFee;
           total = o.amount ?? 0.0;
+          
+          return _buildCardContent(context, o, items, laborFee, total);
         }
 
-        return GestureDetector(
-          onTap: () {
-            setState(() {
-              _isExpanded = !_isExpanded;
-            });
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            margin: const EdgeInsets.only(bottom: 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: _isExpanded ? AppTheme.themeColor.withOpacity(0.3) : Colors.transparent,
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                )
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 1. Header: Profile and Chat (ہمیشہ نظر آئے گا)
-                _buildHeader(context),
-
-                // اگر کارڈ کھلا ہوا ہے تو باقی تفصیلات دکھائیں
-                if (_isExpanded) ...[
-                  // 2. Items List
-                  if (items.isNotEmpty)
-                    _buildItemsList(items, laborFee)
-                  else
-                    _buildEmptyState(),
-
-                  // 3. Labor Fee Row
-                  _buildLaborRow(items, laborFee),
-
-                  // 4. Quick Input (Only Artisan)
-                  _buildInputBar(items, laborFee),
-
-                  // 5. Action Buttons (Complete & Review)
-                  if (snapshot.hasData && snapshot.data!.exists)
-                    _buildActions(context, ArtisanWorkOrder.fromMap(snapshot.data!.data() as Map<String, dynamic>)),
-
-                  // 6. Total Strip
-                  _buildTotalStrip(total),
-                ] else ...[
-                  // اگر کارڈ بند ہے تو صرف ایک چھوٹا سا ٹوٹل دکھا دیتے ہیں تاکہ اندازہ ہو
-                  _buildCollapsedFooter(total),
-                ],
-              ],
-            ),
-          ),
-        );
+        return _buildCardContent(context, widget.order, items, laborFee, total);
       },
     );
   }
+
+  Widget _buildCardContent(BuildContext context, ArtisanWorkOrder currentOrder, List<TransactionItem> items, double laborFee, double total) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _isExpanded = !_isExpanded;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            )
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(context, currentOrder),
+
+            if (_isExpanded) ...[
+              if (items.isNotEmpty)
+                _buildItemsList(items, laborFee)
+              else
+                _buildEmptyState(),
+
+              _buildInputBar(items, laborFee),
+              _buildActions(context, currentOrder),
+              _buildTotalStrip(total),
+            ] else ...[
+              _buildCollapsedFooter(total),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildCollapsedFooter(double total) {
     return Padding(
@@ -186,36 +176,88 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, ArtisanWorkOrder order) {
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
           Expanded(
             child: widget.isArtisanMode
-                ? ProfileInfoWidget(name: widget.order.customerName, phone: '', customSize: 32)
+                ? ProfileInfoWidget(
+                    name: order.customerName,
+                    phone: '',
+                    customSize: 42,
+                    borderRadius: 6,
+                    address: order.title ?? order.workDescription,
+                    isAddressBold: true,
+                    addressColor: AppTheme.themeColor,
+                  )
                 : FutureBuilder<ArtisanProfile?>(
-                    future: ArtisanService().getProfile(widget.order.artisanId),
+                    future: ArtisanService().getProfile(order.artisanId),
                     builder: (context, snapshot) {
                       final profile = snapshot.data;
-                      final String displayName = (widget.order.artisanName != null && widget.order.artisanName!.isNotEmpty)
-                          ? widget.order.artisanName!
-                          : (profile?.name ?? (widget.isUrdu ? 'کاریگر' : 'Artisan'));
-                      
+                      final String displayName = (order.artisanName != null &&
+                              order.artisanName!.isNotEmpty)
+                          ? order.artisanName!
+                          : (profile?.name ??
+                              (widget.isUrdu ? 'کاریگر' : 'Artisan'));
+
                       return ProfileInfoWidget(
                         name: displayName,
                         phone: '',
-                        category: widget.isUrdu ? profile?.professionUrdu : profile?.profession,
+                        profileImage: profile?.profileImage,
+                        category: widget.isUrdu
+                            ? profile?.professionUrdu
+                            : profile?.profession,
                         isVerticalCategory: true,
-                        customSize: 32,
+                        customSize: 42,
+                        borderRadius: 6,
+                        address: order.title ?? order.workDescription,
+                        isAddressBold: true,
+                        addressColor: AppTheme.themeColor,
                       );
                     },
                   ),
           ),
           if (_isSyncing) const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+          
+          if (widget.isArtisanMode && order.status != 'completed' && order.status != 'rated')
+            GestureDetector(
+              onTap: () => _handleComplete(order),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(color: Colors.green.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.check, size: 12, color: Colors.white),
+                    const SizedBox(width: 4),
+                    Text(
+                      widget.isUrdu ? 'مکمل' : 'Done',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: widget.fontFamily,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           IconButton(
             onPressed: widget.onChatTap,
             icon: Icon(PhosphorIcons.chatCircleText(PhosphorIconsStyle.fill), color: AppTheme.themeColor),
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.all(8),
           ),
         ],
       ),
@@ -225,30 +267,88 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
   Widget _buildItemsList(List<TransactionItem> items, double labor) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        children: items.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final item = entry.value;
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.grey[50], 
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: items.length,
+        separatorBuilder: (context, index) => Divider(height: 1, color: Colors.grey[200], indent: 12, endIndent: 12),
+        itemBuilder: (context, idx) {
+          final item = items[idx];
+          final content = Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
             child: Row(
               children: [
-                Expanded(child: Text(item.description, style: const TextStyle(fontSize: 13))),
-                Text(Formatters.formatCurrency(item.total), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                if (widget.isArtisanMode)
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 18),
-                    onPressed: () {
-                      final newList = List<TransactionItem>.from(items)..removeAt(idx);
-                      _updateOnCloud(newList, labor);
-                    },
-                  ),
+                Expanded(
+                  child: Text(
+                    item.description, 
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, fontFamily: widget.fontFamily)
+                  )
+                ),
+                Text(
+                  Formatters.formatCurrency(item.total), 
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.darkColor)
+                ),
               ],
             ),
           );
-        }).toList(),
+
+          if (!widget.isArtisanMode) return content;
+
+          // کاریگر کے لیے سویپ ٹو ڈیلیٹ
+          return Dismissible(
+            key: Key('item_${idx}_${item.description}'),
+            direction: DismissDirection.endToStart,
+            confirmDismiss: (direction) async {
+               return await _showItemDeleteConfirmation(context, item.description);
+            },
+            onDismissed: (direction) {
+              final newList = List<TransactionItem>.from(items)..removeAt(idx);
+              _updateOnCloud(newList, labor);
+            },
+            background: Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              color: Colors.red,
+              child: const Icon(Icons.delete, color: Colors.white, size: 20),
+            ),
+            child: content,
+          );
+        },
+      ),
+    );
+  }
+
+  Future<bool?> _showItemDeleteConfirmation(BuildContext context, String itemName) async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          widget.isUrdu ? 'آئٹم حذف کریں؟' : 'Delete Item?',
+          style: TextStyle(fontFamily: widget.fontFamily, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          widget.isUrdu 
+            ? 'کیا آپ واقعی "$itemName" کو لسٹ سے ہٹانا چاہتے ہیں؟' 
+            : 'Are you sure you want to remove "$itemName" from the list?',
+          style: TextStyle(fontFamily: widget.fontFamily),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(widget.isUrdu ? 'کینسل' : 'Cancel', style: TextStyle(fontFamily: widget.fontFamily)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: Text(widget.isUrdu ? 'حذف کریں' : 'Delete', style: TextStyle(fontFamily: widget.fontFamily)),
+          ),
+        ],
       ),
     );
   }
@@ -260,7 +360,7 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
         children: [
           Icon(PhosphorIcons.userGear(), size: 16, color: Colors.blue),
           const SizedBox(width: 8),
-          Text(widget.isUrdu ? 'مزدوری فیس:' : 'Labor:', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          Text(widget.isUrdu ? 'مزدوری فیس:' : 'Labor:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: widget.fontFamily)),
           const Spacer(),
           if (widget.isArtisanMode)
             SizedBox(
@@ -282,49 +382,81 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
 
   Widget _buildInputBar(List<TransactionItem> items, double labor) {
     if (!widget.isArtisanMode) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.grey[100]!))),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 3,
-            child: TextField(
-              controller: _descController,
-              decoration: InputDecoration(
-                hintText: widget.isUrdu ? 'آئٹم نام' : 'Item',
-                hintStyle: const TextStyle(fontSize: 12),
-                border: InputBorder.none,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppTheme.backgroundColor,
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: TextField(
+                controller: _descController,
+                style: TextStyle(fontSize: 14, fontFamily: widget.fontFamily, color: AppTheme.darkColor),
+                decoration: InputDecoration(
+                  hintText: widget.isUrdu ? 'آئٹم نام' : 'Item Name',
+                  hintStyle: TextStyle(fontSize: 12, color: Colors.grey[500], fontFamily: widget.fontFamily),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  fillColor: Colors.transparent,
+                  filled: false,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
               ),
             ),
-          ),
-          Container(width: 1, height: 20, color: Colors.grey[200]),
-          const SizedBox(width: 8),
-          Expanded(
-            flex: 2,
-            child: TextField(
-              controller: _rateController,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              decoration: InputDecoration(
-                hintText: widget.isUrdu ? 'رقم' : 'Price',
-                hintStyle: const TextStyle(fontSize: 12),
-                border: InputBorder.none,
+            Container(width: 1, height: 20, color: Colors.grey[400]!.withOpacity(0.5), margin: const EdgeInsets.symmetric(horizontal: 8)),
+            Expanded(
+              flex: 2,
+              child: TextField(
+                controller: _rateController,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.darkColor),
+                decoration: InputDecoration(
+                  hintText: widget.isUrdu ? 'رقم' : 'Price',
+                  hintStyle: TextStyle(fontSize: 12, color: Colors.grey[500], fontFamily: widget.fontFamily),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  fillColor: Colors.transparent,
+                  filled: false,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
               ),
             ),
-          ),
-          IconButton(
-            icon: Icon(Icons.add_circle, color: AppTheme.themeColor, size: 28),
-            onPressed: () {
-              if (_descController.text.isEmpty || _rateController.text.isEmpty) return;
-              final rate = double.tryParse(_rateController.text) ?? 0.0;
-              final newList = List<TransactionItem>.from(items)..add(TransactionItem(description: _descController.text.trim(), quantity: 1, rate: rate, total: rate));
-              _descController.clear();
-              _rateController.clear();
-              _updateOnCloud(newList, labor);
-            },
-          ),
-        ],
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () {
+                if (_descController.text.isEmpty || _rateController.text.isEmpty) return;
+                final rate = double.tryParse(_rateController.text) ?? 0.0;
+                final newList = List<TransactionItem>.from(items)
+                  ..add(TransactionItem(
+                      description: _descController.text.trim(),
+                      quantity: 1,
+                      rate: rate,
+                      total: rate));
+                _descController.clear();
+                _rateController.clear();
+                _updateOnCloud(newList, labor);
+              },
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  color: AppTheme.themeColor,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.add, color: Colors.white, size: 16),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -334,12 +466,12 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: const BoxDecoration(
         color: AppTheme.darkColor,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(widget.isUrdu ? 'کل رقم (میزان):' : 'Total Bill:', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+          Text(widget.isUrdu ? 'کل رقم (میزان):' : 'Total Bill:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, fontFamily: widget.fontFamily)),
           Text(Formatters.formatCurrency(total), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
         ],
       ),
@@ -351,7 +483,7 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
       padding: const EdgeInsets.all(16),
       child: Center(
         child: Text(widget.isUrdu ? "ابھی تک کوئی سامان ایڈ نہیں کیا گیا" : "No items added yet",
-            style: const TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic)),
+            style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic, fontFamily: widget.fontFamily)),
       ),
     );
   }
@@ -361,26 +493,6 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // کاریگر کے لیے کام مکمل کرنے کا بٹن
-          if (widget.isArtisanMode && order.status != 'completed' && order.status != 'rated')
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () => _handleComplete(order),
-                icon: const Icon(Icons.check_circle_outline, size: 18),
-                label: Text(
-                  widget.isUrdu ? 'کام مکمل کریں' : 'Complete Work',
-                  style: TextStyle(fontFamily: widget.fontFamily, fontSize: 13),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ),
-
-          // گاہک کے لیے کاریگر کو ریویو دینے کا بٹن
           if (!widget.isArtisanMode && order.status == 'completed' && !order.isRated)
             Expanded(
               child: ElevatedButton.icon(
@@ -496,12 +608,12 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
               TextField(
                 controller: reviewController,
                 maxLines: 3,
-                maxLength: 150, // تقریباً تین لائنوں کے لیے کریکٹر لمٹ
+                maxLength: 150,
                 decoration: InputDecoration(
                   hintText: widget.isUrdu ? 'کاریگر کے کام کے بارے میں لکھیں...' : 'Write about artisan\'s work...',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   contentPadding: const EdgeInsets.all(12),
-                  counterText: "", // لمٹ دکھانے کی ضرورت نہیں، بس خودکار رک جائے گا
+                  counterText: "",
                 ),
                 style: TextStyle(fontFamily: widget.fontFamily),
               ),

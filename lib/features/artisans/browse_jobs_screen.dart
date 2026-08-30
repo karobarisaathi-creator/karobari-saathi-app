@@ -55,8 +55,7 @@ class _BrowseJobsScreenState extends State<BrowseJobsScreen>
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
 
     return Scaffold(
-      backgroundColor:
-          const Color(0xFFE8EAF0), // Even darker for better contrast
+      backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
         title: isUrdu ? 'کام اور ماہرین' : 'Browse Services',
         showBackButton: false,

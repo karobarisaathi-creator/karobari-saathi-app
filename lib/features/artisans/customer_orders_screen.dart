@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
@@ -25,7 +26,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
     final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
         title: isUrdu ? 'میرے کام کا ریکارڈ' : 'My Job History',
       ),
@@ -58,9 +59,10 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
             return bTime.compareTo(aTime);
           });
 
-          return ListView.builder(
+          return ListView.separated(
             padding: const EdgeInsets.all(16),
             itemCount: sortedOrders.length,
+            separatorBuilder: (context, index) => Divider(height: 1, color: Colors.grey.withOpacity(0.2)),
             itemBuilder: (context, index) {
               final order = sortedOrders[index];
               return WorkOrderListItem(

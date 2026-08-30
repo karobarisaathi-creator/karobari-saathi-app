@@ -26,9 +26,6 @@ import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/features/settings/verification_request_screen.dart';
 import 'package:account_app/features/dashboard/main_navigation_screen.dart';
 
-const String _defaultProfileImage =
-    'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png';
-
 class MasterProfileScreen extends StatefulWidget {
   const MasterProfileScreen({super.key});
 
@@ -192,7 +189,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
         position.latitude,
         position.longitude,
       );
-      if (placemarks.isNotEmpty) {
+      if (placemarks.isNotEmpty && mounted) {
         final p = placemarks[0];
         setState(() {
           _locationController.text = "${p.locality}, ${p.subLocality}";
@@ -324,7 +321,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
 
       // اگر تصویر موجود نہیں ہے تو ڈیفالٹ تصویر استعمال کریں
       if (profileImageUrl == null || profileImageUrl.trim().isEmpty) {
-        profileImageUrl = _defaultProfileImage;
+        profileImageUrl = _getAvatarForName(_nameController.text);
       }
 
       // 2. Upload Work Images (ONLY if Expert mode is ON)
@@ -516,6 +513,17 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
     return found['name'] ?? profession;
   }
 
+  String _getAvatarForName(String name) {
+    if (name.isEmpty) return 'assets/avatars/avatar.svg';
+    int hash = 0;
+    for (int i = 0; i < name.length; i++) {
+      hash = name.codeUnitAt(i) + ((hash << 5) - hash);
+    }
+    final index = hash.abs() % 8;
+    if (index == 0) return 'assets/avatars/avatar.svg';
+    return 'assets/avatars/avatar ($index).svg';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isUrdu = Provider.of<LanguageService>(context).isUrdu;
@@ -523,7 +531,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
     final verificationService = Provider.of<VerificationService>(context);
 
     return Scaffold(
-      backgroundColor: AppTheme.scaffoldBackground,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
         title: _isEditing
             ? (isUrdu ? 'پروفائل میں ترمیم' : 'Edit Profile')
@@ -552,7 +560,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                               _remoteProfileImage!.isNotEmpty
                           ? [_remoteProfileImage!]
                           : (_profileImage == null
-                              ? [_defaultProfileImage]
+                              ? [_getAvatarForName(_nameController.text)]
                               : []),
                       onFilesChanged: (files) {
                         setState(() {
@@ -1388,13 +1396,21 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
 
   Widget _buildLocationField(bool isUrdu, String fontFamily) {
     return RawAutocomplete<Map<String, dynamic>>(
+      key: const ValueKey('location_autocomplete'), // اوزورلے کریش سے بچنے کے لیے کی کا اضافہ
       optionsBuilder: (TextEditingValue textEditingValue) async {
+        if (!mounted) return const Iterable<Map<String, dynamic>>.empty();
         if (textEditingValue.text.length < 3) {
           return const Iterable<Map<String, dynamic>>.empty();
         }
-        return await LocationService.searchLocations(textEditingValue.text);
+        try {
+          final results = await LocationService.searchLocations(textEditingValue.text);
+          if (!mounted) return const Iterable<Map<String, dynamic>>.empty();
+          return results;
+        } catch (e) {
+          return const Iterable<Map<String, dynamic>>.empty();
+        }
       },
-      displayStringForOption: (option) => option['display_name'],
+      displayStringForOption: (option) => option['display_name'] ?? "",
       onSelected: (option) {
         setState(() {
           _locationController.text = option['display_name'];
@@ -1404,7 +1420,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
       },
       fieldViewBuilder:
           (context, controller, focusNode, onEditingComplete) {
-        if (controller.text != _locationController.text && _locationController.text.isNotEmpty && controller.text.isEmpty) {
+        // فیلڈ کو انیشلائز کرنے کا بہتر طریقہ
+        if (controller.text.isEmpty && _locationController.text.isNotEmpty) {
            controller.text = _locationController.text;
         }
         
@@ -1461,6 +1478,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
         );
       },
       optionsViewBuilder: (context, onSelected, options) {
+        if (!mounted) return const SizedBox.shrink();
         return Align(
           alignment: isUrdu ? Alignment.topLeft : Alignment.topRight,
           child: Material(

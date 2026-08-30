@@ -123,15 +123,31 @@ class MigrationHelper {
       // Clean professions with invalid data (e.g., null fields that should not be)
       final Map<dynamic, Profession> professionsToUpdate = {};
       for (var profession in professionsBox.values) {
+        bool needsFix = false;
+        String? newSeasonKey = profession.seasonKey;
+        bool? newIsMaster = profession.isMaster;
+
         if (profession.seasonKey == null) {
+          newSeasonKey = profession.season.isNotEmpty
+              ? _generateSeasonKey(profession.name, profession.season)
+              : "";
+          needsFix = true;
+        }
+
+        // Migration Fix: If parentId is null, it MUST be a Master
+        if (profession.parentId == null && (profession.isMaster == null || profession.isMaster == false)) {
+          newIsMaster = true;
+          needsFix = true;
+        }
+
+        if (needsFix) {
           final fixedProfession = profession.copyWith(
-            seasonKey: profession.season.isNotEmpty
-                ? _generateSeasonKey(profession.name, profession.season)
-                : "",
+            seasonKey: newSeasonKey,
+            isMaster: newIsMaster,
           );
           professionsToUpdate[profession.id] = fixedProfession;
           fixedProfessionCount++;
-          print("  🔧 Queued profession for fixing: ${profession.name}");
+          print("  🔧 Fixed/Migrated profession: ${profession.name}");
         }
       }
       

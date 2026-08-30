@@ -38,15 +38,10 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      extendBodyBehindAppBar: true,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
         title: isUrdu ? 'میرے کام' : 'My Work Orders',
         showBackButton: false,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       ),
       body: StreamBuilder<List<ArtisanWorkOrder>>(
         stream: _ordersStream,
@@ -61,19 +56,6 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
             return _buildEmptyState(isUrdu, fontFamily);
           }
 
-          // ماہانہ حساب کتاب (صرف منظور شدہ یا مکمل کاموں کے لیے)
-          final confirmedOrders = orders.where((o) => 
-            o.status != 'negotiating' && o.status != 'quoted' && o.status != 'rejected'
-          ).toList();
-          
-          final now = DateTime.now();
-          final currentMonthOrders = confirmedOrders.where((o) => 
-            o.createdAt.month == now.month && o.createdAt.year == now.year
-          ).toList();
-          
-          final totalAmount = currentMonthOrders.fold<double>(0, (sum, item) => sum + (item.amount ?? 0));
-          final totalCount = currentMonthOrders.length;
-
           // Remove duplicates and sort by latest activity
           final Map<String, ArtisanWorkOrder> uniqueOrders = {};
           for (var o in orders) {
@@ -86,34 +68,30 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
             return bTime.compareTo(aTime);
           });
 
-          return Column(
-            children: [
-              _buildLargeDarkHeader(totalAmount, totalCount, isUrdu, fontFamily),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: sortedOrders.length,
-                  itemBuilder: (context, index) {
-                    final order = sortedOrders[index];
-                    return WorkOrderListItem(
-                      order: order,
-                      isArtisanMode: true,
-                      isUrdu: isUrdu,
-                      fontFamily: fontFamily,
-                      onChatTap: () {
-                        final notificationService =
-                            Provider.of<NotificationService>(context,
-                                listen: false);
-                        notificationService.setNotificationsTabIndex(1);
-                        notificationService.setTargetExpandOrderId(order.id);
-                        MainNavigationScreen.switchTab(4);
-                        Navigator.pop(context);
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: sortedOrders.length,
+            separatorBuilder: (context, index) => Divider(height: 1, color: Colors.grey.withOpacity(0.2)),
+            itemBuilder: (context, index) {
+              final order = sortedOrders[index];
+              return WorkOrderListItem(
+                order: order,
+                isArtisanMode: true,
+                isUrdu: isUrdu,
+                fontFamily: fontFamily,
+                onChatTap: () {
+                  final notificationService =
+                      Provider.of<NotificationService>(context,
+                          listen: false);
+                  notificationService.setNotificationsTabIndex(1);
+                  notificationService.setTargetExpandOrderId(order.id);
+                  MainNavigationScreen.switchTab(4);
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  }
+                },
+              );
+            },
           );
         },
       ),
@@ -151,74 +129,4 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
     );
   }
 
-  Widget _buildLargeDarkHeader(double totalAmount, int totalCount, bool isUrdu, String fontFamily) {
-    return Container(
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 45,
-        bottom: 20,
-        left: 20,
-        right: 20,
-      ),
-      decoration: const BoxDecoration(
-        color: AppTheme.darkColor,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
-      ),
-      child: Row(
-        children: [
-          _buildSummaryItem(
-            isUrdu ? 'اس مہینے کی کمائی' : 'Earnings this month',
-            'Rs. ${totalAmount.toStringAsFixed(0)}',
-            Colors.greenAccent,
-            fontFamily,
-            PhosphorIcons.wallet(),
-          ),
-          Container(width: 1, height: 30, color: Colors.white12),
-          _buildSummaryItem(
-            isUrdu ? 'مکمل کام' : 'Jobs Done',
-            '$totalCount',
-            Colors.blueAccent,
-            fontFamily,
-            PhosphorIcons.briefcase(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryItem(String label, String value, Color iconColor, String fontFamily, IconData icon) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            label,
-            style: TextStyle(color: Colors.white70, fontSize: 11, fontFamily: fontFamily),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 12, color: iconColor),
-              const SizedBox(width: 6),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    value,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: '',
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }

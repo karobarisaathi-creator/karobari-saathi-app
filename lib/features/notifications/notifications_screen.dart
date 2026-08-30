@@ -137,7 +137,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         }
 
         return Scaffold(
-          backgroundColor: const Color(0xFFE8EAF0),
+          backgroundColor: AppTheme.backgroundColor,
           appBar: _isKeyboardVisible
               ? null
               : CustomAppBar(

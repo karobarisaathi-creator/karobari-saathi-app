@@ -20,7 +20,7 @@ class ProfessionAdapter extends TypeAdapter<Profession> {
       id: fields[0] as String,
       name: fields[1] as String,
       categories: (fields[2] as List).cast<String>(),
-      isActive: fields[3] as bool,
+      isActive: fields[3] as bool?,
       totalIncome: fields[4] as double,
       totalExpense: fields[5] as double,
       createdAt: fields[6] as DateTime,
@@ -35,13 +35,15 @@ class ProfessionAdapter extends TypeAdapter<Profession> {
       benchmarkCostPerUnit: fields[15] as double,
       categoryType: fields[16] as ProfessionCategory,
       customMetrics: (fields[17] as Map?)?.cast<String, dynamic>(),
+      isMaster: fields[18] as bool?,
+      parentId: fields[19] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Profession obj) {
     writer
-      ..writeByte(18)
+      ..writeByte(20)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -77,7 +79,11 @@ class ProfessionAdapter extends TypeAdapter<Profession> {
       ..writeByte(16)
       ..write(obj.categoryType)
       ..writeByte(17)
-      ..write(obj.customMetrics);
+      ..write(obj.customMetrics)
+      ..writeByte(18)
+      ..write(obj.isMaster)
+      ..writeByte(19)
+      ..write(obj.parentId);
   }
 
   @override

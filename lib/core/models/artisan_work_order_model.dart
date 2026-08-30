@@ -10,6 +10,9 @@ class ArtisanWorkOrder extends HiveObject {
   @HiveField(0)
   final String id;
 
+  @HiveField(32)
+  final String? title; // کام کا عنوان
+
   @HiveField(1)
   final String artisanId;
 
@@ -136,6 +139,7 @@ class ArtisanWorkOrder extends HiveObject {
     this.isLastMessageRead = true,
     this.items,
     this.laborFee = 0.0,
+    this.title,
   });
 
   Map<String, dynamic> toMap() {
@@ -172,6 +176,7 @@ class ArtisanWorkOrder extends HiveObject {
       'isLastMessageRead': isLastMessageRead,
       'items': items?.map((x) => x.toMap()).toList(),
       'laborFee': laborFee,
+      'title': title,
     };
   }
 
@@ -223,6 +228,7 @@ class ArtisanWorkOrder extends HiveObject {
             }).toList()
           : null,
       laborFee: (map['laborFee'] as num?)?.toDouble() ?? 0.0,
+      title: map['title']?.toString(),
     );
   }
 
@@ -258,9 +264,11 @@ class ArtisanWorkOrder extends HiveObject {
     bool? isLastMessageRead,
     List<TransactionItem>? items,
     double? laborFee,
+    String? title,
   }) {
     return ArtisanWorkOrder(
       id: id ?? this.id,
+      title: title ?? this.title,
       artisanId: artisanId ?? this.artisanId,
       artisanName: artisanName ?? this.artisanName,
       customerId: customerId ?? this.customerId,

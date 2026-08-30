@@ -9,6 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
 import 'package:firebase_messaging/firebase_messaging.dart'; // Added for background handler
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'firebase_options.dart'; // Import generated options
 
 // Models
@@ -70,8 +71,21 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print("Handling a background message: ${message.messageId}");
 }
 
+// Pre-cache helper
+void _precacheAvatars() {
+  final List<String> avatars = [
+    'assets/avatars/avatar.svg',
+    for (int i = 1; i <= 7; i++) 'assets/avatars/avatar ($i).svg',
+  ];
+  for (final path in avatars) {
+    final loader = SvgAssetLoader(path);
+    svg.cache.putIfAbsent(loader.cacheKey(null), () => loader.loadBytes(null));
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _precacheAvatars();
 
   // Load environment variables
   try {

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
@@ -82,6 +83,17 @@ class ProfileInfoWidget extends StatefulWidget {
 }
 
 class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
+  String _getAvatarForName(String name) {
+    if (name.isEmpty) return 'assets/avatars/avatar.svg';
+    int hash = 0;
+    for (int i = 0; i < name.length; i++) {
+      hash = name.codeUnitAt(i) + ((hash << 5) - hash);
+    }
+    final index = hash.abs() % 8;
+    if (index == 0) return 'assets/avatars/avatar.svg';
+    return 'assets/avatars/avatar ($index).svg';
+  }
+
   String _getTranslatedCategory(String category, bool isUrdu) {
     if (!isUrdu) return category;
 
@@ -148,24 +160,7 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(radius),
-              child: displayImage != null && displayImage.isNotEmpty
-                  ? (displayImage.startsWith('http')
-                      ? CachedNetworkImage(
-                          imageUrl: displayImage,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            color: AppTheme.darkColor.withOpacity(0.05),
-                          ),
-                          errorWidget: (context, url, error) => _buildInitials(
-                              displayName, widget.isLarge, AppTheme.darkColor, size),
-                        )
-                      : (File(displayImage).existsSync()
-                          ? Image.file(File(displayImage), fit: BoxFit.cover)
-                          : _buildInitials(
-                              displayName, widget.isLarge, AppTheme.darkColor, size)))
-                  : _buildInitials(
-                      displayName, widget.isLarge, AppTheme.darkColor, size,
-                      isStore: widget.isStore),
+              child: _buildCoreImage(displayImage, displayName, radius, size),
             ),
           ),
 
@@ -359,6 +354,44 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCoreImage(String? displayImage, String displayName, double radius, double size) {
+    if (displayImage == null || displayImage.isEmpty) {
+      return _buildPlaceholderImage(displayName, radius, size);
+    }
+
+    if (displayImage.startsWith('http')) {
+      return CachedNetworkImage(
+        imageUrl: displayImage,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => Container(
+          color: AppTheme.darkColor.withOpacity(0.05),
+        ),
+        errorWidget: (context, url, error) => _buildPlaceholderImage(displayName, radius, size),
+      );
+    }
+
+    if (displayImage.startsWith('assets/')) {
+      return SvgPicture.asset(displayImage, fit: BoxFit.cover);
+    }
+
+    if (File(displayImage).existsSync()) {
+      return Image.file(File(displayImage), fit: BoxFit.cover);
+    }
+
+    return _buildPlaceholderImage(displayName, radius, size);
+  }
+
+  Widget _buildPlaceholderImage(String name, double radius, double size) {
+    final assetPath = _getAvatarForName(name);
+    return SvgPicture.asset(
+      assetPath,
+      fit: BoxFit.cover,
+      placeholderBuilder: (context) => Container(
+        color: AppTheme.darkColor.withOpacity(0.05),
+      ),
     );
   }
 

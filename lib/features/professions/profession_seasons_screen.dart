@@ -10,6 +10,7 @@ import 'categories_management_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/features/accounts/transaction_receipt_screen.dart';
+import 'package:account_app/features/accounts/reports_screen.dart';
 import 'add_profession_transaction_screen.dart';
 
 class ProfessionSeasonsScreen extends StatefulWidget {
@@ -78,6 +79,25 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
         ),
         actions: [
           IconButton(
+            icon: Icon(PhosphorIcons.presentationChart(), color: Colors.white),
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => DraggableScrollableSheet(
+                  initialChildSize: 0.8,
+                  maxChildSize: 0.95,
+                  minChildSize: 0.5,
+                  builder: (context, scrollController) => ReportsScreen(
+                    selectedProfession: widget.masterProfession,
+                  ),
+                ),
+              );
+            },
+            tooltip: isUrdu ? 'رپورٹ' : 'Report',
+          ),
+          IconButton(
             icon: Icon(PhosphorIcons.gear(), color: Colors.white),
             onPressed: () => _navigateToCategoriesScreen(context, isUrdu),
             tooltip: isUrdu ? 'زمرے مینج کریں' : 'Manage Categories',
@@ -87,10 +107,10 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
       body: Consumer<DatabaseService>(
         builder: (context, databaseService, child) {
           final seasons = databaseService.getSeasons(widget.masterProfession.id);
-          final activeSeason = seasons.where((s) => s.isActive).toList().isNotEmpty 
-              ? seasons.firstWhere((s) => s.isActive) 
+          final activeSeason = seasons.where((s) => s.isActive ?? true).toList().isNotEmpty 
+              ? seasons.firstWhere((s) => s.isActive ?? true) 
               : null;
-          final completedSeasons = seasons.where((s) => !s.isActive).toList();
+          final completedSeasons = seasons.where((s) => !(s.isActive ?? true)).toList();
           
           // نئے مکمل شدہ ریکارڈز کو اوپر دکھانے کے لیے ترتیب دیں
           completedSeasons.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
@@ -247,7 +267,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
       ),
       floatingActionButton: Consumer<DatabaseService>(
         builder: (context, db, child) {
-          final activeSeason = db.getSeasons(widget.masterProfession.id).where((s) => s.isActive).firstOrNull;
+          final activeSeason = db.getSeasons(widget.masterProfession.id).where((s) => s.isActive ?? true).firstOrNull;
           if (activeSeason == null) return const SizedBox.shrink();
           
           return FloatingActionButton(
@@ -318,9 +338,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
               });
             },
             onLongPress: () {
-              if (!isBaseRecord) {
-                _showSeasonOptions(context, season, isUrdu, fontFamily, db);
-              }
+              _showSeasonOptions(context, season, isUrdu, fontFamily, db, isBaseRecord: isBaseRecord);
             },
             borderRadius: BorderRadius.circular(12),
             child: Padding(
@@ -616,7 +634,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
     );
   }
 
-  void _showSeasonOptions(BuildContext context, Profession season, bool isUrdu, String fontFamily, DatabaseService db) {
+  void _showSeasonOptions(BuildContext context, Profession season, bool isUrdu, String fontFamily, DatabaseService db, {bool isBaseRecord = false}) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -628,11 +646,13 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Text(
-                '${isUrdu ? 'سیزن' : 'Season'}: ${season.season}',
+                isBaseRecord 
+                  ? (isUrdu ? 'بنیادی ریکارڈ کے اختیارات' : 'Base Record Options')
+                  : '${isUrdu ? 'سیزن' : 'Season'}: ${season.season}',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: fontFamily),
               ),
             ),
-            if (season.isActive)
+            if (!isBaseRecord && (season.isActive ?? true))
               ListTile(
                 leading: Icon(PhosphorIcons.checkCircle(), color: AppTheme.incomeColor),
                 title: Text(
@@ -644,7 +664,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                   _showCompleteSeasonDialog(context, season, isUrdu, fontFamily);
                 },
               ),
-            if (!season.isActive)
+            if (!isBaseRecord && !(season.isActive ?? true))
               ListTile(
                 leading: Icon(PhosphorIcons.playCircle(), color: AppTheme.themeColor),
                 title: Text(
@@ -659,13 +679,93 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
             ListTile(
               leading: Icon(PhosphorIcons.trash(), color: AppTheme.expenseColor),
               title: Text(
-                isUrdu ? 'حذف کریں' : 'Delete',
+                isBaseRecord 
+                  ? (isUrdu ? 'بنیادی ریکارڈ صاف کریں' : 'Clear Base Record')
+                  : (isUrdu ? 'حذف کریں' : 'Delete'),
                 style: TextStyle(fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
               ),
               onTap: () {
                 Navigator.pop(context);
-                _showDeleteSeasonDialog(context, season, isUrdu, fontFamily);
+                if (isBaseRecord) {
+                   _showClearBaseRecordDialog(context, isUrdu, fontFamily, db);
+                } else {
+                   _showDeleteSeasonDialog(context, season, isUrdu, fontFamily);
+                }
               },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showClearBaseRecordDialog(BuildContext context, bool isUrdu, String fontFamily, DatabaseService db) {
+    bool isConfirmed = false;
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(
+            isUrdu ? 'بنیادی ریکارڈ صاف کریں؟' : 'Clear Base Record?',
+            style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                isUrdu 
+                  ? 'کیا آپ واقعی اس پیشے کا بنیادی ریکارڈ (وہ ٹرانزیکشنز جو کسی سیزن میں نہیں ہیں) صاف کرنا چاہتے ہیں؟ اس سے صرف پرانا ڈیٹا مٹے گا، نئے سیزنز محفوظ رہیں گے۔' 
+                  : 'Are you sure you want to clear the base record (transactions not linked to any season)? This will only delete legacy data; active seasons will remain safe.',
+                style: TextStyle(fontFamily: fontFamily, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              CheckboxListTile(
+                value: isConfirmed,
+                onChanged: (val) => setDialogState(() => isConfirmed = val ?? false),
+                title: Text(
+                  isUrdu ? 'جی ہاں، میں مٹانا چاہتا ہوں' : 'Yes, I want to clear',
+                  style: TextStyle(fontFamily: fontFamily, fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                activeColor: AppTheme.expenseColor,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(isUrdu ? 'منسوخ' : 'Cancel'),
+            ),
+            AppButton(
+              text: isUrdu ? 'صاف کریں' : 'Clear',
+              onPressed: isConfirmed ? () async {
+                // 1. Get transactions linked to master but NOT to any season
+                final masterId = widget.masterProfession.id;
+                final txs = db.getAllTransactions().where((t) => t.professionId == masterId).toList();
+                
+                for (var t in txs) {
+                   await db.deleteTransaction(t.id);
+                }
+                
+                // 2. Reset master totals
+                final updatedMaster = widget.masterProfession.copyWith(
+                  totalIncome: 0,
+                  totalExpense: 0,
+                  updatedAt: DateTime.now(),
+                );
+                await db.updateProfession(updatedMaster);
+                
+                if (context.mounted) {
+                   Navigator.pop(context);
+                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                     content: Text(isUrdu ? 'بنیادی ریکارڈ صاف کر دیا گیا' : 'Base record cleared'),
+                     backgroundColor: AppTheme.themeColor,
+                   ));
+                }
+              } : null,
+              color: AppTheme.expenseColor,
+              size: AppButtonSize.small,
             ),
           ],
         ),
@@ -732,7 +832,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
 
   Future<void> _reactivateSeason(BuildContext context, Profession season, bool isUrdu, String fontFamily, DatabaseService db) async {
     final allSeasons = db.getSeasons(widget.masterProfession.id);
-    final activeSeason = allSeasons.where((s) => s.isActive).firstOrNull;
+    final activeSeason = allSeasons.where((s) => s.isActive ?? true).firstOrNull;
 
     if (activeSeason != null) {
       await db.updateProfession(activeSeason.copyWith(isActive: false));

@@ -43,7 +43,7 @@ class Profession {
   final List<String> categories;
 
   @HiveField(3)
-  final bool isActive;
+  final bool? isActive;
 
   @HiveField(4)
   final double totalIncome;
@@ -89,7 +89,7 @@ class Profession {
   final Map<String, dynamic>? customMetrics;
 
   @HiveField(18)
-  final bool isMaster;
+  final bool? isMaster;
 
   @HiveField(19)
   final String? parentId;

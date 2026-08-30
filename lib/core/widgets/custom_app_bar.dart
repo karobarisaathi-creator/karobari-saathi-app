@@ -77,10 +77,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   Widget _buildBackButton(BuildContext context, bool isUrdu) {
     return IconButton(
-      icon: Directionality(
-          textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
-          child: const Icon(Icons.arrow_back)),
-      onPressed: onBackPressed ?? () => Navigator.pop(context),
+      icon: const Icon(Icons.arrow_back),
+      onPressed: onBackPressed ?? () => Navigator.of(context).pop(),
       tooltip: isUrdu ? 'پیچھے جائیں' : 'Back',
     );
   }

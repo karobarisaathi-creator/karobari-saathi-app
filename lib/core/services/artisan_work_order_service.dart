@@ -390,34 +390,29 @@ class ArtisanWorkOrderService extends BaseService {
       
       // اگر سیزن اسکرین پر کوئی فعال سیزن ہے تو وہاں بھیجیں، ورنہ ماسٹر پیشے میں
       String targetId = professionId;
-      final seasons = professionsBox?.values.where((p) => p.parentId == professionId && p.isActive).toList() ?? [];
+      final seasons = professionsBox?.values.where((p) => p.parentId == professionId && (p.isActive ?? true)).toList() ?? [];
       if (seasons.isNotEmpty) {
         targetId = seasons.first.id;
       }
 
-      // ایک معتبر اکاؤنٹ تلاش کریں
-      String accountId = "cash_account";
-      final allAccounts = accountsBox?.values.toList() ?? [];
-      if (allAccounts.isNotEmpty) {
-        // پہلے 'cash' والا اکاؤنٹ ڈھونڈیں، ورنہ پہلا والا استعمال کریں
-        final cashAccs = allAccounts.where((a) => a.name.toLowerCase().contains('cash') || a.id == 'cash_account').toList();
-        accountId = cashAccs.isNotEmpty ? cashAccs.first.id : allAccounts.first.id;
-      }
+      // ہم کسی کھاتہ میں انٹری نہیں کریں گے، صرف پیشے کے لیے ایک ٹرانزیکشن بنائیں گے
+      // اکاؤنٹ آئی ڈی میں ایک مخصوص 'internal' آئی ڈی استعمال کریں گے جو عام کھاتوں میں نظر نہیں آتی
+      const String internalAccountId = "artisan_internal_income";
 
       final transaction = model.Transaction(
         id: "artisan_job_${order.id}",
-        accountId: accountId, 
+        accountId: internalAccountId, 
         amount: order.amount!,
         type: 'income',
-        category: 'کام کی اجرت',
+        category: order.customerName, 
         date: DateTime.now(),
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
-        description: "کام مکمل: ${order.workDescription}",
+        description: order.title ?? order.workDescription, // یہاں عنوان استعمال کریں، اگر نہ ہو تو تفصیل
         professionId: targetId,
       );
 
-      // ٹرانزیکشن کو محفوظ کریں
+      // ٹرانزیکشن کو محفوظ کریں (صرف پیشے کے ریکارڈ کے لیے)
       await transactionsBox?.put(transaction.id, transaction);
       
       // پیشے کا حساب اپ ڈیٹ کریں
@@ -427,8 +422,7 @@ class ArtisanWorkOrderService extends BaseService {
         await profService.recalculateProfessionFinance(professionId);
       }
 
-      // اکاؤنٹ کا بیلنس اپ ڈیٹ کریں
-      await AccountService().recalculateAccountBalance(transaction.accountId);
+      // نوٹ: ہم اکاؤنٹ کا بیلنس اپ ڈیٹ نہیں کریں گے کیونکہ صارف نے منع کیا ہے
 
       // Cloud Sync
       await firestore

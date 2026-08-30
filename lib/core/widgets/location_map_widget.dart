@@ -1,3 +1,5 @@
+// lib/core/widgets/location_map_widget.dart
+
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -45,8 +47,10 @@ class _LocationMapWidgetState extends State<LocationMapWidget> {
         permission = await Geolocator.requestPermission();
       }
 
-      if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+      if (permission == LocationPermission.always ||
+          permission == LocationPermission.whileInUse) {
         Position currentPosition = await Geolocator.getCurrentPosition();
+
         double distanceInMeters = Geolocator.distanceBetween(
           currentPosition.latitude,
           currentPosition.longitude,
@@ -57,14 +61,14 @@ class _LocationMapWidgetState extends State<LocationMapWidget> {
         double km = distanceInMeters / 1000;
         if (mounted) {
           setState(() {
-            _distanceStr = km < 1 
-              ? "${(distanceInMeters).toStringAsFixed(0)} m" 
-              : "${km.toStringAsFixed(1)} km";
+            _distanceStr = km < 1
+                ? "${(distanceInMeters).toStringAsFixed(0)} m"
+                : "${km.toStringAsFixed(1)} km";
             _calculatingDistance = false;
           });
         }
       } else {
-         if (mounted) setState(() => _calculatingDistance = false);
+        if (mounted) setState(() => _calculatingDistance = false);
       }
     } catch (e) {
       debugPrint("Distance calc error: $e");
@@ -74,14 +78,19 @@ class _LocationMapWidgetState extends State<LocationMapWidget> {
 
   Future<void> _openMap() async {
     if (widget.latitude == null || widget.longitude == null) {
-      final url = Uri.parse("https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(widget.address)}");
+      final url = Uri.parse(
+          "https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(widget.address)}"
+      );
       if (await canLaunchUrl(url)) {
         await launchUrl(url, mode: LaunchMode.externalApplication);
       }
       return;
     }
 
-    final url = Uri.parse("https://www.google.com/maps/search/?api=1&query=${widget.latitude},${widget.longitude}");
+    // Google Maps پر کھولیں
+    final url = Uri.parse(
+        "https://www.google.com/maps/search/?api=1&query=${widget.latitude},${widget.longitude}&zoom=15"
+    );
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     }
@@ -89,195 +98,159 @@ class _LocationMapWidgetState extends State<LocationMapWidget> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.latitude == null && widget.longitude == null && widget.address.isEmpty) return const SizedBox.shrink();
+    if (widget.latitude == null && widget.longitude == null && widget.address.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
-    // Use a cleaner static map style (Yandex with custom parameters for a lighter look)
-    // l=map (standard), l=sat (satellite), l=skl (schematic)
-    final String mapUrl = widget.latitude != null && widget.longitude != null
-        ? "https://static-maps.yandex.ru/1.x/?ll=${widget.longitude},${widget.latitude}&z=14&l=map&size=650,350&pt=${widget.longitude},${widget.latitude},pm2rdm"
-        : "";
+    // ✅ بڑا نقشہ (سادہ)
+    String mapUrl = "";
+    if (widget.latitude != null && widget.longitude != null) {
+      mapUrl = "https://static-maps.yandex.ru/1.x/"
+          "?ll=${widget.longitude},${widget.latitude}"
+          "&z=13"  // 2-3 کلومیٹر
+          "&l=map"  // سادہ نقشہ
+          "&size=650,450"
+          "&pt=${widget.longitude},${widget.latitude},pm2rdl"
+          "&lang=en_US"
+          "&scale=2";
+    }
 
-    return GestureDetector(
-      onTap: _openMap,
-      child: Container(
-        height: 200,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF0F2F5),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white, width: 4),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          children: [
-            // Background Map
-            if (mapUrl.isNotEmpty)
-              CachedNetworkImage(
-                imageUrl: mapUrl,
-                width: double.infinity,
-                height: double.infinity,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
-                  color: const Color(0xFFF0F2F5),
-                  child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                ),
-                errorWidget: (context, url, error) => _buildPlaceholder(),
-              )
-            else
-              _buildPlaceholder(),
-            
-            // Route/Design Overlay (Simulated clean look)
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.white.withOpacity(0.1),
-                      Colors.transparent,
-                    ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: _openMap,
+          child: Container(
+            height: 280,
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 0),
+            child: Stack(
+              children: [
+                // 1. نقشہ (بیک گراؤنڈ میں اور کلپ شدہ)
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: mapUrl.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: mapUrl,
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              color: const Color(0xFFF0F2F5),
+                              child: const Center(
+                                  child: CircularProgressIndicator(strokeWidth: 2)),
+                            ),
+                            errorWidget: (context, url, error) => _buildPlaceholder(),
+                          )
+                        : _buildPlaceholder(),
                   ),
                 ),
-              ),
-            ),
 
-            // Distance Badge (Top Left like in image)
-            if (!_calculatingDistance && _distanceStr.isNotEmpty)
-              Positioned(
-                top: 16,
-                left: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      )
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Colors.blue,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _distanceStr,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          color: AppTheme.darkColor,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        widget.isUrdu ? "دور" : "away",
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[600],
-                          fontFamily: widget.isUrdu ? 'NooriNastaleeq' : '',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-            // Center Pin (Design style)
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      PhosphorIcons.mapPin(PhosphorIconsStyle.fill),
-                      color: Colors.black,
-                      size: 32,
-                    ),
-                  ),
-                  const SizedBox(height: 32), // Offset to put pin point in center
-                ],
-              ),
-            ),
-
-            // Open Map Button (Bottom Right) - No Background
-            Positioned(
-              bottom: 16,
-              right: 16,
-              child: Icon(
-                PhosphorIcons.navigationArrow(PhosphorIconsStyle.bold),
-                size: 24,
-                color: AppTheme.darkColor,
-                shadows: [
-                  Shadow(
-                    offset: const Offset(0, 0),
-                    blurRadius: 10,
-                    color: Colors.white.withOpacity(0.8),
-                  ),
-                ],
-              ),
-            ),
-
-            // Address Overlay (Bottom Left) - No Background
-            Positioned(
-              bottom: 16,
-              left: 16,
-              right: 70, // Avoid overlapping with Open Map button
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(PhosphorIcons.mapPin(PhosphorIconsStyle.fill),
-                      size: 16, color: AppTheme.darkColor),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      widget.address,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.darkColor,
-                        fontWeight: FontWeight.w900,
-                        fontFamily: widget.isUrdu ? 'NooriNastaleeq' : '',
-                        shadows: [
-                          Shadow(
-                            offset: const Offset(0, 0),
-                            blurRadius: 10,
-                            color: Colors.white.withOpacity(0.8),
+                // 2. معلومات کی پٹی (نیچے)
+                Positioned(
+                  bottom: 4, // باڈر کی موٹائی کے لحاظ سے تھوڑی جگہ
+                  left: 4,
+                  right: 4,
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      color: Colors.white.withOpacity(0.95),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            size: 18,
+                            color: AppTheme.themeColor,
                           ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              widget.address,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.darkColor,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: widget.isUrdu ? 'NooriNastaleeq' : '',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (!_calculatingDistance && _distanceStr.isNotEmpty) ...[
+                            const SizedBox(width: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppTheme.themeColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                _distanceStr,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppTheme.themeColor,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                ],
-              ),
+                ),
+
+                // 3. باڈر (سب سے اوپر تاکہ کونے نہ کٹیں)
+                IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppTheme.goldColor, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // 4. زوم بیج (اوپر دائیں)
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.zoom_in, color: Colors.white, size: 14),
+                        SizedBox(width: 4),
+                        Text(
+                          "2 km",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -288,15 +261,43 @@ class _LocationMapWidgetState extends State<LocationMapWidget> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(PhosphorIcons.mapTrifold(), size: 40, color: Colors.grey[400]),
+            Icon(
+              Icons.map_outlined,
+              size: 40,
+              color: Colors.grey[400],
+            ),
             const SizedBox(height: 8),
             Text(
-              "Click to see location",
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              widget.isUrdu ? 'مقام دستیاب نہیں' : 'Location not available',
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontSize: 13,
+              ),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+// ✅ مثلث پینٹر
+class _TrianglePainter extends CustomPainter {
+  final Color color;
+
+  _TrianglePainter({this.color = Colors.blue});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    final path = Path();
+    path.moveTo(0, 0);
+    path.lineTo(size.width, 0);
+    path.lineTo(size.width / 2, size.height);
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

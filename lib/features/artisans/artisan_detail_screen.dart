@@ -4,8 +4,6 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -15,7 +13,6 @@ import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/utils/formatters.dart';
-import 'package:account_app/core/utils/artisan_validators.dart';
 import 'package:account_app/core/services/artisan_service.dart';
 import 'package:account_app/core/services/artisan_work_order_service.dart';
 import 'package:account_app/core/services/database/job_negotiation_service.dart';
@@ -26,12 +23,9 @@ import 'package:account_app/core/widgets/artisan_rating_stars.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/image_gallery_viewer.dart';
 import 'artisan_work_orders_screen.dart';
-import 'artisan_reviews_screen.dart';
 
-import 'package:account_app/features/notifications/notifications_screen.dart';
 import '../settings/master_profile_screen.dart';
 import '../dashboard/main_navigation_screen.dart';
-import 'package:account_app/core/widgets/location_map_widget.dart';
 import 'package:account_app/features/settings/verification_request_screen.dart';
 
 class ArtisanDetailScreen extends StatefulWidget {
@@ -55,7 +49,6 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
   bool _isLoading = true;
   int _workCount = 0;
   bool _isSending = false;
-  String _activeSection = 'about'; // 'about', 'gallery', 'reviews'
   int _activeIndex = 0; // 0: about, 1: gallery, 2: reviews
   late PageController _pageController;
 
@@ -233,79 +226,6 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
     );
   }
 
-  Widget _buildValidatedBudgetField({
-    required TextEditingController controller,
-    required String label,
-    required bool isUrdu,
-    required void Function(String) onChanged,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: TextInputType.number,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      onChanged: onChanged,
-      style: const TextStyle(fontSize: 15),
-      decoration: InputDecoration(
-        labelText: label,
-        errorText: controller.text.isNotEmpty &&
-                (double.tryParse(controller.text) ?? 0) <= 0
-            ? (isUrdu
-                ? 'برائے مہربانی درست رقم درج کریں'
-                : 'Please enter a valid amount')
-            : null,
-        filled: true,
-        fillColor: const Color(0xFFF5F7F9),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none),
-      ),
-    );
-  }
-
-  Widget _buildDialogTextField({
-    required TextEditingController controller,
-    required String label,
-    String? hint,
-    int maxLines = 1,
-    bool isNumber = false,
-    required bool isUrdu,
-    required String fontFamily,
-  }) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-      style: TextStyle(
-        color: AppTheme.darkColor,
-        fontFamily: isNumber ? '' : fontFamily,
-        fontSize: 16,
-      ),
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        labelStyle: TextStyle(
-            fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-            color: Colors.grey.shade600,
-            fontSize: 13,
-            fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        fillColor: const Color(0xFFF5F7F9),
-        filled: true,
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.0),
-            borderSide: BorderSide(color: Colors.grey.shade400)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.0),
-            borderSide: BorderSide(color: Colors.grey.shade400)),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.0),
-            borderSide: const BorderSide(color: AppTheme.themeColor, width: 1)),
-      ),
-    );
-  }
-
   Future<void> _openNegotiation(bool isUrdu, String workDescription) async {
     setState(() => _isSending = true);
     final user = FirebaseAuth.instance.currentUser;
@@ -329,10 +249,23 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
       if (existingOrders.docs.isNotEmpty) {
         order = ArtisanWorkOrder.fromMap(existingOrders.docs.first.data());
       } else {
+        // 🆕 اسمارٹ عنوان: اگر پہلا پیغام مختصر ہے تو اسے عنوان بنا دیں، ورنہ پیشہ استعمال کریں
+        String smartTitle = workDescription.trim();
+        if (smartTitle.length > 40) {
+          smartTitle = smartTitle.substring(0, 37) + "...";
+        }
+        // اگر پیغام بہت ہی چھوٹا ہے (مثلاً صرف سلام)، تو پیشہ ہی رہنے دیں
+        if (smartTitle.length < 5) {
+          smartTitle = isUrdu 
+            ? '${_artisan?.professionUrdu ?? 'کاریگر'} کی خدمات' 
+            : '${_artisan?.profession ?? 'Artisan'} Service';
+        }
+
         order = ArtisanWorkOrder(
           id: 'artisan_chat_${DateTime.now().millisecondsSinceEpoch}',
           artisanId: widget.artisanId,
           artisanName: _artisan?.name,
+          title: smartTitle, // اسمارٹ عنوان یہاں سیو ہوگا
           customerId: user.uid,
           customerName:
               user.displayName ?? (isUrdu ? 'ایک گاہک' : 'A Customer'),
@@ -361,16 +294,13 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
           _isSending = false;
         });
 
-        // 1. Get the navigation state first
-        final navState = MainNavigationScreen.of(context);
-
-        // 2. Set the target tab and expansion
+        // Set the target tab and expansion
         final notificationService =
             Provider.of<NotificationService>(context, listen: false);
         notificationService.setNotificationsTabIndex(1);
         notificationService.setTargetExpandOrderId(order.id);
 
-        // 3. Change tab and THEN pop
+        // Change tab and THEN pop
         MainNavigationScreen.switchTab(4);
         Navigator.pop(context);
 
@@ -598,7 +528,7 @@ Check out this artisan on Karobari Saathi!
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(artisan, isUrdu, fontFamily),
-            _buildLocationAndTasksStrip(artisan, isUrdu, fontFamily),
+            _buildLocationStrip(artisan, isUrdu, fontFamily),
             _buildSelectionBar(isUrdu, fontFamily),
             const SizedBox(height: 16),
             _buildTabContent(artisan, isUrdu, fontFamily),
@@ -612,12 +542,15 @@ Check out this artisan on Karobari Saathi!
     );
   }
 
-  Widget _buildTabContent(ArtisanProfile artisan, bool isUrdu, String fontFamily) {
+  Widget _buildTabContent(
+      ArtisanProfile artisan, bool isUrdu, String fontFamily) {
     switch (_activeIndex) {
       case 0:
-        return _AboutTab(artisan: artisan, isUrdu: isUrdu, fontFamily: fontFamily);
+        return _AboutTab(
+            artisan: artisan, isUrdu: isUrdu, fontFamily: fontFamily);
       case 1:
-        return _GalleryTab(artisan: artisan, isUrdu: isUrdu, fontFamily: fontFamily);
+        return _GalleryTab(
+            artisan: artisan, isUrdu: isUrdu, fontFamily: fontFamily);
       case 2:
         return _ReviewsTab(
           artisanId: widget.artisanId,
@@ -731,6 +664,16 @@ Check out this artisan on Karobari Saathi!
                             ),
                           ),
                         ],
+                        const Spacer(),
+                        Text(
+                          '${isUrdu ? 'مکمل کام' : 'Jobs Done'}: $_workCount',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withOpacity(0.9),
+                            fontWeight: FontWeight.bold,
+                            fontFamily: fontFamily,
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -782,7 +725,7 @@ Check out this artisan on Karobari Saathi!
     );
   }
 
-  Widget _buildLocationAndTasksStrip(
+  Widget _buildLocationStrip(
       ArtisanProfile artisan, bool isUrdu, String fontFamily) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -793,20 +736,34 @@ Check out this artisan on Karobari Saathi!
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStripItem(
-            isUrdu ? 'مقام' : 'Location',
-            artisan.location,
-            PhosphorIcons.mapPin(PhosphorIconsStyle.fill),
-            fontFamily,
-          ),
-          Container(width: 1, height: 24, color: Colors.grey.shade300),
-          _buildStripItem(
-            isUrdu ? 'مکمل کام' : 'Jobs Done',
-            '$_workCount',
-            PhosphorIcons.briefcase(PhosphorIconsStyle.fill),
-            fontFamily,
+          Icon(PhosphorIcons.mapPin(PhosphorIconsStyle.fill),
+              size: 20, color: AppTheme.themeColor),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isUrdu ? 'مقام' : 'Location',
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey[500],
+                      fontFamily: fontFamily),
+                ),
+                Text(
+                  artisan.location,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.darkColor,
+                      fontFamily: fontFamily),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1041,7 +998,6 @@ Check out this artisan on Karobari Saathi!
         onTap: () {
           setState(() {
             _activeIndex = index;
-            _activeSection = index == 0 ? 'about' : (index == 1 ? 'gallery' : 'reviews');
           });
         },
         behavior: HitTestBehavior.opaque,
@@ -1178,8 +1134,10 @@ class _AboutTabState extends State<_AboutTab>
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children:
-                (isUrdu ? artisan.skillsUrdu : artisan.skills).map((skill) {
+            children: (isUrdu && artisan.skillsUrdu.isNotEmpty
+                    ? artisan.skillsUrdu
+                    : artisan.skills)
+                .map((skill) {
               return Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

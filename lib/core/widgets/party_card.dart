@@ -125,7 +125,7 @@ class _PartyCardState extends State<PartyCard> {
         color: isSettled 
             ? Colors.white 
             : balanceColor.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -133,18 +133,12 @@ class _PartyCardState extends State<PartyCard> {
             offset: const Offset(0, 4),
           ),
         ],
-        border: Border.all(
-          color: isSettled 
-              ? AppTheme.darkColor.withOpacity(0.15) 
-              : balanceColor.withOpacity(0.3),
-          width: 1,
-        ),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: widget.onView,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           child: Column(
             children: [
               Padding(

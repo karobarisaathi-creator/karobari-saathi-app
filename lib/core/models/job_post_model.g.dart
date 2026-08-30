@@ -37,6 +37,8 @@ class JobPostAdapter extends TypeAdapter<JobPost> {
       exclusions: fields[19] as String?,
       isComplex: fields[20] as bool?,
       estimatedDays: fields[21] as int?,
+      budgetUnit: fields[28] as String?,
+      durationUnit: fields[29] as String?,
       requiresHeightWork: fields[22] as bool?,
       requiresSpecialTools: fields[23] as bool?,
       latitude: fields[24] as double?,
@@ -49,7 +51,7 @@ class JobPostAdapter extends TypeAdapter<JobPost> {
   @override
   void write(BinaryWriter writer, JobPost obj) {
     writer
-      ..writeByte(26)
+      ..writeByte(28)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -90,6 +92,10 @@ class JobPostAdapter extends TypeAdapter<JobPost> {
       ..write(obj.isComplex)
       ..writeByte(21)
       ..write(obj.estimatedDays)
+      ..writeByte(28)
+      ..write(obj.budgetUnit)
+      ..writeByte(29)
+      ..write(obj.durationUnit)
       ..writeByte(22)
       ..write(obj.requiresHeightWork)
       ..writeByte(23)

@@ -171,7 +171,10 @@ class JobNegotiationService {
               .doc(artisanId)
               .collection('work_orders')
               .doc(jobId),
-          {'isLastMessageRead': true});
+          {
+            'isLastMessageRead': true,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
     }
 
     await batch.commit();
