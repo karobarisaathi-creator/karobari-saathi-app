@@ -4,6 +4,7 @@ import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/config/professions_config.dart';
 
 class ProfessionDialog extends StatefulWidget {
   final bool isUrdu;
@@ -25,32 +26,25 @@ class ProfessionDialog extends StatefulWidget {
 class _ProfessionDialogState extends State<ProfessionDialog> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _seasonController = TextEditingController();
 
-  String _selectedIcon = 'business_center';
+  String _selectedIcon = 'tools';
   bool _isSaving = false;
 
-  final List<Map<String, dynamic>> _availableIcons = [
-    {'key': 'agriculture', 'icon': PhosphorIcons.tractor(), 'label': 'Agri', 'labelUr': 'زراعت'},
-    {'key': 'livestock', 'icon': PhosphorIcons.cow(), 'label': 'Livestock', 'labelUr': 'مال مویشی'},
-    {'key': 'transport', 'icon': PhosphorIcons.truck(), 'label': 'Transport', 'labelUr': 'گاڑی/ٹرک'},
-    {'key': 'shop', 'icon': PhosphorIcons.storefront(), 'label': 'Shop', 'labelUr': 'دکان'},
-    {'key': 'factory', 'icon': PhosphorIcons.factory(), 'label': 'Factory', 'labelUr': 'فیکٹری'},
-    {'key': 'hammer', 'icon': PhosphorIcons.hammer(), 'label': 'Hammer', 'labelUr': 'تعمیرات'},
-    {'key': 'land', 'icon': PhosphorIcons.mapPin(), 'label': 'Land', 'labelUr': 'زمین/پلاٹ'},
-    {'key': 'tools', 'icon': PhosphorIcons.wrench(), 'label': 'Services', 'labelUr': 'خدمات'},
-    {'key': 'food', 'icon': PhosphorIcons.cookingPot(), 'label': 'Food', 'labelUr': 'کھانا'},
-    {'key': 'tech', 'icon': PhosphorIcons.cpu(), 'label': 'Tech', 'labelUr': 'ٹیکنالوجی'},
-    {'key': 'finance', 'icon': PhosphorIcons.bank(), 'label': 'Bank', 'labelUr': 'بینک'},
-    {'key': 'cart', 'icon': PhosphorIcons.shoppingCart(), 'label': 'Cart', 'labelUr': 'خریداری'},
-  ];
+  Map<String, List<MasterProfession>> get _groupedProfessions {
+    final Map<String, List<MasterProfession>> grouped = {};
+    for (var p in ProfessionsConfig.allProfessions) {
+      final cat = widget.isUrdu ? p.categoryUrdu : p.categoryName;
+      if (!grouped.containsKey(cat)) grouped[cat] = [];
+      grouped[cat]!.add(p);
+    }
+    return grouped;
+  }
 
   @override
   void initState() {
     super.initState();
     if (widget.profession != null) {
       _nameController.text = widget.profession!.name;
-      _seasonController.text = widget.profession!.season;
 
       String desc = widget.profession!.description ?? '';
       if (desc.startsWith('ICON:')) {
@@ -77,7 +71,7 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
     final fontWeight = widget.isUrdu ? FontWeight.bold : FontWeight.normal;
 
     return Scaffold(
-      backgroundColor: AppTheme.lightColor,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
         title: widget.profession == null
             ? (widget.isUrdu ? 'نیا پیشہ' : 'New Profession')
@@ -86,164 +80,66 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon Selection
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.darkColor.withOpacity(0.1)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.isUrdu ? 'آئیکن منتخب کریں' : 'Select Icon',
-                    style: TextStyle(
-                      color: AppTheme.darkColor,
-                      fontFamily: fontFamily,
-                      fontWeight: fontWeight,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 4,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 0.8,
-                    ),
-                    itemCount: _availableIcons.length,
-                    itemBuilder: (context, index) {
-                      final iconData = _availableIcons[index];
-                      final isSelected = _selectedIcon == iconData['key'];
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedIcon = iconData['key'];
-                          });
-                        },
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: isSelected ? AppTheme.themeColor : AppTheme.lightColor.withOpacity(0.5),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isSelected ? AppTheme.themeColor : AppTheme.darkColor.withOpacity(0.1),
-                                  width: 1.5,
-                                ),
-                                boxShadow: isSelected ? [
-                                  BoxShadow(
-                                    color: AppTheme.themeColor.withOpacity(0.3),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
-                                  )
-                                ] : null,
-                              ),
-                              child: Icon(
-                                iconData['icon'],
-                                color: isSelected ? Colors.white : AppTheme.themeColor,
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Flexible(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  widget.isUrdu ? iconData['labelUr'] : iconData['label'],
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontFamily: fontFamily,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.darkColor,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ],
+            Text(
+              widget.isUrdu ? 'تفصیلات درج کریں' : 'Enter Details',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                fontFamily: fontFamily,
+                color: AppTheme.darkColor,
               ),
             ),
-
             const SizedBox(height: 16),
 
-            // Form Fields
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.darkColor.withOpacity(0.1)),
-              ),
-              child: Column(
-                children: [
-                  // Profession Name
-                  _buildTextField(
-                    controller: _nameController,
-                    label: widget.isUrdu ? 'پیشہ کا نام' : 'Profession Name',
-                    icon: PhosphorIcons.briefcase(),
-                    fontFamily: fontFamily,
-                    fontWeight: fontWeight,
-                  ),
+            // Form Fields at Top
+            Column(
+              children: [
+                // Profession Name
+                _buildTextField(
+                  controller: _nameController,
+                  label: widget.isUrdu ? 'پیشہ کا نام' : 'Profession Name',
+                  fontFamily: fontFamily,
+                  fontWeight: fontWeight,
+                ),
 
-                  const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-                  // Season / Year
-                  _buildTextField(
-                    controller: _seasonController,
-                    label: widget.isUrdu ? 'سیزن / سال (اختیاری)' : 'Season / Year (Optional)',
-                    hint: widget.isUrdu ? 'مثلاً: گندم 2024' : 'e.g., Wheat 2024',
-                    icon: PhosphorIcons.calendar(),
-                    fontFamily: fontFamily,
-                    fontWeight: fontWeight,
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: widget.isUrdu ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Text(
-                      widget.isUrdu
-                          ? 'نوٹ: اگر آپ سیزن کا موازنہ کرنا چاہتے ہیں تو سیزن لکھنا ضروری ہے۔'
-                          : 'Note: Season is required if you want to use season comparison.',
-                      style: TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 11,
-                        fontFamily: fontFamily,
-                        fontWeight: fontWeight,
-                      ),
-                    ),
-                  ),
+                // Description
+                _buildTextField(
+                  controller: _descriptionController,
+                  label: widget.isUrdu ? 'تفصیل (لازمی)' : 'Description (Required)',
+                  hint: widget.isUrdu ? 'کم از کم 3 سے 4 لائنوں کی تفصیل لکھیں۔' : 'Enter 3-4 lines of description.',
+                  fontFamily: fontFamily,
+                  fontWeight: fontWeight,
+                  maxLines: 4,
+                ),
+              ],
+            ),
 
-                  const SizedBox(height: 16),
+            const SizedBox(height: 24),
 
-                  // Description
-                  _buildTextField(
-                    controller: _descriptionController,
-                    label: widget.isUrdu ? 'تفصیل (لازمی)' : 'Description (Required)',
-                    hint: widget.isUrdu ? 'کم از کم 3 سے 4 لائنوں کی تفصیل لکھیں۔' : 'Enter 3-4 lines of description.',
-                    icon: PhosphorIcons.note(),
-                    fontFamily: fontFamily,
-                    fontWeight: fontWeight,
-                    maxLines: 4,
-                  ),
-                ],
+            Text(
+              widget.isUrdu ? 'شعبہ یا آئیکن منتخب کریں' : 'Select Profession / Icon',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                fontFamily: fontFamily,
+                color: AppTheme.darkColor,
               ),
             ),
+            const SizedBox(height: 16),
+
+            // Grouped Professions in Cards
+            ..._groupedProfessions.entries.map((entry) {
+              return _buildCategoryCard(
+                category: entry.key,
+                items: entry.value,
+                isUrdu: widget.isUrdu,
+                fontFamily: fontFamily,
+              );
+            }).toList(),
 
             const SizedBox(height: 24),
 
@@ -265,7 +161,7 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
                       finalDescription,
                       widget.profession?.totalProduction ?? 0.0,
                       widget.profession?.productionUnit ?? '',
-                      _seasonController.text,
+                      '', // Season removed
                       widget.profession?.targetProduction ?? 0.0,
                       widget.profession?.budgetLimits,
                       widget.profession?.benchmarkCostPerUnit ?? 0.0,
@@ -283,7 +179,7 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        widget.isUrdu ? 'پیشہ کا نام درج کریں' : 'Please enter profession name',
+                        widget.isUrdu ? 'پیشہ کا نام اور تفصیل درج کریں' : 'Please enter profession name and description',
                         style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight),
                       ),
                       backgroundColor: AppTheme.expenseColor,
@@ -304,10 +200,109 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
     );
   }
 
+  Widget _buildCategoryCard({
+    required String category,
+    required List<MasterProfession> items,
+    required bool isUrdu,
+    required String fontFamily,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.darkColor.withOpacity(0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            category,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+              color: AppTheme.themeColor,
+              fontFamily: fontFamily,
+            ),
+          ),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              childAspectRatio: 0.75,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+            ),
+            itemCount: items.length,
+            itemBuilder: (context, idx) {
+              final p = items[idx];
+              final isSelected = _selectedIcon == p.id;
+              return InkWell(
+                onTap: () {
+                  setState(() {
+                    _selectedIcon = p.id;
+                    if (_nameController.text.isEmpty) {
+                      _nameController.text = p.name;
+                    }
+                  });
+                },
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppTheme.themeColor : AppTheme.backgroundColor.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isSelected ? AppTheme.themeColor : Colors.transparent,
+                          width: 2,
+                        ),
+                      ),
+                      child: Icon(
+                        p.icon,
+                        color: isSelected ? Colors.white : AppTheme.themeColor,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Flexible(
+                      child: Text(
+                        p.name,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                          fontFamily: fontFamily,
+                          color: isSelected ? AppTheme.themeColor : AppTheme.darkColor,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
-    required IconData icon,
     required String fontFamily,
     required FontWeight fontWeight,
     String? hint,
@@ -335,15 +330,14 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
           color: AppTheme.textSecondary.withOpacity(0.5),
         ),
         filled: true,
-        fillColor: AppTheme.lightColor.withOpacity(0.5),
-        prefixIcon: Icon(icon, color: AppTheme.themeColor),
+        fillColor: Colors.white,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppTheme.darkColor.withOpacity(0.1)),
+          borderSide: BorderSide(color: AppTheme.darkColor.withOpacity(0.15)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppTheme.darkColor.withOpacity(0.1)),
+          borderSide: BorderSide(color: AppTheme.darkColor.withOpacity(0.15)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -358,7 +352,6 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
-    _seasonController.dispose();
     super.dispose();
   }
 }

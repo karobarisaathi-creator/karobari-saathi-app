@@ -13,7 +13,12 @@ class TransactionService extends BaseService {
     // 1. Save locally first
     await transactionsBox?.put(transaction.id, transaction);
     await _accountService.recalculateAccountBalance(transaction.accountId);
-    if (transaction.professionId != null) await _professionService.recalculateProfessionFinance(transaction.professionId!);
+    
+    // Recalculate profession finance (this helper now handles master/season hierarchy)
+    if (transaction.professionId != null) {
+      await _professionService.recalculateProfessionFinance(transaction.professionId!);
+    }
+    
     notifyListeners();
     
     // 2. Background Cloud Sync

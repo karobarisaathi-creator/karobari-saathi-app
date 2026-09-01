@@ -48,6 +48,25 @@ class JobService extends BaseService {
     }
   }
 
+  /// کام کی حیثیت (Status) اپ ڈیٹ کریں
+  Future<void> updateJobStatus(String jobId, String status) async {
+    // 1. Update locally
+    final job = jobsBox?.get(jobId);
+    if (job != null) {
+      final updatedJob = job.copyWith(status: status);
+      await jobsBox?.put(jobId, updatedJob);
+      notifyListeners();
+    }
+
+    // 2. Update in Cloud
+    if (auth.currentUser != null) {
+      await firestore.collection('jobs').doc(jobId).update({
+        'status': status,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
   /// Get Jobs with Local First approach
   List<JobPost> getJobsLocal() {
     return jobsBox?.values.toList() ?? [];

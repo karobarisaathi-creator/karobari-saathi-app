@@ -11,6 +11,7 @@ import 'package:account_app/features/accounts/reports_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/config/professions_config.dart';
 
 class ProfessionsScreen extends StatefulWidget {
   @override
@@ -140,24 +141,31 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
           final parts = profession.description!.split('|');
           final iconKey = parts[0].substring(5);
           
-          final Map<String, dynamic> iconMap = {
-            'agriculture': {'icon': PhosphorIcons.tractor(), 'label': 'Agriculture', 'labelUr': 'زراعت'},
-            'livestock': {'icon': PhosphorIcons.cow(), 'label': 'Livestock', 'labelUr': 'مال مویشی'},
-            'transport': {'icon': PhosphorIcons.truck(), 'label': 'Transport', 'labelUr': 'گاڑی/ٹرک'},
-            'shop': {'icon': PhosphorIcons.storefront(), 'label': 'Shop', 'labelUr': 'دکان'},
-            'factory': {'icon': PhosphorIcons.factory(), 'label': 'Factory', 'labelUr': 'فیکٹری'},
-            'hammer': {'icon': PhosphorIcons.hammer(), 'label': 'Construction', 'labelUr': 'تعمیرات'},
-            'land': {'icon': PhosphorIcons.mapPin(), 'label': 'Land', 'labelUr': 'زمین/پلاٹ'},
-            'tools': {'icon': PhosphorIcons.wrench(), 'label': 'Services', 'labelUr': 'خدمات'},
-            'food': {'icon': PhosphorIcons.cookingPot(), 'label': 'Food', 'labelUr': 'کھانا'},
-            'tech': {'icon': PhosphorIcons.cpu(), 'label': 'Tech', 'labelUr': 'ٹیکنالوجی'},
-            'finance': {'icon': PhosphorIcons.bank(), 'label': 'Finance', 'labelUr': 'بینک'},
-            'cart': {'icon': PhosphorIcons.shoppingCart(), 'label': 'Cart', 'labelUr': 'خریداری'},
-          };
-
-          if (iconMap.containsKey(iconKey)) {
-            displayIcon = iconMap[iconKey]['icon'];
-            categoryLabel = isUrdu ? iconMap[iconKey]['labelUr'] : iconMap[iconKey]['label'];
+          if (ProfessionsConfig.iconMap.containsKey(iconKey)) {
+            displayIcon = ProfessionsConfig.iconMap[iconKey]!;
+            
+            // Try to find Urdu label from config if possible
+            final configMatch = ProfessionsConfig.allProfessions.where((p) => p.id == iconKey).firstOrNull;
+            if (configMatch != null) {
+              categoryLabel = isUrdu ? configMatch.name : configMatch.id[0].toUpperCase() + configMatch.id.substring(1);
+            } else {
+              // Fallback labels
+              final Map<String, String> labels = {
+                'agriculture': isUrdu ? 'زراعت' : 'Agriculture',
+                'livestock': isUrdu ? 'مال مویشی' : 'Livestock',
+                'transport': isUrdu ? 'گاڑی/ٹرک' : 'Transport',
+                'shop': isUrdu ? 'دکان' : 'Shop',
+                'factory': isUrdu ? 'فیکٹری' : 'Factory',
+                'hammer': isUrdu ? 'تعمیرات' : 'Construction',
+                'land': isUrdu ? 'زمین/پلاٹ' : 'Land',
+                'tools': isUrdu ? 'خدمات' : 'Services',
+                'food': isUrdu ? 'کھانا' : 'Food',
+                'tech': isUrdu ? 'ٹیکنالوجی' : 'Tech',
+                'finance': isUrdu ? 'بینک' : 'Finance',
+                'cart': isUrdu ? 'خریداری' : 'Cart',
+              };
+              categoryLabel = labels[iconKey] ?? (isUrdu ? 'دیگر' : 'Other');
+            }
           }
           
           if (parts.length > 1) {

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/language_service.dart';
@@ -12,10 +11,14 @@ import 'package:account_app/features/artisans/widgets/job_post_card.dart';
 import 'package:account_app/features/artisans/job_detail_screen.dart';
 import 'package:account_app/core/services/job_algorithm_service.dart';
 import 'package:account_app/core/widgets/skeleton_shimmer.dart';
+import 'package:account_app/core/services/logging_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 
 class JobsTab extends StatefulWidget {
   final String selectedCategory;
   final String searchQuery;
+  
   const JobsTab({
     super.key,
     required this.selectedCategory,
@@ -27,16 +30,25 @@ class JobsTab extends StatefulWidget {
 }
 
 class _JobsTabState extends State<JobsTab> {
+  final _logger = LoggingService();
   final ScrollController _scrollController = ScrollController();
+  final JobService _jobService = JobService();
+  final ArtisanService _artisanService = ArtisanService();
+  final JobAlgorithmService _algorithmService = JobAlgorithmService();
+  
   List<JobPost> _jobs = [];
   DocumentSnapshot? _lastJobDocument;
-  bool _isLoadingMoreJobs = false;
+  
+  bool _isLoadingMore = false;
   bool _hasMoreJobs = true;
-  bool _isInitialJobsLoading = true;
+  bool _isInitialLoading = true;
+  
   String? _artisanProfession;
   double? _artisanLat;
   double? _artisanLng;
+  
   final int _batchSize = 10;
+  StreamSubscription? _jobsSubscription;
 
   @override
   void initState() {
@@ -44,118 +56,185 @@ class _JobsTabState extends State<JobsTab> {
     _scrollController.addListener(_onScroll);
     _loadArtisanProfile();
     _fetchJobs(isRefresh: true);
+    
+    // لوکل ڈیٹا میں تبدیلیوں پر نظر رکھنے کے لیے
+    _jobService.addListener(_onServiceChanged);
   }
 
-  Future<void> _loadArtisanProfile() async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return;
+  void _onServiceChanged() {
+    if (mounted) {
+      setState(() {
+        // جب بھی لوکل ڈیٹا بدلے گا (مثلاً نئی جاب پوسٹ ہوگی)، لسٹ اپ ڈیٹ ہوگی
+        _syncLocalJobs();
+      });
+    }
+  }
 
-    final profile = await ArtisanService().getProfile(userId);
-    if (!mounted) return;
-    setState(() {
-      _artisanProfession =
-          profile != null && profile.isActive ? profile.profession : null;
-      _artisanLat = profile?.latitude;
-      _artisanLng = profile?.longitude;
-    });
+  void _syncLocalJobs() {
+    final localJobs = _jobService.getJobsLocal();
+    if (localJobs.isNotEmpty) {
+      setState(() {
+        for (var updatedJob in localJobs) {
+          final index = _jobs.indexWhere((j) => j.id == updatedJob.id);
+          if (index != -1) {
+            // اگر جاب پہلے سے موجود ہے تو اسے اپ ڈیٹ کریں
+            _jobs[index] = updatedJob;
+          } else {
+            // اگر نئی جاب ہے تو اسے شروع میں شامل کریں
+            _jobs.insert(0, updatedJob);
+          }
+        }
+      });
+    }
   }
 
   @override
   void didUpdateWidget(JobsTab oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedCategory != widget.selectedCategory) {
+    if (oldWidget.selectedCategory != widget.selectedCategory ||
+        oldWidget.searchQuery != widget.searchQuery) {
       _fetchJobs(isRefresh: true);
     }
   }
 
   @override
   void dispose() {
+    _jobService.removeListener(_onServiceChanged);
     _scrollController.dispose();
+    _jobsSubscription?.cancel();
     super.dispose();
   }
 
   void _onScroll() {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
-      if (_hasMoreJobs && !_isLoadingMoreJobs) {
+      if (_hasMoreJobs && !_isLoadingMore) {
         _fetchJobs();
       }
     }
   }
 
+  Future<void> _loadArtisanProfile() async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return;
+
+      final profile = await _artisanService.getProfile(userId);
+      if (!mounted) return;
+      
+      setState(() {
+        _artisanProfession = profile != null && profile.isActive
+            ? profile.profession
+            : null;
+        _artisanLat = profile?.latitude;
+        _artisanLng = profile?.longitude;
+      });
+    } catch (e, stack) {
+      _logger.error("Load artisan profile error", e, stack);
+    }
+  }
+
   Future<void> _fetchJobs({bool isRefresh = false}) async {
-    if (_isLoadingMoreJobs) return;
+    if (_isLoadingMore) return;
 
     if (mounted) {
       setState(() {
+        _isLoadingMore = true;
         if (isRefresh) {
-          _isInitialJobsLoading = true;
-          _jobs = [];
+          _isInitialLoading = true;
+          _jobs = []; // پرانا ڈیٹا صاف کریں
           _lastJobDocument = null;
           _hasMoreJobs = true;
         }
-        _isLoadingMoreJobs = true;
       });
     }
 
     try {
-      final service = Provider.of<JobService>(context, listen: false);
-
-      // 1. Fetch Local First
-      final localJobs = service.getJobsLocal();
-      if (localJobs.isNotEmpty && mounted && isRefresh) {
-        setState(() {
-          _isInitialJobsLoading = false;
-        });
-      }
-
-      // 2. Sync from Cloud
-      final snapshot = await service.getJobsBatch(
+      final snapshot = await _jobService.getJobsBatch(
         limit: _batchSize,
         startAfter: _lastJobDocument,
         category: widget.selectedCategory,
       );
 
+      if (!mounted) return;
+
       if (snapshot.docs.isNotEmpty) {
         _lastJobDocument = snapshot.docs.last;
-        final newJobs =
-            snapshot.docs.map((doc) => JobPost.fromMap(doc.data())).toList();
-
-        final now = DateTime.now();
-        final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-
-        final validJobs = newJobs
-            .where((j) =>
-                j.customerId == currentUserId ||
-                j.deadline == null ||
-                j.deadline!.isAfter(now))
+        final newJobs = snapshot.docs
+            .map((doc) => JobPost.fromMap(doc.data()))
             .toList();
 
-        if (mounted) {
-          setState(() {
-            _hasMoreJobs = snapshot.docs.length == _batchSize;
-          });
-          // Update local cache manually if needed or let the service handle it
-          for (var j in validJobs) {
-            await service.jobsBox?.put(j.id, j);
+        final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+        final now = DateTime.now();
+
+        final validJobs = newJobs.where((job) {
+          return job.customerId == currentUserId ||
+              job.deadline == null ||
+              job.deadline!.isAfter(now);
+        }).toList();
+
+        setState(() {
+          if (isRefresh) {
+            _jobs = validJobs;
+          } else {
+            // Avoid duplicates
+            final existingIds = _jobs.map((j) => j.id).toSet();
+            _jobs.addAll(validJobs.where((j) => !existingIds.contains(j.id)));
           }
-          service.notifyListeners();
-        }
+          _hasMoreJobs = snapshot.docs.length == _batchSize;
+          _isInitialLoading = false;
+          _isLoadingMore = false;
+        });
       } else {
-        if (mounted) {
-          setState(() => _hasMoreJobs = false);
-        }
+        setState(() {
+          _hasMoreJobs = false;
+          _isInitialLoading = false;
+          _isLoadingMore = false;
+        });
       }
-    } catch (e) {
-      debugPrint("Error fetching jobs: $e");
-    } finally {
+    } catch (e, stack) {
+      _logger.error("Fetch jobs error", e, stack);
       if (mounted) {
         setState(() {
-          _isInitialJobsLoading = false;
-          _isLoadingMoreJobs = false;
+          _isInitialLoading = false;
+          _isLoadingMore = false;
         });
       }
     }
+  }
+
+  List<JobPost> _filterAndSortJobs() {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    final now = DateTime.now();
+
+    var jobs = _jobs.where((job) {
+      bool isNotMine = widget.selectedCategory == 'all' ||
+          job.customerId != currentUserId;
+      bool matchesCategory = widget.selectedCategory == 'all' ||
+          job.categories.contains(widget.selectedCategory);
+      bool isNotExpired = job.customerId == currentUserId ||
+          job.deadline == null ||
+          job.deadline!.isAfter(now);
+      bool isOpen = job.status == 'open' || job.customerId == currentUserId;
+
+      bool matchesSearch = true;
+      if (widget.searchQuery.isNotEmpty) {
+        final query = widget.searchQuery.toLowerCase();
+        matchesSearch = job.title.toLowerCase().contains(query) ||
+            job.description.toLowerCase().contains(query) ||
+            job.location.toLowerCase().contains(query);
+      }
+
+      return isNotMine && matchesCategory && isNotExpired && isOpen && matchesSearch;
+    }).toList();
+
+    return _algorithmService.applySmartSort(
+      jobs: jobs,
+      artisanProfession: _artisanProfession,
+      currentUserId: currentUserId,
+      artisanLat: _artisanLat,
+      artisanLng: _artisanLng,
+    );
   }
 
   @override
@@ -163,113 +242,95 @@ class _JobsTabState extends State<JobsTab> {
     final isUrdu = Provider.of<LanguageService>(context).isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
 
-    return Consumer<JobService>(
-      builder: (context, service, child) {
-        final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-        final now = DateTime.now();
+    return RefreshIndicator(
+      onRefresh: () => _fetchJobs(isRefresh: true),
+      color: AppTheme.themeColor,
+      child: _buildBody(isUrdu, fontFamily),
+    );
+  }
 
-        // Filter jobs from local cache reactively
-        var jobs = service.jobsBox?.values.where((j) {
-              // If 'all' is selected, show everything (including own).
-              // If a specific category is selected, hide own to focus on others' jobs.
-              bool isNotMine = widget.selectedCategory == 'all' ||
-                  j.customerId != currentUserId;
-              bool matchesCategory = widget.selectedCategory == 'all' ||
-                  j.categories.contains(widget.selectedCategory);
-              bool isNotExpired = j.customerId == currentUserId ||
-                  j.deadline == null ||
-                  j.deadline!.isAfter(now);
-              bool isOpen = j.status == 'open' || j.customerId == currentUserId;
+  Widget _buildBody(bool isUrdu, String fontFamily) {
+    if (_isInitialLoading && _jobs.isEmpty) {
+      return _buildShimmerLoading();
+    }
 
-              bool matchesSearch = true;
-              if (widget.searchQuery.isNotEmpty) {
-                final query = widget.searchQuery.toLowerCase();
-                matchesSearch = j.title.toLowerCase().contains(query) ||
-                    j.description.toLowerCase().contains(query) ||
-                    j.location.toLowerCase().contains(query);
-              }
+    final filteredJobs = _filterAndSortJobs();
 
-              return isNotMine &&
-                  matchesCategory &&
-                  isNotExpired &&
-                  isOpen &&
-                  matchesSearch;
-            }).toList() ??
-            [];
+    if (filteredJobs.isEmpty) {
+      return _buildEmptyState(isUrdu, fontFamily);
+    }
 
-        // Apply algorithm sorting
-        final algorithm = JobAlgorithmService();
-        jobs = algorithm.applySmartSort(
-          jobs: jobs,
-          artisanProfession: _artisanProfession,
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.all(16),
+      itemCount: filteredJobs.length + (_hasMoreJobs ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == filteredJobs.length) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppTheme.themeColor.withValues(alpha: 0.5),
+              ),
+            ),
+          );
+        }
+
+        final job = filteredJobs[index];
+        return JobPostCard(
+          job: job,
+          isUrdu: isUrdu,
+          fontFamily: fontFamily,
           currentUserId: currentUserId,
-          artisanLat: _artisanLat,
-          artisanLng: _artisanLng,
-        );
-
-        return RefreshIndicator(
-          onRefresh: () => _fetchJobs(isRefresh: true),
-          color: AppTheme.themeColor,
-          child: _isInitialJobsLoading && jobs.isEmpty
-              ? _buildShimmerLoading()
-              : jobs.isEmpty
-                  ? _buildEmptyState(isUrdu, fontFamily)
-                  : ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(16),
-                      itemCount: jobs.length + (_hasMoreJobs ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        if (index < jobs.length) {
-                          final job = jobs[index];
-                          return JobPostCard(
-                            job: job,
-                            isUrdu: isUrdu,
-                            fontFamily: fontFamily,
-                            currentUserId: currentUserId ?? '',
-                            onTap: () {
-                              Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (context) =>
-                                          JobDetailScreen(job: job)));
-                            },
-                          );
-                        } else {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 32),
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color:
-                                    AppTheme.themeColor.withValues(alpha: 0.5),
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                    ),
+          onDeleted: () {
+            setState(() {
+              _jobs.removeWhere((j) => j.id == job.id);
+            });
+          },
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => JobDetailScreen(job: job),
+              ),
+            );
+          },
         );
       },
     );
   }
 
   Widget _buildEmptyState(bool isUrdu, String fontFamily) {
-    return SingleChildScrollView(
+    return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      child: Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        alignment: Alignment.center,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(PhosphorIcons.megaphone(), size: 64, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            Text(isUrdu ? 'کوئی کام دستیاب نہیں' : 'No jobs available',
+      children: [
+        Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                PhosphorIcons.megaphone(),
+                size: 64,
+                color: Colors.grey[300],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                isUrdu ? 'کوئی کام دستیاب نہیں' : 'No jobs available',
                 style: TextStyle(
-                    fontSize: 18, color: Colors.grey, fontFamily: fontFamily)),
-          ],
+                  fontSize: 18,
+                  color: Colors.grey,
+                  fontFamily: fontFamily,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -286,7 +347,10 @@ class _JobsTabState extends State<JobsTab> {
             const SkeletonShimmer(width: 100, height: 12, borderRadius: 4),
             const SizedBox(height: 16),
             const SkeletonShimmer(
-                width: double.infinity, height: 14, borderRadius: 4),
+              width: double.infinity,
+              height: 14,
+              borderRadius: 4,
+            ),
             const SizedBox(height: 8),
             const SkeletonShimmer(width: 200, height: 14, borderRadius: 4),
             const SizedBox(height: 16),

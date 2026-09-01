@@ -10,14 +10,11 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/voice_comment_player.dart';
-import 'package:account_app/core/widgets/image_gallery_viewer.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'add_transaction_screen.dart';
-import 'package:account_app/features/professions/add_profession_transaction_screen.dart';
-import 'package:account_app/core/models/profession_model.dart';
+import 'package:account_app/features/professions/add_project_transaction_screen.dart';
 
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 
@@ -45,7 +42,7 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
     final numberStyle = const TextStyle(fontFamily: '', fontWeight: FontWeight.bold);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
         title: isUrdu ? 'رسید' : 'Receipt',
         showBackButton: true,
@@ -66,7 +63,7 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 5)),
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 5)),
                       ],
                     ),
                     child: Column(
@@ -302,7 +299,7 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                 
                 const SizedBox(height: 20),
 
-                if (widget.transaction.voiceNote != null || (widget.transaction.billImage != null && widget.transaction.billImage!.isNotEmpty))
+                if (widget.transaction.voiceNote != null)
                   Container(
                     width: double.infinity,
                     margin: const EdgeInsets.only(top: 10),
@@ -311,7 +308,7 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5),
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 5),
                       ],
                     ),
                     child: Column(
@@ -322,21 +319,16 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                             Icon(PhosphorIcons.paperclip(), size: 20, color: AppTheme.darkColor),
                             const SizedBox(width: 8),
                             Text(
-                              isUrdu ? 'منسلک تصاویر اور وائس نوٹ' : 'Attached Images & Voice',
+                              isUrdu ? 'منسلک وائس نوٹ' : 'Attached Voice Note',
                               style: TextStyle(fontWeight: fontWeight, fontFamily: fontFamily, color: AppTheme.darkColor),
                             ),
                           ],
                         ),
                         const Divider(height: 20),
-                        if (widget.transaction.voiceNote != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: VoiceCommentPlayer(audioUrl: widget.transaction.voiceNote!),
-                          ),
-                        if (widget.transaction.billImage != null && widget.transaction.billImage!.isNotEmpty)
-                          ImageGalleryViewer(
-                            imagePaths: widget.transaction.billImage!.split(','),
-                          ),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: VoiceCommentPlayer(audioUrl: widget.transaction.voiceNote!),
+                        ),
                       ],
                     ),
                   ),
@@ -349,30 +341,15 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                       child: AppButton(
                         text: isUrdu ? 'ایڈٹ کریں' : 'Edit',
                         onPressed: () {
-                          if (widget.transaction.professionId != null && widget.transaction.professionId!.isNotEmpty) {
+                          if (widget.transaction.accountId == 'default_account' && widget.transaction.professionId != null) {
                             final db = Provider.of<DatabaseService>(context, listen: false);
                             final profession = db.getProfession(widget.transaction.professionId!);
                             if (profession != null) {
-                              List<String> incomeCats = [];
-                              List<String> expenseCats = [];
-                              for (var cat in profession.categories) {
-                                if (cat.startsWith('INC:')) {
-                                  incomeCats.add(cat.substring(4));
-                                } else if (cat.startsWith('EXP:')) {
-                                  expenseCats.add(cat.substring(4));
-                                }
-                              }
-                              
-                              if (incomeCats.isEmpty) incomeCats = ['تنخواہ', 'فری لانس', 'کاروبار', 'دیگر'];
-                              if (expenseCats.isEmpty) expenseCats = ['کرایہ', 'بجلی', 'پانی', 'ٹرانسپورٹ', 'دیگر'];
-
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => AddProfessionTransactionScreen(
+                                  builder: (context) => AddProjectTransactionScreen(
                                     profession: profession,
-                                    incomeCategories: incomeCats,
-                                    expenseCategories: expenseCats,
                                     transactionToEdit: widget.transaction,
                                   ),
                                 ),
@@ -383,7 +360,11 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
 
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => AddTransactionScreen(transactionToEdit: widget.transaction)),
+                            MaterialPageRoute(
+                              builder: (context) => AddTransactionScreen(
+                                transactionToEdit: widget.transaction,
+                              ),
+                            ),
                           );
                         },
                         icon: PhosphorIcons.pencilLine(),

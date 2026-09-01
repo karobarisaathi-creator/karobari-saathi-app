@@ -612,22 +612,6 @@ class _NegotiationsTabState extends State<_NegotiationsTab>
                                 suffix: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    if (isIArtisan) ...[
-                                      _buildBillButton(order, isIArtisan, widget.isUrdu, widget.fontFamily),
-                                      const SizedBox(width: 8),
-                                    ],
-                                    if (order.lastMessageSenderId == user.uid) ...[
-                                      Icon(
-                                        order.isLastMessageRead
-                                            ? PhosphorIcons.envelopeOpen()
-                                            : PhosphorIcons.envelope(),
-                                        size: 11,
-                                        color: order.isLastMessageRead
-                                            ? Colors.blue
-                                            : Colors.grey[400],
-                                      ),
-                                      const SizedBox(width: 4),
-                                    ],
                                     Text(
                                       _formatTime(
                                           order.updatedAt ?? order.createdAt,
@@ -681,23 +665,6 @@ class _NegotiationsTabState extends State<_NegotiationsTab>
                                     suffix: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        if (isIArtisan) ...[
-                                          _buildBillButton(order, isIArtisan, widget.isUrdu, widget.fontFamily),
-                                          const SizedBox(width: 8),
-                                        ],
-                                        if (order.lastMessageSenderId ==
-                                            user.uid) ...[
-                                          Icon(
-                                            order.isLastMessageRead
-                                                ? PhosphorIcons.envelopeOpen()
-                                                : PhosphorIcons.envelope(),
-                                            size: 11,
-                                            color: order.isLastMessageRead
-                                                ? Colors.blue
-                                                : Colors.grey[400],
-                                          ),
-                                          const SizedBox(width: 4),
-                                        ],
                                         Text(
                                           _formatTime(
                                               order.updatedAt ??

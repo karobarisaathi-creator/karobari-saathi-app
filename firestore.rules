@@ -74,24 +74,18 @@ service cloud.firestore {
           // Artisan: Full control over their work orders (except changing customer feedback)
           (request.auth.uid == artisanId &&
            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rating', 'review', 'isRated', 'ratedAt'])) ||
-          // Customer: Can only rate IF work is marked completed by artisan
-          (request.auth.uid == resource.data.customerId &&
-           (
-             // Rating Rule: Old status must be 'completed'
-             (resource.data.status == 'completed' &&
-              request.resource.data.status == 'rated' &&
-              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'review', 'isRated', 'ratedAt', 'status', 'updatedAt'])) ||
-             // Metadata Rule: Can update read status anytime
-             (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isLastMessageRead', 'updatedAt'])) ||
-             // Confirmation Rule
-             ((resource.data.status == 'negotiating' || resource.data.status == 'quoted') &&
-              request.resource.data.status == 'confirmed' &&
-              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customerAgreed', 'customerAcceptedTerms', 'agreedAt', 'status', 'updatedAt']))
-           ));
+          // Customer: Can update negotiation fields and provide rating
+          (request.auth.uid == resource.data.customerId && (
+             // Case 1: Updating rating (only if status is completed and not already rated)
+             (resource.data.status == 'completed' && request.resource.data.status == 'rated' && !resource.data.isRated && request.resource.data.isRated == true) ||
+             // Case 2: General negotiation/chat updates
+             (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['rating', 'review', 'isRated', 'ratedAt', 'artisanAgreed', 'artisanAcceptedTerms']))
+          ));
+
         allow delete: if isAdmin() || request.auth.uid == artisanId || resource.data.customerId == request.auth.uid;
 
         match /negotiations/{messageId} {
-          allow read: if isSignedIn() &&
+          allow read, list: if isSignedIn() &&
             (request.auth.uid == artisanId ||
              request.auth.uid == get(/databases/$(database)/documents/artisans/$(artisanId)/work_orders/$(orderId)).data.customerId);
           allow create: if isSignedIn() &&
@@ -138,7 +132,8 @@ service cloud.firestore {
             'estimatedBudget', 'deadline', 'images', 'clarifications',
             'detailedScope', 'scopeOfWork', 'exclusions', 'isComplex',
             'estimatedDays', 'requiresHeightWork', 'requiresSpecialTools',
-            'latitude', 'longitude', 'timeIn', 'timeOut'
+            'latitude', 'longitude', 'timeIn', 'timeOut', 'status', 'website',
+            'budgetUnit', 'durationUnit', 'companyName'
           ]));
       allow delete: if isSignedIn() && (request.auth.uid == resource.data.customerId || isAdmin());
 

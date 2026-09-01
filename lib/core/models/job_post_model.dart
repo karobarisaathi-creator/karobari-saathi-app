@@ -89,6 +89,12 @@ class JobPost extends HiveObject {
   @HiveField(27)
   final String? timeOut;
 
+  @HiveField(30)
+  final String? website;
+
+  @HiveField(31)
+  final String? companyName;
+
   JobPost({
     required this.id,
     required this.customerId,
@@ -118,6 +124,8 @@ class JobPost extends HiveObject {
     this.longitude,
     this.timeIn,
     this.timeOut,
+    this.website,
+    this.companyName,
   });
 
   Map<String, dynamic> toMap() {
@@ -150,6 +158,8 @@ class JobPost extends HiveObject {
       'longitude': longitude,
       'timeIn': timeIn,
       'timeOut': timeOut,
+      'website': website,
+      'companyName': companyName,
     };
   }
 
@@ -192,6 +202,8 @@ class JobPost extends HiveObject {
       longitude: (map['longitude'] as num?)?.toDouble(),
       timeIn: map['timeIn'],
       timeOut: map['timeOut'],
+      website: map['website'],
+      companyName: map['companyName'],
     );
   }
 
@@ -224,6 +236,8 @@ class JobPost extends HiveObject {
     double? longitude,
     String? timeIn,
     String? timeOut,
+    String? website,
+    String? companyName,
   }) {
     return JobPost(
       id: id ?? this.id,
@@ -254,6 +268,8 @@ class JobPost extends HiveObject {
       longitude: longitude ?? this.longitude,
       timeIn: timeIn ?? this.timeIn,
       timeOut: timeOut ?? this.timeOut,
+      website: website ?? this.website,
+      companyName: companyName ?? this.companyName,
     );
   }
 }

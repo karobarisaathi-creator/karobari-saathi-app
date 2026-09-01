@@ -5,6 +5,7 @@ import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/services/artisan_service.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/theme/app_theme.dart';
+import 'dart:async';
 
 class ArtisanCard extends StatefulWidget {
   final ArtisanProfile artisan;
@@ -27,13 +28,73 @@ class ArtisanCard extends StatefulWidget {
 }
 
 class _ArtisanCardState extends State<ArtisanCard> {
+  final ArtisanService _artisanService = ArtisanService();
+  StreamSubscription<bool>? _favoriteSubscription;
+  bool _isFavorite = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavoriteStatus();
+  }
+
+  void _loadFavoriteStatus() {
+    _favoriteSubscription?.cancel();
+    _favoriteSubscription = _artisanService
+        .isFavorite(widget.artisan.id)
+        .listen(
+          (isFav) {
+            if (mounted && isFav != _isFavorite) {
+              setState(() => _isFavorite = isFav);
+            }
+          },
+          onError: (error) {
+            // Silent fail for favorite status
+          },
+        );
+  }
+
+  @override
+  void dispose() {
+    _favoriteSubscription?.cancel();
+    super.dispose();
+  }
+
+  String _getRateText() {
+    if (widget.artisan.rate == null || widget.artisan.rate!.isEmpty) {
+      return widget.isUrdu ? 'ریٹ دستیاب نہیں' : 'N/A';
+    }
+    
+    final unit = widget.isUrdu
+        ? _getUnitUr(widget.artisan.rateUnit)
+        : _getUnitEn(widget.artisan.rateUnit);
+    
+    return 'Rs. ${widget.artisan.rate} / $unit';
+  }
+
+  String _getUnitUr(String? unit) {
+    switch (unit) {
+      case 'hour': return 'فی گھنٹہ';
+      case 'day': return 'فی دیہاڑی';
+      case 'month': return 'فی مہینہ';
+      case 'fixed': return 'مکمل کام';
+      default: return 'کام';
+    }
+  }
+
+  String _getUnitEn(String? unit) {
+    switch (unit) {
+      case 'hour': return 'Hr';
+      case 'day': return 'Day';
+      case 'month': return 'Mo';
+      case 'fixed': return 'Fixed';
+      default: return 'Job';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final String rateText = widget.artisan.rate != null && widget.artisan.rate!.isNotEmpty
-        ? (widget.isUrdu
-            ? 'Rs. ${widget.artisan.rate} / ${_getUnitUr(widget.artisan.rateUnit)}'
-            : 'Rs. ${widget.artisan.rate} / ${_getUnitEn(widget.artisan.rateUnit)}')
-        : (widget.isUrdu ? 'ریٹ دستیاب نہیں' : 'N/A');
+    final rateText = _getRateText();
 
     return GestureDetector(
       onTap: widget.onTap,
@@ -44,7 +105,7 @@ class _ArtisanCardState extends State<ArtisanCard> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -54,25 +115,24 @@ class _ArtisanCardState extends State<ArtisanCard> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: StreamBuilder<bool>(
-                stream: ArtisanService().isFavorite(widget.artisan.id),
-                builder: (context, favSnapshot) {
-                  final isFav = favSnapshot.data ?? false;
-                  return Column(
-                    children: [
-                      ProfileInfoWidget(
-                        name: widget.artisan.name,
-                        phone: '',
-                        profileImage: widget.artisan.profileImage,
-                        category: widget.isUrdu ? widget.artisan.professionUrdu : widget.artisan.profession,
-                        isVerified: widget.artisan.isVerified || widget.artisan.verificationStatus == 'approved',
-                        isFavorite: false,
-                        customSize: 70,
-                        isVerticalCategory: true,
-                        verticalSpacing: 6.0,
-                        textColor: Colors.black87,
-                        subtitleColor: Colors.grey.shade600,
-                        categoryColor: Colors.grey.shade600,
+              child: Column(
+                children: [
+                  ProfileInfoWidget(
+                    name: widget.artisan.name,
+                    phone: '',
+                    profileImage: widget.artisan.profileImage,
+                    category: widget.isUrdu
+                        ? widget.artisan.professionUrdu
+                        : widget.artisan.profession,
+                    isVerified: widget.artisan.isVerified ||
+                        widget.artisan.verificationStatus == 'approved',
+                    isFavorite: false,
+                    customSize: 70,
+                    isVerticalCategory: true,
+                    verticalSpacing: 6.0,
+                    textColor: Colors.black87,
+                    subtitleColor: Colors.grey.shade600,
+                    categoryColor: Colors.grey.shade600,
                     suffix: Text(
                       rateText,
                       style: TextStyle(
@@ -82,95 +142,75 @@ class _ArtisanCardState extends State<ArtisanCard> {
                         fontFamily: widget.isUrdu ? widget.fontFamily : null,
                       ),
                     ),
-                        bottom: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                    bottom: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            // ریٹنگ (Rating)
-                            Row(
-                              children: [
-                                const Icon(Icons.star, color: AppTheme.darkColor, size: 16),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${widget.artisan.rating} (${widget.artisan.totalReviews} ${widget.isUrdu ? 'ریٹنگز' : 'ratings'})',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
-                                    fontFamily: widget.isUrdu ? widget.fontFamily : null,
-                                  ),
-                                ),
-                                if (widget.artisan.rating >= 4.5) ...[
-                                  const SizedBox(width: 8),
-                                  _buildBadge(
-                                    widget.isUrdu ? 'بہترین سروس' : 'GREAT VALUE', 
-                                    AppTheme.incomeColor.withOpacity(0.15), 
-                                    AppTheme.incomeColor,
-                                    widget.fontFamily
-                                  ),
-                                ],
-                                if (isFav) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.themeColor.withOpacity(0.15),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      PhosphorIcons.heart(PhosphorIconsStyle.fill),
-                                      size: 12,
-                                      color: AppTheme.themeColor,
-                                    ),
-                                  ),
-                                ],
-                              ],
+                            const Icon(
+                              Icons.star,
+                              color: AppTheme.darkColor,
+                              size: 16,
                             ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      // ٹاسک کی معلومات اور بیجز (Tasks Stats & Badges)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '${widget.artisan.workCount} ${widget.isUrdu ? 'خدمات فراہم کیں' : 'tasks completed'}',
-                              overflow: TextOverflow.ellipsis,
+                            const SizedBox(width: 4),
+                            Text(
+                              '${widget.artisan.rating} (${widget.artisan.totalReviews} ${widget.isUrdu ? 'ریٹنگز' : 'ratings'})',
                               style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w900,
-                                color: const Color(0xFF27AE60),
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
                                 fontFamily: widget.isUrdu ? widget.fontFamily : null,
                               ),
                             ),
+                            if (widget.artisan.rating >= 4.5) ...[
+                              const SizedBox(width: 8),
+                              _buildBadge(
+                                widget.isUrdu ? 'بہترین سروس' : 'GREAT VALUE',
+                                AppTheme.incomeColor.withValues(alpha: 0.15),
+                                AppTheme.incomeColor,
+                              ),
+                            ],
+                            if (_isFavorite) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.themeColor.withValues(alpha: 0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  PhosphorIcons.heart(PhosphorIconsStyle.fill),
+                                  size: 12,
+                                  color: AppTheme.themeColor,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${widget.artisan.workCount} ${widget.isUrdu ? 'خدمات فراہم کیں' : 'tasks completed'}',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            color: const Color(0xFF27AE60),
+                            fontFamily: widget.isUrdu ? widget.fontFamily : null,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '•',
-                            style: TextStyle(color: Colors.grey.shade400),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${widget.artisan.workCount + 20} ${widget.isUrdu ? 'کل خدمات' : 'tasks overall'}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                              fontFamily: widget.isUrdu ? widget.fontFamily : null,
-                            ),
-                          ),
-                          const Spacer(),
-                        ],
+                        ),
                       ),
                     ],
-                  );
-                },
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 6),
-
-            // بائیو باکس (Bio Section)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
@@ -197,7 +237,7 @@ class _ArtisanCardState extends State<ArtisanCard> {
     );
   }
 
-  Widget _buildBadge(String text, Color bgColor, Color textColor, String fontFamily) {
+  Widget _buildBadge(String text, Color bgColor, Color textColor) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
@@ -207,43 +247,25 @@ class _ArtisanCardState extends State<ArtisanCard> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (text == 'ELITE' || text == 'تصدیق شدہ')
-             Icon(PhosphorIcons.sealCheck(PhosphorIconsStyle.fill), size: 12, color: textColor),
-          if (text == 'GREAT VALUE' || text == 'بہترین سروس')
-             Icon(PhosphorIcons.star(PhosphorIconsStyle.fill), size: 12, color: textColor),
-          if (text == 'ELITE' || text == 'تصدیق شدہ' || text == 'GREAT VALUE' || text == 'بہترین سروس')
-             const SizedBox(width: 4),
+          Icon(
+            text == 'GREAT VALUE' || text == 'بہترین سروس'
+                ? PhosphorIcons.star(PhosphorIconsStyle.fill)
+                : PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
+            size: 12,
+            color: textColor,
+          ),
+          const SizedBox(width: 4),
           Text(
             text,
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w900,
               color: textColor,
-              fontFamily: widget.isUrdu ? fontFamily : null,
+              fontFamily: widget.isUrdu ? widget.fontFamily : null,
             ),
           ),
         ],
       ),
     );
-  }
-
-  String _getUnitUr(String? unit) {
-    switch (unit) {
-      case 'hour': return 'فی گھنٹہ';
-      case 'day': return 'فی دیہاڑی';
-      case 'month': return 'فی مہینہ';
-      case 'fixed': return 'مکمل کام';
-      default: return 'کام';
-    }
-  }
-
-  String _getUnitEn(String? unit) {
-    switch (unit) {
-      case 'hour': return 'Hr';
-      case 'day': return 'Day';
-      case 'month': return 'Mo';
-      case 'fixed': return 'Fixed';
-      default: return 'Job';
-    }
   }
 }

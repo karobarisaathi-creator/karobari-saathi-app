@@ -3,27 +3,50 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 
-class CategoriesManagementScreen extends StatefulWidget {
-  final List<String> incomeCategories;
-  final List<String> expenseCategories;
-  final bool isUrdu;
-  final Function(List<String>, List<String>) onCategoriesUpdated;
+// مرکزی ڈیفالٹ لسٹ جو پوری ایپ میں استعمال ہوگی
+List<String> getAppDefaultCategories(bool isUrdu) {
+  return isUrdu 
+      ? ['مزدوری', 'مٹیریل', 'ٹرانسپورٹ', 'فروخت', 'کرایہ', 'کھاد', 'بیج', 'دیگر'] 
+      : ['Labor', 'Material', 'Transport', 'Sale', 'Rent', 'Fertilizer', 'Seed', 'Other'];
+}
 
-  const CategoriesManagementScreen({super.key, required this.incomeCategories, required this.expenseCategories, required this.isUrdu, required this.onCategoriesUpdated});
+class CategoriesManagementScreen extends StatefulWidget {
+  final List<String> categories;
+  final bool isUrdu;
+  final Function(List<String>) onCategoriesUpdated;
+
+  const CategoriesManagementScreen({
+    super.key, 
+    required this.categories, 
+    required this.isUrdu, 
+    required this.onCategoriesUpdated
+  });
 
   @override
   _CategoriesManagementScreenState createState() => _CategoriesManagementScreenState();
 }
 
 class _CategoriesManagementScreenState extends State<CategoriesManagementScreen> {
-  late List<String> _incomeCategories;
-  late List<String> _expenseCategories;
+  late List<String> _categories;
 
   @override
   void initState() {
     super.initState();
-    _incomeCategories = List.from(widget.incomeCategories);
-    _expenseCategories = List.from(widget.expenseCategories);
+    _loadCategories();
+  }
+
+  void _loadCategories() {
+    // پرانے کوڈ کے سابقے (Prefixes) صاف کریں
+    _categories = widget.categories.map((c) {
+      if (c.startsWith('INC:')) return c.substring(4);
+      if (c.startsWith('EXP:')) return c.substring(4);
+      return c;
+    }).toSet().toList();
+
+    // اگر لسٹ خالی ہو تو ڈیفالٹ زمرے دکھائیں
+    if (_categories.isEmpty) {
+      _categories = getAppDefaultCategories(widget.isUrdu);
+    }
   }
 
   @override
@@ -35,138 +58,110 @@ class _CategoriesManagementScreenState extends State<CategoriesManagementScreen>
       backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
         title: widget.isUrdu ? 'زمرے مینج کریں' : 'Manage Categories',
-        actions: [IconButton(icon: Icon(PhosphorIcons.checkCircle()), onPressed: _saveCategories)],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          children: [
-            _buildCategoryCard(isIncome: true, isUrdu: widget.isUrdu, fontFamily: fontFamily),
-            const SizedBox(height: 16),
-            _buildCategoryCard(isIncome: false, isUrdu: widget.isUrdu, fontFamily: fontFamily),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryCard({required bool isIncome, required bool isUrdu, required String fontFamily}) {
-    final categories = isIncome ? _incomeCategories : _expenseCategories;
-    final title = isIncome 
-        ? (isUrdu ? 'آمدنی کے زمرے' : 'Income Categories') 
-        : (isUrdu ? 'خرچ کے زمرے' : 'Expense Categories');
-    final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.check, color: Colors.white), 
+            onPressed: _saveCategories
+          )
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(title, style: TextStyle(fontSize: 17, fontWeight: fontWeight, color: AppTheme.darkColor, fontFamily: fontFamily)),
-                IconButton(icon: Icon(PhosphorIcons.plusCircle(), color: AppTheme.themeColor), onPressed: () => _showAddCategoryDialog(isIncome, isUrdu)),
-              ],
-            ),
-            const Divider(height: 24, thickness: 0.5),
-            
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: categories.length,
-              separatorBuilder: (context, index) => Divider(color: AppTheme.darkColor.withValues(alpha: 0.05), height: 1),
-              itemBuilder: (context, index) {
-                final cat = categories[index];
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    cat, 
-                    style: TextStyle(
-                      color: AppTheme.darkColor, 
-                      fontFamily: fontFamily, 
-                      fontWeight: fontWeight, 
-                      fontSize: 15
-                    )
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.themeColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: AppTheme.themeColor, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      widget.isUrdu 
+                        ? 'یہ زمرے آپ کے پیشے کے لین دین میں استعمال ہوں گے۔' 
+                        : 'These categories will be used in your profession transactions.',
+                      style: TextStyle(fontSize: 12, color: AppTheme.themeColor, fontFamily: fontFamily, fontWeight: fontWeight),
+                    ),
                   ),
-                  trailing: IconButton(
-                    icon: Icon(PhosphorIcons.trash(), color: AppTheme.expenseColor, size: 18),
-                    onPressed: () {
-                      setState(() {
-                        if (isIncome) {
-                          _incomeCategories.remove(cat);
-                        } else {
-                          _expenseCategories.remove(cat);
-                        }
-                      });
-                    },
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _categories.length,
+              itemBuilder: (context, index) {
+                final cat = _categories[index];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 5)],
+                  ),
+                  child: ListTile(
+                    title: Text(cat, style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight, fontSize: 15)),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+                      onPressed: () => setState(() => _categories.removeAt(index)),
+                    ),
                   ),
                 );
               },
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddCategoryDialog,
+        backgroundColor: AppTheme.darkColor,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: Text(widget.isUrdu ? 'نیا زمرہ' : 'Add Category', style: TextStyle(fontFamily: fontFamily, color: Colors.white)),
       ),
     );
   }
 
-  void _showAddCategoryDialog(bool isIncome, bool isUrdu) {
+  void _showAddCategoryDialog() {
     final TextEditingController controller = TextEditingController();
-    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-    final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
+    final fontFamily = widget.isUrdu ? 'NooriNastaleeq' : '';
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(isUrdu ? 'نیا زمرہ شامل کریں' : 'Add New Category', style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight, color: AppTheme.darkColor)),
-        content: TextFormField(
+        title: Text(widget.isUrdu ? 'نیا زمرہ' : 'New Category', style: TextStyle(fontFamily: fontFamily)),
+        content: TextField(
           controller: controller,
           autofocus: true,
-          style: TextStyle(color: AppTheme.darkColor, fontFamily: fontFamily, fontWeight: fontWeight),
+          style: TextStyle(fontFamily: fontFamily),
           decoration: InputDecoration(
-            labelText: isUrdu ? 'زمرہ کا نام' : 'Category Name',
-            labelStyle: TextStyle(color: AppTheme.textSecondary, fontFamily: fontFamily, fontWeight: fontWeight),
-            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.darkColor.withValues(alpha: 0.1))),
-            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.themeColor)),
+            hintText: widget.isUrdu ? 'زمرہ کا نام لکھیں...' : 'Enter category name...',
+            hintStyle: TextStyle(fontFamily: fontFamily, fontSize: 13),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text(isUrdu ? 'منسوخ' : 'Cancel', style: TextStyle(color: AppTheme.textSecondary, fontFamily: fontFamily, fontWeight: fontWeight))),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(widget.isUrdu ? 'منسوخ' : 'Cancel')),
           ElevatedButton(
-              onPressed: () {
-                if (controller.text.isNotEmpty) {
-                  setState(() {
-                    if (isIncome) {
-                      _incomeCategories.add(controller.text);
-                    } else {
-                      _expenseCategories.add(controller.text);
-                    }
-                  });
-                  Navigator.pop(context);
-                }
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.darkColor, foregroundColor: Colors.white),
-              child: Text(isUrdu ? 'شامل کریں' : 'Add', style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight))),
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                setState(() => _categories.add(controller.text.trim()));
+                Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.darkColor),
+            child: Text(widget.isUrdu ? 'شامل کریں' : 'Add'),
+          ),
         ],
       ),
     );
   }
 
   void _saveCategories() {
-    widget.onCategoriesUpdated(_incomeCategories, _expenseCategories);
+    widget.onCategoriesUpdated(_categories);
     Navigator.pop(context);
   }
 }

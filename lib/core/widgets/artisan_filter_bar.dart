@@ -3,6 +3,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/artisan_service.dart';
 import 'package:account_app/core/widgets/app_filter_chip.dart';
+import 'package:account_app/core/config/professions_config.dart';
 
 class ArtisanFilterBar extends StatelessWidget {
   final String selectedProfession;
@@ -24,8 +25,15 @@ class ArtisanFilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final allProfessions = ArtisanService.getProfessions();
     
-    // Select top 6 most popular professions
-    final topProfessions = allProfessions.take(6).toList();
+    // Popular professions کو پہلے دکھائیں
+    final popularIds = ProfessionsConfig.popularProfessionIds;
+    
+    final topProfessions = popularIds
+        .map((id) => allProfessions.firstWhere(
+              (p) => p['id'] == id,
+              orElse: () => allProfessions.first,
+            ))
+        .toList();
 
     return Container(
       height: 40,
@@ -34,7 +42,6 @@ class ArtisanFilterBar extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         children: [
-          // "All" Chip
           AppFilterChip(
             labelEn: 'All',
             labelUr: 'سب',
@@ -43,8 +50,6 @@ class ArtisanFilterBar extends StatelessWidget {
             activeColor: AppTheme.goldColor,
             onTap: () => onProfessionSelected('all'),
           ),
-
-          // Top 6 Professions
           ...topProfessions.map((p) {
             final icon = p['icon'];
             return AppFilterChip(
@@ -56,8 +61,6 @@ class ArtisanFilterBar extends StatelessWidget {
               onTap: () => onProfessionSelected(p['id']!),
             );
           }),
-
-          // "View All" Chip Style
           AppFilterChip(
             labelEn: 'More...',
             labelUr: 'مزید...',

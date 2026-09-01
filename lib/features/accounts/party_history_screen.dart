@@ -116,7 +116,9 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
     
     // Reverse price lists to show newest changes first in UI
     history.forEach((key, value) {
-      history[key] = value.reversed.toList();
+      // Ensure we sort by date descending to have the newest at the top
+      value.sort((a, b) => b.date.compareTo(a.date));
+      history[key] = value;
     });
 
     _totalVolume = _totalIn + _totalOut;
@@ -195,7 +197,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
 
     return Scaffold(
-      backgroundColor: AppTheme.scaffoldBackground,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
         title: isUrdu ? 'تجزیہ و ریکارڈ' : 'Analysis & History',
         centerTitle: true,
@@ -205,73 +207,98 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Business Relationship Section - Removed outer container for better edge-to-edge look
-            Column(
-              children: [
-                _buildInfoTile(
-                  isUrdu ? 'فون نمبر' : 'Phone Number',
-                  widget.party.phone.replaceAll('+92', '0'),
-                  PhosphorIcons.phone(),
-                  isUrdu, fontFamily
-                ),
-                if ((_remoteProfession != null && _remoteProfession!.isNotEmpty) || 
-                    (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account').isNotEmpty)
+            // Business Relationship Section - Grouped in a White Card
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey[200]!),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
                   _buildInfoTile(
-                    isUrdu ? 'پیشہ / نوعیت' : 'Profession / Type',
-                    (_remoteProfession != null && _remoteProfession!.isNotEmpty)
-                        ? _remoteProfession!
-                        : (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account'),
-                    PhosphorIcons.briefcase(),
+                    isUrdu ? 'فون نمبر' : 'Phone Number',
+                    widget.party.phone.replaceAll('+92', '0'),
+                    PhosphorIcons.phone(),
                     isUrdu, fontFamily
                   ),
-                if ((widget.party.address != null && widget.party.address!.isNotEmpty) || 
-                    (_remoteAddress != null && _remoteAddress!.isNotEmpty))
+                  const Divider(height: 1, thickness: 0.5),
+                  if ((_remoteProfession != null && _remoteProfession!.isNotEmpty) || 
+                      (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account').isNotEmpty) ...[
+                    _buildInfoTile(
+                      isUrdu ? 'پیشہ / نوعیت' : 'Profession / Type',
+                      (_remoteProfession != null && _remoteProfession!.isNotEmpty)
+                          ? _remoteProfession!
+                          : (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account'),
+                      PhosphorIcons.briefcase(),
+                      isUrdu, fontFamily
+                    ),
+                    const Divider(height: 1, thickness: 0.5),
+                  ],
+                  if ((widget.party.address != null && widget.party.address!.isNotEmpty) || 
+                      (_remoteAddress != null && _remoteAddress!.isNotEmpty)) ...[
+                    _buildInfoTile(
+                      isUrdu ? 'پتہ' : 'Address',
+                      (_remoteAddress != null && _remoteAddress!.isNotEmpty)
+                          ? _remoteAddress!
+                          : widget.party.address!,
+                      PhosphorIcons.mapPin(),
+                      isUrdu, fontFamily
+                    ),
+                    const Divider(height: 1, thickness: 0.5),
+                  ],
                   _buildInfoTile(
-                    isUrdu ? 'پتہ' : 'Address',
-                    (_remoteAddress != null && _remoteAddress!.isNotEmpty)
-                        ? _remoteAddress!
-                        : widget.party.address!,
-                    PhosphorIcons.mapPin(),
+                    isUrdu ? 'پہلا لین دین' : 'First Transaction',
+                    _firstDeal != null ? DateFormat('dd MMM yyyy', 'en_US').format(_firstDeal!) : '-',
+                    PhosphorIcons.calendar(),
                     isUrdu, fontFamily
                   ),
-                _buildInfoTile(
-                  isUrdu ? 'پہلا لین دین' : 'First Transaction',
-                  _firstDeal != null ? DateFormat('dd MMM yyyy', 'en_US').format(_firstDeal!) : '-',
-                  PhosphorIcons.calendar(),
-                  isUrdu, fontFamily
-                ),
-                _buildInfoTile(
-                  isUrdu ? 'کل عرصہ تعلق' : 'Relationship Period',
-                  _getRelationshipPeriod(),
-                  PhosphorIcons.hourglass(),
-                  isUrdu, fontFamily
-                ),
-                _buildInfoTile(
-                  isUrdu ? 'کل کاروباری حجم' : 'Total Business Volume',
-                  'Rs ${_totalVolume.toStringAsFixed(0)}',
-                  PhosphorIcons.chartLineUp(),
-                  isUrdu, fontFamily
-                ),
-                _buildInfoTile(
-                  isUrdu ? 'اوسط لین دین کا وقفہ' : 'Avg. Deal Interval',
-                  '$_avgPaymentDays days',
-                  PhosphorIcons.clock(),
-                  isUrdu, fontFamily
-                ),
-                _buildInfoTile(
-                  isUrdu ? 'کل انٹریز' : 'Total Entries',
-                  _totalDeals.toString(),
-                  PhosphorIcons.listNumbers(),
-                  isUrdu, fontFamily
-                ),
-                _buildInfoTile(
-                  isUrdu ? 'سب سے زیادہ آئٹم' : 'Top Item',
-                  _mostTradedItem,
-                  PhosphorIcons.package(),
-                  isUrdu, fontFamily
-                ),
-                _buildTrustScoreTile(isUrdu, fontFamily),
-              ],
+                  const Divider(height: 1, thickness: 0.5),
+                  _buildInfoTile(
+                    isUrdu ? 'کل عرصہ تعلق' : 'Relationship Period',
+                    _getRelationshipPeriod(),
+                    PhosphorIcons.hourglass(),
+                    isUrdu, fontFamily
+                  ),
+                  const Divider(height: 1, thickness: 0.5),
+                  _buildInfoTile(
+                    isUrdu ? 'کل کاروباری حجم' : 'Total Business Volume',
+                    'Rs ${_totalVolume.toStringAsFixed(0)}',
+                    PhosphorIcons.chartLineUp(),
+                    isUrdu, fontFamily
+                  ),
+                  const Divider(height: 1, thickness: 0.5),
+                  _buildInfoTile(
+                    isUrdu ? 'اوسط لین دین کا وقفہ' : 'Avg. Deal Interval',
+                    '$_avgPaymentDays days',
+                    PhosphorIcons.clock(),
+                    isUrdu, fontFamily
+                  ),
+                  const Divider(height: 1, thickness: 0.5),
+                  _buildInfoTile(
+                    isUrdu ? 'کل انٹریز' : 'Total Entries',
+                    _totalDeals.toString(),
+                    PhosphorIcons.listNumbers(),
+                    isUrdu, fontFamily
+                  ),
+                  const Divider(height: 1, thickness: 0.5),
+                  _buildInfoTile(
+                    isUrdu ? 'سب سے زیادہ آئٹم' : 'Top Item',
+                    _mostTradedItem,
+                    PhosphorIcons.package(),
+                    isUrdu, fontFamily
+                  ),
+                  const Divider(height: 1, thickness: 0.5),
+                  _buildTrustScoreTile(isUrdu, fontFamily),
+                ],
+              ),
             ),
 
             const SizedBox(height: 24),
@@ -367,13 +394,8 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
     // Check if the value contains Urdu characters
     bool hasUrdu = RegExp(r'[\u0600-\u06FF]').hasMatch(value);
     
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppTheme.themeColor.withOpacity(0.05), // Light theme color (Blue) background
-        borderRadius: BorderRadius.circular(10),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
           Icon(icon, color: AppTheme.themeColor.withOpacity(0.7), size: 18),
@@ -396,13 +418,8 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
   }
 
   Widget _buildTrustScoreTile(bool isUrdu, String fontFamily) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppTheme.themeColor.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(10),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
           Icon(PhosphorIcons.shieldCheck(), color: AppTheme.themeColor.withOpacity(0.7), size: 18),
@@ -438,7 +455,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen> with TickerProv
         : (isIncrease ? AppTheme.expenseColor : AppTheme.incomeColor); // Same logic for now, but aware of type
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
       child: Row(
         children: [
           // Date & Interval (Darker Color)

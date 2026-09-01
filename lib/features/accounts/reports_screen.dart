@@ -84,9 +84,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
         continue;
       }
 
-      if (transaction.type == 'income') {
+      if (transaction.professionSide == 'income') {
         income += transaction.amount;
-      } else if (transaction.type == 'expense') {
+      } else if (transaction.professionSide == 'expense') {
         expense += transaction.amount;
       }
     }
@@ -96,20 +96,32 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Map<String, double> _getIncomeCategories() {
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
     Map<String, double> categories = {};
-    for (var transaction in _transactions.where((t) => t.type == 'income' && t.partnershipId == null && t.professionId != null)) {
+    for (var transaction in _transactions.where((t) => t.partnershipId == null && t.professionId != null)) {
       if (widget.selectedProfession != null && !_relevantProfessionIds.contains(transaction.professionId)) continue;
+      
+      if (transaction.professionSide != 'income') continue;
+
       String category = transaction.category;
+      if (category.startsWith('INC:')) category = category.substring(4);
+      if (category == 'income' || category == 'دیگر') category = isUrdu ? 'آمدن' : 'Income';
       categories[category] = (categories[category] ?? 0) + transaction.amount;
     }
     return categories;
   }
 
   Map<String, double> _getExpenseCategories() {
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
     Map<String, double> categories = {};
-    for (var transaction in _transactions.where((t) => t.type == 'expense' && t.partnershipId == null && t.professionId != null)) {
+    for (var transaction in _transactions.where((t) => t.partnershipId == null && t.professionId != null)) {
       if (widget.selectedProfession != null && !_relevantProfessionIds.contains(transaction.professionId)) continue;
+      
+      if (transaction.professionSide != 'expense') continue;
+
       String category = transaction.category;
+      if (category.startsWith('EXP:')) category = category.substring(4);
+      if (category == 'expense' || category == 'دیگر') category = isUrdu ? 'خرچ' : 'Expense';
       categories[category] = (categories[category] ?? 0) + transaction.amount;
     }
     return categories;

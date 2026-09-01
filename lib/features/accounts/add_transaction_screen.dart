@@ -1,9 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
@@ -13,8 +11,8 @@ import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
+import 'package:account_app/core/config/professions_config.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/image_gallery_viewer.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
@@ -24,12 +22,14 @@ class AddTransactionScreen extends StatefulWidget {
   final Transaction? transactionToEdit;
   final String? initialDescription;
   final double? initialAmount;
+  final Profession? forcedProfession;
 
   const AddTransactionScreen({
     this.account,
     this.transactionToEdit,
     this.initialDescription,
     this.initialAmount,
+    this.forcedProfession,
   });
 
   @override
@@ -60,18 +60,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _referenceNumberController = TextEditingController();
   final TextEditingController _dateInputController = TextEditingController();
-  List<_ItemEntry> _itemEntries = [];
-  String _transactionType = 'income';
+  final List<_ItemEntry> _itemEntries = [];
   String? _selectedAccountId;
   String? _selectedProfessionId;
+  String? _selectedCategory;
+  String? _professionSyncType; // 'income' or 'expense'
   DateTime _selectedDate = DateTime.now();
   List<Account> _accounts = [];
   List<Profession> _professions = [];
   List<String> _allItemNames = [];
   bool _isLoading = false;
+  bool _isProfessionCentric = false;
 
   List<File> _billImages = [];
-  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -79,11 +80,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     if (widget.transactionToEdit != null) {
       final t = widget.transactionToEdit!;
-      _transactionType = t.type;
       _amountController.text = t.amount.toStringAsFixed(0);
       _selectedDate = t.date;
       _selectedAccountId = t.accountId;
       _selectedProfessionId = t.professionId;
+      _isProfessionCentric = t.accountId == 'default_account';
+
+      if (t.professionId != null) {
+        _professionSyncType = (t.category.startsWith('INC:') || t.category == 'income') ? 'income' : 'expense';
+        _selectedCategory = t.category.contains(':') ? t.category.split(':')[1] : t.category;
+      }
       _referenceNumberController.text = t.referenceNumber ?? '';
       if (t.billImage != null && t.billImage!.isNotEmpty) {
         _billImages = t.billImage!.split(',').map((p) => File(p)).toList();
@@ -131,6 +137,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     _loadData();
     if (widget.account != null && _selectedAccountId == null) {
       _selectedAccountId = widget.account!.id;
+      _isProfessionCentric = false;
+    }
+
+    if (widget.forcedProfession != null) {
+      _selectedProfessionId = widget.forcedProfession!.id;
+      _isProfessionCentric = true;
     }
   }
 
@@ -233,9 +245,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   Future<void> _loadData() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
-    _accounts = await databaseService.getAccounts();
-    final allProfessions = await databaseService.getProfessions();
-    _professions = allProfessions.where((p) => p.isActive ?? true).toList();
+    _accounts = databaseService.getAccounts();
+    final masterProfessions = databaseService.getMasterProfessions();
+    _professions = masterProfessions.where((p) => p.isActive ?? true).toList();
 
     // Collect unique item names from past transactions
     Set<String> names = {};
@@ -263,11 +275,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
     final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
-    final isAccountPreSelected = widget.account != null;
     final isEditing = widget.transactionToEdit != null;
 
     return Scaffold(
-      backgroundColor: AppTheme.lightColor,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
         title: isEditing ? (isUrdu ? 'لین دین میں ترمیم' : 'Edit Transaction') : (isUrdu ? 'نیا لین دین' : 'New Transaction'),
       ),
@@ -277,88 +288,73 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
-                  // Bill Number & Date Row
-                  Row(
+                  // 1. Basic Info Card
+                  _buildSectionCard(
                     children: [
-                      Expanded(
-                        child: _buildTextField(
-                          controller: _referenceNumberController,
-                          label: isUrdu ? 'بل نمبر' : 'Bill Number',
-                          isNumber: true,
-                          icon: PhosphorIcons.hash(),
-                          fontFamily: '',
-                          fontWeight: fontWeight,
-                        ),
+                      _buildSectionHeader(isUrdu ? 'بنیادی معلومات' : 'Basic Information', fontFamily, isUrdu, topPadding: 0),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _referenceNumberController,
+                              label: isUrdu ? 'بل نمبر' : 'Bill Number',
+                              isNumber: true,
+                              icon: PhosphorIcons.hash(),
+                              fontFamily: '',
+                              fontWeight: fontWeight,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildEditableDateSelector(isUrdu, fontFamily, fontWeight),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildEditableDateSelector(isUrdu, fontFamily, fontWeight),
+                      if (widget.forcedProfession == null && _professions.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _buildProfessionSelectionArea(isUrdu, fontFamily, fontWeight),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 2. Items & Total Card
+                  _buildSectionCard(
+                    children: [
+                      _buildSectionHeader(isUrdu ? 'ایٹمز اور کل رقم' : 'Items & Total Amount', fontFamily, isUrdu, topPadding: 0),
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _itemEntries.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) => _buildItemRow(index, isUrdu, fontFamily, fontWeight),
+                      ),
+                      const SizedBox(height: 20),
+                      _buildTextField(
+                        controller: _amountController,
+                        label: isUrdu ? 'کل رقم' : 'Grand Total',
+                        isNumber: true,
+                        icon: PhosphorIcons.wallet(),
+                        fontFamily: fontFamily,
+                        fontWeight: FontWeight.bold,
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
 
-                  // Profession Selector (Optional)
-                  if (_professions.isNotEmpty) ...[
-                    _buildDropdownField(
-                      value: _selectedProfessionId,
-                      label: isUrdu ? 'پیشہ منتخب کریں (اختیاری)' : 'Select Profession (Optional)',
-                      icon: PhosphorIcons.briefcase(),
-                      fontFamily: fontFamily,
-                      fontWeight: fontWeight,
-                      items: [
-                        DropdownMenuItem(
-                          value: null,
-                          child: Text(isUrdu ? 'کسی پیشے میں نہیں' : 'None', style: TextStyle(fontFamily: fontFamily)),
-                        ),
-                        ..._professions.map((p) => DropdownMenuItem(
-                          value: p.id,
-                          child: Text(
-                            "${p.name}${p.season.isNotEmpty ? ' (${p.season})' : ''}", 
-                            style: TextStyle(fontFamily: fontFamily)
-                          ),
-                        )),
-                      ],
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedProfessionId = val as String?;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Items List
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _itemEntries.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) => _buildItemRow(index, isUrdu, fontFamily, fontWeight),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Grand Total
-                  _buildTextField(
-                    controller: _amountController,
-                    label: isUrdu ? 'کل رقم' : 'Grand Total',
-                    isNumber: true,
-                    icon: PhosphorIcons.wallet(),
-                    fontFamily: fontFamily,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Image Selector
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: ImageSelectorField(
-                      label: isUrdu ? 'بل کی تصویر (اختیاری)' : 'Bill Image (Optional)',
-                      selectedFiles: _billImages,
-                      onFilesChanged: (newList) => setState(() => _billImages = newList),
-                      maxTotal: 5,
-                    ),
+                  // 3. Attachments Card
+                  _buildSectionCard(
+                    children: [
+                      _buildSectionHeader(isUrdu ? 'منسلکات' : 'Attachments', fontFamily, isUrdu, topPadding: 0),
+                      ImageSelectorField(
+                        selectedFiles: _billImages,
+                        onFilesChanged: (newList) => setState(() => _billImages = newList),
+                        maxTotal: 1,
+                        isVertical: true,
+                        isFullWidth: true,
+                        aspectRatio: 3,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 24),
 
@@ -368,10 +364,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       Expanded(
                         child: AppButton(
                           text: isUrdu ? 'رقم لی / جمع' : 'Received',
-                          icon: PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold),
+                          icon: PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold),
                           color: AppTheme.incomeColor,
                           variant: AppButtonVariant.primary,
-                          size: AppButtonSize.large, // 🔥 Changed to Small (38px)
+                          size: AppButtonSize.large,
                           onPressed: () => _saveTransaction('income'),
                         ),
                       ),
@@ -379,10 +375,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       Expanded(
                         child: AppButton(
                           text: isUrdu ? 'رقم دی / بنام' : 'Paid',
-                          icon: PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold),
+                          icon: PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold),
                           color: AppTheme.expenseColor,
                           variant: AppButtonVariant.primary,
-                          size: AppButtonSize.large, // 🔥 Changed to Small (38px)
+                          size: AppButtonSize.large,
                           onPressed: () => _saveTransaction('expense'),
                         ),
                       ),
@@ -462,9 +458,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                         fillColor: Colors.white,
                         filled: true,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0), borderSide: BorderSide(color: Colors.grey.shade400)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0), borderSide: BorderSide(color: Colors.grey.shade400)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0), borderSide: const BorderSide(color: AppTheme.themeColor, width: 1)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0), 
+                          borderSide: BorderSide(color: Colors.grey[300]!)
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0), 
+                          borderSide: BorderSide(color: Colors.grey[300]!)
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0), 
+                          borderSide: const BorderSide(color: AppTheme.themeColor, width: 1.5)
+                        ),
                         prefixIcon: Icon(PhosphorIcons.note(), color: AppTheme.themeColor, size: 20),
                       ),
                     );
@@ -538,13 +543,320 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
+  Widget _buildProfessionSelectionArea(bool isUrdu, String fontFamily, FontWeight fontWeight) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              isUrdu ? 'پیشہ منتخب کریں' : 'Select Profession',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: fontWeight,
+                fontFamily: fontFamily,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            if (_selectedProfessionId != null)
+              GestureDetector(
+                onTap: () => setState(() {
+                  _selectedProfessionId = null;
+                  _professionSyncType = null;
+                }),
+                child: Text(
+                  isUrdu ? 'تبدیل کریں' : 'Change',
+                  style: TextStyle(fontSize: 11, color: AppTheme.themeColor, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 88,
+          child: _selectedProfessionId == null
+              ? ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _professions.length + 1,
+                  separatorBuilder: (context, index) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return _buildProfessionCard(
+                        null,
+                        isUrdu ? 'کسی پیشے میں نہیں' : 'None',
+                        PhosphorIcons.prohibit(),
+                        _selectedProfessionId == null,
+                        isUrdu,
+                        fontFamily,
+                        fontWeight,
+                      );
+                    }
+                    final p = _professions[index - 1];
+                    IconData displayIcon = _getProfessionIcon(p);
+                    return _buildProfessionCard(p.id, p.name, displayIcon, false, isUrdu, fontFamily, fontWeight);
+                  },
+                )
+              : _buildSelectedProfessionView(isUrdu, fontFamily, fontWeight),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSelectedProfessionView(bool isUrdu, String fontFamily, FontWeight fontWeight) {
+    // Find the profession - it might be a Master ID or a Season ID
+    final db = Provider.of<DatabaseService>(context, listen: false);
+    Profession? selectedProf = _professions.where((p) => p.id == _selectedProfessionId).firstOrNull;
+
+    // If not in the filtered list (e.g. it's a season), look it up globally
+    selectedProf ??= db.getProfession(_selectedProfessionId!);
+
+    if (selectedProf == null) {
+      // Fallback if still not found
+      return Text(isUrdu ? 'پیشہ دستیاب نہیں' : 'Profession not found');
+    }
+
+    return ListView(
+      scrollDirection: Axis.horizontal,
+      children: [
+        // Always show "None" option
+        _buildProfessionCard(
+          null,
+          isUrdu ? 'کسی پیشے میں نہیں' : 'None',
+          PhosphorIcons.prohibit(),
+          false,
+          isUrdu,
+          fontFamily,
+          fontWeight,
+        ),
+        const SizedBox(width: 12),
+        // Selected Profession
+        _buildProfessionCard(
+          _selectedProfessionId,
+          selectedProf.name,
+          _getProfessionIcon(selectedProf),
+          true,
+          isUrdu,
+          fontFamily,
+          fontWeight,
+        ),
+        const SizedBox(width: 12),
+        Center(child: Container(width: 1.5, height: 40, color: Colors.grey.shade200)),
+        const SizedBox(width: 12),
+        _buildSyncTypeCard(
+          label: isUrdu ? 'آمدن' : 'Income',
+          type: 'income',
+          icon: PhosphorIcons.trendUp(),
+          color: AppTheme.incomeColor,
+          isSelected: _professionSyncType == 'income',
+          fontFamily: fontFamily,
+        ),
+        const SizedBox(width: 12),
+        _buildSyncTypeCard(
+          label: isUrdu ? 'خرچ' : 'Expense',
+          type: 'expense',
+          icon: PhosphorIcons.trendDown(),
+          color: AppTheme.expenseColor,
+          isSelected: _professionSyncType == 'expense',
+          fontFamily: fontFamily,
+        ),
+      ],
+    );
+  }
+
+  IconData _getProfessionIcon(Profession p) {
+    IconData displayIcon = PhosphorIcons.briefcase();
+    if (p.description != null && p.description!.startsWith('ICON:')) {
+      try {
+        final parts = p.description!.split('|');
+        final iconKey = parts[0].substring(5);
+        if (ProfessionsConfig.iconMap.containsKey(iconKey)) {
+          displayIcon = ProfessionsConfig.iconMap[iconKey]!;
+        }
+      } catch (_) {}
+    }
+    return displayIcon;
+  }
+
+  Widget _buildSyncTypeCard({
+    required String label,
+    required String type,
+    required IconData icon,
+    required Color color,
+    required bool isSelected,
+    required String fontFamily,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _professionSyncType = type;
+          _selectedCategory = null; // Reset category
+        });
+      },
+      child: SizedBox(
+        width: 75,
+        child: Column(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isSelected ? color : color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isSelected ? color : color.withValues(alpha: 0.3),
+                  width: 2,
+                ),
+                boxShadow: isSelected ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  )
+                ] : [],
+              ),
+              child: Icon(
+                icon,
+                color: isSelected ? Colors.white : color,
+                size: 24,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                fontFamily: fontFamily,
+                color: isSelected ? color : AppTheme.darkColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfessionCard(
+    String? id,
+    String name,
+    IconData icon,
+    bool isSelected,
+    bool isUrdu,
+    String fontFamily,
+    FontWeight fontWeight,
+  ) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (_selectedProfessionId == id && id != null) {
+            // Deselect if already selected
+            _selectedProfessionId = null;
+            _professionSyncType = null;
+          } else {
+            _selectedProfessionId = id;
+            if (id == null) {
+              _professionSyncType = null;
+            }
+          }
+        });
+      },
+      child: SizedBox(
+        width: 75,
+        child: Column(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isSelected ? AppTheme.themeColor : AppTheme.backgroundColor.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isSelected ? AppTheme.themeColor : Colors.transparent,
+                  width: 2,
+                ),
+                boxShadow: isSelected ? [
+                  BoxShadow(
+                    color: AppTheme.themeColor.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  )
+                ] : [],
+              ),
+              child: Icon(
+                icon,
+                color: isSelected ? Colors.white : AppTheme.themeColor,
+                size: 24,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                fontFamily: fontFamily,
+                color: isSelected ? AppTheme.themeColor : AppTheme.darkColor,
+                height: 1.1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({required List<Widget> children, EdgeInsets? padding}) {
+    return Container(
+      padding: padding ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.themeColor.withValues(alpha: 0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, String fontFamily, bool isUrdu, {double topPadding = 24}) {
+    return Padding(
+      padding: EdgeInsets.only(top: topPadding, bottom: 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: AppTheme.themeColor,
+          fontFamily: fontFamily,
+        ),
+      ),
+    );
+  }
+
   Widget _buildSmallTextField({required TextEditingController controller, required String label, required String fontFamily, required FontWeight fontWeight, bool isNumber = false, bool readOnly = false, String? suffixText}) {
     final isUrdu = isUrduHelper(context);
     return TextFormField(
       controller: controller,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       style: TextStyle(
-        color: AppTheme.darkColor, 
+        color: readOnly ? Colors.grey : AppTheme.darkColor, 
         fontFamily: isNumber ? '' : fontFamily, 
         fontSize: isNumber ? 16 : 14,
         fontWeight: fontWeight
@@ -553,16 +865,30 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       cursorColor: AppTheme.themeColor,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '', color: Colors.grey.shade600, fontSize: 14, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
+        labelStyle: TextStyle(
+          fontFamily: isUrdu ? 'NooriNastaleeq' : '', 
+          color: Colors.grey.shade600, 
+          fontSize: 14, 
+          fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal
+        ),
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         suffixText: suffixText,
         suffixStyle: const TextStyle(fontSize: 10, color: Colors.grey),
         fillColor: Colors.white,
         filled: true,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0), borderSide: BorderSide(color: Colors.grey.shade400)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0), borderSide: BorderSide(color: Colors.grey.shade400)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0), borderSide: const BorderSide(color: AppTheme.themeColor, width: 1)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0), 
+          borderSide: BorderSide(color: Colors.grey[300]!)
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0), 
+          borderSide: BorderSide(color: Colors.grey[300]!)
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0), 
+          borderSide: const BorderSide(color: AppTheme.themeColor, width: 1.5)
+        ),
       ),
     );
   }
@@ -579,42 +905,35 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       style: TextStyle(
         color: AppTheme.darkColor, 
         fontFamily: isNumber ? '' : fontFamily, 
-        fontSize: isNumber ? 18 : 16,
+        fontSize: 16,
         fontWeight: fontWeight
       ),
       cursorColor: AppTheme.themeColor,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '', color: Colors.grey.shade600, fontSize: 13, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
+        labelStyle: TextStyle(
+          fontFamily: isUrdu ? 'NooriNastaleeq' : '', 
+          color: Colors.grey.shade600, 
+          fontSize: 13, 
+          fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal
+        ),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        fillColor: const Color(0xFFF5F7F9),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        fillColor: Colors.white,
         filled: true,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0), borderSide: BorderSide(color: Colors.grey.shade400)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0), borderSide: BorderSide(color: Colors.grey.shade400)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0), borderSide: const BorderSide(color: AppTheme.themeColor, width: 1)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0), 
+          borderSide: BorderSide(color: Colors.grey[300]!)
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0), 
+          borderSide: BorderSide(color: Colors.grey[300]!)
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0), 
+          borderSide: const BorderSide(color: AppTheme.themeColor, width: 1.5)
+        ),
         prefixIcon: icon != null ? Icon(icon, color: AppTheme.themeColor, size: 20) : null,
-      ),
-    );
-  }
-
-  Widget _buildDropdownField({required dynamic value, required String label, required List<DropdownMenuItem<Object>> items, required Function(Object?) onChanged, IconData? icon, required String fontFamily, required FontWeight fontWeight}) {
-    final isUrdu = isUrduHelper(context);
-    return DropdownButtonFormField(
-      value: value,
-      items: items,
-      onChanged: onChanged,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '', color: Colors.grey.shade600, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal, fontSize: 13),
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        fillColor: const Color(0xFFF5F7F9),
-        filled: true,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0), borderSide: BorderSide(color: Colors.grey.shade400)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0), borderSide: BorderSide(color: Colors.grey.shade400)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0), borderSide: const BorderSide(color: AppTheme.themeColor, width: 1)),
-        prefixIcon: icon != null ? Icon(icon, color: AppTheme.themeColor) : null,
       ),
     );
   }
@@ -629,14 +948,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-
-
   Future<void> _saveTransaction(String type) async {
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-    if (_selectedAccountId == null) {
-      _showSnackBar(isUrdu ? 'اکاؤنٹ منتخب کریں' : 'Please select account', true);
-      return;
-    }
     double grandTotal = double.tryParse(_amountController.text) ?? 0;
     if (grandTotal <= 0) {
       _showSnackBar(isUrdu ? 'رقم درج کریں' : 'Please enter amount', true);
@@ -667,19 +980,38 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       }
 
       String? profName;
+      String? targetProfessionId = _selectedProfessionId;
+
       if (_selectedProfessionId != null) {
         try {
-          profName = _professions.firstWhere((p) => p.id == _selectedProfessionId).name;
-        } catch (_) {}
+          // Look up profession globally as it could be a Season ID
+          final db = Provider.of<DatabaseService>(context, listen: false);
+          Profession? prof = db.getProfession(_selectedProfessionId!);
+          
+          if (prof != null) {
+            profName = prof.name;
+            
+            // If it's a master profession, try to find an active season
+            if (prof.parentId == null) {
+              final seasons = databaseService.getSeasons(_selectedProfessionId!);
+              final activeSeason = seasons.where((s) => s.isActive ?? true).firstOrNull;
+              if (activeSeason != null) {
+                targetProfessionId = activeSeason.id;
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint("Error setting profession data: $e");
+        }
       }
 
       final transaction = Transaction(
         id: widget.transactionToEdit?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-        accountId: _selectedAccountId!,
+        accountId: _selectedAccountId ?? 'default_account',
         amount: grandTotal,
         pendingAmount: grandTotal,
         type: type,
-        category: 'دیگر',
+        category: _professionSyncType ?? type,
         description: mainDescription.isEmpty ? 'دیگر' : mainDescription,
         date: _selectedDate,
         quantity: 1,
@@ -689,7 +1021,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         billImage: _billImages.isNotEmpty ? _billImages.map((f) => f.path).join(',') : null,
         referenceNumber: _referenceNumberController.text.trim(),
         items: items,
-        professionId: _selectedProfessionId,
+        professionId: targetProfessionId,
         professionName: profName,
       );
 
@@ -726,16 +1058,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     // Removed finally to prevent setState on a popped screen
   }
 
-  Future<void> _selectDate(BuildContext context, bool isUrdu) async {
-    final DateTime? picked = await showDatePicker(context: context, initialDate: _selectedDate, firstDate: DateTime(2020), lastDate: DateTime(2030));
-    if (picked != null) {
-      setState(() {
-        _selectedDate = picked;
-        _dateInputController.text = DateFormat('dd/MM/yy').format(picked);
-      });
-    }
-  }
-
   void _showSnackBar(String message, bool isError) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -752,7 +1074,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     _amountController.dispose();
     _referenceNumberController.dispose();
     _dateInputController.dispose();
-    for (var entry in _itemEntries) entry.dispose();
+    for (var entry in _itemEntries) {
+      entry.dispose();
+    }
     super.dispose();
   }
 }

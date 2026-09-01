@@ -11,7 +11,7 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/features/accounts/transaction_receipt_screen.dart';
 import 'package:account_app/features/accounts/reports_screen.dart';
-import 'add_profession_transaction_screen.dart';
+import 'package:account_app/features/professions/add_project_transaction_screen.dart';
 
 class ProfessionSeasonsScreen extends StatefulWidget {
   final Profession masterProfession;
@@ -35,26 +35,17 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
 
   void _parseCategories() {
     if (widget.masterProfession.categories.isNotEmpty) {
-      List<String> loadedIncome = [];
-      List<String> loadedExpense = [];
-      bool hasData = false;
+      // Clean and unify categories
+      final cleanCategories = widget.masterProfession.categories.map((c) {
+        if (c.startsWith('INC:')) return c.substring(4);
+        if (c.startsWith('EXP:')) return c.substring(4);
+        return c;
+      }).toSet().toList();
 
-      for (var cat in widget.masterProfession.categories) {
-        if (cat.startsWith('INC:')) {
-          loadedIncome.add(cat.substring(4));
-          hasData = true;
-        } else if (cat.startsWith('EXP:')) {
-          loadedExpense.add(cat.substring(4));
-          hasData = true;
-        }
-      }
-
-      if (hasData) {
-        setState(() {
-          _incomeCategories = loadedIncome;
-          _expenseCategories = loadedExpense;
-        });
-      }
+      setState(() {
+        _expenseCategories = cleanCategories;
+        _incomeCategories = []; // Unified list stored in _expenseCategories for UI simplicity
+      });
     }
   }
 
@@ -457,7 +448,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
   }
 
   Widget _buildTransactionItem(BuildContext context, transaction_model.Transaction t, bool isUrdu, String fontFamily, {bool isLast = false}) {
-    final isIncome = t.type == 'income';
+    final isIncome = t.professionSide == 'income';
     final db = Provider.of<DatabaseService>(context, listen: false);
     final account = db.getAccount(t.accountId);
     
@@ -468,6 +459,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
       children: [
         ListTile(
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => TransactionReceiptScreen(transaction: t))),
+          onLongPress: () => _showDeleteTransactionDialog(context, t, isUrdu, fontFamily, db),
           title: Text(
             t.description.isNotEmpty ? t.description : displayName, 
             style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.darkColor)
@@ -522,34 +514,85 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
   }
 
   void _navigateToAddTransaction(BuildContext context, Profession season) {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => AddProfessionTransactionScreen(
+    Navigator.push(context, MaterialPageRoute(builder: (context) => AddProjectTransactionScreen(
       profession: season,
-      incomeCategories: _incomeCategories, 
-      expenseCategories: _expenseCategories,
     )));
   }
 
+  void _showDeleteTransactionDialog(BuildContext context, transaction_model.Transaction t, bool isUrdu, String fontFamily, DatabaseService db) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          isUrdu ? 'ٹرانزیکشن حذف کریں؟' : 'Delete Transaction?',
+          style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          isUrdu 
+            ? 'کیا آپ واقعی اس ٹرانزیکشن کو حذف کرنا چاہتے ہیں؟' 
+            : 'Are you sure you want to delete this transaction?',
+          style: TextStyle(fontFamily: fontFamily),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(isUrdu ? 'منسوخ' : 'Cancel', style: const TextStyle(color: AppTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await db.deleteTransaction(t.id);
+              if (context.mounted) Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(isUrdu ? 'حذف کر دیا گیا' : 'Deleted successfully'),
+                backgroundColor: AppTheme.expenseColor,
+              ));
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.expenseColor, foregroundColor: Colors.white),
+            child: Text(isUrdu ? 'حذف کریں' : 'Delete', style: TextStyle(fontFamily: fontFamily)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _navigateToCategoriesScreen(BuildContext context, bool isUrdu) {
+    // زمروں کو صاف کریں (بغیر کسی INC: یا EXP: کے)
+    final cleanCategories = widget.masterProfession.categories.map((c) {
+      if (c.contains(':')) return c.split(':')[1];
+      return c;
+    }).toSet().toList();
+
     Navigator.push(context, MaterialPageRoute(builder: (context) => CategoriesManagementScreen(
-      incomeCategories: _incomeCategories,
-      expenseCategories: _expenseCategories,
+      categories: cleanCategories,
       isUrdu: isUrdu, 
-      onCategoriesUpdated: (inCats, outCats) async {
-         setState(() {
-            _incomeCategories = inCats;
-            _expenseCategories = outCats;
-         });
-
-         List<String> allCategories = [];
-         for (var c in inCats) allCategories.add('INC:$c');
-         for (var c in outCats) allCategories.add('EXP:$c');
-
+      onCategoriesUpdated: (newCats) async {
+         final db = Provider.of<DatabaseService>(context, listen: false);
+         
+         // ماسٹر ریکارڈ اپ ڈیٹ کریں
          final updatedProfession = widget.masterProfession.copyWith(
-            categories: allCategories,
+            categories: newCats,
             updatedAt: DateTime.now()
          );
          
-         await Provider.of<DatabaseService>(context, listen: false).updateProfession(updatedProfession);
+         await db.updateProfession(updatedProfession);
+
+         // اگر کوئی جاری سیزن ہے تو اس کے زمرے بھی اپ ڈیٹ کر دیں تاکہ وہ فوری نظر آئیں
+         final activeSeason = db.getSeasons(widget.masterProfession.id)
+            .where((s) => s.isActive ?? true).firstOrNull;
+         
+         if (activeSeason != null) {
+            await db.updateProfession(activeSeason.copyWith(
+               categories: newCats,
+               updatedAt: DateTime.now()
+            ));
+         }
+
+         if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+             content: Text(isUrdu ? 'زمرہ جات محفوظ کر لیے گئے ہیں' : 'Categories saved successfully'),
+             backgroundColor: AppTheme.themeColor,
+           ));
+         }
       }
     )));
   }

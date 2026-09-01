@@ -1,3 +1,4 @@
+// lib/features/artisans/job_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/theme/app_theme.dart';
@@ -12,15 +13,10 @@ import 'package:photo_view/photo_view_gallery.dart';
 import 'package:provider/provider.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/artisan_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:account_app/core/services/database/job_service.dart';
-import 'package:account_app/core/models/artisan_work_order_model.dart';
-import 'package:account_app/core/services/artisan_work_order_service.dart';
-import 'package:account_app/core/services/database/job_negotiation_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:account_app/core/widgets/location_map_widget.dart';
 import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/features/dashboard/main_navigation_screen.dart';
+import 'package:account_app/features/artisans/controllers/job_detail_controller.dart';
 import 'post_job_screen.dart';
 
 class JobDetailScreen extends StatefulWidget {
@@ -32,185 +28,197 @@ class JobDetailScreen extends StatefulWidget {
 }
 
 class _JobDetailScreenState extends State<JobDetailScreen> {
-  final TextEditingController _commentController = TextEditingController();
-  final FocusNode _focusNode = FocusNode();
-  bool _isStartingNegotiation = false;
-  bool _canContact = false;
+  late final JobDetailController _controller;
 
   @override
   void initState() {
     super.initState();
-    _focusNode.addListener(() {
-      if (mounted) setState(() {});
-    });
-    _loadContactPermission();
-  }
-
-  Future<void> _loadContactPermission() async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return;
-
-    final profile = await ArtisanService().getProfile(userId);
-    if (!mounted) return;
-    setState(() => _canContact = profile != null && profile.isActive);
+    _controller = JobDetailController(initialJob: widget.job);
   }
 
   @override
   void dispose() {
-    _commentController.dispose();
-    _focusNode.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider.value(
+      value: _controller,
+      child: Consumer<JobDetailController>(
+        builder: (context, controller, _) {
+          return _buildScreen(context, controller);
+        },
+      ),
+    );
+  }
+
+  Widget _buildScreen(BuildContext context, JobDetailController controller) {
     final isUrdu = Provider.of<LanguageService>(context).isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
-    final isOwner = widget.job.customerId == currentUserId;
+    final job = controller.currentJob ?? widget.job;
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: CustomAppBar(
         title: isUrdu ? 'کام کی مکمل تفصیل' : 'Job Details',
-        actions: isOwner ? [_buildOptionsMenu(isUrdu, fontFamily)] : null,
+        actions: controller.isOwner
+            ? [_buildOptionsMenu(controller, isUrdu, fontFamily)]
+            : null,
       ),
-      body: StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('jobs')
-              .doc(widget.job.id)
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData)
-              return const Center(child: CircularProgressIndicator());
-
-            final jobData = snapshot.data!.data() as Map<String, dynamic>?;
-            if (jobData == null)
-              return const Center(child: Text('Job not found'));
-
-            final freshJob = JobPost.fromMap(jobData);
-
-            return Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // 1. Customer Info Header
-                              _buildCustomerHeader(
-                                  isUrdu, fontFamily, freshJob),
-                              const SizedBox(height: 16),
+                        // کسٹمر ہیڈر
+                        _buildCustomerHeader(controller, isUrdu, fontFamily, job),
+                        const SizedBox(height: 16),
 
-                              // 2. Title
-                              if (freshJob.title.isNotEmpty) ...[
-                                Text(
-                                  freshJob.title,
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.black,
-                                    fontFamily: fontFamily,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                              ],
-
-                              // 3. Detailed Description
-                              const SizedBox(height: 12),
-                              _buildBulletPoints(
-                                freshJob.detailedScope ?? freshJob.description,
-                                isUrdu,
-                                fontFamily,
-                                Colors.black,
-                              ),
-
-                              // 4. Exclusions (If present)
-                              if (freshJob.exclusions != null &&
-                                  freshJob.exclusions!.isNotEmpty) ...[
-                                const SizedBox(height: 24),
-                                Text(
-                                  isUrdu
-                                      ? 'اس کام میں شامل نہیں ہے:'
-                                      : 'Not Included:',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.red.shade700,
-                                    fontFamily: fontFamily,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                _buildBulletPoints(
-                                  freshJob.exclusions!,
-                                  isUrdu,
-                                  fontFamily,
-                                  Colors.red.shade900,
-                                ),
-                              ],
-
-                              const SizedBox(height: 24),
-                              const Divider(height: 1),
-                              const SizedBox(height: 24),
-
-                              // 🔥 Location Map (Moved above profession tags)
-                              LocationMapWidget(
-                                latitude: freshJob.latitude,
-                                longitude: freshJob.longitude,
-                                address: freshJob.location,
-                                isUrdu: isUrdu,
-                              ),
-                              const SizedBox(height: 24),
-
-                              // 5. Category & Location Row (Moved below divider)
-                              _buildCategoryAndLocationRow(
-                                  isUrdu, fontFamily, freshJob),
-                              const SizedBox(height: 24),
-
-                              // 6. Job Terms (Timings, Duration, Budget)
-                              _buildJobTerms(isUrdu, fontFamily, freshJob),
-
-                              const SizedBox(height: 32),
-
-                              // 8. Images Gallery
-                              _buildImageGallery(context, freshJob),
-
-                              const SizedBox(height: 100),
-                            ],
+                        // عنوان
+                        if (job.title.isNotEmpty) ...[
+                          Text(
+                            job.title,
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.black,
+                              fontFamily: fontFamily,
+                            ),
                           ),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // تفصیل
+                        const SizedBox(height: 12),
+                        _buildBulletPoints(
+                          job.detailedScope ?? job.description,
+                          isUrdu,
+                          fontFamily,
+                          Colors.black,
                         ),
+
+                        // مستثنیات
+                        if (job.exclusions != null &&
+                            job.exclusions!.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          Text(
+                            isUrdu ? 'اس کام میں شامل نہیں ہے:' : 'Not Included:',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red.shade700,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          _buildBulletPoints(
+                            job.exclusions!,
+                            isUrdu,
+                            fontFamily,
+                            Colors.red.shade900,
+                          ),
+                        ],
+
+                        const SizedBox(height: 24),
+                        const Divider(height: 1),
+                        const SizedBox(height: 24),
+
+                        // لوکیشن میپ
+                        LocationMapWidget(
+                          latitude: job.latitude,
+                          longitude: job.longitude,
+                          address: job.location,
+                          isUrdu: isUrdu,
+                        ),
+                        const SizedBox(height: 24),
+
+                        // کیٹیگری اور لوکیشن
+                        _buildCategoryAndLocationRow(isUrdu, fontFamily, job),
+                        const SizedBox(height: 24),
+
+                        // کام کی شرائط
+                        _buildJobTerms(isUrdu, fontFamily, job),
+
+                        // کمپنی کا نام (اگر موجود ہو - اب رقم کے نیچے)
+                        if (job.companyName != null && job.companyName!.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          _buildCompanySection(job.companyName!, isUrdu, fontFamily),
+                        ],
+
+                        // ویب سائٹ لنک (اگر موجود ہو)
+                        if (job.website != null && job.website!.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          _buildWebsiteSection(job.website!, isUrdu, fontFamily),
+                        ],
+
+                        if (job.images.isNotEmpty)
+                          const SizedBox(height: 32),
+
+                        // تصاویر گیلری
+                        _buildImageGallery(context, job),
                       ],
                     ),
                   ),
-                ),
+                ],
+              ),
+            ),
+          ),
 
-                // Bottom Action Bar
-                if (!isOwner && _canContact)
-                  _buildBottomActionBar(context, isUrdu, fontFamily, freshJob),
-              ],
-            );
-          }),
+          // نیچے ایکشن بار
+          if (!controller.isOwner && controller.canContact)
+            _buildBottomActionBar(controller, isUrdu, fontFamily, job),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomerHeader(
+    JobDetailController controller,
+    bool isUrdu,
+    String fontFamily,
+    JobPost job,
+  ) {
+    return ProfileInfoWidget(
+      name: job.customerName,
+      phone: '',
+      profileImage: job.customerPhotoUrl,
+      customSize: 42,
+      borderRadius: 6,
+      isFavorite: controller.isFavorite,
+      bottom: Text(
+        Formatters.formatDate(job.createdAt),
+        style: TextStyle(
+          fontSize: 12,
+          color: Colors.grey[600],
+          fontFamily: fontFamily,
+        ),
+      ),
     );
   }
 
   Widget _buildJobTerms(bool isUrdu, String fontFamily, JobPost job) {
-    String budgetLabel = isUrdu ? 'بجٹ / رقم' : 'Budget / Price';
-    if (job.budgetUnit == 'monthly') budgetLabel = isUrdu ? 'ماہانہ تنخواہ' : 'Monthly Salary';
-    if (job.budgetUnit == 'hourly') budgetLabel = isUrdu ? 'فی گھنٹہ اجرت' : 'Hourly Rate';
-    if (job.budgetUnit == 'contract') budgetLabel = isUrdu ? 'ٹھیکہ / ماوضع' : 'Contract Price';
-
-    String durationValue = "";
-    if (job.estimatedDays != null) {
-      String unit = isUrdu ? 'دن' : 'Days';
-      if (job.durationUnit == 'hours') unit = isUrdu ? 'گھنٹے' : 'Hours';
-      if (job.durationUnit == 'weeks') unit = isUrdu ? 'ہفتے' : 'Weeks';
-      if (job.durationUnit == 'months') unit = isUrdu ? 'مہینے' : 'Months';
-      durationValue = '${job.estimatedDays} $unit';
+    String budgetLabel = isUrdu ? 'رقم / اجرت' : 'Budget / Rate';
+    
+    switch (job.budgetUnit) {
+      case 'monthly': budgetLabel = isUrdu ? 'ماہانہ تنخواہ' : 'Monthly Salary'; break;
+      case 'hourly': budgetLabel = isUrdu ? 'فی گھنٹہ اجرت' : 'Hourly Rate'; break;
+      case 'daily': budgetLabel = isUrdu ? 'فی دیہاڑی' : 'Daily Rate'; break;
+      case 'contract': budgetLabel = isUrdu ? 'ٹھیکہ / پروجیکٹ' : 'Contract Price'; break;
+      case 'per_item': budgetLabel = isUrdu ? 'فی آئٹم ریٹ' : 'Per Item Rate'; break;
+      case 'sqft': budgetLabel = isUrdu ? 'فی مربع فٹ' : 'Per Sqft Rate'; break;
+      case 'visit': budgetLabel = isUrdu ? 'فی وزٹ فیس' : 'Per Visit Fee'; break;
+      case 'km': budgetLabel = isUrdu ? 'فی کلومیٹر کرایہ' : 'Per KM Rate'; break;
+      case 'kg': budgetLabel = isUrdu ? 'فی کلو ریٹ' : 'Per KG Rate'; break;
+      case 'total': budgetLabel = isUrdu ? 'کل رقم / بجٹ' : 'Total Budget'; break;
     }
 
     return Column(
@@ -222,30 +230,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             value: '${job.timeIn} - ${job.timeOut}',
             fontFamily: fontFamily,
           ),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (job.estimatedBudget != null)
-              Expanded(
-                child: _buildTermItem(
-                  icon: PhosphorIcons.money(),
-                  label: budgetLabel,
-                  value: 'Rs. ${job.estimatedBudget!.toStringAsFixed(0)}',
-                  fontFamily: fontFamily,
-                  valueColor: Colors.green.shade700,
-                ),
-              ),
-            if (durationValue.isNotEmpty)
-              Expanded(
-                child: _buildTermItem(
-                  icon: PhosphorIcons.calendarDots(),
-                  label: isUrdu ? 'متوقع مدت' : 'Estimated Duration',
-                  value: durationValue,
-                  fontFamily: fontFamily,
-                ),
-              ),
-          ],
-        ),
+        if (job.estimatedBudget != null)
+          _buildTermItem(
+            icon: PhosphorIcons.money(),
+            label: budgetLabel,
+            value: 'Rs. ${job.estimatedBudget!.toStringAsFixed(0)}${_getBudgetUnitValue(job, isUrdu)}',
+            fontFamily: fontFamily,
+            valueColor: Colors.green.shade700,
+          ),
       ],
     );
   }
@@ -264,7 +256,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppTheme.themeColor.withOpacity(0.1),
+              color: AppTheme.themeColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, size: 20, color: AppTheme.themeColor),
@@ -297,74 +289,29 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
-  Future<void> _startNegotiation(bool isUrdu, JobPost job) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  Future<void> _startNegotiation(JobDetailController controller) async {
+    final success = await controller.startNegotiation();
 
-    final artisanId = user.uid;
-    final customerId = job.customerId;
+    if (!mounted || !success) return;
 
-    setState(() => _isStartingNegotiation = true);
+    // نوٹیفکیشن ٹیب پر جائیں
+    final notificationService = Provider.of<NotificationService>(
+      context,
+      listen: false,
+    );
+    notificationService.setNotificationsTabIndex(1);
+    notificationService.setTargetExpandOrderId('job_neg_${widget.job.id}');
 
-    try {
-      final orderId = 'job_neg_${job.id}';
-      final existingOrder = await FirebaseFirestore.instance
-          .collection('artisans')
-          .doc(artisanId)
-          .collection('work_orders')
-          .doc(orderId)
-          .get();
-      ArtisanWorkOrder order;
-      if (existingOrder.exists && existingOrder.data() != null) {
-        order = ArtisanWorkOrder.fromMap(existingOrder.data()!);
-      } else {
-        order = ArtisanWorkOrder(
-          id: orderId,
-          artisanId: artisanId,
-          artisanName: user.displayName ?? (isUrdu ? 'کاریگر' : 'Artisan'),
-          customerId: customerId,
-          customerName: job.customerName,
-          customerPhone: '',
-          title: job.title, // کام کا عنوان یہاں سیو کریں
-          workDescription: job.description, // مکمل تفصیل یہاں
-          status: 'negotiating',
-          amount: job.estimatedBudget,
-          createdAt: DateTime.now(),
-          artisanAgreed: true,
-        );
-
-        await ArtisanWorkOrderService().addWorkOrder(order);
-
-        // Send initial message
-        final negService = JobNegotiationService();
-        await negService.sendNegotiationMessage(
-          jobId: order.id,
-          artisanId: artisanId,
-          message: isUrdu
-              ? 'السلام علیکم! میں آپ کے کام "${job.title}" میں دلچسپی رکھتا ہوں۔ کیا ہم اس بارے میں بات کر سکتے ہیں؟'
-              : 'Salam! I am interested in your job "${job.title}". Can we discuss this?',
-          isDirect: true,
-        );
-      }
-
-      if (mounted) {
-        // 1. Set the target tab and expansion
-        final notificationService = Provider.of<NotificationService>(context, listen: false);
-        notificationService.setNotificationsTabIndex(1);
-        notificationService.setTargetExpandOrderId(order.id);
-        
-        // 2. Change tab and THEN pop
-        MainNavigationScreen.switchTab(4);
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      debugPrint("Error starting negotiation: $e");
-    } finally {
-      if (mounted) setState(() => _isStartingNegotiation = false);
-    }
+    // ٹیب تبدیل کریں اور پھر پاپ کریں
+    MainNavigationScreen.switchTab(4);
+    Navigator.pop(context);
   }
 
-  Widget _buildOptionsMenu(bool isUrdu, String fontFamily) {
+  Widget _buildOptionsMenu(
+    JobDetailController controller,
+    bool isUrdu,
+    String fontFamily,
+  ) {
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert, color: Colors.white),
       onSelected: (value) async {
@@ -372,13 +319,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => PostJobScreen(jobToEdit: widget.job),
+              builder: (context) => PostJobScreen(
+                jobToEdit: controller.currentJob,
+              ),
             ),
           );
-        } else if (value == 'clarify') {
-          _showAddClarificationDialog(isUrdu, fontFamily);
         } else if (value == 'delete') {
-          _showDeleteConfirmation(isUrdu, fontFamily);
+          _showDeleteConfirmation(controller, isUrdu, fontFamily);
         }
       },
       itemBuilder: (context) => [
@@ -388,19 +335,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             children: [
               Icon(PhosphorIcons.pencilLine(), color: Colors.blue, size: 18),
               const SizedBox(width: 10),
-              Text(isUrdu ? 'ترمیم کریں' : 'Edit',
-                  style: TextStyle(fontFamily: fontFamily)),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: 'clarify',
-          child: Row(
-            children: [
-              Icon(PhosphorIcons.info(), color: Colors.orange, size: 18),
-              const SizedBox(width: 10),
-              Text(isUrdu ? 'مزید تفصیل دیں' : 'Add Detail',
-                  style: TextStyle(fontFamily: fontFamily)),
+              Text(
+                isUrdu ? 'ترمیم کریں' : 'Edit',
+                style: TextStyle(fontFamily: fontFamily),
+              ),
             ],
           ),
         ),
@@ -410,8 +348,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             children: [
               Icon(PhosphorIcons.trash(), color: Colors.red, size: 18),
               const SizedBox(width: 10),
-              Text(isUrdu ? 'ڈیلیٹ کریں' : 'Delete',
-                  style: TextStyle(fontFamily: fontFamily, color: Colors.red)),
+              Text(
+                isUrdu ? 'ڈیلیٹ کریں' : 'Delete',
+                style: TextStyle(
+                  fontFamily: fontFamily,
+                  color: Colors.red,
+                ),
+              ),
             ],
           ),
         ),
@@ -419,70 +362,92 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
-  void _showDeleteConfirmation(bool isUrdu, String fontFamily) {
+  void _showDeleteConfirmation(
+    JobDetailController controller,
+    bool isUrdu,
+    String fontFamily,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(isUrdu ? 'حذف کریں؟' : 'Delete?'),
-        content: Text(isUrdu
-            ? 'کیا آپ واقعی اس کام کو حذف کرنا چاہتے ہیں؟'
-            : 'Are you sure you want to delete this job?'),
+        content: Text(
+          isUrdu
+              ? 'کیا آپ واقعی اس کام کو حذف کرنا چاہتے ہیں؟'
+              : 'Are you sure you want to delete this job?',
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(isUrdu ? 'نہیں' : 'No')),
+            onPressed: () => Navigator.pop(context),
+            child: Text(isUrdu ? 'نہیں' : 'No'),
+          ),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              await JobService().deleteJob(widget.job.id);
+              await controller.deleteJob();
               if (mounted && context.mounted) {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content:
-                        Text(isUrdu ? 'کام حذف کر دیا گیا' : 'Job deleted')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      isUrdu ? 'کام حذف کر دیا گیا' : 'Job deleted',
+                    ),
+                  ),
+                );
               }
             },
-            child: Text(isUrdu ? 'ہاں' : 'Yes',
-                style: const TextStyle(color: Colors.red)),
+            child: Text(
+              isUrdu ? 'ہاں' : 'Yes',
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _showAddClarificationDialog(bool isUrdu, String fontFamily) {
-    final controller = TextEditingController();
+  void _showAddClarificationDialog(
+    JobDetailController controller,
+    bool isUrdu,
+    String fontFamily,
+  ) {
+    final textController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(isUrdu ? 'مزید تفصیل (سب کے لیے)' : 'Add Detail (For All)',
-            style:
-                TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          isUrdu ? 'مزید تفصیل (سب کے لیے)' : 'Add Detail (For All)',
+          style: TextStyle(
+            fontFamily: fontFamily,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         content: TextField(
-          controller: controller,
+          controller: textController,
           maxLines: 4,
           style: TextStyle(fontFamily: fontFamily),
           decoration: InputDecoration(
             hintText: isUrdu
                 ? 'یہاں کام کی مزید وضاحت لکھیں...'
                 : 'Enter more details here...',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(isUrdu ? 'کینسل' : 'Cancel')),
+            onPressed: () => Navigator.pop(context),
+            child: Text(isUrdu ? 'کینسل' : 'Cancel'),
+          ),
           AppButton(
             text: isUrdu ? 'پوسٹ کریں' : 'Post',
             size: AppButtonSize.small,
             onPressed: () async {
-              final text = controller.text.trim();
-              if (text.isEmpty) return;
-
-              await JobService().appendJobDetail(widget.job.id, text);
-
+              await controller.addClarification(textController.text);
               if (context.mounted) Navigator.pop(context);
             },
           ),
@@ -491,20 +456,129 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
+  Widget _buildWebsiteSection(String website, bool isUrdu, String fontFamily) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(PhosphorIcons.globe(), color: Colors.blue, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isUrdu ? 'ویب سائٹ' : 'Website',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontFamily: fontFamily,
+                  ),
+                ),
+                Text(
+                  website,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompanySection(String companyName, bool isUrdu, String fontFamily) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(PhosphorIcons.buildings(), color: Colors.blue, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isUrdu ? 'کمپنی / ادارہ' : 'Company Name',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontFamily: fontFamily,
+                  ),
+                ),
+                Text(
+                  companyName,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade900,
+                    fontFamily: fontFamily,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getBudgetUnitValue(JobPost job, bool isUrdu) {
+    final unit = job.budgetUnit;
+    if (unit == null || unit == 'total') return "";
+
+    switch (unit) {
+      case 'hourly': return isUrdu ? " / فی گھنٹہ" : " / Hr";
+      case 'daily': return isUrdu ? " / فی دیہاڑی" : " / Day";
+      case 'monthly': return isUrdu ? " / فی مہینہ" : " / Mo";
+      case 'contract': return isUrdu ? " / ٹھیکہ" : " / Contract";
+      case 'per_item': return isUrdu ? " / فی آئٹم" : " / Item";
+      case 'sqft': return isUrdu ? " / فی فٹ" : " / Sqft";
+      case 'visit': return isUrdu ? " / فی وزٹ" : " / Visit";
+      case 'km': return isUrdu ? " / فی کلومیٹر" : " / KM";
+      case 'kg': return isUrdu ? " / فی کلو" : " / KG";
+      default: return "";
+    }
+  }
+
   Widget _buildBottomActionBar(
-      BuildContext context, bool isUrdu, String fontFamily, JobPost job) {
+    JobDetailController controller,
+    bool isUrdu,
+    String fontFamily,
+    JobPost job,
+  ) {
     final bool isOpen = job.status == 'open';
 
     return Container(
       padding: EdgeInsets.fromLTRB(
-          16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+        16,
+        12,
+        16,
+        MediaQuery.of(context).padding.bottom + 12,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -5))
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
         ],
       ),
       child: Row(
@@ -516,13 +590,18 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(isUrdu ? 'تخمینی بجٹ' : 'Est. Budget',
-                      style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                  Text('Rs. ${job.estimatedBudget!.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green)),
+                  Text(
+                    isUrdu ? 'تخمینی بجٹ' : 'Est. Budget',
+                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
+                  Text(
+                    'Rs. ${job.estimatedBudget!.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -532,13 +611,15 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             flex: 2,
             child: AppButton(
               text: isOpen
-                  ? (isUrdu ? 'رابطہ کریں' : 'Contact Owner')
+                  ? (isUrdu ? 'کام حاصل کریں' : 'Apply for Job')
                   : (isUrdu ? 'کام جاری ہے' : 'In Progress'),
               color: isOpen ? AppTheme.themeColor : Colors.grey,
               size: AppButtonSize.large,
-              isLoading: _isStartingNegotiation,
+              isLoading: controller.status == JobDetailStatus.negotiating,
               isFullWidth: true,
-              onPressed: isOpen ? () => _startNegotiation(isUrdu, job) : null,
+              onPressed: isOpen
+                  ? () => _startNegotiation(controller)
+                  : null,
             ),
           ),
         ],
@@ -549,11 +630,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   Widget _buildImageGallery(BuildContext context, JobPost job) {
     if (job.images.isEmpty) return const SizedBox.shrink();
 
+    final isUrdu = Provider.of<LanguageService>(context).isUrdu;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          Provider.of<LanguageService>(context).isUrdu ? 'تصاویر:' : 'Images:',
+          isUrdu ? 'تصاویر:' : 'Images:',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
@@ -567,7 +650,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               return _SmartImageFrame(
                 imageUrl: job.images[index],
                 tag: "job_img_${job.id}_$index",
-                onTap: () => _openFullScreenGallery(context, job.images, index),
+                onTap: () => _openFullScreenGallery(
+                  context,
+                  job.images,
+                  index,
+                ),
                 isDetail: true,
               );
             },
@@ -578,7 +665,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   }
 
   void _openFullScreenGallery(
-      BuildContext context, List<String> images, int initialIndex) {
+    BuildContext context,
+    List<String> images,
+    int initialIndex,
+  ) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -601,7 +691,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     minScale: PhotoViewComputedScale.contained * 0.8,
                     maxScale: PhotoViewComputedScale.covered * 2,
                     heroAttributes: PhotoViewHeroAttributes(
-                        tag: "job_img_${widget.job.id}_$index"),
+                      tag: "job_img_${widget.job.id}_$index",
+                    ),
                   );
                 },
                 scrollPhysics: const BouncingScrollPhysics(),
@@ -611,15 +702,20 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               Positioned(
                 bottom: 20,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     "${initialIndex + 1} / ${images.length}",
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ),
@@ -631,74 +727,81 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   }
 
   Widget _buildBulletPoints(
-      String text, bool isUrdu, String fontFamily, Color color) {
-    final List<String> lines =
-        text.split('\n').where((l) => l.trim().isNotEmpty).toList();
+    String text,
+    bool isUrdu,
+    String fontFamily,
+    Color color,
+  ) {
+    final List<String> lines = text
+        .split('\n')
+        .where((l) => l.trim().isNotEmpty)
+        .toList();
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: lines.map((line) {
-        // نکتہ ہٹائیں اگر پہلے سے موجود ہے تاکہ ہم اپنی مرضی کی سپیس دے سکیں
-        final cleanLine = line.replaceAll(RegExp(r'^•\s*'), '').trim();
-        if (cleanLine.isEmpty) return const SizedBox.shrink();
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (lines.length > 1) ...[
-                Text(
-                  "•",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: color == Colors.black ? AppTheme.themeColor : color,
+        // نشان اور تحریر کو الگ کرنے کی کوشش کریں
+        final match = RegExp(r'^(•|★|✓|\d+\.)\s*(.*)$').firstMatch(line);
+        
+        if (match != null) {
+          final symbol = match.group(1)!;
+          final content = match.group(2)!;
+          
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 22, // جگہ تھوڑی بڑھا دی
+                  child: Text(
+                    symbol,
+                    style: TextStyle(
+                      fontSize: symbol.contains('.') ? 16 : 22,
+                      fontWeight: FontWeight.bold,
+                      color: color == Colors.black ? AppTheme.themeColor : color,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 14), // نکتہ اور تحریر کے درمیان سپیس
+                const SizedBox(width: 6), // فاصلہ مناسب کر دیا
+                Expanded(
+                  child: Text(
+                    content,
+                    style: TextStyle(
+                      fontSize: 17,
+                      height: 1.5,
+                      color: color,
+                      fontFamily: fontFamily,
+                    ),
+                  ),
+                ),
               ],
-              Expanded(
-                child: Text(
-                  cleanLine,
-                  style: TextStyle(
-                    fontSize: 17,
-                    height: 1.5,
-                    color: color,
-                    fontFamily: fontFamily,
-                  ),
-                ),
-              ),
-            ],
+            ),
+          );
+        }
+
+        // اگر کوئی نشان نہ ملے تو عام ٹیکسٹ کی طرح دکھائیں
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            line,
+            style: TextStyle(
+              fontSize: 17,
+              height: 1.5,
+              color: color,
+              fontFamily: fontFamily,
+            ),
           ),
         );
       }).toList(),
     );
   }
 
-  Widget _buildCustomerHeader(bool isUrdu, String fontFamily, JobPost job) {
-    return StreamBuilder<bool>(
-      stream: ArtisanService().isFavorite(job.customerId),
-      builder: (context, favSnapshot) {
-        final isFav = favSnapshot.data ?? false;
-        return ProfileInfoWidget(
-          name: job.customerName,
-          phone: '',
-          profileImage: job.customerPhotoUrl,
-          customSize: 42,
-          borderRadius: 6,
-          isFavorite: isFav,
-          bottom: Text(
-            Formatters.formatDate(job.createdAt),
-            style: TextStyle(
-                fontSize: 12, color: Colors.grey[600], fontFamily: fontFamily),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildCategoryAndLocationRow(
-      bool isUrdu, String fontFamily, JobPost job) {
+    bool isUrdu,
+    String fontFamily,
+    JobPost job,
+  ) {
     final professions = ArtisanService.getProfessions();
 
     return Wrap(
@@ -708,27 +811,35 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         ...job.categories.map((catId) {
           final prof = professions.firstWhere(
             (p) => p['id'] == catId,
-            orElse: () => {'name': catId, 'icon': PhosphorIcons.briefcase()},
+            orElse: () => {
+              'name': catId,
+              'icon': PhosphorIcons.briefcase(),
+            },
           );
           return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 7,
+            ),
             decoration: BoxDecoration(
-              color: AppTheme.themeColor.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(20),
-              border:
-                  Border.all(color: AppTheme.themeColor.withValues(alpha: 0.2)),
+              color: const Color(0xFFE8EAF0),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(prof['icon'], size: 16, color: AppTheme.themeColor),
+                Icon(
+                  prof['icon'],
+                  size: 14,
+                  color: Colors.black.withValues(alpha: 0.7),
+                ),
                 const SizedBox(width: 8),
                 Text(
                   isUrdu ? prof['name'] : prof['id'],
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.themeColor,
+                    color: Colors.black.withValues(alpha: 0.7),
                     fontFamily: fontFamily,
                   ),
                 ),
@@ -741,6 +852,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   }
 }
 
+// _SmartImageFrame کلاس کو بہتر بنایا گیا
 class _SmartImageFrame extends StatefulWidget {
   final String imageUrl;
   final String tag;
@@ -760,6 +872,8 @@ class _SmartImageFrame extends StatefulWidget {
 
 class _SmartImageFrameState extends State<_SmartImageFrame> {
   double? _aspectRatio;
+  ImageStream? _imageStream;
+  ImageStreamListener? _imageStreamListener;
 
   @override
   void initState() {
@@ -769,15 +883,36 @@ class _SmartImageFrameState extends State<_SmartImageFrame> {
 
   void _calculateImageSize() {
     final Image image = Image.network(widget.imageUrl);
-    image.image.resolve(const ImageConfiguration()).addListener(
-      ImageStreamListener((ImageInfo info, bool _) {
+    _imageStream = image.image.resolve(const ImageConfiguration());
+    
+    _imageStreamListener = ImageStreamListener(
+      (ImageInfo info, bool _) {
         if (mounted) {
           setState(() {
             _aspectRatio = info.image.width / info.image.height;
           });
         }
-      }),
+      },
+      onError: (error, stackTrace) {
+        // غلطی کی صورت میں ڈیفالٹ اسپیکٹ ریشو
+        if (mounted) {
+          setState(() {
+            _aspectRatio = 1.0;
+          });
+        }
+      },
     );
+    
+    _imageStream!.addListener(_imageStreamListener!);
+  }
+
+  @override
+  void dispose() {
+    // میموری لیک سے بچنے کے لیے لسٹنر کو ہٹائیں
+    if (_imageStream != null && _imageStreamListener != null) {
+      _imageStream!.removeListener(_imageStreamListener!);
+    }
+    super.dispose();
   }
 
   @override

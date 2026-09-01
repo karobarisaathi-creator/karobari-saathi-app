@@ -1,7 +1,7 @@
 // lib/features/artisans/models/artisan_work_order_model.dart
 import 'package:hive/hive.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'transaction_item_model.dart';
+import 'package:account_app/core/models/transaction_item_model.dart';
 
 part 'artisan_work_order_model.g.dart';
 
@@ -265,6 +265,7 @@ class ArtisanWorkOrder extends HiveObject {
     List<TransactionItem>? items,
     double? laborFee,
     String? title,
+    DateTime? updatedAt,
   }) {
     return ArtisanWorkOrder(
       id: id ?? this.id,

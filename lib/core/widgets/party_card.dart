@@ -122,13 +122,11 @@ class _PartyCardState extends State<PartyCard> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: isSettled 
-            ? Colors.white 
-            : balanceColor.withOpacity(0.08),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -189,7 +187,7 @@ class _PartyCardState extends State<PartyCard> {
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(color: Colors.white, width: 1.5),
                                   boxShadow: [
-                                    BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4),
+                                    BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 4),
                                   ],
                                 ),
                                 child: Text(
@@ -285,7 +283,7 @@ class _PartyCardState extends State<PartyCard> {
                 ),
               ),
 
-              Divider(height: 1, thickness: 1, color: AppTheme.darkColor.withOpacity(0.08)),
+              Divider(height: 1, thickness: 1, color: AppTheme.darkColor.withValues(alpha: 0.08)),
 
               // Bottom Section: Actions
               Container(
@@ -324,7 +322,7 @@ class _PartyCardState extends State<PartyCard> {
                       ),
                     ),
                     
-                    Container(height: 24, width: 1, color: Colors.grey.withOpacity(0.3)),
+                    Container(height: 24, width: 1, color: Colors.grey.withValues(alpha: 0.3)),
 
                     // Reminder Action
                     Expanded(

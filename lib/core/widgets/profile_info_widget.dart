@@ -1,18 +1,16 @@
+// lib/core/widgets/profile_info_widget.dart
 import 'dart:io';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/services/language_service.dart';
-import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
-import 'package:account_app/core/models/account_model.dart';
 import 'category_chip.dart';
 
-class ProfileInfoWidget extends StatefulWidget {
+class ProfileInfoWidget extends StatelessWidget {
   final String name;
   final String phone;
   final String? profileImage;
@@ -78,11 +76,6 @@ class ProfileInfoWidget extends StatefulWidget {
     this.addressColor,
   });
 
-  @override
-  State<ProfileInfoWidget> createState() => _ProfileInfoWidgetState();
-}
-
-class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
   String _getAvatarForName(String name) {
     if (name.isEmpty) return 'assets/avatars/avatar.svg';
     int hash = 0;
@@ -96,18 +89,17 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
 
   String _getTranslatedCategory(String category, bool isUrdu) {
     if (!isUrdu) return category;
-
     final key = category.trim().toLowerCase();
 
     try {
-      // صرف CategoryChip کی لسٹ سے میچ کرنے کی کوشش کریں
-      final match = CategoryChip.partyCategories.firstWhere((c) =>
-          c.id.toLowerCase() == key ||
-          c.labelEn.toLowerCase() == key ||
-          c.labelUr == category.trim());
+      final match = CategoryChip.partyCategories.firstWhere(
+        (c) =>
+            c.id.toLowerCase() == key ||
+            c.labelEn.toLowerCase() == key ||
+            c.labelUr == category.trim(),
+      );
       return match.labelUr;
     } catch (_) {
-      // اگر لسٹ میں نہ ملے تو اصل ٹیکسٹ ہی واپس کر دیں (جو شاید پہلے سے ہی اردو ہو یا کوئی سسٹم کیٹگری ہو)
       return category;
     }
   }
@@ -118,35 +110,67 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
     final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
-    final effectiveTextColor = widget.textColor ?? AppTheme.darkColor;
-    final effectiveSubtitleColor =
-        widget.subtitleColor ?? AppTheme.textSecondary;
+    final effectiveTextColor = textColor ?? AppTheme.darkColor;
+    final effectiveSubtitleColor = subtitleColor ?? AppTheme.textSecondary;
 
-    final String displayCategory = widget.category != null
-        ? _getTranslatedCategory(widget.category!, isUrdu)
+    final displayCategory = category != null
+        ? _getTranslatedCategory(category!, isUrdu)
         : '';
 
-    // Default values
-    String displayName = widget.name.trim().isEmpty
+    final displayName = name.trim().isEmpty
         ? (isUrdu ? 'نامعلوم' : 'Unknown')
-        : widget.name;
-    String? displayImage = widget.profileImage;
+        : name;
 
-    final double size = widget.customSize ?? (widget.isLarge ? 50 : 36);
-    final double radius = widget.borderRadius ?? 12.0; // Enforced 12 radius as requested
+    final size = customSize ?? (isLarge ? 50 : 36);
+    final radius = borderRadius ?? 12.0;
 
-    // Check if the phone field actually contains Urdu text (like 'Verified Profile')
-    bool phoneHasUrdu = RegExp(r'[\u0600-\u06FF]').hasMatch(widget.phone);
+    final phoneHasUrdu = RegExp(r'[\u0600-\u06FF]').hasMatch(phone);
 
-    // Build the Image Widget
-    Widget imagePart = SizedBox(
+    final imagePart = _buildImagePart(
+      displayName,
+      size,
+      radius,
+    );
+
+    if (!showText) return imagePart;
+
+    if (isCentered) {
+      return _buildCenteredLayout(
+        imagePart,
+        displayName,
+        phone,
+        phoneHasUrdu,
+        isUrdu,
+        fontFamily,
+        fontWeight,
+        effectiveTextColor,
+        effectiveSubtitleColor,
+      );
+    }
+
+    return _buildRowLayout(
+      imagePart,
+      displayName,
+      phone,
+      phoneHasUrdu,
+      displayCategory,
+      isUrdu,
+      fontFamily,
+      fontWeight,
+      effectiveTextColor,
+      effectiveSubtitleColor,
+      size,
+    );
+  }
+
+  Widget _buildImagePart(String displayName, double size, double radius) {
+    return SizedBox(
       width: size,
       height: size,
       child: Stack(
         alignment: Alignment.center,
         clipBehavior: Clip.none,
         children: [
-          // Main Image Container
           Container(
             width: size,
             height: size,
@@ -154,18 +178,16 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(radius),
               border: Border.all(
-                color: AppTheme.darkColor.withOpacity(0.12),
+                color: AppTheme.darkColor.withValues(alpha: 0.12),
                 width: 1,
               ),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(radius),
-              child: _buildCoreImage(displayImage, displayName, radius, size),
+              child: _buildCoreImage(profileImage, displayName, size),
             ),
           ),
-
-          // Small Update Badge
-          if (widget.hasUpdate)
+          if (hasUpdate)
             Positioned(
               right: -2,
               top: -2,
@@ -188,48 +210,106 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
         ],
       ),
     );
+  }
 
-    // Return only image if text is not needed to prevent Row overflow in tight spaces
-    if (!widget.showText) return imagePart;
+  Widget _buildCoreImage(String? imagePath, String displayName, double size) {
+    if (imagePath == null || imagePath.isEmpty) {
+      return _buildPlaceholderImage(displayName);
+    }
 
-    // Centered Vertical Layout (New Support)
-    if (widget.isCentered) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          imagePart,
-          const SizedBox(height: 12),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: Text(
-                  displayName,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: widget.isLarge ? 20 : 16,
-                    fontWeight: fontWeight,
-                    color: effectiveTextColor,
-                    fontFamily: fontFamily,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (widget.phone.isNotEmpty)
-            Text(
-              Formatters.formatPhoneNumber(widget.phone),
-              style: TextStyle(
-                fontSize: 12,
-                color: effectiveSubtitleColor,
-                fontFamily: phoneHasUrdu ? fontFamily : '',
-              ),
-            ),
-        ],
+    if (imagePath.startsWith('http')) {
+      return CachedNetworkImage(
+        imageUrl: imagePath,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => Container(
+          color: AppTheme.darkColor.withValues(alpha: 0.05),
+        ),
+        errorWidget: (context, url, error) => _buildPlaceholderImage(displayName),
       );
     }
 
-    // Default Row Layout
+    if (imagePath.startsWith('assets/')) {
+      return SvgPicture.asset(imagePath, fit: BoxFit.cover);
+    }
+
+    final file = File(imagePath);
+    if (file.existsSync()) {
+      return Image.file(file, fit: BoxFit.cover);
+    }
+
+    return _buildPlaceholderImage(displayName);
+  }
+
+  Widget _buildPlaceholderImage(String name) {
+    final assetPath = _getAvatarForName(name);
+    return SvgPicture.asset(
+      assetPath,
+      fit: BoxFit.cover,
+      placeholderBuilder: (context) => Container(
+        color: AppTheme.darkColor.withValues(alpha: 0.05),
+      ),
+    );
+  }
+
+  Widget _buildCenteredLayout(
+    Widget imagePart,
+    String displayName,
+    String phone,
+    bool phoneHasUrdu,
+    bool isUrdu,
+    String fontFamily,
+    FontWeight fontWeight,
+    Color effectiveTextColor,
+    Color effectiveSubtitleColor,
+  ) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        imagePart,
+        const SizedBox(height: 12),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                displayName,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: isLarge ? 20 : 16,
+                  fontWeight: fontWeight,
+                  color: effectiveTextColor,
+                  fontFamily: fontFamily,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (phone.isNotEmpty)
+          Text(
+            Formatters.formatPhoneNumber(phone),
+            style: TextStyle(
+              fontSize: 12,
+              color: effectiveSubtitleColor,
+              fontFamily: phoneHasUrdu ? fontFamily : '',
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildRowLayout(
+    Widget imagePart,
+    String displayName,
+    String phone,
+    bool phoneHasUrdu,
+    String displayCategory,
+    bool isUrdu,
+    String fontFamily,
+    FontWeight fontWeight,
+    Color effectiveTextColor,
+    Color effectiveSubtitleColor,
+    double size,
+  ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisSize: MainAxisSize.max,
@@ -240,18 +320,18 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min, // Allow to grow if needed
+            mainAxisSize: MainAxisSize.min,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (widget.topLabel != null && widget.topLabel!.isNotEmpty)
+                  if (topLabel != null && topLabel!.isNotEmpty)
                     Text(
-                      widget.topLabel!,
+                      topLabel!,
                       style: TextStyle(
                         fontSize: 12,
-                        color: effectiveSubtitleColor.withOpacity(0.7),
+                        color: effectiveSubtitleColor.withValues(alpha: 0.7),
                         fontFamily: fontFamily,
                       ),
                     ),
@@ -268,7 +348,7 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                                 displayName,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: widget.isLarge ? 20 : 16,
+                                  fontSize: isLarge ? 20 : 16,
                                   fontWeight: fontWeight,
                                   color: effectiveTextColor,
                                   fontFamily: fontFamily,
@@ -276,27 +356,27 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                                 ),
                               ),
                             ),
-                            if (widget.isVerified) ...[
+                            if (isVerified) ...[
                               const SizedBox(width: 4),
                               Icon(
                                 PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
-                                size: widget.isLarge ? 18 : 14,
+                                size: isLarge ? 18 : 14,
                                 color: AppTheme.verifiedGold,
                               ),
                             ],
                           ],
                         ),
                       ),
-                      if (widget.suffix != null) ...[
+                      if (suffix != null) ...[
                         const SizedBox(width: 8),
-                        widget.suffix!,
+                        suffix!,
                       ],
                     ],
                   ),
                 ],
               ),
-              if (widget.isVerticalCategory && displayCategory.isNotEmpty) ...[
-                SizedBox(height: widget.verticalSpacing),
+              if (isVerticalCategory && displayCategory.isNotEmpty) ...[
+                SizedBox(height: verticalSpacing),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -305,7 +385,7 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                         displayCategory,
                         style: TextStyle(
                           fontSize: 14,
-                          color: widget.categoryColor ?? AppTheme.themeColor,
+                          color: categoryColor ?? AppTheme.themeColor,
                           fontFamily: fontFamily,
                           fontWeight: fontWeight,
                           height: 1.0,
@@ -314,17 +394,17 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (widget.categorySuffix != null) ...[
+                    if (categorySuffix != null) ...[
                       const SizedBox(width: 8),
-                      widget.categorySuffix!,
+                      categorySuffix!,
                     ],
                   ],
                 ),
               ],
-              if (widget.phone.isNotEmpty) ...[
-                SizedBox(height: widget.verticalSpacing),
+              if (phone.isNotEmpty) ...[
+                SizedBox(height: verticalSpacing),
                 Text(
-                  Formatters.formatPhoneNumber(widget.phone),
+                  Formatters.formatPhoneNumber(phone),
                   style: TextStyle(
                     fontSize: 13,
                     color: effectiveSubtitleColor,
@@ -332,108 +412,59 @@ class _ProfileInfoWidgetState extends State<ProfileInfoWidget> {
                   ),
                 ),
               ],
-              if (widget.address != null && widget.address!.isNotEmpty) ...[
-                SizedBox(height: widget.verticalSpacing),
+              if (address != null && address!.isNotEmpty) ...[
+                SizedBox(height: verticalSpacing),
                 Text(
-                  widget.address!,
+                  address!,
                   style: TextStyle(
-                      fontSize: 13,
-                      color: widget.addressColor ?? effectiveSubtitleColor,
-                      fontFamily: fontFamily,
-                      fontWeight: widget.isAddressBold ? FontWeight.w900 : fontWeight,
-                      height: 1.0),
+                    fontSize: 13,
+                    color: addressColor ?? effectiveSubtitleColor,
+                    fontFamily: fontFamily,
+                    fontWeight: isAddressBold ? FontWeight.w900 : fontWeight,
+                    height: 1.0,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
-              if (widget.bottom != null) ...[
-                SizedBox(height: widget.verticalSpacing),
-                widget.bottom!,
+              if (showDate && date != null) ...[
+                SizedBox(height: verticalSpacing),
+                Text(
+                  Formatters.formatDate(date!),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: effectiveSubtitleColor,
+                    fontFamily: fontFamily,
+                  ),
+                ),
+              ],
+              if (bottom != null) ...[
+                SizedBox(height: verticalSpacing),
+                bottom!,
+              ],
+              if (reputationLabel != null) ...[
+                SizedBox(height: verticalSpacing),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: reputationBgColor ?? AppTheme.themeColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    reputationLabel!,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: reputationColor ?? AppTheme.themeColor,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: fontFamily,
+                    ),
+                  ),
+                ),
               ],
             ],
           ),
         ),
       ],
     );
-  }
-
-  Widget _buildCoreImage(String? displayImage, String displayName, double radius, double size) {
-    if (displayImage == null || displayImage.isEmpty) {
-      return _buildPlaceholderImage(displayName, radius, size);
-    }
-
-    if (displayImage.startsWith('http')) {
-      return CachedNetworkImage(
-        imageUrl: displayImage,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => Container(
-          color: AppTheme.darkColor.withOpacity(0.05),
-        ),
-        errorWidget: (context, url, error) => _buildPlaceholderImage(displayName, radius, size),
-      );
-    }
-
-    if (displayImage.startsWith('assets/')) {
-      return SvgPicture.asset(displayImage, fit: BoxFit.cover);
-    }
-
-    if (File(displayImage).existsSync()) {
-      return Image.file(File(displayImage), fit: BoxFit.cover);
-    }
-
-    return _buildPlaceholderImage(displayName, radius, size);
-  }
-
-  Widget _buildPlaceholderImage(String name, double radius, double size) {
-    final assetPath = _getAvatarForName(name);
-    return SvgPicture.asset(
-      assetPath,
-      fit: BoxFit.cover,
-      placeholderBuilder: (context) => Container(
-        color: AppTheme.darkColor.withOpacity(0.05),
-      ),
-    );
-  }
-
-  Widget _buildInitials(String name, bool isLarge, Color color, double size,
-      {bool isStore = false}) {
-    return Center(
-      child: Icon(
-        isStore ? PhosphorIcons.storefront() : PhosphorIcons.user(),
-        size: isLarge ? size * 0.5 : size * 0.6, // Relative to container size
-        color: color.withOpacity(0.4),
-      ),
-    );
-  }
-}
-
-class _GradientBorderPainter extends CustomPainter {
-  final Gradient gradient;
-  final double strokeWidth;
-  final double radius;
-
-  _GradientBorderPainter({
-    required this.gradient,
-    required this.strokeWidth,
-    required this.radius,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
-    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
-
-    final paint = Paint()
-      ..shader = gradient.createShader(rect)
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawRRect(rrect, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _GradientBorderPainter oldDelegate) {
-    return true;
   }
 }

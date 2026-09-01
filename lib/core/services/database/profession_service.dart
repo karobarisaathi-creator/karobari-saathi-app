@@ -82,22 +82,68 @@ class ProfessionService extends BaseService {
   Future<void> recalculateProfessionFinance(String professionId) async {
     final profession = professionsBox?.get(professionId);
     if (profession != null) {
-      final txs = transactionsBox?.values.where((t) => t.professionId == professionId).toList() ?? [];
-      double income = txs.where((t) => t.type == 'income').fold(0.0, (sum, t) => sum + t.amount);
-      double expense = txs.where((t) => t.type == 'expense').fold(0.0, (sum, t) => sum + t.amount);
-      final updated = profession.copyWith(totalIncome: income, totalExpense: expense, updatedAt: DateTime.now());
-      await professionsBox?.put(profession.id, updated);
-      
-      // Background Cloud Sync (Don't await, keeping it Local First & Fast)
-      if (auth.currentUser != null) {
-        firestore
-            .collection('users')
-            .doc(auth.currentUser!.uid)
-            .collection('professions')
-            .doc(profession.id)
-            .set(updated.toMap())
-            .catchError((e) => debugPrint("Offline Sync: Profession finance update delayed"));
+      if (profession.parentId != null) {
+        // 1. This is a Season. Calculate its own finance first.
+        final txs = transactionsBox?.values.where((t) => t.professionId == professionId).toList() ?? [];
+        
+        double income = txs.where((t) => t.professionSide == 'income').fold(0.0, (sum, t) => sum + t.amount);
+        double expense = txs.where((t) => t.professionSide == 'expense').fold(0.0, (sum, t) => sum + t.amount);
+        
+        final updatedSeason = profession.copyWith(totalIncome: income, totalExpense: expense, updatedAt: DateTime.now());
+        await professionsBox?.put(profession.id, updatedSeason);
+        
+        // 2. Now update the Master Profession.
+        await _recalculateMasterProfessionFinance(profession.parentId!);
+      } else {
+        // This is a Master Profession.
+        await _recalculateMasterProfessionFinance(professionId);
       }
+
+      notifyListeners();
+    }
+  }
+
+  Future<void> _recalculateMasterProfessionFinance(String masterId) async {
+    final master = professionsBox?.get(masterId);
+    if (master == null) return;
+
+    final seasons = getSeasons(masterId);
+    final masterTxs = transactionsBox?.values.where((t) => t.professionId == masterId).toList() ?? [];
+
+    double totalIncome = 0;
+    double totalExpense = 0;
+
+    // 1. Sum up all seasons' calculated totals
+    for (var season in seasons) {
+      totalIncome += season.totalIncome;
+      totalExpense += season.totalExpense;
+    }
+
+    // 2. Add transactions directly linked to master (if any)
+    for (var t in masterTxs) {
+      if (t.professionSide == 'income') {
+        totalIncome += t.amount;
+      } else if (t.professionSide == 'expense') {
+        totalExpense += t.amount;
+      }
+    }
+
+    final updatedMaster = master.copyWith(
+      totalIncome: totalIncome,
+      totalExpense: totalExpense,
+      updatedAt: DateTime.now(),
+    );
+    await professionsBox?.put(masterId, updatedMaster);
+    
+    // Cloud Sync Master
+    if (auth.currentUser != null) {
+      firestore
+          .collection('users')
+          .doc(auth.currentUser!.uid)
+          .collection('professions')
+          .doc(masterId)
+          .update(updatedMaster.toMap())
+          .catchError((_) {});
     }
   }
 

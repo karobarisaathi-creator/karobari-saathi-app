@@ -9,6 +9,7 @@ import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
 import 'package:account_app/core/models/artisan_review_model.dart';
+import 'package:account_app/core/models/transaction_item_model.dart';
 
 import 'database/account_service.dart';
 import 'database/transaction_service.dart';
@@ -108,6 +109,22 @@ class DatabaseService extends ChangeNotifier {
   Stream<List<ArtisanWorkOrder>> getArtisanWorkOrders(String id) => _artisanWorkOrderService.getArtisanWorkOrders(id);
   Future<List<ArtisanWorkOrder>> getCustomerWorkOrders(String id) => _artisanWorkOrderService.getCustomerWorkOrders(id);
   Future<void> updateArtisanWorkStatus(String aId, String oId, String s) async { await _artisanWorkOrderService.updateStatus(aId, oId, s); notifyListeners(); }
+  Future<void> updateArtisanWorkOrderItems({
+    required String artisanId,
+    required String orderId,
+    required List<TransactionItem> items,
+    required double laborFee,
+    required double total,
+  }) async {
+    await _artisanWorkOrderService.updateWorkOrderItems(
+      artisanId: artisanId,
+      orderId: orderId,
+      items: items,
+      laborFee: laborFee,
+      total: total,
+    );
+    notifyListeners();
+  }
 
   // SYNC OPERATIONS
   void startRealtimeSync() => _syncService.startRealtimeSync();

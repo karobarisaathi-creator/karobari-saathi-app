@@ -162,7 +162,7 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
-          isUrdu ? 'بات چیت شروع کریں' : 'Start Negotiation',
+          isUrdu ? 'رابطہ کریں' : 'Contact Artisan',
           style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
         ),
         content: Text(
@@ -307,7 +307,7 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                isUrdu ? 'بات چیت شروع کر دی گئی ہے۔' : 'Negotiation started.'),
+                isUrdu ? 'رابطہ شروع کر دیا گیا ہے۔' : 'Contact started.'),
             backgroundColor: Colors.green.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -319,8 +319,8 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(isUrdu
-                  ? 'بات چیت شروع نہیں ہو سکی'
-                  : 'Unable to start negotiation')),
+                  ? 'رابطہ شروع نہیں ہو سکا'
+                  : 'Unable to start contact')),
         );
       }
     }
@@ -330,9 +330,11 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
     double selectedRating = 5.0;
     final commentController = TextEditingController();
 
+    bool isSubmitting = false;
+
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
+      builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -384,34 +386,47 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
               text: isUrdu ? 'کینسل' : 'Cancel',
               variant: AppButtonVariant.ghost,
               color: Colors.grey[600],
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
             ),
             const SizedBox(width: 8),
             AppButton(
               text: isUrdu ? 'جمع کریں' : 'Submit',
               color: AppTheme.themeColor,
               variant: AppButtonVariant.primary,
-              onPressed: () async {
-                if (commentController.text.trim().length < 20) return;
+              isLoading: isSubmitting,
+              onPressed: isSubmitting ? null : () async {
+                final comment = commentController.text.trim();
+                if (comment.length < 20) return;
 
-                final artisanService = ArtisanService();
-                await artisanService.addReview(
-                  artisanId: widget.artisanId,
-                  rating: selectedRating,
-                  comment: commentController.text.trim(),
-                );
+                setDialogState(() => isSubmitting = true);
 
-                if (mounted) {
-                  Navigator.pop(context);
-                  _loadData();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(isUrdu
-                          ? 'آپ کا ریویو جمع ہوگیا ہے!'
-                          : 'Review submitted!'),
-                      backgroundColor: Colors.green,
-                    ),
+                try {
+                  final artisanService = ArtisanService();
+                  await artisanService.addReview(
+                    artisanId: widget.artisanId,
+                    rating: selectedRating,
+                    comment: comment,
                   );
+
+                  if (mounted) {
+                    Navigator.pop(dialogContext);
+                    _loadData();
+                    ScaffoldMessenger.of(this.context).showSnackBar(
+                      SnackBar(
+                        content: Text(isUrdu
+                            ? 'آپ کا ریویو جمع ہوگیا ہے!'
+                            : 'Review submitted!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    setDialogState(() => isSubmitting = false);
+                    ScaffoldMessenger.of(this.context).showSnackBar(
+                      SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+                    );
+                  }
                 }
               },
             ),
@@ -423,7 +438,7 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
 
   Widget _buildWorkRequestButton(bool isUrdu, String fontFamily) {
     Color btnColor = AppTheme.themeColor;
-    final btnText = isUrdu ? 'بات چیت شروع کریں' : 'Start Negotiation';
+    final btnText = isUrdu ? 'رابطہ کریں' : 'Contact';
     final icon = PhosphorIcons.chatCircleDots();
 
     return AppButton(
@@ -532,7 +547,6 @@ Check out this artisan on Karobari Saathi!
             _buildSelectionBar(isUrdu, fontFamily),
             const SizedBox(height: 16),
             _buildTabContent(artisan, isUrdu, fontFamily),
-            const SizedBox(height: 100),
           ],
         ),
       ),
@@ -666,7 +680,7 @@ Check out this artisan on Karobari Saathi!
                         ],
                         const Spacer(),
                         Text(
-                          '${isUrdu ? 'مکمل کام' : 'Jobs Done'}: $_workCount',
+                          '${isUrdu ? 'مکمل کام' : 'Jobs Done'}: ${artisan.workCount}',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.white.withOpacity(0.9),
@@ -919,7 +933,20 @@ Check out this artisan on Karobari Saathi!
       case 'month':
         return 'فی مہینہ';
       case 'fixed':
-        return 'مکمل کام';
+        return 'کل رقم';
+      case 'contract':
+        return 'ٹھیکہ';
+      case 'item':
+      case 'per_item':
+        return 'فی آئٹم';
+      case 'sqft':
+        return 'فی مربع فٹ';
+      case 'visit':
+        return 'فی وزٹ';
+      case 'km':
+        return 'فی کلومیٹر';
+      case 'kg':
+        return 'فی کلو';
       default:
         return 'کام';
     }
@@ -934,7 +961,20 @@ Check out this artisan on Karobari Saathi!
       case 'month':
         return 'Mo';
       case 'fixed':
-        return 'Fixed';
+        return 'Total';
+      case 'contract':
+        return 'Contract';
+      case 'item':
+      case 'per_item':
+        return 'Item';
+      case 'sqft':
+        return 'Sqft';
+      case 'visit':
+        return 'Visit';
+      case 'km':
+        return 'KM';
+      case 'kg':
+        return 'KG';
       default:
         return 'Job';
     }
@@ -1078,6 +1118,10 @@ class _AboutTabState extends State<_AboutTab>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildDescription(widget.artisan, widget.isUrdu, widget.fontFamily),
+          if (widget.artisan.qualification != null && widget.artisan.qualification!.isNotEmpty)
+            _buildQualificationSection(widget.artisan, widget.isUrdu, widget.fontFamily),
+          if (widget.artisan.website != null && widget.artisan.website!.isNotEmpty)
+            _buildWebsiteSection(widget.artisan, widget.isUrdu, widget.fontFamily),
           if (widget.artisan.skills.isNotEmpty)
             _buildSkillsSection(
                 widget.artisan, widget.isUrdu, widget.fontFamily),
@@ -1105,10 +1149,80 @@ class _AboutTabState extends State<_AboutTab>
           Text(
             artisan.description,
             style: TextStyle(
-                fontSize: 16,
+                fontSize: 15,
                 color: Colors.grey[800],
                 fontFamily: fontFamily,
                 height: 1.6),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQualificationSection(
+      ArtisanProfile artisan, bool isUrdu, String fontFamily) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isUrdu ? 'تعلیمی قابلیت' : 'Qualification',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.darkColor,
+                fontFamily: fontFamily),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            artisan.qualification!,
+            style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey[800],
+                fontFamily: fontFamily,
+                height: 1.6),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWebsiteSection(
+      ArtisanProfile artisan, bool isUrdu, String fontFamily) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isUrdu ? 'ویب سائٹ' : 'Website',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.darkColor,
+                fontFamily: fontFamily),
+          ),
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: () {
+              // وپ سائٹ کھولنے کی لاجک یہاں آ سکتی ہے
+            },
+            child: Row(
+              children: [
+                Icon(PhosphorIcons.globe(), size: 18, color: Colors.blue),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    artisan.website!,
+                    style: const TextStyle(
+                        fontSize: 15,
+                        color: Colors.blue,
+                        decoration: TextDecoration.underline),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1140,18 +1254,16 @@ class _AboutTabState extends State<_AboutTab>
                 .map((skill) {
               return Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 decoration: BoxDecoration(
-                  color: AppTheme.themeColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border:
-                      Border.all(color: AppTheme.themeColor.withOpacity(0.3)),
+                  color: const Color(0xFFE8EAF0),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   skill,
                   style: TextStyle(
                       fontSize: 13,
-                      color: AppTheme.themeColor,
+                      color: Colors.black.withValues(alpha: 0.7),
                       fontWeight: FontWeight.bold,
                       fontFamily: fontFamily),
                 ),

@@ -56,10 +56,14 @@ class _ArtisanWorkOrdersScreenState extends State<ArtisanWorkOrdersScreen> {
             return _buildEmptyState(isUrdu, fontFamily);
           }
 
-          // Remove duplicates and sort by latest activity
+          // Remove duplicates, filter out pre-start negotiations, and sort by latest activity
           final Map<String, ArtisanWorkOrder> uniqueOrders = {};
           for (var o in orders) {
-            uniqueOrders[o.id] = o;
+            // Only show orders that have been formally started/confirmed/completed
+            // Hide negotiating, quoted, and pending from this list (they belong in Chats/Negotiations)
+            if (o.status != 'negotiating' && o.status != 'quoted' && o.status != 'pending') {
+              uniqueOrders[o.id] = o;
+            }
           }
           final sortedOrders = uniqueOrders.values.toList();
           sortedOrders.sort((a, b) {

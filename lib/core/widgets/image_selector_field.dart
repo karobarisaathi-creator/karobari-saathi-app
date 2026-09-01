@@ -9,6 +9,9 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/image_utils.dart';
 import 'package:provider/provider.dart';
 import 'package:account_app/core/services/language_service.dart';
+import 'package:account_app/core/services/logging_service.dart';
+
+import 'image_gallery_viewer.dart';
 
 class ImageSelectorField extends StatefulWidget {
   final List<File> selectedFiles;
@@ -19,6 +22,7 @@ class ImageSelectorField extends StatefulWidget {
   final String? label;
   final bool isProfile;
   final bool isFullWidth;
+  final bool isVertical;
   final double? customSize;
   final double aspectRatio;
 
@@ -32,6 +36,7 @@ class ImageSelectorField extends StatefulWidget {
     this.label,
     this.isProfile = false,
     this.isFullWidth = false,
+    this.isVertical = false,
     this.customSize,
     this.aspectRatio = 4 / 3,
   });
@@ -41,49 +46,86 @@ class ImageSelectorField extends StatefulWidget {
 }
 
 class _ImageSelectorFieldState extends State<ImageSelectorField> {
+  final _logger = LoggingService();
   final ImagePicker _picker = ImagePicker();
+  bool _isPicking = false;
 
   Future<void> _pickImage() async {
-    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-    
+    if (_isPicking) return;
+    _isPicking = true;
+
     try {
+      final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+      
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 80,
       );
-      
-      if (image != null && mounted) {
-        final croppedFile = await ImageCropper().cropImage(
-          sourcePath: image.path,
-          aspectRatio: widget.isProfile 
-              ? const CropAspectRatio(ratioX: 1, ratioY: 1)
-              : widget.isFullWidth 
-                  ? CropAspectRatio(ratioX: widget.aspectRatio, ratioY: 1)
-                  : const CropAspectRatio(ratioX: 4, ratioY: 3),
-          uiSettings: [
-            AndroidUiSettings(
-              toolbarTitle: isUrdu ? 'تصویر کاٹیں' : 'Crop Image',
-              toolbarColor: AppTheme.darkColor,
-              toolbarWidgetColor: Colors.white,
-              lockAspectRatio: widget.isProfile || widget.isFullWidth,
-            ),
-          ],
-        );
 
+      if (image != null && mounted) {
+        final croppedFile = await _cropImage(image, isUrdu);
         if (croppedFile != null) {
           final compressedFile = await ImageUtils.compressImage(File(croppedFile.path));
-          List<File> updatedList = List.from(widget.selectedFiles);
-          if (widget.isProfile || (widget.isFullWidth && widget.maxTotal == 1)) {
-            updatedList = [compressedFile]; 
-          } else {
-            updatedList.add(compressedFile);
-          }
-          widget.onFilesChanged(updatedList);
+          _updateFiles(compressedFile);
         }
       }
-    } catch (e) {
-      debugPrint("Error picking/cropping image: $e");
+    } catch (e, stack) {
+      _logger.error("Image pick error", e, stack);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              Provider.of<LanguageService>(context, listen: false).isUrdu
+                  ? 'تصویر منتخب کرنے میں ناکامی'
+                  : 'Failed to pick image',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPicking = false;
+        });
+      }
     }
+  }
+
+  Future<CroppedFile?> _cropImage(XFile image, bool isUrdu) async {
+    try {
+      return await ImageCropper().cropImage(
+        sourcePath: image.path,
+        aspectRatio: widget.isProfile
+            ? const CropAspectRatio(ratioX: 1, ratioY: 1)
+            : widget.isFullWidth
+                ? CropAspectRatio(ratioX: widget.aspectRatio, ratioY: 1)
+                : const CropAspectRatio(ratioX: 4, ratioY: 3),
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: isUrdu ? 'تصویر کاٹیں' : 'Crop Image',
+            toolbarColor: AppTheme.darkColor,
+            toolbarWidgetColor: Colors.white,
+            lockAspectRatio: widget.isProfile || widget.isFullWidth,
+          ),
+        ],
+      );
+    } catch (e, stack) {
+      _logger.error("Image crop error", e, stack);
+      return null;
+    }
+  }
+
+  void _updateFiles(File compressedFile) {
+    List<File> updatedList = List.from(widget.selectedFiles);
+    
+    if (widget.isProfile || (widget.isFullWidth && widget.maxTotal == 1)) {
+      updatedList = [compressedFile];
+    } else {
+      updatedList.add(compressedFile);
+    }
+    
+    widget.onFilesChanged(updatedList);
   }
 
   void _removeFile(int index) {
@@ -107,62 +149,117 @@ class _ImageSelectorFieldState extends State<ImageSelectorField> {
       children: [
         if (widget.label != null) ...[
           Text(
-            widget.label!, 
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, fontFamily: fontFamily, color: AppTheme.darkColor)
+            widget.label!,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              fontFamily: fontFamily,
+              color: AppTheme.darkColor,
+            ),
           ),
           const SizedBox(height: 10),
         ],
         if (widget.isFullWidth && widget.maxTotal == 1)
           _buildFullWidthPicker(isUrdu, fontFamily)
+        else if (widget.isVertical)
+          _buildVerticalPicker(size, isUrdu, fontFamily)
         else
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              // Remote Images
-              ...widget.remoteUrls.asMap().entries.map((entry) => _buildImageItem(
-                size: size,
-                image: CachedNetworkImage(
-                  imageUrl: entry.value,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                ),
-                onRemove: () => widget.onRemoteRemoved?.call(entry.key),
-              )),
+          _buildWrapPicker(size, isUrdu, fontFamily),
+      ],
+    );
+  }
 
-              // Local Files
-              ...widget.selectedFiles.asMap().entries.map((entry) => _buildImageItem(
-                size: size,
-                image: Image.file(entry.value, fit: BoxFit.cover),
-                onRemove: () => _removeFile(entry.key),
-              )),
+  Widget _buildVerticalPicker(double size, bool isUrdu, String fontFamily) {
+    final allImages = [
+      ...widget.remoteUrls,
+      ...widget.selectedFiles.map((f) => f.path),
+    ];
 
-              // Add Button
-              if (widget.selectedFiles.length + widget.remoteUrls.length < widget.maxTotal)
-                _buildAddButton(size, isUrdu, fontFamily),
-            ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (allImages.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: ImageGalleryViewer(
+              imagePaths: allImages,
+              onRemove: (index) {
+                if (index < widget.remoteUrls.length) {
+                  widget.onRemoteRemoved?.call(index);
+                } else {
+                  _removeFile(index - widget.remoteUrls.length);
+                }
+              },
+              isReadOnly: false,
+              isVerticalGrid: true,
+              crossAxisCount: 1,
+              padding: EdgeInsets.zero,
+            ),
           ),
+        if (allImages.length < widget.maxTotal)
+          _buildAddButton(widget.isFullWidth ? double.infinity : size, isUrdu, fontFamily),
+      ],
+    );
+  }
+
+  Widget _buildWrapPicker(double size, bool isUrdu, String fontFamily) {
+    final allImages = [
+      ...widget.remoteUrls,
+      ...widget.selectedFiles.map((f) => f.path),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (allImages.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: ImageGalleryViewer(
+              imagePaths: allImages,
+              onRemove: (index) {
+                if (index < widget.remoteUrls.length) {
+                  widget.onRemoteRemoved?.call(index);
+                } else {
+                  _removeFile(index - widget.remoteUrls.length);
+                }
+              },
+              isReadOnly: false,
+              isVerticalGrid: true,
+              crossAxisCount: 3,
+              padding: EdgeInsets.zero,
+            ),
+          ),
+        if (allImages.length < widget.maxTotal)
+          _buildAddButton(size, isUrdu, fontFamily),
       ],
     );
   }
 
   Widget _buildFullWidthPicker(bool isUrdu, String fontFamily) {
-    Widget? displayImage;
-    bool hasImage = false;
+    final allImages = [
+      ...widget.remoteUrls,
+      ...widget.selectedFiles.map((f) => f.path),
+    ];
 
-    if (widget.selectedFiles.isNotEmpty) {
-      displayImage = Image.file(widget.selectedFiles.first, fit: BoxFit.cover);
-      hasImage = true;
-    } else if (widget.remoteUrls.isNotEmpty) {
-      displayImage = CachedNetworkImage(
-        imageUrl: widget.remoteUrls.first,
-        fit: BoxFit.cover,
+    if (allImages.isNotEmpty) {
+      return ImageGalleryViewer(
+        imagePaths: allImages,
+        onRemove: (index) {
+          if (index < widget.remoteUrls.length) {
+            widget.onRemoteRemoved?.call(index);
+          } else {
+            _removeFile(index - widget.remoteUrls.length);
+          }
+        },
+        isReadOnly: false,
+        isVerticalGrid: true,
+        crossAxisCount: 1,
+        padding: EdgeInsets.zero,
       );
-      hasImage = true;
     }
 
     return GestureDetector(
-      onTap: _pickImage,
+      onTap: _isPicking ? null : _pickImage,
       child: AspectRatio(
         aspectRatio: widget.aspectRatio,
         child: Container(
@@ -175,36 +272,33 @@ class _ImageSelectorFieldState extends State<ImageSelectorField> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (hasImage)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(11),
-                  child: displayImage,
-                )
-              else
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(PhosphorIcons.cameraPlus(), size: 40, color: Colors.grey[400]),
-                    const SizedBox(height: 10),
-                    Text(
-                      isUrdu ? 'تصویر منتخب کریں' : 'Select Image', 
-                      style: TextStyle(color: Colors.grey[500], fontFamily: fontFamily, fontSize: 13)
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    PhosphorIcons.cameraPlus(),
+                    size: 40,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    isUrdu ? 'تصویر منتخب کریں' : 'Select Image',
+                    style: TextStyle(
+                      color: Colors.grey[500],
+                      fontFamily: fontFamily,
+                      fontSize: 13,
                     ),
-                  ],
-                ),
-              if (hasImage)
-                Positioned(
-                  top: 8, right: 8,
-                  child: GestureDetector(
-                    onTap: () {
-                      if (widget.selectedFiles.isNotEmpty) _removeFile(0);
-                      else widget.onRemoteRemoved?.call(0);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                      child: const Icon(Icons.close, size: 16, color: Colors.white),
-                    ),
+                  ),
+                ],
+              ),
+              if (_isPicking)
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: const Center(
+                    child: CircularProgressIndicator(),
                   ),
                 ),
             ],
@@ -214,41 +308,13 @@ class _ImageSelectorFieldState extends State<ImageSelectorField> {
     );
   }
 
-  Widget _buildImageItem({required double size, required Widget image, required VoidCallback onRemove}) {
-    return Stack(
-      children: [
-        Container(
-          width: size, height: size,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey[300]!),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(11),
-            child: image,
-          ),
-        ),
-        Positioned(
-          top: 2, right: 2,
-          child: GestureDetector(
-            onTap: onRemove,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-              child: const Icon(Icons.close, size: 12, color: Colors.white),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildAddButton(double size, bool isUrdu, String fontFamily) {
     return InkWell(
-      onTap: _pickImage,
+      onTap: _isPicking ? null : _pickImage,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        width: size, height: size,
+        width: size,
+        height: size == double.infinity ? 65 : size,
         decoration: BoxDecoration(
           color: const Color(0xFFF5F7F9),
           borderRadius: BorderRadius.circular(12),
@@ -257,11 +323,19 @@ class _ImageSelectorFieldState extends State<ImageSelectorField> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(PhosphorIcons.camera(), color: AppTheme.themeColor, size: size * 0.35),
+            Icon(
+              PhosphorIcons.camera(),
+              color: AppTheme.themeColor,
+              size: size == double.infinity ? 24 : size * 0.35,
+            ),
             const SizedBox(height: 4),
             Text(
-              isUrdu ? 'شامل کریں' : 'Add', 
-              style: TextStyle(fontSize: 10, fontFamily: fontFamily, color: Colors.grey[600])
+              isUrdu ? 'شامل کریں' : 'Add',
+              style: TextStyle(
+                fontSize: 10,
+                fontFamily: fontFamily,
+                color: Colors.grey[600],
+              ),
             ),
           ],
         ),
@@ -278,47 +352,59 @@ class _ImageSelectorFieldState extends State<ImageSelectorField> {
       hasImage = true;
     } else if (widget.remoteUrls.isNotEmpty) {
       final url = widget.remoteUrls.first;
-      if (url.startsWith('assets/') && url.endsWith('.svg')) {
-        displayImage = SvgPicture.asset(url, fit: BoxFit.cover);
-      } else {
-        displayImage = CachedNetworkImage(
-          imageUrl: url,
-          fit: BoxFit.cover,
-          placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-          errorWidget: (context, url, error) => Icon(PhosphorIcons.user(), size: size * 0.4, color: Colors.grey[400]),
-        );
-      }
+      displayImage = _buildRemoteImage(url, size);
       hasImage = true;
     }
 
     return GestureDetector(
-      onTap: _pickImage,
+      onTap: _isPicking ? null : _pickImage,
       child: Stack(
         children: [
           Container(
-            width: size, height: size,
+            width: size,
+            height: size,
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.themeColor.withOpacity(0.2), width: 2),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+              border: Border.all(
+                color: AppTheme.themeColor.withValues(alpha: 0.2),
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                ),
+              ],
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(14),
-              child: hasImage 
-                ? displayImage 
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(PhosphorIcons.camera(), size: size * 0.3, color: Colors.grey[400]),
-                      const SizedBox(height: 4),
-                      Text(isUrdu ? 'تصویر' : 'Photo', style: TextStyle(fontSize: 12, color: Colors.grey[400], fontFamily: fontFamily)),
-                    ],
-                  ),
+              child: hasImage
+                  ? displayImage
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          PhosphorIcons.camera(),
+                          size: size * 0.3,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isUrdu ? 'تصویر' : 'Photo',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[400],
+                            fontFamily: fontFamily,
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
           Positioned(
-            bottom: 0, right: 0,
+            bottom: 0,
+            right: 0,
             child: Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
@@ -326,12 +412,17 @@ class _ImageSelectorFieldState extends State<ImageSelectorField> {
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
               ),
-              child: Icon(PhosphorIcons.pencilSimple(), color: Colors.white, size: 14),
+              child: Icon(
+                PhosphorIcons.pencilSimple(),
+                color: Colors.white,
+                size: 14,
+              ),
             ),
           ),
           if (hasImage)
             Positioned(
-              top: 0, right: 0,
+              top: 0,
+              right: 0,
               child: GestureDetector(
                 onTap: () {
                   if (widget.selectedFiles.isNotEmpty) {
@@ -346,11 +437,46 @@ class _ImageSelectorFieldState extends State<ImageSelectorField> {
                     color: Colors.red,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.delete_outline, color: Colors.white, size: 14),
+                  child: const Icon(
+                    Icons.delete_outline,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                ),
+              ),
+            ),
+          if (_isPicking)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black26,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRemoteImage(String url, double size) {
+    if (url.startsWith('assets/') && url.endsWith('.svg')) {
+      return SvgPicture.asset(url, fit: BoxFit.cover);
+    }
+    
+    return CachedNetworkImage(
+      imageUrl: url,
+      fit: BoxFit.cover,
+      placeholder: (context, url) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+      errorWidget: (context, url, error) => Icon(
+        PhosphorIcons.user(),
+        size: size * 0.4,
+        color: Colors.grey[400],
       ),
     );
   }

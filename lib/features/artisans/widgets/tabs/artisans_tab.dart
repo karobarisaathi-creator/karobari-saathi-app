@@ -7,18 +7,22 @@ import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/artisan_service.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/widgets/artisan_card.dart';
-import 'package:account_app/core/widgets/search_sort_bar.dart';
+import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 import 'package:account_app/features/artisans/artisan_detail_screen.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:account_app/core/widgets/skeleton_shimmer.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 
 class ArtisansTab extends StatefulWidget {
   final String selectedProfession;
   final String searchQuery;
+  final VoidCallback? onProfessionTap;
+  
   const ArtisansTab({
     super.key,
     required this.selectedProfession,
     this.searchQuery = '',
+    this.onProfessionTap,
   });
 
   @override
@@ -26,20 +30,53 @@ class ArtisansTab extends StatefulWidget {
 }
 
 class _ArtisansTabState extends State<ArtisansTab> {
+  final ArtisanService _artisanService = ArtisanService();
+  final ScrollController _scrollController = ScrollController();
+  
   String _artisanSortBy = 'rating';
   Position? _currentPosition;
-  int _currentArtisanPage = 1;
-  static const int _artisanPageSize = 20;
+  
+  List<ArtisanProfile> _allArtisans = [];
+  bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  final int _pageSize = 20;
+  
+  DocumentSnapshot? _lastDocument;
+  StreamSubscription? _artisanSubscription;
 
   @override
   void initState() {
     super.initState();
     _getCurrentLocation();
+    _loadArtisans();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void didUpdateWidget(ArtisansTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // اگر پیشہ یا سرچ کیوری بدل جائے تو دوبارہ لوڈ کریں
+    if (oldWidget.selectedProfession != widget.selectedProfession ||
+        oldWidget.searchQuery != widget.searchQuery) {
+      _loadArtisans();
+    }
   }
 
   @override
   void dispose() {
+    _scrollController.dispose();
+    _artisanSubscription?.cancel();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      if (_hasMore && !_isLoadingMore) {
+        _loadMoreArtisans();
+      }
+    }
   }
 
   Future<void> _getCurrentLocation() async {
@@ -48,6 +85,65 @@ class _ArtisansTabState extends State<ArtisansTab> {
       if (mounted) setState(() => _currentPosition = position);
     } catch (e) {
       debugPrint("Error getting location: $e");
+    }
+  }
+
+  Future<void> _loadArtisans() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _allArtisans = []; // پرانی لسٹ صاف کریں
+    });
+    
+    try {
+      _artisanSubscription?.cancel();
+      
+      _artisanSubscription = _artisanService
+          .streamArtisansPaginated(limit: _pageSize)
+          .listen(
+        (artisans) {
+          if (mounted) {
+            setState(() {
+              _allArtisans = artisans;
+              _isLoading = false;
+              _hasMore = artisans.length >= _pageSize;
+              // Note: We need to handle _lastDocument for pagination if we use stream for the first batch
+              // and Future for the rest. Or just use Future for all.
+              // For simplicity, let's keep the stream for the first batch and manual load for more.
+            });
+          }
+        },
+        onError: (error) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+          }
+        },
+      );
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadMoreArtisans() async {
+    if (_isLoadingMore || !_hasMore) return;
+    
+    setState(() => _isLoadingMore = true);
+    
+    try {
+      final moreArtisans = await _artisanService.getArtisansBatch(
+        limit: _pageSize,
+        startAfter: _lastDocument,
+      );
+      
+      if (mounted) {
+        setState(() {
+          _allArtisans.addAll(moreArtisans);
+          _hasMore = moreArtisans.length >= _pageSize;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -62,36 +158,73 @@ class _ArtisansTabState extends State<ArtisansTab> {
         1000;
   }
 
-  int _calculateArtisanScore(ArtisanProfile artisan) {
+  int _calculateArtisanScore(ArtisanProfile artisan, double? distance) {
     int score = 0;
-
-    // 1. Available: +30 points
-    if (artisan.availability == 'available') {
-      score += 30;
-    }
-
-    // 2. Distance < 5km: +25 points
-    final distance = _calculateDistance(artisan.latitude, artisan.longitude);
-    if (distance != null && distance < 5.0) {
-      score += 25;
-    }
-
-    // 3. Verified: +20 points
-    if (artisan.isVerified) {
-      score += 20;
-    }
-
-    // 4. Rating 4.5+: +15 points
-    if (artisan.rating >= 4.5) {
-      score += 15;
-    }
-
-    // 5. Experience 5+ years: +10 points
-    if (artisan.experience >= 5) {
-      score += 10;
-    }
-
+    if (artisan.availability == 'available') score += 30;
+    if (distance != null && distance < 5.0) score += 25;
+    if (artisan.isVerified) score += 20;
+    if (artisan.rating >= 4.5) score += 15;
+    if (artisan.experience >= 5) score += 10;
     return score;
+  }
+
+  List<ArtisanProfile> _filterAndSortArtisans() {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    
+    var filtered = _allArtisans
+        .where((a) => a.id != currentUserId && a.isActive)
+        .toList();
+
+    if (widget.selectedProfession != 'all') {
+      filtered = filtered
+          .where((a) => a.profession == widget.selectedProfession)
+          .toList();
+    }
+
+    if (widget.searchQuery.isNotEmpty) {
+      final query = widget.searchQuery.toLowerCase();
+      filtered = filtered.where((a) {
+        final matchesSkills = a.skills.any(
+          (s) => s.toLowerCase().contains(query),
+        );
+        return a.name.toLowerCase().contains(query) ||
+            a.profession.toLowerCase().contains(query) ||
+            a.description.toLowerCase().contains(query) ||
+            matchesSkills;
+      }).toList();
+    }
+
+    // Pre-calculate distances
+    final distances = <String, double?>{};
+    for (var artisan in filtered) {
+      distances[artisan.id] = _calculateDistance(
+        artisan.latitude,
+        artisan.longitude,
+      );
+    }
+
+    filtered.sort((a, b) {
+      final scoreA = _calculateArtisanScore(a, distances[a.id]);
+      final scoreB = _calculateArtisanScore(b, distances[b.id]);
+
+      if (scoreA != scoreB) return scoreB.compareTo(scoreA);
+
+      switch (_artisanSortBy) {
+        case 'distance':
+          final distA = distances[a.id] ?? 9999.0;
+          final distB = distances[b.id] ?? 9999.0;
+          return distA.compareTo(distB);
+        case 'experience':
+          return b.experience.compareTo(a.experience);
+        case 'reviews':
+          return b.totalReviews.compareTo(a.totalReviews);
+        case 'rating':
+        default:
+          return b.rating.compareTo(a.rating);
+      }
+    });
+
+    return filtered;
   }
 
   @override
@@ -101,166 +234,110 @@ class _ArtisansTabState extends State<ArtisansTab> {
 
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              Text(
-                isUrdu ? 'ترتیب:' : 'Sort By:',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                  fontFamily: fontFamily,
-                ),
-              ),
-              const SizedBox(width: 8),
-              _buildArtisanSortChip(
-                  'rating', isUrdu ? 'ریٹنگ' : 'Rating', fontFamily),
-              _buildArtisanSortChip(
-                  'distance', isUrdu ? 'قریب' : 'Nearby', fontFamily),
-              _buildArtisanSortChip(
-                  'experience', isUrdu ? 'تجربہ' : 'Experience', fontFamily),
-              _buildArtisanSortChip(
-                  'reviews', isUrdu ? 'ریویوز' : 'Reviews', fontFamily),
-            ],
-          ),
-        ),
+        _buildSortBar(isUrdu, fontFamily),
         Expanded(
-          child: StreamBuilder<List<ArtisanProfile>>(
-            stream: ArtisanService().streamArtisansPaginated(
-                limit: _currentArtisanPage * _artisanPageSize),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return _buildShimmerLoading();
-              }
-
-              final allArtisans = snapshot.data ?? [];
-              final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-
-              // Always hide the current user's own profile from the Artisans list
-              var filtered = allArtisans
-                  .where((a) => a.id != currentUserId && a.isActive)
-                  .toList();
-
-              if (widget.selectedProfession != 'all') {
-                filtered = filtered
-                    .where((a) => a.profession == widget.selectedProfession)
-                    .toList();
-              }
-
-              if (widget.searchQuery.isNotEmpty) {
-                final query = widget.searchQuery.toLowerCase();
-                filtered = filtered.where((a) {
-                  final matchesSkills = a.skills.any((s) => s.toLowerCase().contains(query));
-                  return a.name.toLowerCase().contains(query) ||
-                      a.profession.toLowerCase().contains(query) ||
-                      a.description.toLowerCase().contains(query) ||
-                      matchesSkills;
-                }).toList();
-              }
-
-              filtered.sort((a, b) {
-                final scoreA = _calculateArtisanScore(a);
-                final scoreB = _calculateArtisanScore(b);
-
-                if (scoreA != scoreB) {
-                  return scoreB.compareTo(scoreA); // Higher score first
-                }
-
-                // Tie-breaker: Use the user selected sort criteria
-                if (_artisanSortBy == 'distance') {
-                  final distA =
-                      _calculateDistance(a.latitude, a.longitude) ?? 9999.0;
-                  final distB =
-                      _calculateDistance(b.latitude, b.longitude) ?? 9999.0;
-                  return distA.compareTo(distB);
-                }
-
-                switch (_artisanSortBy) {
-                  case 'experience':
-                    return b.experience.compareTo(a.experience);
-                  case 'reviews':
-                    return b.totalReviews.compareTo(a.totalReviews);
-                  case 'rating':
-                  default:
-                    return b.rating.compareTo(a.rating);
-                }
-              });
-
-              if (filtered.isEmpty) {
-                return _buildArtisanEmptyState(isUrdu, fontFamily);
-              }
-
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: filtered.length +
-                    (filtered.length >= _currentArtisanPage * _artisanPageSize
-                        ? 1
-                        : 0),
-                itemBuilder: (context, index) {
-                  if (index == filtered.length) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      child: Center(
-                        child: TextButton.icon(
-                          onPressed: () {
-                            setState(() {
-                              _currentArtisanPage++;
-                            });
-                          },
-                          icon: Icon(PhosphorIcons.plus(), size: 18),
-                          label: Text(
-                            isUrdu ? 'مزید لوڈ کریں' : 'Load More',
-                            style: TextStyle(
-                                fontFamily: fontFamily,
-                                fontWeight: FontWeight.bold),
-                          ),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppTheme.themeColor,
-                            backgroundColor:
-                                AppTheme.themeColor.withOpacity(0.1),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-
-                  final artisan = filtered[index];
-                  final distance =
-                      _calculateDistance(artisan.latitude, artisan.longitude);
-
-                  return ArtisanCard(
-                    artisan: artisan,
-                    isUrdu: isUrdu,
-                    fontFamily: fontFamily,
-                    distanceKm: distance,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ArtisanDetailScreen(
-                            artisanId: artisan.id,
-                            initialArtisan: artisan,
-                            distanceKm: distance,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              );
-            },
-          ),
+          child: _isLoading
+              ? _buildShimmerLoading()
+              : _buildArtisanList(isUrdu, fontFamily),
         ),
       ],
     );
   }
 
-  Widget _buildArtisanSortChip(String value, String label, String fontFamily) {
+  Widget _buildSortBar(bool isUrdu, String fontFamily) {
+    String professionName = isUrdu ? 'پیشہ' : 'Profession';
+    if (widget.selectedProfession != 'all') {
+      final professions = ArtisanService.getProfessions();
+      final found = professions.firstWhere(
+        (p) => p['id'] == widget.selectedProfession,
+        orElse: () => {},
+      );
+      if (found.isNotEmpty) {
+        professionName = isUrdu ? found['name'] : found['id'];
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            // Profession Filter
+            GestureDetector(
+              onTap: widget.onProfessionTap,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: widget.selectedProfession != 'all' 
+                      ? AppTheme.themeColor.withValues(alpha: 0.1) 
+                      : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: widget.selectedProfession != 'all' 
+                        ? AppTheme.themeColor 
+                        : Colors.grey[300]!,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      PhosphorIcons.briefcase(),
+                      size: 14,
+                      color: widget.selectedProfession != 'all' 
+                          ? AppTheme.themeColor 
+                          : Colors.grey[600],
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      professionName,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: widget.selectedProfession != 'all' 
+                            ? AppTheme.themeColor 
+                            : Colors.grey[600],
+                        fontFamily: fontFamily,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(
+                      Icons.arrow_drop_down,
+                      size: 14,
+                      color: widget.selectedProfession != 'all' 
+                          ? AppTheme.themeColor 
+                          : Colors.grey[600],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 4),
+            Container(width: 1, height: 16, color: Colors.grey[300]),
+            const SizedBox(width: 8),
+
+            Text(
+              isUrdu ? 'ترتیب:' : 'Sort By:',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                fontFamily: fontFamily,
+              ),
+            ),
+            const SizedBox(width: 8),
+            _buildSortChip('rating', isUrdu ? 'ریٹنگ' : 'Rating', fontFamily),
+            _buildSortChip('distance', isUrdu ? 'قریب' : 'Nearby', fontFamily),
+            _buildSortChip('experience', isUrdu ? 'تجربہ' : 'Experience', fontFamily),
+            _buildSortChip('reviews', isUrdu ? 'ریویوز' : 'Reviews', fontFamily),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSortChip(String value, String label, String fontFamily) {
     final isSelected = _artisanSortBy == value;
     return GestureDetector(
       onTap: () => setState(() => _artisanSortBy = value),
@@ -287,13 +364,76 @@ class _ArtisansTabState extends State<ArtisansTab> {
     );
   }
 
-  Widget _buildArtisanEmptyState(bool isUrdu, String fontFamily) {
+  Widget _buildArtisanList(bool isUrdu, String fontFamily) {
+    final filteredArtisans = _filterAndSortArtisans();
+
+    if (filteredArtisans.isEmpty) {
+      return _buildEmptyState(isUrdu, fontFamily);
+    }
+
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.all(16),
+      itemCount: filteredArtisans.length + (_hasMore ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == filteredArtisans.length) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Center(
+              child: _isLoadingMore
+                  ? const CircularProgressIndicator(strokeWidth: 2)
+                  : TextButton(
+                      onPressed: _loadMoreArtisans,
+                      child: Text(
+                        isUrdu ? 'مزید لوڈ کریں' : 'Load More',
+                        style: TextStyle(
+                          fontFamily: fontFamily,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+            ),
+          );
+        }
+
+        final artisan = filteredArtisans[index];
+        final distance = _calculateDistance(
+          artisan.latitude,
+          artisan.longitude,
+        );
+
+        return ArtisanCard(
+          artisan: artisan,
+          isUrdu: isUrdu,
+          fontFamily: fontFamily,
+          distanceKm: distance,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ArtisanDetailScreen(
+                  artisanId: artisan.id,
+                  initialArtisan: artisan,
+                  distanceKm: distance,
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState(bool isUrdu, String fontFamily) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(PhosphorIcons.magnifyingGlass(),
-              size: 64, color: Colors.grey[300]),
+          Icon(
+            PhosphorIcons.magnifyingGlass(),
+            size: 64,
+            color: Colors.grey[300],
+          ),
           const SizedBox(height: 16),
           Text(
             isUrdu ? 'کوئی کاریگر نہیں ملا' : 'No artisans found',

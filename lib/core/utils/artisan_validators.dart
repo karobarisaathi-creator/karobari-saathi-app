@@ -6,9 +6,15 @@ class ArtisanValidators {
     return regex.hasMatch(phone);
   }
 
-  /// کام کی تفصیل کی تصدیق کرتا ہے (10 سے 500 حروف)
+  /// کام کی تفصیل کی تصدیق کرتا ہے (10 سے 3000 حروف)
   static bool isValidDescription(String desc) {
-    return desc.isNotEmpty && desc.length >= 10 && desc.length <= 500;
+    return desc.isNotEmpty && desc.length >= 10 && desc.length <= 3000;
+  }
+
+  /// تعلیمی قابلیت کی تصدیق کرتا ہے (اختیاری، 10 سے 3000 حروف)
+  static bool isValidQualification(String? qual) {
+    if (qual == null || qual.trim().isEmpty) return true;
+    return qual.trim().length >= 10 && qual.trim().length <= 3000;
   }
 
   /// بجٹ کی تصدیق کرتا ہے (0 سے زیادہ اور ایک حد کے اندر)
@@ -35,7 +41,9 @@ class ArtisanValidators {
         case 'phone':
           return 'فون نمبر غلط ہے (مثلاً: 03001234567)';
         case 'description':
-          return 'تفصیل کم از کم 10 اور زیادہ سے زیادہ 500 حروف میں ہونی چاہیے';
+          return 'تفصیل کم از کم 10 اور زیادہ سے زیادہ 3000 حروف میں ہونی چاہیے';
+        case 'qualification':
+          return 'قابلیت کم از کم 10 اور زیادہ سے زیادہ 3000 حروف میں ہونی چاہیے';
         case 'budget':
           return 'بجٹ 0 سے زیادہ ہونا چاہیے';
         case 'experience':

@@ -1,7 +1,7 @@
 import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'transaction_item_model.dart';
+import 'package:account_app/core/models/transaction_item_model.dart';
 
 part 'transaction_model.g.dart';
 
@@ -165,4 +165,14 @@ class Transaction extends HiveObject {
   bool get isFullyPaid => receivedAmount >= amount;
   String get formattedDate => DateFormat('dd/MM/yyyy').format(date);
   String get formattedTime => DateFormat('hh:mm a').format(date);
+
+  /// پیشے کے لیے یہ آمدن ہے یا خرچ؟
+  String get professionSide {
+    if (category.startsWith('INC:')) return 'income';
+    if (category.startsWith('EXP:')) return 'expense';
+    if (category == 'income') return 'income';
+    if (category == 'expense') return 'expense';
+    // Fallback to ledger type
+    return type;
+  }
 }
