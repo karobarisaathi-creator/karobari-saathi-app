@@ -16,6 +16,12 @@ class ArtisanWorkOrderService extends BaseService {
   // ============================================================
 
   Future<void> addWorkOrder(ArtisanWorkOrder order) async {
+    final user = auth.currentUser;
+    if (user == null) throw Exception('Unauthorized');
+    if (user.uid != order.artisanId && user.uid != order.customerId) {
+      throw Exception('Only the work order participants can create it');
+    }
+
     // 1. Save locally
     await workOrdersBox?.put(order.id, order);
     notifyListeners();
@@ -114,6 +120,11 @@ class ArtisanWorkOrderService extends BaseService {
     required double laborFee,
     required double total,
   }) async {
+    final user = auth.currentUser;
+    if (user == null || user.uid != artisanId) {
+      throw Exception('Only the artisan can update the work order bill');
+    }
+
     final orderRef = firestore
         .collection('artisans')
         .doc(artisanId)
@@ -139,16 +150,10 @@ class ArtisanWorkOrderService extends BaseService {
     }
   }
 
-  Future<void> updateStatus(
-    String artisanId,
-    String orderId,
-    String status,
-  ) async {
+  Future<void> updateStatus(String artisanId, String orderId, String status,
+      {String? title}) async {
     final user = auth.currentUser;
     if (user == null) throw Exception('Unauthorized');
-    if (user.uid != artisanId) {
-      throw Exception('Only the artisan can update work status');
-    }
 
     const allowedStatuses = {
       'negotiating',
@@ -176,16 +181,26 @@ class ArtisanWorkOrderService extends BaseService {
 
     final latestData = orderSnapshot.data() as Map<String, dynamic>;
     final currentStatus = latestData['status']?.toString();
-    
-    final validTransition =
-        (currentStatus == 'negotiating' && (status == 'quoted' || status == 'confirmed' || status == 'in_progress')) ||
-            (currentStatus == 'confirmed' && status == 'in_progress') ||
-            (currentStatus == 'pending' && status == 'in_progress') ||
-            (currentStatus == 'in_progress' && status == 'completed') ||
-            (status == 'completed'); // Allow marking completed from any active state
+    final isArtisan = user.uid == artisanId;
+    final isCustomer = user.uid == latestData['customerId'];
+    if (!isArtisan && !isCustomer) {
+      throw Exception('Only the work order participants can update it');
+    }
 
-    if (!validTransition) {
-      throw StateError('Invalid work order status transition from $currentStatus to $status');
+    // Status hierarchy and valid transitions
+    final artisanTransition = (currentStatus == 'negotiating' &&
+            (status == 'quoted' || status == 'rejected')) ||
+        (currentStatus == 'confirmed' && status == 'in_progress') ||
+        (currentStatus == 'pending' && status == 'in_progress') ||
+        (currentStatus == 'in_progress' && status == 'completed');
+    final customerTransition =
+        (currentStatus == 'negotiating' || currentStatus == 'quoted') &&
+            status == 'confirmed';
+    final validTransition = isCustomer ? customerTransition : artisanTransition;
+
+    if (!validTransition && status != currentStatus) {
+      throw StateError(
+          'Invalid work order status transition from $currentStatus to $status');
     }
 
     final data = <String, dynamic>{
@@ -193,41 +208,66 @@ class ArtisanWorkOrderService extends BaseService {
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
-    if (status == 'completed') {
-      data['completedAt'] = FieldValue.serverTimestamp();
-      // کاریگر کی پروفائل میں کام کی تعداد بڑھائیں (سرور پر)
-      firestore.collection('artisans').doc(artisanId).update({
-        'workCount': FieldValue.increment(1),
-      }).catchError((e) => debugPrint("Error incrementing workCount: $e"));
-
-      // کاریگر کی پروفائل میں کام کی تعداد بڑھائیں (لوکل کیش میں)
-      final artisanProfile = artisansBox?.get(artisanId);
-      if (artisanProfile != null) {
-        final updatedArtisan = artisanProfile.copyWith(
-          workCount: artisanProfile.workCount + 1,
-        );
-        await artisansBox?.put(artisanId, updatedArtisan);
+    if (isCustomer && status == 'confirmed') {
+      final existingTitle = latestData['title']?.toString().trim() ?? '';
+      if (existingTitle.isEmpty) {
+        final trimmedTitle = title?.trim() ?? '';
+        if (trimmedTitle.length < 5 || trimmedTitle.length > 40) {
+          throw ArgumentError('Work title must be between 5 and 40 characters');
+        }
+        data['title'] = trimmedTitle;
       }
     }
 
-    await orderRef.update(data);
+    final shouldComplete =
+        status == 'completed' && currentStatus != 'completed';
+    if (shouldComplete) {
+      data['completedAt'] = FieldValue.serverTimestamp();
+    }
+
+    if (shouldComplete) {
+      final artisanRef = firestore.collection('artisans').doc(artisanId);
+      await firestore.runTransaction((transaction) async {
+        final latestOrder = await transaction.get(orderRef);
+        final latestStatus = latestOrder.data()?['status']?.toString();
+        if (!latestOrder.exists || latestStatus != 'in_progress') {
+          throw StateError('Work order is no longer in progress');
+        }
+        transaction.update(orderRef, data);
+        transaction.update(artisanRef, {
+          'workCount': FieldValue.increment(1),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      });
+
+      final artisanProfile = artisansBox?.get(artisanId);
+      if (artisanProfile != null) {
+        await artisansBox?.put(
+          artisanId,
+          artisanProfile.copyWith(
+            workCount: artisanProfile.workCount + 1,
+          ),
+        );
+      }
+    } else {
+      await orderRef.update(data);
+    }
 
     // لوکل ڈیٹا اپ ڈیٹ کریں (سرور سے تازہ ترین ڈیٹا لے کر)
     final updatedOrder = ArtisanWorkOrder.fromMap({
       ...latestData,
       ...data,
       'updatedAt': DateTime.now().toIso8601String(),
-      if (status == 'completed') 'completedAt': DateTime.now().toIso8601String(),
+      if (status == 'completed')
+        'completedAt': DateTime.now().toIso8601String(),
     });
 
     await workOrdersBox?.put(orderId, updatedOrder);
 
     // اگر کام شروع ہو گیا ہے تو اصل جاب پوسٹ کو براؤز سے ہٹائیں
-    if (status == 'confirmed' || status == 'in_progress') {
-      if (orderId.startsWith('job_neg_')) {
-        final jobId = orderId.replaceFirst('job_neg_', '');
-        JobService().updateJobStatus(jobId, 'in_progress');
-      }
+    if (status == 'confirmed' && isCustomer && orderId.startsWith('job_neg_')) {
+      final jobId = orderId.replaceFirst('job_neg_', '');
+      await JobService().updateJobStatus(jobId, 'in_progress');
     }
 
     if (status == 'completed') {
@@ -249,17 +289,32 @@ class ArtisanWorkOrderService extends BaseService {
     double rating,
     String review,
   ) async {
+    final user = auth.currentUser;
+    if (user == null) throw Exception('Unauthorized');
+    if (rating < 1 || rating > 5) {
+      throw ArgumentError('Rating must be between 1 and 5');
+    }
     final orderRef = firestore
         .collection('artisans')
         .doc(artisanId)
         .collection('work_orders')
         .doc(orderId);
 
+    final orderSnapshot = await orderRef.get();
+    final orderData = orderSnapshot.data();
+    if (!orderSnapshot.exists ||
+        orderData?['customerId'] != user.uid ||
+        orderData?['status'] != 'completed' ||
+        orderData?['isRated'] == true) {
+      throw StateError('Only completed, unrated work can be rated');
+    }
+
     await orderRef.update({
       'rating': rating,
       'review': review,
       'isRated': true,
       'ratedAt': FieldValue.serverTimestamp(),
+      'status': 'rated',
     });
 
     final localOrder = workOrdersBox?.get(orderId);
@@ -269,7 +324,9 @@ class ArtisanWorkOrderService extends BaseService {
         review: review,
         isRated: true,
         ratedAt: DateTime.now(),
+        status: 'rated',
       );
+
       await workOrdersBox?.put(orderId, updatedOrder);
       notifyListeners();
     }
@@ -284,6 +341,11 @@ class ArtisanWorkOrderService extends BaseService {
     String orderId,
     List<String> imageUrls,
   ) async {
+    final user = auth.currentUser;
+    if (user == null || user.uid != artisanId) {
+      throw Exception('Only the artisan can update work images');
+    }
+
     final orderRef = firestore
         .collection('artisans')
         .doc(artisanId)
@@ -334,12 +396,16 @@ class ArtisanWorkOrderService extends BaseService {
   // ============================================================
 
   Future<void> deleteWorkOrder(String artisanId, String orderId) async {
+    final user = auth.currentUser;
+    if (user == null) throw Exception('Unauthorized');
+
     await firestore
         .collection('artisans')
         .doc(artisanId)
         .collection('work_orders')
         .doc(orderId)
         .delete();
+    await workOrdersBox?.delete(orderId);
   }
 
   // ============================================================
@@ -443,65 +509,71 @@ class ArtisanWorkOrderService extends BaseService {
   Future<void> _syncJobToProfession(ArtisanWorkOrder order) async {
     try {
       if (order.amount == null || order.amount! <= 0) {
-        debugPrint("❌ Sync skipped: Order amount is null or zero (${order.amount})");
+        debugPrint(
+            "❌ Sync skipped: Order amount is null or zero (${order.amount})");
         return;
       }
 
       final artisanService = ArtisanService();
       ArtisanProfile? artisanProfile = artisansBox?.get(order.artisanId);
-      
+
       // اگر لوکل میموری میں پروفائل نہیں ہے تو سرور سے حاصل کریں
       if (artisanProfile == null) {
         debugPrint("Artisan profile not in box, fetching from server...");
         artisanProfile = await artisanService.getProfile(order.artisanId);
       }
-      
+
       if (artisanProfile == null) {
-        debugPrint("❌ Sync failed: Could not find artisan profile for ID: ${order.artisanId}");
+        debugPrint(
+            "❌ Sync failed: Could not find artisan profile for ID: ${order.artisanId}");
         return;
       }
 
       // وہی مستقل آئی ڈی جو ہم نے سروس میں رکھی ہے
       const String professionId = "artisan_main_work";
-      debugPrint("✅ Syncing job to stable profession ID: $professionId with amount: ${order.amount}");
+      debugPrint(
+          "✅ Syncing job to stable profession ID: $professionId with amount: ${order.amount}");
 
       // اگر سیزن اسکرین پر کوئی جاری (Active) سیزن ہے تو وہاں بھیجیں، مکمل شدہ (Completed) میں نہیں
       String targetId = professionId;
-      final seasons = professionsBox?.values.where((p) => 
-        p.parentId == professionId && (p.isActive == true)
-      ).toList() ?? [];
-      
+      final seasons = professionsBox?.values
+              .where((p) => p.parentId == professionId && (p.isActive == true))
+              .toList() ??
+          [];
+
       if (seasons.isNotEmpty) {
         // سیزنز کو تاریخ کے حساب سے ترتیب دیں اور تازہ ترین جاری سیزن لیں
         seasons.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         targetId = seasons.first.id;
         debugPrint("✅ Using active season for entry: $targetId");
       } else {
-        debugPrint("ℹ️ No active season found, using master profession record.");
+        debugPrint(
+            "ℹ️ No active season found, using master profession record.");
       }
 
       // ہم کسی کھاتہ میں انٹری نہیں کریں گے، صرف پیشے کے لیے ایک ٹرانزیکشن بنائیں گے
       const String internalAccountId = "artisan_internal_income";
-      
+
       // انکم کیٹیگری کا تعین کریں (پیشہ کے زمروں سے میل کھانا چاہیے)
       String category = "INC:کام کی اجرت";
 
       final transaction = model.Transaction(
         id: "artisan_job_${order.id}",
-        accountId: internalAccountId, 
+        accountId: internalAccountId,
         amount: order.amount!,
         type: 'income',
-        category: category, 
+        category: category,
         date: DateTime.now(),
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
-        description: "${order.customerName}: ${order.title ?? order.workDescription}", 
+        description:
+            "${order.customerName}: ${order.title ?? order.workDescription}",
         professionId: targetId,
       );
 
       // ٹرانزیکشن کو محفوظ کریں (صرف پیشے کے ریکارڈ کے لیے)
       await transactionsBox?.put(transaction.id, transaction);
-      
+
       // پیشے کا حساب اپ ڈیٹ کریں
       final profService = ProfessionService();
       await profService.recalculateProfessionFinance(targetId);
@@ -516,9 +588,8 @@ class ArtisanWorkOrderService extends BaseService {
           .collection('transactions')
           .doc(transaction.id)
           .set(transaction.toMap());
-      
+
       debugPrint("🚀 Transaction synced successfully: ${transaction.id}");
-          
     } catch (e, stack) {
       debugPrint("❌ Error syncing job to profession: $e");
       debugPrint(stack.toString());

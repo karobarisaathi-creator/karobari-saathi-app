@@ -27,7 +27,6 @@ class JobPostAdapter extends TypeAdapter<JobPost> {
       location: fields[6] as String,
       categories: (fields[7] as List).cast<String>(),
       estimatedBudget: fields[8] as double?,
-      deadline: fields[9] as DateTime?,
       images: (fields[10] as List).cast<String>(),
       status: fields[11] as String,
       createdAt: fields[12] as DateTime,
@@ -51,7 +50,7 @@ class JobPostAdapter extends TypeAdapter<JobPost> {
   @override
   void write(BinaryWriter writer, JobPost obj) {
     writer
-      ..writeByte(28)
+      ..writeByte(27)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -70,8 +69,6 @@ class JobPostAdapter extends TypeAdapter<JobPost> {
       ..write(obj.categories)
       ..writeByte(8)
       ..write(obj.estimatedBudget)
-      ..writeByte(9)
-      ..write(obj.deadline)
       ..writeByte(10)
       ..write(obj.images)
       ..writeByte(11)

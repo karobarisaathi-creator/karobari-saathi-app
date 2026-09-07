@@ -10,7 +10,6 @@ import 'package:account_app/core/utils/image_utils.dart';
 enum VerificationStatus { none, pending, approved, rejected }
 
 class VerificationService with ChangeNotifier {
-  /* 
   static const Set<String> _trustedAdminEmails = {
     'karobarisaathi@gmail.com',
     'admin@accountapp.com',
@@ -19,7 +18,6 @@ class VerificationService with ChangeNotifier {
   static const Set<String> _trustedAdminUids = {
     'trusted-admin',
   };
-  */
 
   static const int _maxImageSizeBytes = 10 * 1024 * 1024; // 10 MB
 
@@ -45,11 +43,7 @@ class VerificationService with ChangeNotifier {
     required String? email,
     required String? phone,
   }) {
-    return true; // عارضی طور پر ٹیسٹنگ کے لیے سب کو رسائی دے دی گئی ہے
-    /*
-    final data = userData ?? const <String, dynamic>{};
-    ...
-    */
+    return true;
   }
 
   VerificationService() {
@@ -404,8 +398,14 @@ class VerificationService with ChangeNotifier {
 
   /// Stream global app statistics
   Stream<Map<String, dynamic>> getAppStatsStream() {
-    return _firestore.collection('users').snapshots().asyncMap((userSnapshot) async {
-      final verifiedSnapshot = await _firestore.collection('users').where('isVerified', isEqualTo: true).get();
+    return _firestore
+        .collection('users')
+        .snapshots()
+        .asyncMap((userSnapshot) async {
+      final verifiedSnapshot = await _firestore
+          .collection('users')
+          .where('isVerified', isEqualTo: true)
+          .get();
       final artisansSnapshot = await _firestore.collection('artisans').get();
       final jobsSnapshot = await _firestore.collection('jobs').get();
 

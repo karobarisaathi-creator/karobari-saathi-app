@@ -26,7 +26,6 @@ import 'artisan_work_orders_screen.dart';
 
 import '../settings/master_profile_screen.dart';
 import '../dashboard/main_navigation_screen.dart';
-import 'package:account_app/features/settings/verification_request_screen.dart';
 
 class ArtisanDetailScreen extends StatefulWidget {
   final String artisanId;
@@ -84,33 +83,11 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
     });
   }
 
-  Future<void> _toggleAvailability() async {
-    if (_artisan == null || !isOwner) return;
-
-    final service = ArtisanService();
-    final newStatus =
-        _artisan!.availability == 'available' ? 'busy' : 'available';
-
-    final updatedProfile = _artisan!.copyWith(
-      availability: newStatus,
-      updatedAt: DateTime.now(),
-    );
-
-    try {
-      await service.saveProfile(updatedProfile);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
-      }
-    }
-  }
-
   Future<void> _loadExtraData() async {
-    if (_artisan != null) {
+    final artisan = _artisan;
+    if (artisan != null) {
       setState(() {
-        _workCount = _artisan!.workCount;
+        _workCount = artisan.workCount;
       });
     }
 
@@ -194,43 +171,11 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
     );
   }
 
-  Widget _buildValidatedTextField({
-    required TextEditingController controller,
-    required String label,
-    required int minLength,
-    required int maxLength,
-    required bool isUrdu,
-    required void Function(String) onChanged,
-  }) {
-    return TextField(
-      controller: controller,
-      maxLines: 3,
-      maxLength: maxLength,
-      onChanged: onChanged,
-      style: const TextStyle(fontSize: 15),
-      decoration: InputDecoration(
-        labelText: label,
-        counterText: '${controller.text.length}/$maxLength',
-        errorText:
-            controller.text.isNotEmpty && controller.text.length < minLength
-                ? (isUrdu
-                    ? 'کم از کم $minLength حروف درکار ہیں'
-                    : 'Min $minLength characters required')
-                : null,
-        filled: true,
-        fillColor: const Color(0xFFF5F7F9),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none),
-      ),
-    );
-  }
-
   Future<void> _openNegotiation(bool isUrdu, String workDescription) async {
     setState(() => _isSending = true);
     final user = FirebaseAuth.instance.currentUser;
 
-    if (user == null) {
+    if (user == null || _artisan?.isActive != true) {
       if (mounted) setState(() => _isSending = false);
       return;
     }
@@ -249,23 +194,21 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
       if (existingOrders.docs.isNotEmpty) {
         order = ArtisanWorkOrder.fromMap(existingOrders.docs.first.data());
       } else {
-        // 🆕 اسمارٹ عنوان: اگر پہلا پیغام مختصر ہے تو اسے عنوان بنا دیں، ورنہ پیشہ استعمال کریں
         String smartTitle = workDescription.trim();
         if (smartTitle.length > 40) {
           smartTitle = smartTitle.substring(0, 37) + "...";
         }
-        // اگر پیغام بہت ہی چھوٹا ہے (مثلاً صرف سلام)، تو پیشہ ہی رہنے دیں
         if (smartTitle.length < 5) {
-          smartTitle = isUrdu 
-            ? '${_artisan?.professionUrdu ?? 'کاریگر'} کی خدمات' 
-            : '${_artisan?.profession ?? 'Artisan'} Service';
+          smartTitle = isUrdu
+              ? '${_artisan?.professionUrdu ?? 'کاریگر'} کی خدمات'
+              : '${_artisan?.profession ?? 'Artisan'} Service';
         }
 
         order = ArtisanWorkOrder(
           id: 'artisan_chat_${DateTime.now().millisecondsSinceEpoch}',
           artisanId: widget.artisanId,
           artisanName: _artisan?.name,
-          title: smartTitle, // اسمارٹ عنوان یہاں سیو ہوگا
+          title: smartTitle,
           customerId: user.uid,
           customerName:
               user.displayName ?? (isUrdu ? 'ایک گاہک' : 'A Customer'),
@@ -294,20 +237,18 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
           _isSending = false;
         });
 
-        // Set the target tab and expansion
         final notificationService =
             Provider.of<NotificationService>(context, listen: false);
         notificationService.setNotificationsTabIndex(1);
         notificationService.setTargetExpandOrderId(order.id);
 
-        // Change tab and THEN pop
         MainNavigationScreen.switchTab(4);
         Navigator.pop(context);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-                isUrdu ? 'رابطہ شروع کر دیا گیا ہے۔' : 'Contact started.'),
+            content:
+                Text(isUrdu ? 'رابطہ شروع کر دیا گیا ہے۔' : 'Contact started.'),
             backgroundColor: Colors.green.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -326,116 +267,6 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
     }
   }
 
-  void _showAddReviewDialog(bool isUrdu, String fontFamily) {
-    double selectedRating = 5.0;
-    final commentController = TextEditingController();
-
-    bool isSubmitting = false;
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(
-            isUrdu ? 'اپنی رائے دیں' : 'Write a Review',
-            style:
-                TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                isUrdu ? 'کاریگر کا کام کیسا رہا؟' : 'How was your experience?',
-                style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                    fontFamily: fontFamily),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (index) {
-                  return IconButton(
-                    onPressed: () =>
-                        setDialogState(() => selectedRating = index + 1.0),
-                    icon: Icon(
-                      index < selectedRating
-                          ? PhosphorIcons.star(PhosphorIconsStyle.fill)
-                          : PhosphorIcons.star(),
-                      color: AppTheme.darkColor,
-                      size: 32,
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 16),
-              _buildValidatedTextField(
-                controller: commentController,
-                label: isUrdu ? 'اپنا تجربہ لکھیں' : 'Write your experience',
-                minLength: 20,
-                maxLength: 200,
-                isUrdu: isUrdu,
-                onChanged: (val) => setDialogState(() {}),
-              ),
-            ],
-          ),
-          actions: [
-            AppButton(
-              text: isUrdu ? 'کینسل' : 'Cancel',
-              variant: AppButtonVariant.ghost,
-              color: Colors.grey[600],
-              onPressed: () => Navigator.pop(dialogContext),
-            ),
-            const SizedBox(width: 8),
-            AppButton(
-              text: isUrdu ? 'جمع کریں' : 'Submit',
-              color: AppTheme.themeColor,
-              variant: AppButtonVariant.primary,
-              isLoading: isSubmitting,
-              onPressed: isSubmitting ? null : () async {
-                final comment = commentController.text.trim();
-                if (comment.length < 20) return;
-
-                setDialogState(() => isSubmitting = true);
-
-                try {
-                  final artisanService = ArtisanService();
-                  await artisanService.addReview(
-                    artisanId: widget.artisanId,
-                    rating: selectedRating,
-                    comment: comment,
-                  );
-
-                  if (mounted) {
-                    Navigator.pop(dialogContext);
-                    _loadData();
-                    ScaffoldMessenger.of(this.context).showSnackBar(
-                      SnackBar(
-                        content: Text(isUrdu
-                            ? 'آپ کا ریویو جمع ہوگیا ہے!'
-                            : 'Review submitted!'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    setDialogState(() => isSubmitting = false);
-                    ScaffoldMessenger.of(this.context).showSnackBar(
-                      SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
-                    );
-                  }
-                }
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildWorkRequestButton(bool isUrdu, String fontFamily) {
     Color btnColor = AppTheme.themeColor;
     final btnText = isUrdu ? 'رابطہ کریں' : 'Contact';
@@ -452,12 +283,13 @@ class _ArtisanDetailScreenState extends State<ArtisanDetailScreen> {
   }
 
   void _shareProfile() {
-    if (_artisan == null) return;
+    final artisan = _artisan;
+    if (artisan == null) return;
     final message = '''
-🛠️ ${_artisan!.name}
-📋 ${_artisan!.profession} | ${_artisan!.professionUrdu}
-📍 ${_artisan!.location}
-⭐ ${_artisan!.rating} (${_artisan!.totalReviews} reviews)
+🛠️ ${artisan.name}
+📋 ${artisan.profession} | ${artisan.professionUrdu}
+📍 ${artisan.location}
+⭐ ${artisan.rating} (${artisan.totalReviews} reviews)
 
 Check out this artisan on Karobari Saathi!
 کاریگر کی تفصیلات دیکھنے کے لیے کاروباری ساتھی ایپ ڈاؤن لوڈ کریں۔
@@ -489,7 +321,8 @@ Check out this artisan on Karobari Saathi!
       );
     }
 
-    final artisan = _artisan!;
+    final artisan = _artisan;
+    if (artisan == null) return const SizedBox.shrink();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -502,7 +335,6 @@ Check out this artisan on Karobari Saathi!
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          _buildAvailabilityBadge(artisan, isUrdu, fontFamily),
           if (!isOwner)
             StreamBuilder<bool>(
               stream: ArtisanService().isFavorite(widget.artisanId),
@@ -538,17 +370,23 @@ Check out this artisan on Karobari Saathi!
             ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(artisan, isUrdu, fontFamily),
-            _buildLocationStrip(artisan, isUrdu, fontFamily),
-            _buildSelectionBar(isUrdu, fontFamily),
-            const SizedBox(height: 16),
-            _buildTabContent(artisan, isUrdu, fontFamily),
-          ],
-        ),
+      body: Column(
+        children: [
+          _buildHeader(artisan, isUrdu, fontFamily),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLocationStrip(artisan, isUrdu, fontFamily),
+                  _buildSelectionBar(isUrdu, fontFamily),
+                  const SizedBox(height: 16),
+                  _buildTabContent(artisan, isUrdu, fontFamily),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: isOwner
           ? _buildOwnerBottomBar(isUrdu, fontFamily)
@@ -572,7 +410,6 @@ Check out this artisan on Karobari Saathi!
           fontFamily: fontFamily,
           requestStatus: null,
           isOwner: isOwner,
-          onAddReview: () => _showAddReviewDialog(isUrdu, fontFamily),
         );
       default:
         return const SizedBox.shrink();
@@ -680,7 +517,7 @@ Check out this artisan on Karobari Saathi!
                         ],
                         const Spacer(),
                         Text(
-                          '${isUrdu ? 'مکمل کام' : 'Jobs Done'}: ${artisan.workCount}',
+                          '${artisan.workCount} ${isUrdu ? 'خدمات فراہم کیں' : 'tasks completed'}',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.white.withOpacity(0.9),
@@ -696,45 +533,6 @@ Check out this artisan on Karobari Saathi!
             },
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildAvailabilityBadge(
-      ArtisanProfile artisan, bool isUrdu, String fontFamily) {
-    return Center(
-      child: InkWell(
-        onTap: isOwner ? _toggleAvailability : null,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: artisan.availability == 'available'
-                ? Colors.green.withValues(alpha: 0.2)
-                : Colors.red.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: artisan.availability == 'available'
-                  ? Colors.green
-                  : Colors.red,
-              width: 1,
-            ),
-          ),
-          child: Text(
-            artisan.availability == 'available'
-                ? (isUrdu ? 'دستیاب' : 'Available')
-                : (isUrdu ? 'مصروف' : 'Busy'),
-            style: TextStyle(
-              fontSize: 10,
-              color: artisan.availability == 'available'
-                  ? Colors.green[300]
-                  : Colors.red[300],
-              fontWeight: FontWeight.bold,
-              fontFamily: fontFamily,
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -822,11 +620,8 @@ Check out this artisan on Karobari Saathi!
   }
 
   Widget _buildOwnerBottomBar(bool isUrdu, String fontFamily) {
-    final artisan = _artisan!;
-    final bool isVerified =
-        artisan.isVerified || artisan.verificationStatus == 'approved';
-    final bool isPending = artisan.verificationStatus == 'pending';
-
+    final artisan = _artisan;
+    if (artisan == null) return const SizedBox.shrink();
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       decoration: BoxDecoration(
@@ -842,34 +637,6 @@ Check out this artisan on Karobari Saathi!
       child: SafeArea(
         child: Row(
           children: [
-            if (!isVerified) ...[
-              Expanded(
-                child: AppButton(
-                  text: isPending
-                      ? (isUrdu ? 'تصدیق جاری ہے...' : 'Verifying...')
-                      : (isUrdu ? 'تصدیق کروائیں' : 'Verify Now'),
-                  icon: isPending
-                      ? PhosphorIcons.clock()
-                      : PhosphorIcons.shieldCheck(),
-                  color: isPending ? Colors.grey : AppTheme.verifiedGold,
-                  size: AppButtonSize.large,
-                  onPressed: isPending
-                      ? null
-                      : () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const VerificationRequestScreen(
-                                isArtisanMode: true,
-                              ),
-                            ),
-                          ).then((_) => _loadData());
-                        },
-                ),
-              ),
-              const SizedBox(width: 12),
-            ],
             Expanded(
               child: AppButton(
                 text: isUrdu ? 'میرے کام' : 'My Works',
@@ -893,6 +660,9 @@ Check out this artisan on Karobari Saathi!
   }
 
   Widget _buildCustomerBottomBar(bool isUrdu, String fontFamily) {
+    final artisan = _artisan;
+    if (artisan == null) return const SizedBox.shrink();
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       decoration: BoxDecoration(
@@ -911,11 +681,9 @@ Check out this artisan on Karobari Saathi!
           children: [
             Row(
               children: [
-                if (_artisan!.availability == 'available') ...[
-                  Expanded(
-                    child: _buildWorkRequestButton(isUrdu, fontFamily),
-                  ),
-                ],
+                Expanded(
+                  child: _buildWorkRequestButton(isUrdu, fontFamily),
+                ),
               ],
             ),
           ],
@@ -1118,10 +886,14 @@ class _AboutTabState extends State<_AboutTab>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildDescription(widget.artisan, widget.isUrdu, widget.fontFamily),
-          if (widget.artisan.qualification != null && widget.artisan.qualification!.isNotEmpty)
-            _buildQualificationSection(widget.artisan, widget.isUrdu, widget.fontFamily),
-          if (widget.artisan.website != null && widget.artisan.website!.isNotEmpty)
-            _buildWebsiteSection(widget.artisan, widget.isUrdu, widget.fontFamily),
+          if (widget.artisan.qualification != null &&
+              widget.artisan.qualification!.isNotEmpty)
+            _buildQualificationSection(
+                widget.artisan, widget.isUrdu, widget.fontFamily),
+          if (widget.artisan.website != null &&
+              widget.artisan.website!.isNotEmpty)
+            _buildWebsiteSection(
+                widget.artisan, widget.isUrdu, widget.fontFamily),
           if (widget.artisan.skills.isNotEmpty)
             _buildSkillsSection(
                 widget.artisan, widget.isUrdu, widget.fontFamily),
@@ -1206,7 +978,6 @@ class _AboutTabState extends State<_AboutTab>
           const SizedBox(height: 8),
           InkWell(
             onTap: () {
-              // وپ سائٹ کھولنے کی لاجک یہاں آ سکتی ہے
             },
             child: Row(
               children: [
@@ -1354,7 +1125,6 @@ class _ReviewsTab extends StatefulWidget {
   final String fontFamily;
   final String? requestStatus;
   final bool isOwner;
-  final VoidCallback onAddReview;
 
   const _ReviewsTab({
     required this.artisanId,
@@ -1362,7 +1132,6 @@ class _ReviewsTab extends StatefulWidget {
     required this.fontFamily,
     this.requestStatus,
     required this.isOwner,
-    required this.onAddReview,
   });
 
   @override
@@ -1390,18 +1159,6 @@ class _ReviewsTabState extends State<_ReviewsTab>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (widget.requestStatus == 'accepted' && !widget.isOwner)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 20),
-              child: AppButton(
-                text: widget.isUrdu ? 'اپنی رائے دیں' : 'Write a Review',
-                onPressed: widget.onAddReview,
-                icon: PhosphorIcons.pencilLine(),
-                color: AppTheme.themeColor,
-                isFullWidth: true,
-                size: AppButtonSize.large,
-              ),
-            ),
           StreamBuilder<List<ArtisanReview>>(
             stream: _reviewsStream,
             builder: (context, snapshot) {

@@ -17,7 +17,8 @@ class ProfessionService extends BaseService {
           .collection('professions')
           .doc(profession.id)
           .set(profession.toMap())
-          .catchError((e) => debugPrint("Offline Sync: Profession addition delayed"));
+          .catchError(
+              (e) => debugPrint("Offline Sync: Profession addition delayed"));
     }
   }
 
@@ -35,12 +36,19 @@ class ProfessionService extends BaseService {
           .collection('professions')
           .doc(profession.id)
           .update(updated.toMap())
-          .catchError((e) => debugPrint("Offline Sync: Profession update delayed"));
+          .catchError(
+              (e) => debugPrint("Offline Sync: Profession update delayed"));
     }
   }
 
   Future<void> deleteProfession(String professionId) async {
-    final transactionsToDelete = transactionsBox?.values.where((t) => t.professionId == professionId).toList() ?? [];
+    final profession = professionsBox?.get(professionId);
+    final String? parentId = profession?.parentId;
+
+    final transactionsToDelete = transactionsBox?.values
+            .where((t) => t.professionId == professionId)
+            .toList() ??
+        [];
     for (var transaction in transactionsToDelete) {
       await transactionsBox?.delete(transaction.id);
       if (auth.currentUser != null) {
@@ -54,6 +62,12 @@ class ProfessionService extends BaseService {
       }
     }
     await professionsBox?.delete(professionId);
+
+    // If this was a season, recalculate the master profession
+    if (parentId != null) {
+      await _recalculateMasterProfessionFinance(parentId);
+    }
+
     if (auth.currentUser != null) {
       firestore
           .collection('users')
@@ -61,20 +75,25 @@ class ProfessionService extends BaseService {
           .collection('professions')
           .doc(professionId)
           .delete()
-          .catchError((e) => debugPrint("Offline Sync: Profession deletion delayed"));
+          .catchError(
+              (e) => debugPrint("Offline Sync: Profession deletion delayed"));
     }
     notifyListeners();
   }
 
   List<Profession> getProfessions() => professionsBox?.values.toList() ?? [];
-  
+
   List<Profession> getMasterProfessions() {
     // ہر وہ پیشہ جس کا کوئی پیرنٹ نہیں ہے اسے ماسٹر سمجھا جائے گا (پرانے ڈیٹا کے لیے بھی)
-    return professionsBox?.values.where((p) => p.parentId == null).toList() ?? [];
+    return professionsBox?.values.where((p) => p.parentId == null).toList() ??
+        [];
   }
 
   List<Profession> getSeasons(String parentId) {
-    return professionsBox?.values.where((p) => p.parentId == parentId).toList() ?? [];
+    return professionsBox?.values
+            .where((p) => p.parentId == parentId)
+            .toList() ??
+        [];
   }
 
   Profession? getProfession(String id) => professionsBox?.get(id);
@@ -84,14 +103,24 @@ class ProfessionService extends BaseService {
     if (profession != null) {
       if (profession.parentId != null) {
         // 1. This is a Season. Calculate its own finance first.
-        final txs = transactionsBox?.values.where((t) => t.professionId == professionId).toList() ?? [];
-        
-        double income = txs.where((t) => t.professionSide == 'income').fold(0.0, (sum, t) => sum + t.amount);
-        double expense = txs.where((t) => t.professionSide == 'expense').fold(0.0, (sum, t) => sum + t.amount);
-        
-        final updatedSeason = profession.copyWith(totalIncome: income, totalExpense: expense, updatedAt: DateTime.now());
+        final txs = transactionsBox?.values
+                .where((t) => t.professionId == professionId)
+                .toList() ??
+            [];
+
+        double income = txs
+            .where((t) => t.professionSide == 'income')
+            .fold(0.0, (sum, t) => sum + t.amount);
+        double expense = txs
+            .where((t) => t.professionSide == 'expense')
+            .fold(0.0, (sum, t) => sum + t.amount);
+
+        final updatedSeason = profession.copyWith(
+            totalIncome: income,
+            totalExpense: expense,
+            updatedAt: DateTime.now());
         await professionsBox?.put(profession.id, updatedSeason);
-        
+
         // 2. Now update the Master Profession.
         await _recalculateMasterProfessionFinance(profession.parentId!);
       } else {
@@ -108,7 +137,10 @@ class ProfessionService extends BaseService {
     if (master == null) return;
 
     final seasons = getSeasons(masterId);
-    final masterTxs = transactionsBox?.values.where((t) => t.professionId == masterId).toList() ?? [];
+    final masterTxs = transactionsBox?.values
+            .where((t) => t.professionId == masterId)
+            .toList() ??
+        [];
 
     double totalIncome = 0;
     double totalExpense = 0;
@@ -134,7 +166,7 @@ class ProfessionService extends BaseService {
       updatedAt: DateTime.now(),
     );
     await professionsBox?.put(masterId, updatedMaster);
-    
+
     // Cloud Sync Master
     if (auth.currentUser != null) {
       firestore
@@ -147,8 +179,11 @@ class ProfessionService extends BaseService {
     }
   }
 
-  List<model.Transaction> getProfessionTransactions(String pId) => transactionsBox?.values.where((t) => t.professionId == pId).toList() ?? [];
-  Future<double> calculateCostPerUnit(String pId) async => getProfession(pId)?.costPerUnit ?? 0.0;
+  List<model.Transaction> getProfessionTransactions(String pId) =>
+      transactionsBox?.values.where((t) => t.professionId == pId).toList() ??
+      [];
+  Future<double> calculateCostPerUnit(String pId) async =>
+      getProfession(pId)?.costPerUnit ?? 0.0;
 
   Future<Map<String, bool>> checkBudgetAlerts(String pId) async {
     final p = getProfession(pId);
@@ -156,14 +191,28 @@ class ProfessionService extends BaseService {
     final txs = getProfessionTransactions(pId);
     Map<String, bool> alerts = {};
     for (var entry in p.budgetLimits!.entries) {
-      double spent = txs.where((t) => t.type == 'expense' && t.category == entry.key).fold(0.0, (s, t) => s + t.amount);
+      double spent = txs.where((t) {
+        if (t.type != 'expense' && t.professionSide != 'expense') return false;
+        // Normalize: "Seed" or "EXP:Seed" both should match entry.key "Seed"
+        final category = t.category.startsWith('EXP:')
+            ? t.category.substring(4)
+            : t.category;
+        return category.trim().toLowerCase() == entry.key.trim().toLowerCase();
+      }).fold(0.0, (s, t) => s + t.amount);
       alerts[entry.key] = spent > entry.value;
     }
     return alerts;
   }
 
-  Future<Map<String, dynamic>> getSeasonComparison(String name) async {
-    final list = professionsBox?.values.where((p) => p.name == name && p.season.isNotEmpty).toList() ?? [];
+  Future<Map<String, dynamic>> getSeasonComparison(
+    String name, {
+    required String parentId,
+  }) async {
+    final list = professionsBox?.values
+            .where((p) =>
+                p.name == name && p.parentId == parentId && p.season.isNotEmpty)
+            .toList() ??
+        [];
     if (list.length < 2) return {'hasComparison': false};
     list.sort((a, b) => b.season.compareTo(a.season));
     final latest = list[0], prev = list[1];
@@ -174,8 +223,12 @@ class ProfessionService extends BaseService {
       'costChange': latest.costPerUnit - prev.costPerUnit,
       'profitChange': latest.netProfit - prev.netProfit,
       'productionChange': latest.totalProduction - prev.totalProduction,
-      'costChangePercent': prev.costPerUnit > 0 ? ((latest.costPerUnit - prev.costPerUnit) / prev.costPerUnit * 100) : 0,
-      'profitChangePercent': prev.netProfit.abs() > 0 ? ((latest.netProfit - prev.netProfit) / prev.netProfit.abs() * 100) : 0,
+      'costChangePercent': prev.costPerUnit > 0
+          ? ((latest.costPerUnit - prev.costPerUnit) / prev.costPerUnit * 100)
+          : 0,
+      'profitChangePercent': prev.netProfit.abs() > 0
+          ? ((latest.netProfit - prev.netProfit) / prev.netProfit.abs() * 100)
+          : 0,
     };
   }
 
@@ -187,11 +240,15 @@ class ProfessionService extends BaseService {
 
     // 1. Cost recommendations
     if (p.benchmarkCostPerUnit > 0 && p.costPerUnit > 0) {
-      final diffPercent = ((p.costPerUnit - p.benchmarkCostPerUnit) / p.benchmarkCostPerUnit * 100);
+      final diffPercent = ((p.costPerUnit - p.benchmarkCostPerUnit) /
+          p.benchmarkCostPerUnit *
+          100);
       if (diffPercent > 20) {
-        recommendations.add('لاگت ${diffPercent.toStringAsFixed(1)}% زیادہ ہے۔ سپلائرز سے ریٹ کم کریں۔');
+        recommendations.add(
+            'لاگت ${diffPercent.toStringAsFixed(1)}% زیادہ ہے۔ سپلائرز سے ریٹ کم کریں۔');
       } else if (diffPercent < -10) {
-        recommendations.add('لاگت ${diffPercent.abs().toStringAsFixed(1)}% کم ہے۔ بہترین!');
+        recommendations.add(
+            'لاگت ${diffPercent.abs().toStringAsFixed(1)}% کم ہے۔ بہترین!');
       }
     }
 
@@ -199,9 +256,11 @@ class ProfessionService extends BaseService {
     if (p.targetProduction > 0) {
       final progress = p.productionProgress;
       if (progress < 50) {
-        recommendations.add('پیداوار صرف ${progress.toStringAsFixed(1)}% ہے۔ کوالٹی بیج اور کھاد استعمال کریں۔');
+        recommendations.add(
+            'پیداوار صرف ${progress.toStringAsFixed(1)}% ہے۔ کوالٹی بیج اور کھاد استعمال کریں۔');
       } else if (progress > 100) {
-        recommendations.add('پیداوار ہدف سے ${(progress - 100).toStringAsFixed(1)}% زیادہ ہے۔ بہترین!');
+        recommendations.add(
+            'پیداوار ہدف سے ${(progress - 100).toStringAsFixed(1)}% زیادہ ہے۔ بہترین!');
       }
     }
 
@@ -209,20 +268,24 @@ class ProfessionService extends BaseService {
     if (p.netProfit < 0) {
       recommendations.add('نقصان ہو رہا ہے۔ خرچ کم کریں یا قیمتیں بڑھائیں۔');
     } else if (p.netProfit > p.totalIncome * 0.3) {
-      recommendations.add('منافع اچھا ہے (${(p.netProfit / p.totalIncome * 100).toStringAsFixed(1)}%)۔');
+      recommendations.add(
+          'منافع اچھا ہے (${(p.netProfit / p.totalIncome * 100).toStringAsFixed(1)}%)۔');
     }
 
     // 4. Budget recommendations
     final budgetAlerts = await checkBudgetAlerts(pId);
-    final exceededCategories = budgetAlerts.entries.where((e) => e.value).map((e) => e.key).toList();
+    final exceededCategories =
+        budgetAlerts.entries.where((e) => e.value).map((e) => e.key).toList();
     if (exceededCategories.isNotEmpty) {
-      recommendations.add('${exceededCategories.join(', ')} میں بجٹ سے زیادہ خرچ ہوا ہے۔');
+      recommendations
+          .add('${exceededCategories.join(', ')} میں بجٹ سے زیادہ خرچ ہوا ہے۔');
     }
 
     // 5. Performance score based
     final score = p.performanceScore;
     if (score < 40) {
-      recommendations.add('کارکردگی کم ہے (${score.toStringAsFixed(0)}%)۔ بہتری کی ضرورت ہے۔');
+      recommendations.add(
+          'کارکردگی کم ہے (${score.toStringAsFixed(0)}%)۔ بہتری کی ضرورت ہے۔');
     } else if (score > 80) {
       recommendations.add('شاندار کارکردگی! (${score.toStringAsFixed(0)}%)');
     }
@@ -234,8 +297,33 @@ class ProfessionService extends BaseService {
     return recommendations.toList();
   }
 
-  Future<Profession> createProfessionWithDefaults({required String name, required String season, String? description, double totalProduction = 0.0, String productionUnit = 'kg', double targetProduction = 0.0, Map<String, double>? budgetLimits, double benchmarkCostPerUnit = 0.0, ProfessionCategory categoryType = ProfessionCategory.general}) async {
-    return Profession(id: DateTime.now().millisecondsSinceEpoch.toString(), name: name, categories: [], isActive: true, totalIncome: 0.0, totalExpense: 0.0, createdAt: DateTime.now(), updatedAt: DateTime.now(), description: description, totalProduction: totalProduction, productionUnit: productionUnit, season: season, targetProduction: targetProduction, budgetLimits: budgetLimits, benchmarkCostPerUnit: benchmarkCostPerUnit, categoryType: categoryType);
+  Future<Profession> createProfessionWithDefaults(
+      {required String name,
+      required String season,
+      String? description,
+      double totalProduction = 0.0,
+      String productionUnit = 'kg',
+      double targetProduction = 0.0,
+      Map<String, double>? budgetLimits,
+      double benchmarkCostPerUnit = 0.0,
+      ProfessionCategory categoryType = ProfessionCategory.general}) async {
+    return Profession(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: name,
+        categories: [],
+        isActive: true,
+        totalIncome: 0.0,
+        totalExpense: 0.0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        description: description,
+        totalProduction: totalProduction,
+        productionUnit: productionUnit,
+        season: season,
+        targetProduction: targetProduction,
+        budgetLimits: budgetLimits,
+        benchmarkCostPerUnit: benchmarkCostPerUnit,
+        categoryType: categoryType);
   }
 
   Future<int> getProfessionsCount() async => professionsBox?.length ?? 0;

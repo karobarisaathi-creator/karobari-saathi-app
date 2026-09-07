@@ -52,6 +52,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
   String? _highlightId;
   final ScrollController _scrollController = ScrollController();
   bool _isFabVisible = true;
+  final Set<String> _expandedCycleIds = {}; // ٹریک رکھنے کے لیے کہ کون سا سائیکل کھلا ہے
 
   // App Theme Colors (Using Central Theme)
   final Color _darkColor = AppTheme.darkColor;
@@ -200,6 +201,10 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                           _buildInfoRow(isUrdu ? 'نام' : 'Name', _remoteProfile!['name'] ?? '', PhosphorIcons.user(), isUrdu, fontFamily),
                           const Divider(height: 20),
                           _buildInfoRow(isUrdu ? 'فون' : 'Phone', widget.party.phone, PhosphorIcons.phone(), isUrdu, fontFamily),
+                          if (_remoteProfile!['profession'] != null && _remoteProfile!['profession']!.isNotEmpty) ...[
+                            const Divider(height: 20),
+                            _buildInfoRow(isUrdu ? 'پیشہ / نوعیت' : 'Profession', _remoteProfile!['profession']!, PhosphorIcons.briefcase(), isUrdu, fontFamily),
+                          ],
                         ],
                       ),
                     ),
@@ -533,7 +538,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               color: AppTheme.scaffoldBackground,
               child: Column(
                 children: [
-                  const SizedBox(height: 12), // Added spacing from header
+                  const SizedBox(height: 8), 
                   SearchSortBar(
                     controller: _searchController,
                     onSearchChanged: (value) => setState(() => _searchQuery = value),
@@ -900,42 +905,82 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     );
   }
 
-  Widget _buildTransactionList(List<model.Transaction> txs, bool isUrdu, String fontFamily) {
-    final sortedChronological = [..._transactions];
-    sortedChronological.sort((a, b) => a.date.compareTo(b.date));
+  Widget _buildTransactionList(
+      List<model.Transaction> txs, bool isUrdu, String fontFamily) {
+    // بیلنس اور سائیکلز کا حساب ہمیشہ مکمل ہسٹری پر ہونا چاہیے
+    final allSortedChronological = [..._transactions];
+    allSortedChronological.sort((a, b) => a.date.compareTo(b.date));
 
-    Map<String, Map<String, dynamic>> settlementData = {};
-    Map<String, double> runningBalances = {};
+    // ٹرانزیکشنز کو گروپس (سائیکلز) میں بانٹنا
+    List<Map<String, dynamic>> cycles = [];
+    List<model.Transaction> currentCycleTxs = [];
     double runningIn = 0;
     double runningOut = 0;
-    double currentBal = 0;
     DateTime? cycleStartDate;
+    
+    // بیلنس ٹریک کرنے کے لیے
+    Map<String, double> txBalances = {};
 
-    for (var tx in sortedChronological) {
+    for (var tx in allSortedChronological) {
       if (cycleStartDate == null) cycleStartDate = tx.date;
-      
+      currentCycleTxs.add(tx);
+
       if (tx.type == 'income') {
         runningIn += tx.amount;
-        currentBal += tx.amount;
       } else {
         runningOut += tx.amount;
-        currentBal -= tx.amount;
       }
       
-      runningBalances[tx.id] = currentBal;
+      txBalances[tx.id] = runningIn - runningOut;
 
       if ((runningIn - runningOut).abs() < 0.01) {
-        settlementData[tx.id] = {
+        cycles.add({
+          'id': tx.id,
+          'transactions': List<model.Transaction>.from(currentCycleTxs),
+          'isSettled': true,
           'totalIn': runningIn,
           'totalOut': runningOut,
           'startDate': cycleStartDate,
           'endDate': tx.date,
           'days': tx.date.difference(cycleStartDate).inDays,
-        };
+        });
+        currentCycleTxs.clear();
         runningIn = 0;
         runningOut = 0;
         cycleStartDate = null;
       }
+    }
+
+    if (currentCycleTxs.isNotEmpty) {
+      cycles.add({
+        'id': 'active_cycle',
+        'transactions': List<model.Transaction>.from(currentCycleTxs),
+        'isSettled': false,
+        'totalIn': runningIn,
+        'totalOut': runningOut,
+      });
+    }
+
+    // اب صرف وہی سائیکلز اور ٹرانزیکشنز دکھائیں جو فلٹر شدہ لسٹ (txs) میں ہیں
+    final Set<String> filteredTxIds = txs.map((t) => t.id).toSet();
+    
+    List<Map<String, dynamic>> displayCycles = [];
+    for (var cycle in cycles) {
+      final cycleTxs = (cycle['transactions'] as List<model.Transaction>)
+          .where((t) => filteredTxIds.contains(t.id))
+          .toList();
+      
+      if (cycleTxs.isNotEmpty) {
+        displayCycles.add({
+          ...cycle,
+          'displayTransactions': cycleTxs,
+        });
+      }
+    }
+
+    // صارف کی پسند کے مطابق ترتیب (Ascending/Descending)
+    if (!_isAscending) {
+      displayCycles = displayCycles.reversed.toList();
     }
 
     return NotificationListener<UserScrollNotification>(
@@ -948,34 +993,31 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
         return true;
       },
       child: ListView.builder(
+        padding: EdgeInsets.zero,
         controller: _scrollController,
-        itemCount: txs.length,
-        itemBuilder: (context, index) {
-          final t = txs[index];
-          final bool showDateHeader = index == 0 ||
-              DateFormat('yyyy-MM-dd').format(txs[index - 1].date) !=
-                  DateFormat('yyyy-MM-dd').format(t.date);
+        itemCount: displayCycles.length,
+        itemBuilder: (context, cycleIndex) {
+          final cycle = displayCycles[cycleIndex];
+          final cycleTxs = cycle['displayTransactions'] as List<model.Transaction>;
+          final bool isSettled = cycle['isSettled'];
+          final String cycleId = cycle['id'];
+          final bool isExpanded = _expandedCycleIds.contains(cycleId);
 
-          final settlement = settlementData[t.id];
-          final runningBalance = runningBalances[t.id] ?? 0;
+          // اگر یہ جاری حساب ہے، یا فلٹر لگا ہوا ہے، تو ٹرانزیکشنز براہ راست دکھائیں
+          if (!isSettled || _selectedFilter != 'all' || _searchQuery.isNotEmpty) {
+            return _buildTransactionSubList(
+                _isAscending ? cycleTxs : cycleTxs.reversed.toList(), 
+                isUrdu, fontFamily, txBalances);
+          }
 
+          // اگر حساب برابر ہے، تو کھلنے والا کارڈ دکھائیں
           return Column(
             children: [
-              // اگر ترتیب نئی سے پرانی ہے تو پٹی انٹری کے اوپر دکھانی ہے
-              if (!_isAscending && settlement != null)
-                _buildSettlementDivider(isUrdu, fontFamily, settlement),
-              
-              if (showDateHeader)
-                _buildDateHeader(t.date, isUrdu, fontFamily, runningBalance),
-              
-              _buildTransactionItem(t, isUrdu, fontFamily),
-              
-              // اگر ترتیب پرانی سے نئی ہے تو پٹی انٹری کے نیچے دکھانی ہے
-              if (_isAscending && settlement != null)
-                _buildSettlementDivider(isUrdu, fontFamily, settlement),
-              
-              if (settlement == null)
-                Divider(height: 1, thickness: 1, color: Colors.grey.shade300),
+              _buildExpandableSettlementCard(
+                  cycle, isUrdu, fontFamily, isExpanded),
+              if (isExpanded)
+                _buildTransactionSubList(
+                    cycleTxs.reversed.toList(), isUrdu, fontFamily, txBalances),
             ],
           );
         },
@@ -983,44 +1025,151 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     );
   }
 
-  Widget _buildSettlementDivider(bool isUrdu, String fontFamily, Map<String, dynamic> data) {
-    final df = DateFormat('dd/MM/yy');
+  Widget _buildTransactionSubList(
+      List<model.Transaction> txs, bool isUrdu, String fontFamily, Map<String, double> txBalances) {
+    return Column(
+      children: txs.map((t) {
+        return Column(
+          children: [
+            _buildTransactionItem(t, isUrdu, fontFamily, txBalances[t.id] ?? 0),
+            Divider(height: 1, thickness: 1, color: Colors.grey.shade200),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildExpandableSettlementCard(
+      Map<String, dynamic> data, bool isUrdu, String fontFamily, bool isExpanded) {
+    final df = DateFormat('dd MMM yyyy');
     final start = df.format(data['startDate']);
     final end = df.format(data['endDate']);
     final days = data['days'];
+    final cycleId = data['id'];
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-      decoration: BoxDecoration(
-        color: AppTheme.goldColor.withOpacity(0.08),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Text(
-                isUrdu ? "حساب برابر ہو گیا" : "Account Balanced",
-                style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.themeColor),
+    return InkWell(
+      onTap: () {
+        setState(() {
+          if (isExpanded) {
+            _expandedCycleIds.remove(cycleId);
+          } else {
+            _expandedCycleIds.add(cycleId);
+          }
+        });
+      },
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isExpanded ? Colors.green.withOpacity(0.08) : Colors.green.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.green.withOpacity(0.2), width: 1),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.check,
+                      size: 10, color: Colors.white),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  isUrdu ? "حساب برابر (ٹیپ کریں)" : "Account Balanced (Tap)",
+                  style: TextStyle(
+                      fontFamily: fontFamily,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                      color: Colors.green.shade800),
+                ),
+                const Spacer(),
+                _buildDurationBadge(
+                    "$days ${isUrdu ? 'دن' : 'days'}", isUrdu, fontFamily),
+              ],
+            ),
+            if (isExpanded) ...[
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildSettlementDateInfo(
+                      isUrdu ? "شروع" : "From", start, PhosphorIcons.calendar()),
+                  Container(
+                      width: 1, height: 20, color: Colors.grey.withOpacity(0.2)),
+                  _buildSettlementDateInfo(
+                      isUrdu ? "ختم" : "To", end, PhosphorIcons.calendarCheck()),
+                ],
               ),
-              const Spacer(),
-              Text(
-                "$start - $end",
-                style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary, fontWeight: FontWeight.bold, fontFamily: ''),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Divider(height: 1, thickness: 0.5),
               ),
-              const SizedBox(width: 12),
-              Text(
-                "$days ${isUrdu ? 'دن' : 'days'}",
-                style: TextStyle(fontFamily: fontFamily, fontSize: 13, color: Colors.blueGrey, fontWeight: FontWeight.bold),
+              Row(
+                children: [
+                  _buildEnhancedSettlementStat(isUrdu ? "کل جمع" : "Total In",
+                      data['totalIn'], AppTheme.incomeColor, isUrdu, fontFamily),
+                  const SizedBox(width: 16),
+                  _buildEnhancedSettlementStat(isUrdu ? "کل بنام" : "Total Out",
+                      data['totalOut'], AppTheme.expenseColor, isUrdu, fontFamily),
+                ],
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDurationBadge(String text, bool isUrdu, String fontFamily) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppTheme.darkColor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(PhosphorIcons.clock(), size: 12, color: AppTheme.darkColor),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.darkColor,
+              fontFamily: isUrdu ? fontFamily : '',
+            ),
           ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettlementDateInfo(String label, String date, IconData icon) {
+    return Expanded(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 14, color: AppTheme.textSecondary),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildCompactStat(isUrdu ? "کل جمع" : "Total In", data['totalIn'], AppTheme.incomeColor, isUrdu, fontFamily),
-              _buildCompactStat(isUrdu ? "کل بنام" : "Total Out", data['totalOut'], AppTheme.expenseColor, isUrdu, fontFamily),
+              Text(label,
+                  style:
+                      const TextStyle(fontSize: 9, color: AppTheme.textSecondary)),
+              Text(date,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: '')),
             ],
           ),
         ],
@@ -1028,18 +1177,37 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     );
   }
 
-  Widget _buildCompactStat(String label, double amount, Color color, bool isUrdu, String fontFamily) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text("$label: ", style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontFamily: fontFamily)),
-        Text(
-          "Rs ${amount.toStringAsFixed(0)}",
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color, fontFamily: ''),
+  Widget _buildEnhancedSettlementStat(String label, double amount, Color color,
+      bool isUrdu, String fontFamily) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(8),
         ),
-      ],
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label,
+                style: TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.textSecondary,
+                    fontFamily: fontFamily)),
+            Text(
+              "Rs ${amount.toStringAsFixed(0)}",
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                  fontFamily: ''),
+            ),
+          ],
+        ),
+      ),
     );
   }
+
 
   Widget _buildDateHeader(DateTime date, bool isUrdu, String fontFamily, double balance) {
     String dateStr = DateFormat('dd/MM/yyyy').format(date);
@@ -1091,7 +1259,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     );
   }
 
-  Widget _buildTransactionItem(model.Transaction t, bool isUrdu, String fontFamily) {
+  Widget _buildTransactionItem(model.Transaction t, bool isUrdu, String fontFamily, double runningBalance) {
     final isIncome = t.type == 'income';
     final isHighlighted = _highlightId == t.id;
 
@@ -1138,7 +1306,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                           "${isUrdu ? 'بل نمبر  ' : 'Bill NO'} ${t.referenceNumber}",
                           style: TextStyle(
                             color: AppTheme.themeColor,
-                            fontSize: 14,
+                            fontSize: 12,
                             fontWeight: FontWeight.bold,
                             fontFamily: isUrdu ? fontFamily : '',
                           ),
@@ -1152,7 +1320,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                           t.professionName!,
                           style: TextStyle(
                             color: AppTheme.themeColor,
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.bold,
                             fontFamily: fontFamily,
                           ),
@@ -1166,6 +1334,16 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                           fontSize: 12,
                           fontFamily: '',
                           fontWeight: FontWeight.normal,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        "${isUrdu ? 'بیلنس: ' : 'Bal: '}${runningBalance.abs().toStringAsFixed(0)}",
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: isUrdu ? fontFamily : '',
                         ),
                       ),
                     ],

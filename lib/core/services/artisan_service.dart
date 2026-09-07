@@ -7,6 +7,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'package:geolocator/geolocator.dart';
 import 'package:account_app/core/services/database/base_service.dart';
+import 'package:account_app/core/services/database/profession_service.dart';
 import 'package:account_app/core/models/artisan_profile_model.dart';
 import 'package:account_app/core/models/artisan_review_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
@@ -15,8 +16,9 @@ import 'package:account_app/core/config/professions_config.dart';
 
 class ArtisanService extends BaseService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
+  final ProfessionService _professionService = ProfessionService();
   final _logger = LoggingService();
-  
+
   // Cache for professions list
   static List<Map<String, dynamic>>? _cachedProfessions;
 
@@ -41,7 +43,7 @@ class ArtisanService extends BaseService {
           .set(profile.toMap(), SetOptions(merge: true));
 
       await _ensureArtisanProfession(profile);
-      
+
       // Update local cache
       await artisansBox?.put(profile.id, profile);
       notifyListeners();
@@ -58,7 +60,7 @@ class ArtisanService extends BaseService {
 
       // مستقل آئی ڈی تاکہ پیشہ بدلنے پر بھی ریکارڈ ایک ہی رہے
       const String professionId = "artisan_main_work";
-      
+
       final professions = getProfessions();
       final pData = professions.firstWhere(
         (p) => p['id'] == profile.profession,
@@ -79,17 +81,12 @@ class ArtisanService extends BaseService {
         // اگر موجود ہے تو صرف نام اور آئیکن اپ ڈیٹ کریں
         final updated = existing.copyWith(
           name: professionName,
-          description: "ICON:$iconKey|یہ پیشہ کاریگر پروفائل سے خودکار طور پر بنایا گیا ہے۔",
+          description:
+              "ICON:$iconKey|یہ پیشہ کاریگر پروفائل سے خودکار طور پر بنایا گیا ہے۔",
           updatedAt: DateTime.now(),
         );
-        await professionsBox?.put(professionId, updated);
-        await firestore
-            .collection('users')
-            .doc(user.uid)
-            .collection('professions')
-            .doc(professionId)
-            .set(updated.toMap(), SetOptions(merge: true));
-        
+        await _professionService.updateProfession(updated);
+
         _logger.info("Updated existing artisan profession: $professionName");
         return;
       }
@@ -109,19 +106,13 @@ class ArtisanService extends BaseService {
         isMaster: true,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
-        description: "ICON:$iconKey|یہ پیشہ کاریگر پروفائل سے خودکار طور پر بنایا گیا ہے۔",
+        description:
+            "ICON:$iconKey|یہ پیشہ کاریگر پروفائل سے خودکار طور پر بنایا گیا ہے۔",
         season: "عمومی",
       );
 
-      await professionsBox?.put(masterProfession.id, masterProfession);
-      
-      await firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('professions')
-          .doc(masterProfession.id)
-          .set(masterProfession.toMap());
-      
+      await _professionService.addProfession(masterProfession);
+
       notifyListeners();
     } catch (e, stack) {
       _logger.error("Ensure profession error", e, stack);
@@ -133,7 +124,7 @@ class ArtisanService extends BaseService {
       (p) => p.id == profession,
       orElse: () => ProfessionsConfig.allProfessions.first,
     );
-    
+
     switch (config.id) {
       case 'mason':
         return 'hammer';
@@ -166,7 +157,7 @@ class ArtisanService extends BaseService {
       if (profile != null) {
         await _deleteProfileImages(profile);
       }
-      
+
       await firestore.collection('artisans').doc(id).delete();
       await artisansBox?.delete(id);
       notifyListeners();
@@ -182,7 +173,7 @@ class ArtisanService extends BaseService {
           profile.profileImage!.startsWith('http')) {
         await _storage.refFromURL(profile.profileImage!).delete();
       }
-      
+
       for (var imageUrl in profile.workImages) {
         if (imageUrl.startsWith('http')) {
           await _storage.refFromURL(imageUrl).delete();
@@ -212,11 +203,8 @@ class ArtisanService extends BaseService {
 
       final fileName =
           "${userId}_${type}_${DateTime.now().millisecondsSinceEpoch}.$extension";
-      final ref = _storage
-          .ref()
-          .child('artisan_uploads')
-          .child(userId)
-          .child(fileName);
+      final ref =
+          _storage.ref().child('artisan_uploads').child(userId).child(fileName);
 
       _logger.info("Uploading $type image for user: $userId");
       await ref.putFile(file);
@@ -246,7 +234,8 @@ class ArtisanService extends BaseService {
 
       final doc = await firestore.collection('artisans').doc(id).get();
       if (doc.exists) {
-        final profile = ArtisanProfile.fromMap(doc.data() as Map<String, dynamic>);
+        final profile =
+            ArtisanProfile.fromMap(doc.data() as Map<String, dynamic>);
         await artisansBox?.put(id, profile);
         return profile;
       }
@@ -260,7 +249,8 @@ class ArtisanService extends BaseService {
   Stream<ArtisanProfile?> streamProfile(String id) {
     return firestore.collection('artisans').doc(id).snapshots().map((doc) {
       if (doc.exists) {
-        final profile = ArtisanProfile.fromMap(doc.data() as Map<String, dynamic>);
+        final profile =
+            ArtisanProfile.fromMap(doc.data() as Map<String, dynamic>);
         artisansBox?.put(id, profile);
         return profile;
       }
@@ -285,7 +275,8 @@ class ArtisanService extends BaseService {
           .get();
 
       for (var doc in snapshot.docs) {
-        final profile = ArtisanProfile.fromMap(doc.data() as Map<String, dynamic>);
+        final profile =
+            ArtisanProfile.fromMap(doc.data() as Map<String, dynamic>);
         await artisansBox?.put(profile.id, profile);
       }
       notifyListeners();
@@ -300,7 +291,8 @@ class ArtisanService extends BaseService {
         .where('isActive', isEqualTo: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => ArtisanProfile.fromMap(doc.data() as Map<String, dynamic>))
+            .map((doc) =>
+                ArtisanProfile.fromMap(doc.data() as Map<String, dynamic>))
             .toList());
   }
 
@@ -312,7 +304,8 @@ class ArtisanService extends BaseService {
         .limit(limit)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => ArtisanProfile.fromMap(doc.data() as Map<String, dynamic>))
+            .map((doc) =>
+                ArtisanProfile.fromMap(doc.data() as Map<String, dynamic>))
             .toList());
   }
 
@@ -333,7 +326,8 @@ class ArtisanService extends BaseService {
 
       final snapshot = await query.get();
       return snapshot.docs
-          .map((doc) => ArtisanProfile.fromMap(doc.data() as Map<String, dynamic>))
+          .map((doc) =>
+              ArtisanProfile.fromMap(doc.data() as Map<String, dynamic>))
           .toList();
     } catch (e, stack) {
       _logger.error("Get artisans batch error", e, stack);
@@ -351,17 +345,19 @@ class ArtisanService extends BaseService {
     double radiusKm = 10,
   }) async {
     try {
-      final query = firestore
-          .collection('artisans')
-          .where('isActive', isEqualTo: true);
+      final query =
+          firestore.collection('artisans').where('isActive', isEqualTo: true);
 
       final snapshot = await query.get();
       var results = snapshot.docs
-          .map((doc) => ArtisanProfile.fromMap(doc.data() as Map<String, dynamic>))
+          .map((doc) =>
+              ArtisanProfile.fromMap(doc.data() as Map<String, dynamic>))
           .toList();
-      
-      results = results.where((p) =>
-          p.profession == profession || p.skills.contains(profession)).toList();
+
+      results = results
+          .where((p) =>
+              p.profession == profession || p.skills.contains(profession))
+          .toList();
 
       if (latitude != null && longitude != null) {
         results = results.where((p) {
@@ -400,7 +396,8 @@ class ArtisanService extends BaseService {
           .get();
 
       return snapshot.docs
-          .map((doc) => ArtisanProfile.fromMap(doc.data() as Map<String, dynamic>))
+          .map((doc) =>
+              ArtisanProfile.fromMap(doc.data() as Map<String, dynamic>))
           .toList();
     } catch (e, stack) {
       _logger.error("Search by name error", e, stack);
@@ -413,7 +410,7 @@ class ArtisanService extends BaseService {
   // ============================================================
   Future<void> addReview({
     required String artisanId,
-    String? workOrderId,
+    required String workOrderId,
     required double rating,
     required String comment,
   }) async {
@@ -437,9 +434,11 @@ class ArtisanService extends BaseService {
 
       final artisanRef = firestore.collection('artisans').doc(artisanId);
       final reviewRef = artisanRef.collection('reviews').doc(reviewId);
-      final workOrderRef = workOrderId != null && workOrderId.isNotEmpty
-          ? artisanRef.collection('work_orders').doc(workOrderId)
-          : null;
+      if (workOrderId.isEmpty) {
+        throw ArgumentError('A work order is required for a review');
+      }
+      final workOrderRef =
+          artisanRef.collection('work_orders').doc(workOrderId);
 
       await firestore.runTransaction((transaction) async {
         if (workOrderRef != null) {
@@ -453,17 +452,18 @@ class ArtisanService extends BaseService {
           }
         }
 
-        transaction.set(reviewRef, review.toMap());
+        transaction.set(reviewRef, {
+          ...review.toMap(),
+          'workOrderId': workOrderId,
+        });
 
-        if (workOrderRef != null) {
-          transaction.update(workOrderRef, {
-            'rating': rating,
-            'review': comment,
-            'isRated': true,
-            'ratedAt': FieldValue.serverTimestamp(),
-            'status': 'rated',
-          });
-        }
+        transaction.update(workOrderRef, {
+          'rating': rating,
+          'review': comment,
+          'isRated': true,
+          'ratedAt': FieldValue.serverTimestamp(),
+          'status': 'rated',
+        });
       });
 
       await _updateArtisanRating(artisanId);
@@ -577,12 +577,14 @@ class ArtisanService extends BaseService {
   // 9. پیشوں کی فہرست
   // ============================================================
   static List<Map<String, dynamic>> getProfessions() {
-    return ProfessionsConfig.allProfessions.map((p) => <String, dynamic>{
-      'id': p.id,
-      'name': p.name,
-      'icon': p.icon,
-      'category': p.categoryName,
-      'categoryUrdu': p.categoryUrdu,
-    }).toList();
+    return ProfessionsConfig.allProfessions
+        .map((p) => <String, dynamic>{
+              'id': p.id,
+              'name': p.name,
+              'icon': p.icon,
+              'category': p.categoryName,
+              'categoryUrdu': p.categoryUrdu,
+            })
+        .toList();
   }
 }

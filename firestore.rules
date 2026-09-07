@@ -28,6 +28,10 @@ service cloud.firestore {
     }
 
     // --- صارفین کا ڈیٹا (کھاتہ، ٹرانزیکشنز) ---
+    match /backups/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
     match /users/{userId} {
       allow read: if isSignedIn();
       allow write: if isOwner(userId) || isAdmin();
@@ -69,17 +73,25 @@ service cloud.firestore {
         allow create: if isSignedIn() &&
           (request.resource.data.artisanId == artisanId &&
            (request.auth.uid == request.resource.data.customerId || request.auth.uid == request.resource.data.artisanId) &&
-           request.resource.data.artisanId != request.resource.data.customerId);
+           request.resource.data.artisanId != request.resource.data.customerId &&
+           get(/databases/$(database)/documents/artisans/$(artisanId)).data.isActive == true);
         allow update: if isAdmin() ||
-          // Artisan: Full control over their work orders (except changing customer feedback)
+          // Artisan: Can update work progress and bill fields only.
           (request.auth.uid == artisanId &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+             'status', 'updatedAt', 'completedAt', 'items', 'laborFee', 'amount', 'workImages'
+           ]) &&
            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rating', 'review', 'isRated', 'ratedAt'])) ||
-          // Customer: Can update negotiation fields and provide rating
-          (request.auth.uid == resource.data.customerId && (
-             // Case 1: Updating rating (only if status is completed and not already rated)
-             (resource.data.status == 'completed' && request.resource.data.status == 'rated' && !resource.data.isRated && request.resource.data.isRated == true) ||
-             // Case 2: General negotiation/chat updates
-             (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['rating', 'review', 'isRated', 'ratedAt', 'artisanAgreed', 'artisanAcceptedTerms']))
+          // Customer: Can accept a quoted/negotiating order, or rate completed work.
+           (request.auth.uid == resource.data.customerId && (
+             (resource.data.status == 'completed' && request.resource.data.status == 'rated' && resource.data.isRated != true && request.resource.data.isRated == true) ||
+           ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) ||
+             (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'title']) &&
+              request.resource.data.title is string &&
+              request.resource.data.title.size() >= 5 &&
+              request.resource.data.title.size() <= 40)) &&
+            (resource.data.status == 'negotiating' || resource.data.status == 'quoted') &&
+            request.resource.data.status == 'confirmed')
           ));
 
         allow delete: if isAdmin() || request.auth.uid == artisanId || resource.data.customerId == request.auth.uid;
@@ -104,7 +116,14 @@ service cloud.firestore {
 
       match /reviews/{reviewId} {
         allow read: if isSignedIn();
-        allow create: if isSignedIn();
+        allow create: if isSignedIn() &&
+          request.resource.data.artisanId == artisanId &&
+          request.resource.data.reviewerId == request.auth.uid &&
+          request.resource.data.workOrderId is string &&
+          get(/databases/$(database)/documents/artisans/$(artisanId)/work_orders/$(request.resource.data.workOrderId)).data.customerId == request.auth.uid &&
+          get(/databases/$(database)/documents/artisans/$(artisanId)/work_orders/$(request.resource.data.workOrderId)).data.status == 'completed' &&
+          get(/databases/$(database)/documents/artisans/$(artisanId)/work_orders/$(request.resource.data.workOrderId)).data.isRated == false &&
+          request.resource.data.rating >= 1 && request.resource.data.rating <= 5;
         allow update, delete: if isAdmin();
       }
 

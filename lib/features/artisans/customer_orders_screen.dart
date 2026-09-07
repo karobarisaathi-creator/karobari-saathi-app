@@ -8,7 +8,11 @@ import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/services/artisan_work_order_service.dart';
 import 'package:account_app/core/models/artisan_work_order_model.dart';
+import 'package:account_app/core/models/job_post_model.dart';
+import 'package:account_app/core/services/database/job_service.dart';
 import 'package:account_app/features/artisans/widgets/work_order_list_item.dart';
+import 'package:account_app/features/artisans/widgets/job_post_card.dart';
+import 'package:account_app/features/artisans/job_detail_screen.dart';
 import 'package:account_app/features/dashboard/main_navigation_screen.dart';
 import 'package:account_app/core/services/logging_service.dart';
 import 'dart:async';
@@ -23,11 +27,14 @@ class CustomerOrdersScreen extends StatefulWidget {
 class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
   final _logger = LoggingService();
   final ArtisanWorkOrderService _workOrderService = ArtisanWorkOrderService();
-  
+  final JobService _jobService = JobService();
+
   Stream<List<ArtisanWorkOrder>>? _ordersStream;
   StreamSubscription<List<ArtisanWorkOrder>>? _ordersSubscription;
+  StreamSubscription<List<JobPost>>? _postsSubscription;
   List<ArtisanWorkOrder> _orders = [];
-  
+  List<JobPost> _myPosts = [];
+
   bool _isLoading = true;
   String? _error;
   String? _userId;
@@ -37,6 +44,19 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
     super.initState();
     _userId = FirebaseAuth.instance.currentUser?.uid;
     _initializeStream();
+    _initializePostsStream();
+  }
+
+  void _initializePostsStream() {
+    if (_userId == null || _userId!.isEmpty) return;
+
+    _postsSubscription = _jobService.getCustomerJobs(_userId!).listen(
+      (posts) {
+        if (mounted) setState(() => _myPosts = posts);
+      },
+      onError: (error, stackTrace) =>
+          _logger.error('Customer posts stream error', error, stackTrace),
+    );
   }
 
   void _initializeStream() {
@@ -57,13 +77,13 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
 
   void _onOrdersReceived(List<ArtisanWorkOrder> orders) {
     if (!mounted) return;
-    
+
     // Remove duplicates and sort by latest activity
     final Map<String, ArtisanWorkOrder> uniqueOrders = {};
     for (var order in orders) {
       uniqueOrders[order.id] = order;
     }
-    
+
     final sortedOrders = uniqueOrders.values.toList();
     sortedOrders.sort((a, b) {
       final aTime = a.updatedAt ?? a.createdAt;
@@ -79,8 +99,13 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
   }
 
   void _onOrderUpdated() {
-    // This can be used to trigger UI updates if needed, 
+    // This can be used to trigger UI updates if needed,
     // but the stream already handles real-time changes.
+  }
+
+  List<ArtisanWorkOrder> _ordersForPost(JobPost post) {
+    final postOrderId = 'job_neg_${post.id}';
+    return _orders.where((order) => order.id == postOrderId).toList();
   }
 
   void _onError(dynamic error) {
@@ -96,6 +121,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
   @override
   void dispose() {
     _ordersSubscription?.cancel();
+    _postsSubscription?.cancel();
     super.dispose();
   }
 
@@ -133,31 +159,122 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
       return _buildErrorState(isUrdu, fontFamily);
     }
 
-    if (_orders.isEmpty) {
+    if (_orders.isEmpty && _myPosts.isEmpty) {
       return _buildEmptyState(isUrdu, fontFamily);
     }
 
     return RefreshIndicator(
       onRefresh: _refreshOrders,
       color: AppTheme.themeColor,
-      child: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: _orders.length,
-        separatorBuilder: (context, index) => Divider(
-          height: 1,
-          color: Colors.grey.withValues(alpha: 0.2),
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          if (_myPosts.isNotEmpty) ...[
+            ..._myPosts.map(
+              (post) => Container(
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    JobPostCard(
+                      job: post,
+                      isUrdu: isUrdu,
+                      fontFamily: fontFamily,
+                      currentUserId: _userId!,
+                      embedded: true,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => JobDetailScreen(
+                              job: post,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    if (_ordersForPost(post).isNotEmpty)
+                      Divider(
+                        height: 1,
+                        indent: 12,
+                        endIndent: 12,
+                        color: Colors.grey.withValues(alpha: 0.25),
+                      ),
+                    ..._ordersForPost(post).map(
+                      (order) => Padding(
+                        padding: const EdgeInsets.only(left: 12, bottom: 16),
+                        child: WorkOrderListItem(
+                          order: order,
+                          isArtisanMode: false,
+                          isUrdu: isUrdu,
+                          fontFamily: fontFamily,
+                          embedded: true,
+                          onChatTap: () => _navigateToChat(order),
+                          onOrderUpdated: _onOrderUpdated,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (_orders.any((order) =>
+              !_myPosts.any((post) => order.id == 'job_neg_${post.id}'))) ...[
+            _buildSectionTitle(
+              isUrdu ? 'دیگر رابطے اور کام' : 'Other Contacts and Work',
+              fontFamily,
+            ),
+            ..._orders
+                .where((order) =>
+                    !_myPosts.any((post) => order.id == 'job_neg_${post.id}'))
+                .map(
+                  (order) => Column(
+                    children: [
+                      WorkOrderListItem(
+                        order: order,
+                        isArtisanMode: false,
+                        isUrdu: isUrdu,
+                        fontFamily: fontFamily,
+                        showTitleForCustomer: true,
+                        onChatTap: () => _navigateToChat(order),
+                        onOrderUpdated: _onOrderUpdated,
+                      ),
+                      Divider(
+                        height: 1,
+                        color: Colors.grey.withValues(alpha: 0.2),
+                      ),
+                    ],
+                  ),
+                ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title, String fontFamily) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 12),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 17,
+          fontWeight: FontWeight.bold,
+          color: AppTheme.darkColor,
+          fontFamily: fontFamily,
         ),
-        itemBuilder: (context, index) {
-          final order = _orders[index];
-          return WorkOrderListItem(
-            order: order,
-            isArtisanMode: false,
-            isUrdu: isUrdu,
-            fontFamily: fontFamily,
-            onChatTap: () => _navigateToChat(order),
-            onOrderUpdated: _onOrderUpdated,
-          );
-        },
       ),
     );
   }

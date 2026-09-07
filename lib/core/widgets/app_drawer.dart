@@ -4,13 +4,11 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/auth_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/security_service.dart';
-import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/core/services/artisan_service.dart';
 import 'package:account_app/core/services/auto_sync_service.dart';
 import 'package:account_app/core/services/backup_service.dart';
@@ -23,9 +21,7 @@ import 'package:account_app/features/artisans/artisan_detail_screen.dart';
 import 'package:account_app/features/artisans/customer_orders_screen.dart';
 import 'package:account_app/features/artisans/post_job_screen.dart';
 import 'package:account_app/features/artisans/favorite_artisans_screen.dart';
-import 'package:account_app/features/settings/verification_request_screen.dart';
 import 'package:account_app/features/settings/app_lock_screen.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
@@ -147,9 +143,11 @@ class _AppDrawerState extends State<AppDrawer> {
                   trailing: Text(
                     isUrdu ? 'اردو' : 'English',
                     style: TextStyle(
-                        color: AppTheme.themeColor,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: fontFamily),
+                      color: AppTheme.themeColor,
+                      fontWeight: FontWeight.w900,
+                      fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+                      fontSize: isUrdu ? 19 : 15,
+                    ),
                   ),
                 ),
                 _buildDrawerItem(
@@ -204,21 +202,9 @@ class _AppDrawerState extends State<AppDrawer> {
                   onTap: () => _showPrivacyPolicy(context, isUrdu, fontFamily),
                   fontFamily: fontFamily,
                 ),
-                _buildDrawerItem(
-                  icon: PhosphorIcons.headset(),
-                  title: isUrdu ? 'ہم سے رابطہ کریں' : 'Contact Us',
-                  onTap: () => _contactUs(context, isUrdu),
-                  fontFamily: fontFamily,
-                ),
                 _buildDivider(),
-                _buildDrawerItem(
-                  icon: PhosphorIcons.gearSix(),
-                  title: isUrdu ? 'اکاؤنٹ سیٹنگز (لاگ آؤٹ وغیرہ)' : 'Account Settings (Logout etc.)',
-                  onTap: () => _showAccountActionsDialog(context, isUrdu, fontFamily),
-                  fontFamily: fontFamily,
-                  iconColor: Colors.red.shade400,
-                  textColor: Colors.red.shade700,
-                ),
+                const SizedBox(height: 12),
+                _buildAccountCompactActions(context, isUrdu, fontFamily),
                 const SizedBox(height: 30),
               ],
             ),
@@ -245,66 +231,62 @@ class _AppDrawerState extends State<AppDrawer> {
 
   Widget _buildHeader(
       BuildContext context, User? user, bool isUrdu, String fontFamily) {
-    return Consumer<VerificationService>(
-      builder: (context, vService, _) {
-        return GestureDetector(
-          onTap: () async {
-            if (user == null) return;
-            
-            // کاریگر چیک کریں
-            final artisanService = ArtisanService();
-            final profile = await artisanService.getProfile(user.uid);
-            
-            if (!context.mounted) return;
-            
-            Navigator.pop(context); // ڈراور بند کریں
-            
-            if (profile != null && profile.isActive) {
-              // اگر کاریگر ہے تو کاریگر ڈیٹیل اسکرین
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ArtisanDetailScreen(
-                    artisanId: user.uid,
-                    initialArtisan: profile,
-                  ),
-                ),
-              );
-            } else {
-              // اگر کاریگر نہیں ہے تو ماسٹر پروفائل
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MasterProfileScreen(),
-                ),
-              );
-            }
-          },
-          child: Container(
-            padding: EdgeInsets.only(
-                top: MediaQuery.of(context).padding.top + 20,
-                bottom: 20,
-                left: 16,
-                right: 16),
-            decoration: BoxDecoration(
-              color: AppTheme.darkColor,
-              borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(20),
-                  bottomRight: Radius.circular(20)),
+    return GestureDetector(
+      onTap: () async {
+        if (user == null) return;
+
+        // کاریگر چیک کریں
+        final artisanService = ArtisanService();
+        final profile = await artisanService.getProfile(user.uid);
+
+        if (!context.mounted) return;
+
+        Navigator.pop(context); // ڈراور بند کریں
+
+        if (profile != null && profile.isActive) {
+          // اگر کاریگر ہے تو کاریگر ڈیٹیل اسکرین
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ArtisanDetailScreen(
+                artisanId: user.uid,
+                initialArtisan: profile,
+              ),
             ),
-            child: ProfileInfoWidget(
-              name: user?.displayName ?? (isUrdu ? 'صارف' : 'User'),
-              phone: user?.phoneNumber ?? '',
-              profileImage: user?.photoURL,
-              isLarge: true,
-              textColor: Colors.white,
-              subtitleColor: Colors.white70,
-              isVerified: vService.currentStatus == VerificationStatus.approved,
-              customSize: 60,
+          );
+        } else {
+          // اگر کاریگر نہیں ہے تو ماسٹر پروفائل
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const MasterProfileScreen(),
             ),
-          ),
-        );
+          );
+        }
       },
+      child: Container(
+        padding: EdgeInsets.only(
+            top: MediaQuery.of(context).padding.top + 20,
+            bottom: 20,
+            left: 16,
+            right: 16),
+        decoration: BoxDecoration(
+          color: AppTheme.darkColor,
+          borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(20),
+              bottomRight: Radius.circular(20)),
+        ),
+        child: ProfileInfoWidget(
+          name: user?.displayName ?? (isUrdu ? 'صارف' : 'User'),
+          phone: user?.phoneNumber ?? '',
+          profileImage: user?.photoURL,
+          isLarge: true,
+          textColor: Colors.white,
+          subtitleColor: Colors.white70,
+          isVerified: false,
+          customSize: 60,
+        ),
+      ),
     );
   }
 
@@ -356,181 +338,155 @@ class _AppDrawerState extends State<AppDrawer> {
         height: 1, indent: 16, endIndent: 16, color: Color(0xFFEEEEEE));
   }
 
-  void _showAccountActionsDialog(
-      BuildContext context, bool isUrdu, String fontFamily) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        contentPadding: const EdgeInsets.all(20),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              isUrdu ? 'اکاؤنٹ مینیجمنٹ' : 'Account Management',
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: fontFamily),
-            ),
-            const SizedBox(height: 24),
-            
-            // 1. تصدیق کروائیں
-            _buildDialogActionBtn(
-              context: context,
-              icon: PhosphorIcons.shieldCheck(),
-              title: isUrdu ? 'تصدیق کروائیں' : 'Verify Account',
-              color: AppTheme.verifiedGold,
-              onTap: () {
-                Navigator.pop(context); // پاپ اپ بند کریں
-                Navigator.pop(context); // ڈراور بند کریں
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const VerificationRequestScreen()));
-              },
-              fontFamily: fontFamily,
-            ),
-            const SizedBox(height: 12),
-
-            // 2. لاگ آؤٹ
-            _buildDialogActionBtn(
-              context: context,
-              icon: PhosphorIcons.signOut(),
-              title: isUrdu ? 'لاگ آؤٹ' : 'Logout',
-              color: Colors.blue,
-              onTap: () {
-                Navigator.pop(context);
-                _showLogoutDialog(context, isUrdu, fontFamily);
-              },
-              fontFamily: fontFamily,
-            ),
-            const SizedBox(height: 12),
-
-            // 3. اکاؤنٹ ختم کریں
-            _buildDialogActionBtn(
-              context: context,
-              icon: PhosphorIcons.userMinus(),
-              title: isUrdu ? 'اکاؤنٹ ختم کریں' : 'Deactivate Account',
-              color: Colors.red,
-              onTap: () {
-                Navigator.pop(context);
-                _showDeactivateDialog(context, isUrdu, fontFamily);
-              },
-              fontFamily: fontFamily,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDialogActionBtn({
-    required BuildContext context,
-    required IconData icon,
-    required String title,
-    required Color color,
-    required VoidCallback onTap,
-    required String fontFamily,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+  Widget _buildLanguageSelector(BuildContext context, bool isUrdu,
+      String fontFamily, LanguageService languageService) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: Colors.grey[100],
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
         ),
         child: Row(
           children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(width: 12),
-            Text(
-              title,
-              style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: fontFamily,
-                  fontSize: 14),
+            _buildLanguageOption(
+              label: 'English',
+              isSelected: !isUrdu,
+              onTap: () => languageService.changeLanguage('en'),
+              fontFamily: '',
+              fontSize: 15,
             ),
-            const Spacer(),
-            Icon(Icons.arrow_forward_ios, size: 12, color: color),
+            _buildLanguageOption(
+              label: 'اردو',
+              isSelected: isUrdu,
+              onTap: () => languageService.changeLanguage('ur'),
+              fontFamily: 'NooriNastaleeq',
+              fontSize: 19,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildVerificationStatus(
-      BuildContext context, bool isUrdu, String fontFamily) {
-    return Consumer<VerificationService>(
-      builder: (context, vService, _) {
-        Color color = AppTheme.verifiedGold;
-        String text = isUrdu ? 'تصدیق کروائیں' : 'Get Verified';
-        IconData icon = Icons.verified_user_outlined;
-
-        if (vService.currentStatus == VerificationStatus.approved) {
-          color = Colors.green;
-          text = isUrdu ? 'تصدیق شدہ اکاؤنٹ' : 'Verified Account';
-          icon = Icons.verified;
-        } else if (vService.currentStatus == VerificationStatus.pending) {
-          color = Colors.orange;
-          text = isUrdu ? 'تصدیق جاری ہے...' : 'Verification Pending';
-          icon = Icons.hourglass_bottom;
-        }
-
-        return Container(
-          margin: const EdgeInsets.all(16),
-          padding: const EdgeInsets.all(12),
+  Widget _buildLanguageOption({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required String fontFamily,
+    required double fontSize,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.2)),
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    )
+                  ]
+                : [],
           ),
-          child: Row(
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 10),
-              Text(
-                text,
-                style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: fontFamily,
-                    fontSize: 13),
-              ),
-              const Spacer(),
-              if (vService.currentStatus == VerificationStatus.none ||
-                  vService.currentStatus == VerificationStatus.rejected)
-                InkWell(
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) =>
-                                const VerificationRequestScreen()));
-                  },
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                        color: color, borderRadius: BorderRadius.circular(6)),
-                    child: Text(
-                      isUrdu ? 'اپلائی' : 'Apply',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold),
-                    ),
-                  ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: fontFamily,
+              fontSize: fontSize,
+              fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+              color: isSelected ? AppTheme.themeColor : Colors.grey[500],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAccountCompactActions(
+      BuildContext context, bool isUrdu, String fontFamily) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          // لاگ آؤٹ بٹن
+          Expanded(
+            child: InkWell(
+              onTap: () => _showLogoutDialog(context, isUrdu, fontFamily),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: Colors.blue.withOpacity(0.6), width: 1.5),
                 ),
-            ],
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(PhosphorIcons.signOut(),
+                        color: Colors.blue.shade900, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      isUrdu ? 'لاگ آؤٹ' : 'Logout',
+                      style: TextStyle(
+                        color: Colors.blue.shade900,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: fontFamily,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        );
-      },
+          const SizedBox(width: 12),
+          // اکاؤنٹ ختم کریں بٹن
+          Expanded(
+            child: InkWell(
+              onTap: () => _showDeactivateDialog(context, isUrdu, fontFamily),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: Colors.red.withOpacity(0.6), width: 1.5),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(PhosphorIcons.userMinus(),
+                        color: Colors.red.shade900, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      isUrdu ? 'اکاؤنٹ ڈیلیٹ' : 'Delete Account',
+                      style: TextStyle(
+                        color: Colors.red.shade900,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: fontFamily,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -549,25 +505,27 @@ class _AppDrawerState extends State<AppDrawer> {
         margin: const EdgeInsets.fromLTRB(16, 16, 16, 16),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withOpacity(0.25),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withOpacity(0.8), width: 2.0),
         ),
         child: Row(
           children: [
-            Icon(PhosphorIcons.plusCircle(), color: color, size: 20),
+            Icon(PhosphorIcons.plusCircle(PhosphorIconsStyle.fill),
+                color: AppTheme.darkColor, size: 22),
             const SizedBox(width: 10),
             Text(
-              isUrdu ? 'کوئی کام کروانا ہے؟ لکھ کر پوسٹ کریں' : 'Need work done? Write & Post',
+              isUrdu
+                  ? 'کوئی کام کروانا ہے؟ لکھ کر پوسٹ کریں'
+                  : 'Need work done? Write & Post',
               style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.bold,
+                  color: AppTheme.darkColor,
+                  fontWeight: FontWeight.w900,
                   fontFamily: fontFamily,
-                  fontSize: 11),
+                  fontSize: 12),
             ),
             const Spacer(),
-            Icon(Icons.arrow_forward_ios,
-                size: 12, color: color.withOpacity(0.5)),
+            Icon(Icons.arrow_forward_ios, size: 14, color: AppTheme.darkColor),
           ],
         ),
       ),
@@ -678,10 +636,14 @@ class _AppDrawerState extends State<AppDrawer> {
                     Provider.of<PdfService>(context, listen: false);
                 final databaseService =
                     Provider.of<DatabaseService>(context, listen: false);
-                await pdfService.generateAllAccountsReport(
-                    databaseService.accounts,
-                    databaseService.transactions,
-                    isUrdu);
+                try {
+                  await pdfService.generateAllAccountsReport(
+                      databaseService.accounts,
+                      databaseService.transactions,
+                      isUrdu);
+                } catch (e) {
+                  _showSnackBar(context, 'Error: $e', isUrdu, isError: true);
+                }
               },
               icon: PhosphorIcons.filePdf(),
               isFullWidth: true,
@@ -699,8 +661,12 @@ class _AppDrawerState extends State<AppDrawer> {
                     Provider.of<ExcelService>(context, listen: false);
                 final databaseService =
                     Provider.of<DatabaseService>(context, listen: false);
-                await excelService.generateAndShareAllAccountsCsv(
-                    databaseService.accounts, isUrdu);
+                try {
+                  await excelService.generateAndShareAllAccountsCsv(
+                      databaseService.accounts, isUrdu);
+                } catch (e) {
+                  _showSnackBar(context, 'Error: $e', isUrdu, isError: true);
+                }
               },
               icon: PhosphorIcons.fileCsv(),
               isFullWidth: true,
@@ -725,10 +691,16 @@ class _AppDrawerState extends State<AppDrawer> {
               text: isUrdu ? 'بیک اپ بنائیں' : 'Create Backup',
               onPressed: () async {
                 Navigator.pop(dialogContext);
-                await Provider.of<BackupService>(context, listen: false)
-                    .createBackup();
-                _showSnackBar(context,
-                    isUrdu ? 'بیک اپ مکمل ہو گیا' : 'Backup completed', isUrdu);
+                try {
+                  await Provider.of<BackupService>(context, listen: false)
+                      .createBackup();
+                  _showSnackBar(
+                      context,
+                      isUrdu ? 'بیک اپ مکمل ہو گیا' : 'Backup completed',
+                      isUrdu);
+                } catch (e) {
+                  _showSnackBar(context, 'Error: $e', isUrdu, isError: true);
+                }
               },
               icon: PhosphorIcons.cloudArrowUp(),
               isFullWidth: true,
@@ -738,10 +710,14 @@ class _AppDrawerState extends State<AppDrawer> {
               text: isUrdu ? 'بیک اپ بحال کریں' : 'Restore Backup',
               onPressed: () async {
                 Navigator.pop(dialogContext);
-                await Provider.of<BackupService>(context, listen: false)
-                    .restoreBackup();
-                _showSnackBar(context,
-                    isUrdu ? 'ڈیٹا بحال ہو گیا' : 'Data restored', isUrdu);
+                try {
+                  await Provider.of<BackupService>(context, listen: false)
+                      .restoreBackup();
+                  _showSnackBar(context,
+                      isUrdu ? 'ڈیٹا بحال ہو گیا' : 'Data restored', isUrdu);
+                } catch (e) {
+                  _showSnackBar(context, 'Error: $e', isUrdu, isError: true);
+                }
               },
               icon: PhosphorIcons.cloudArrowDown(),
               isFullWidth: true,
@@ -871,8 +847,8 @@ class _AppDrawerState extends State<AppDrawer> {
         content: SingleChildScrollView(
           child: Text(
             isUrdu
-                ? 'ہم آپ کے ڈیٹا کی رازداری کا مکمل احترام کرتے ہیں۔\n\n1. ڈیٹا کی حفاظت: آپ کے کھاتوں اور لین دین کا تمام ریکارڈ کلاؤڈ پر محفوظ اور خفیہ رکھا جاتا ہے۔\n2. کاروباری رابطہ: آپ کا فون نمبر صرف ان لوگوں کو نظر آئے گا جن کے ساتھ آپ خود رابطہ کریں گے یا چیٹ شروع کریں گے۔\n3. خودکار بیک اپ: آپ کا ڈیٹا ہر وقت محفوظ ہے تاکہ موبائل تبدیل کرنے کی صورت میں بھی ریکارڈ ضائع نہ ہو۔'
-                : 'We respect your data privacy.\n\n1. Data Security: All your account records and transactions are stored securely and encrypted on the cloud.\n2. Business Contact: Your phone number is only visible to those you choose to contact or start a chat with.\n3. Auto Backup: Your data is always backed up so you never lose your records even if you change your phone.',
+                ? 'ہم آپ کی رازداری کا احترام کرتے ہیں۔\n\n1. اکاؤنٹ: لاگ اِن کے لیے فون نمبر اور SMS OTP استعمال ہوتا ہے۔\n2. کاروباری ریکارڈ: آپ کے کھاتے، لین دین، پروفائل اور ایپ کا ڈیٹا آپ کے اکاؤنٹ کے ساتھ کلاؤڈ میں محفوظ ہوتا ہے تاکہ آپ اپنے ریکارڈ بحال کر سکیں۔\n3. مقامی حفاظت: ایپ PIN اور متعلقہ حساس معلومات کو ڈیوائس پر محفوظ طریقے سے رکھنے کی کوشش کرتی ہے۔\n4. شیئرنگ: آپ کا ڈیٹا فروخت نہیں کیا جاتا۔ رابطہ یا چیٹ کی معلومات صرف ایپ کے متعلقہ کاروباری فیچرز میں استعمال ہوتی ہیں۔\n5. بیک اپ: کلاؤڈ سنک سہولت ہے، مگر اہم ریکارڈ کا اپنا بیک اپ بھی رکھیں۔'
+                : 'We respect your privacy.\n\n1. Account: Phone number and SMS OTP are used to sign in.\n2. Business records: Your accounts, transactions, profile, and app data are stored in the cloud with your account so your records can be restored.\n3. Local security: App Lock, PIN, and related sensitive information are stored on the device using secure storage where available.\n4. Sharing: We do not sell your data. Contact and chat details are used only by the related business features.\n5. Backups: Cloud sync is provided for convenience, but keep your own backup of important records.',
             style:
                 TextStyle(fontFamily: isUrdu ? fontFamily : '', fontSize: 14),
           ),
@@ -890,20 +866,6 @@ class _AppDrawerState extends State<AppDrawer> {
     Share.share(isUrdu
         ? 'کاروباری ساتھی ایپ ڈاؤن لوڈ کریں!'
         : 'Download Karobari Saathi app now!');
-  }
-
-  void _contactUs(BuildContext context, bool isUrdu) async {
-    final Uri emailUri = Uri(
-      scheme: 'mailto',
-      path: 'karobarisaathi@gmail.com',
-      query: 'subject=Support Request&body=Hello Support Team,',
-    );
-    if (await canLaunchUrl(emailUri)) {
-      await launchUrl(emailUri);
-    } else {
-      _showSnackBar(context, 'Could not launch email app', isUrdu,
-          isError: true);
-    }
   }
 
   void _showLogoutDialog(BuildContext context, bool isUrdu, String fontFamily) {

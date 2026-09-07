@@ -643,7 +643,7 @@ class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
                       itemCount: _filteredContacts.length,
                       itemBuilder: (context, index) {
                         Contact contact = _filteredContacts[index];
-                        String phone = contact.phones.first.number;
+                        String phone = contact.phones.isNotEmpty ? contact.phones.first.number : (widget.isUrdu ? 'نمبر موجود نہیں' : 'No number');
                         return Container(
                           margin: const EdgeInsets.only(bottom: 8),
                           decoration: BoxDecoration(

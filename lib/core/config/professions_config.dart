@@ -5,6 +5,7 @@ import 'package:account_app/core/models/profession_model.dart';
 class MasterProfession {
   final String id;
   final String name;
+  final String nameUrdu;
   final IconData icon;
   final String categoryName;
   final String categoryUrdu;
@@ -14,6 +15,7 @@ class MasterProfession {
   const MasterProfession({
     required this.id,
     required this.name,
+    required this.nameUrdu,
     required this.icon,
     required this.categoryName,
     required this.categoryUrdu,
@@ -27,7 +29,8 @@ class ProfessionsConfig {
     // --- تعمیرات اور ہارڈویئر (Construction & Hardware) ---
     MasterProfession(
       id: 'mason',
-      name: 'راج / مستری',
+      name: 'Mason / Mistri',
+      nameUrdu: 'راج / مستری',
       icon: PhosphorIcons.wall(),
       categoryName: 'Construction & Hardware',
       categoryUrdu: 'تعمیرات اور ہارڈویئر',
@@ -36,7 +39,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'plumber',
-      name: 'پلمبر',
+      name: 'Plumber',
+      nameUrdu: 'پلمبر',
       icon: PhosphorIcons.wrench(),
       categoryName: 'Construction & Hardware',
       categoryUrdu: 'تعمیرات اور ہارڈویئر',
@@ -44,7 +48,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'electrician',
-      name: 'الیکٹریشن',
+      name: 'Electrician',
+      nameUrdu: 'الیکٹریشن',
       icon: PhosphorIcons.lightning(),
       categoryName: 'Construction & Hardware',
       categoryUrdu: 'تعمیرات اور ہارڈویئر',
@@ -52,7 +57,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'carpenter',
-      name: 'ترکھان (لکڑی کا کام)',
+      name: 'Carpenter',
+      nameUrdu: 'ترکھان (لکڑی کا کام)',
       icon: PhosphorIcons.hammer(),
       categoryName: 'Construction & Hardware',
       categoryUrdu: 'تعمیرات اور ہارڈویئر',
@@ -60,7 +66,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'painter',
-      name: 'پینٹر',
+      name: 'Painter',
+      nameUrdu: 'پینٹر',
       icon: PhosphorIcons.paintBrushBroad(),
       categoryName: 'Construction & Hardware',
       categoryUrdu: 'تعمیرات اور ہارڈویئر',
@@ -68,7 +75,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'welder',
-      name: 'ویلڈر',
+      name: 'Welder',
+      nameUrdu: 'ویلڈر',
       icon: PhosphorIcons.fire(),
       categoryName: 'Construction & Hardware',
       categoryUrdu: 'تعمیرات اور ہارڈویئر',
@@ -76,7 +84,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'tile_fixer',
-      name: 'ٹائل فکسر',
+      name: 'Tile Fixer',
+      nameUrdu: 'ٹائل فکسر',
       icon: PhosphorIcons.gridFour(),
       categoryName: 'Construction & Hardware',
       categoryUrdu: 'تعمیرات اور ہارڈویئر',
@@ -84,7 +93,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'plaster',
-      name: 'پلاسٹر ماہر',
+      name: 'Plasterer',
+      nameUrdu: 'پلاسٹر ماہر',
       icon: PhosphorIcons.paintRoller(),
       categoryName: 'Construction & Hardware',
       categoryUrdu: 'تعمیرات اور ہارڈویئر',
@@ -92,7 +102,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'steel_fixer',
-      name: 'سٹیل فکسر',
+      name: 'Steel Fixer',
+      nameUrdu: 'سٹیل فکسر',
       icon: PhosphorIcons.stairs(),
       categoryName: 'Construction & Hardware',
       categoryUrdu: 'تعمیرات اور ہارڈویئر',
@@ -100,7 +111,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'aluminum_worker',
-      name: 'ایلومینیم کا کام',
+      name: 'Aluminum Worker',
+      nameUrdu: 'ایلومینیم کا کام',
       icon: PhosphorIcons.frameCorners(),
       categoryName: 'Construction & Hardware',
       categoryUrdu: 'تعمیرات اور ہارڈویئر',
@@ -108,7 +120,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'glass_worker',
-      name: 'شیشے کا کام',
+      name: 'Glass Worker',
+      nameUrdu: 'شیشے کا کام',
       icon: PhosphorIcons.selectionAll(),
       categoryName: 'Construction & Hardware',
       categoryUrdu: 'تعمیرات اور ہارڈویئر',
@@ -118,7 +131,8 @@ class ProfessionsConfig {
     // --- آئی ٹی اور سافٹ ویئر (IT & Software) ---
     MasterProfession(
       id: 'software_dev',
-      name: 'سوفٹ ویئر ڈویلپر',
+      name: 'Software Developer',
+      nameUrdu: 'سوفٹ ویئر ڈویلپر',
       icon: PhosphorIcons.code(),
       categoryName: 'IT & Software',
       categoryUrdu: 'آئی ٹی اور سافٹ ویئر',
@@ -127,7 +141,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'web_designer',
-      name: 'ویب ڈیزائنر',
+      name: 'Web Designer',
+      nameUrdu: 'ویب ڈیزائنر',
       icon: PhosphorIcons.browser(),
       categoryName: 'IT & Software',
       categoryUrdu: 'آئی ٹی اور سافٹ ویئر',
@@ -135,7 +150,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'graphic_designer',
-      name: 'گرافک ڈیزائنر',
+      name: 'Graphic Designer',
+      nameUrdu: 'گرافک ڈیزائنر',
       icon: PhosphorIcons.palette(),
       categoryName: 'IT & Software',
       categoryUrdu: 'آئی ٹی اور سافٹ ویئر',
@@ -143,7 +159,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'digital_marketer',
-      name: 'ڈیجیٹل مارکیٹنگ',
+      name: 'Digital Marketer',
+      nameUrdu: 'ڈیجیٹل مارکیٹنگ',
       icon: PhosphorIcons.megaphone(),
       categoryName: 'IT & Software',
       categoryUrdu: 'آئی ٹی اور سافٹ ویئر',
@@ -151,7 +168,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'video_editor',
-      name: 'ویڈیو ایڈیٹر',
+      name: 'Video Editor',
+      nameUrdu: 'ویڈیو ایڈیٹر',
       icon: PhosphorIcons.videoCamera(),
       categoryName: 'IT & Software',
       categoryUrdu: 'آئی ٹی اور سافٹ ویئر',
@@ -159,7 +177,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'data_entry',
-      name: 'ڈیٹا اینٹری آپریٹر',
+      name: 'Data Entry Operator',
+      nameUrdu: 'ڈیٹا اینٹری آپریٹر',
       icon: PhosphorIcons.keyboard(),
       categoryName: 'IT & Software',
       categoryUrdu: 'آئی ٹی اور سافٹ ویئر',
@@ -167,7 +186,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'seo_expert',
-      name: 'SEO ایکسپرٹ',
+      name: 'SEO Expert',
+      nameUrdu: 'SEO ایکسپرٹ',
       icon: PhosphorIcons.magnifyingGlassPlus(),
       categoryName: 'IT & Software',
       categoryUrdu: 'آئی ٹی اور سافٹ ویئر',
@@ -175,7 +195,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'mobile_app_developer',
-      name: 'موبائل ایپ ڈویلپر',
+      name: 'Mobile App Developer',
+      nameUrdu: 'موبائل ایپ ڈویلپر',
       icon: PhosphorIcons.deviceMobile(),
       categoryName: 'IT & Software',
       categoryUrdu: 'آئی ٹی اور سافٹ ویئر',
@@ -185,7 +206,8 @@ class ProfessionsConfig {
     // --- مرمت اور مکینک (Repair & Mechanics) ---
     MasterProfession(
       id: 'mobile_repair',
-      name: 'موبائل ریپیئرنگ',
+      name: 'Mobile Repairing',
+      nameUrdu: 'موبائل ریپیئرنگ',
       icon: PhosphorIcons.deviceMobile(),
       categoryName: 'Repair & Mechanics',
       categoryUrdu: 'مرمت اور مکینک',
@@ -193,7 +215,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'laptop_repair',
-      name: 'کمپیوٹر / لیپ ٹاپ ریپیئر',
+      name: 'Computer / Laptop Repair',
+      nameUrdu: 'کمپیوٹر / لیپ ٹاپ ریپیئر',
       icon: PhosphorIcons.laptop(),
       categoryName: 'Repair & Mechanics',
       categoryUrdu: 'مرمت اور مکینک',
@@ -201,7 +224,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'ac_technician',
-      name: 'AC ٹیکنیشن',
+      name: 'AC Technician',
+      nameUrdu: 'AC ٹیکنیشن',
       icon: PhosphorIcons.snowflake(),
       categoryName: 'Repair & Mechanics',
       categoryUrdu: 'مرمت اور مکینک',
@@ -209,7 +233,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'solar_installer',
-      name: 'سولر انسٹالر',
+      name: 'Solar Installer',
+      nameUrdu: 'سولر انسٹالر',
       icon: PhosphorIcons.sun(),
       categoryName: 'Repair & Mechanics',
       categoryUrdu: 'مرمت اور مکینک',
@@ -217,7 +242,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'mechanic',
-      name: 'گاڑیوں کا مکینک',
+      name: 'Car Mechanic',
+      nameUrdu: 'گاڑیوں کا مکینک',
       icon: PhosphorIcons.engine(),
       categoryName: 'Repair & Mechanics',
       categoryUrdu: 'مرمت اور مکینک',
@@ -225,7 +251,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'bike_mechanic',
-      name: 'بائیک مکینک',
+      name: 'Bike Mechanic',
+      nameUrdu: 'بائیک مکینک',
       icon: PhosphorIcons.bicycle(),
       categoryName: 'Repair & Mechanics',
       categoryUrdu: 'مرمت اور مکینک',
@@ -233,7 +260,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'cctv_installer',
-      name: 'کیمرہ انسٹالر (CCTV)',
+      name: 'CCTV Installer',
+      nameUrdu: 'کیمرہ انسٹالر (CCTV)',
       icon: PhosphorIcons.cameraPlus(),
       categoryName: 'Repair & Mechanics',
       categoryUrdu: 'مرمت اور مکینک',
@@ -243,7 +271,8 @@ class ProfessionsConfig {
     // --- زراعت اور مویشی (Agriculture & Livestock) ---
     MasterProfession(
       id: 'agri_expert',
-      name: 'ماہرِ زراعت',
+      name: 'Agriculture Expert',
+      nameUrdu: 'ماہرِ زراعت',
       icon: PhosphorIcons.plant(),
       categoryName: 'Agriculture & Livestock',
       categoryUrdu: 'زراعت اور مویشی',
@@ -252,7 +281,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'gardener',
-      name: 'مالی',
+      name: 'Gardener',
+      nameUrdu: 'مالی',
       icon: PhosphorIcons.leaf(),
       categoryName: 'Agriculture & Livestock',
       categoryUrdu: 'زراعت اور مویشی',
@@ -260,7 +290,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'livestock_expert',
-      name: 'مویشی پال ماہر',
+      name: 'Livestock Expert',
+      nameUrdu: 'مویشی پال ماہر',
       icon: PhosphorIcons.cow(),
       categoryName: 'Agriculture & Livestock',
       categoryUrdu: 'زراعت اور مویشی',
@@ -268,7 +299,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'tractor_driver',
-      name: 'ٹریکٹر ڈرائیور',
+      name: 'Tractor Driver',
+      nameUrdu: 'ٹریکٹر ڈرائیور',
       icon: PhosphorIcons.truck(),
       categoryName: 'Agriculture & Livestock',
       categoryUrdu: 'زراعت اور مویشی',
@@ -276,7 +308,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'poultry_expert',
-      name: 'پولٹری فارم ماہر',
+      name: 'Poultry Farm Expert',
+      nameUrdu: 'پولٹری فارم ماہر',
       icon: PhosphorIcons.bird(),
       categoryName: 'Agriculture & Livestock',
       categoryUrdu: 'زراعت اور مویشی',
@@ -286,7 +319,8 @@ class ProfessionsConfig {
     // --- بیوٹی اور صحت (Beauty & Wellness) ---
     MasterProfession(
       id: 'barber',
-      name: 'حجام / نائی',
+      name: 'Barber / Hair Stylist',
+      nameUrdu: 'حجام / نائی',
       icon: PhosphorIcons.scissors(),
       categoryName: 'Beauty & Wellness',
       categoryUrdu: 'بیوٹی اور صحت',
@@ -294,7 +328,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'beautician',
-      name: 'بیوٹیشن (میک اپ)',
+      name: 'Beautician',
+      nameUrdu: 'بیوٹیشن (میک اپ)',
       icon: PhosphorIcons.sparkle(),
       categoryName: 'Beauty & Wellness',
       categoryUrdu: 'بیوٹی اور صحت',
@@ -302,7 +337,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'gym_trainer',
-      name: 'جم ٹرینر',
+      name: 'Gym Trainer',
+      nameUrdu: 'جم ٹرینر',
       icon: PhosphorIcons.barbell(),
       categoryName: 'Beauty & Wellness',
       categoryUrdu: 'بیوٹی اور صحت',
@@ -310,7 +346,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'physiotherapist',
-      name: 'فزیو تھراپسٹ',
+      name: 'Physiotherapist',
+      nameUrdu: 'فزیو تھراپسٹ',
       icon: PhosphorIcons.handHeart(),
       categoryName: 'Beauty & Wellness',
       categoryUrdu: 'بیوٹی اور صحت',
@@ -318,7 +355,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'home_nurse',
-      name: 'ہوم نرس',
+      name: 'Home Nurse',
+      nameUrdu: 'ہوم نرس',
       icon: PhosphorIcons.firstAidKit(),
       categoryName: 'Beauty & Wellness',
       categoryUrdu: 'بیوٹی اور صحت',
@@ -328,7 +366,8 @@ class ProfessionsConfig {
     // --- کھانا اور پکوان (Food & Hospitality) ---
     MasterProfession(
       id: 'cook',
-      name: 'باورچی / شیف',
+      name: 'Cook / Chef',
+      nameUrdu: 'باورچی / شیف',
       icon: PhosphorIcons.cookingPot(),
       categoryName: 'Food & Hospitality',
       categoryUrdu: 'کھانا اور پکوان',
@@ -336,7 +375,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'baker',
-      name: 'بیکر / کیک ماہر',
+      name: 'Baker / Cake Artist',
+      nameUrdu: 'بیکر / کیک ماہر',
       icon: PhosphorIcons.cake(),
       categoryName: 'Food & Hospitality',
       categoryUrdu: 'کھانا اور پکوان',
@@ -344,7 +384,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'catering_service',
-      name: 'کیٹرنگ سروس',
+      name: 'Catering Service',
+      nameUrdu: 'کیٹرنگ سروس',
       icon: PhosphorIcons.forkKnife(),
       categoryName: 'Food & Hospitality',
       categoryUrdu: 'کھانا اور پکوان',
@@ -354,7 +395,8 @@ class ProfessionsConfig {
     // --- ٹرانسپورٹ (Transport & Logistics) ---
     MasterProfession(
       id: 'driver',
-      name: 'کار ڈرائیور',
+      name: 'Car Driver',
+      nameUrdu: 'کار ڈرائیور',
       icon: PhosphorIcons.car(),
       categoryName: 'Transport & Logistics',
       categoryUrdu: 'ٹرانسپورٹ اور لاجسٹکس',
@@ -363,7 +405,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'heavy_driver',
-      name: 'ہیوی ڈرائیور (ٹرک/بس)',
+      name: 'Heavy Driver (Truck/Bus)',
+      nameUrdu: 'ہیوی ڈرائیور (ٹرک/بس)',
       icon: PhosphorIcons.truck(),
       categoryName: 'Transport & Logistics',
       categoryUrdu: 'ٹرانسپورٹ اور لاجسٹکس',
@@ -372,7 +415,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'delivery_boy',
-      name: 'ڈیلیوری بائے',
+      name: 'Delivery Boy',
+      nameUrdu: 'ڈیلیوری بائے',
       icon: PhosphorIcons.moped(),
       categoryName: 'Transport & Logistics',
       categoryUrdu: 'ٹرانسپورٹ اور لاجسٹکس',
@@ -382,7 +426,8 @@ class ProfessionsConfig {
     // --- تعلیم اور فنون (Education & Arts) ---
     MasterProfession(
       id: 'teacher',
-      name: 'ٹیچر / ٹیوٹر',
+      name: 'Teacher / Tutor',
+      nameUrdu: 'ٹیچر / ٹیوٹر',
       icon: PhosphorIcons.bookOpen(),
       categoryName: 'Education & Arts',
       categoryUrdu: 'تعلیم اور فنون',
@@ -390,7 +435,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'quran_teacher',
-      name: 'قاری صاحب / ٹیچر',
+      name: 'Quran Teacher',
+      nameUrdu: 'قاری صاحب / ٹیچر',
       icon: PhosphorIcons.mosque(),
       categoryName: 'Education & Arts',
       categoryUrdu: 'تعلیم اور فنون',
@@ -398,7 +444,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'photographer',
-      name: 'فوٹوگرافر',
+      name: 'Photographer',
+      nameUrdu: 'فوٹوگرافر',
       icon: PhosphorIcons.camera(),
       categoryName: 'Education & Arts',
       categoryUrdu: 'تعلیم اور فنون',
@@ -406,7 +453,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'calligrapher',
-      name: 'خوش نویس (خطاط)',
+      name: 'Calligrapher',
+      nameUrdu: 'خوش نویس (خطاط)',
       icon: PhosphorIcons.pencilCircle(),
       categoryName: 'Education & Arts',
       categoryUrdu: 'تعلیم اور فنون',
@@ -416,7 +464,8 @@ class ProfessionsConfig {
     // --- دیگر خدمات (Other Services) ---
     MasterProfession(
       id: 'lawyer',
-      name: 'وکیل',
+      name: 'Lawyer',
+      nameUrdu: 'وکیل',
       icon: PhosphorIcons.scales(),
       categoryName: 'Other Services',
       categoryUrdu: 'دیگر خدمات',
@@ -424,7 +473,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'accountant',
-      name: 'اکاؤنٹنٹ',
+      name: 'Accountant',
+      nameUrdu: 'اکاؤنٹنٹ',
       icon: PhosphorIcons.calculator(),
       categoryName: 'Other Services',
       categoryUrdu: 'دیگر خدمات',
@@ -432,7 +482,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'security',
-      name: 'سیکیورٹی گارڈ',
+      name: 'Security Guard',
+      nameUrdu: 'سیکیورٹی گارڈ',
       icon: PhosphorIcons.shieldCheck(),
       categoryName: 'Other Services',
       categoryUrdu: 'دیگر خدمات',
@@ -440,7 +491,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'cleaner',
-      name: 'صفائی کارکن',
+      name: 'Cleaner',
+      nameUrdu: 'صفائی کارکن',
       icon: PhosphorIcons.broom(),
       categoryName: 'Other Services',
       categoryUrdu: 'دیگر خدمات',
@@ -448,7 +500,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'translator',
-      name: 'مترجم',
+      name: 'Translator',
+      nameUrdu: 'مترجم',
       icon: PhosphorIcons.translate(),
       categoryName: 'Other Services',
       categoryUrdu: 'دیگر خدمات',
@@ -456,7 +509,8 @@ class ProfessionsConfig {
     ),
     MasterProfession(
       id: 'travel_agent',
-      name: 'ٹریول ایجنٹ',
+      name: 'Travel Agent',
+      nameUrdu: 'ٹریول ایجنٹ',
       icon: PhosphorIcons.airplane(),
       categoryName: 'Other Services',
       categoryUrdu: 'دیگر خدمات',

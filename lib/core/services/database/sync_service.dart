@@ -34,9 +34,11 @@ class SyncService extends BaseService {
         final data = doc.data()!;
         final isVerified = data['isVerified'] == true;
         try {
-          final myAccount = accountsBox?.values.firstWhere((a) => a.phone == user.phoneNumber);
+          final myAccount = accountsBox?.values
+              .firstWhere((a) => a.phone == user.phoneNumber);
           if (myAccount != null && myAccount.isVerified != isVerified) {
-            await accountsBox?.put(myAccount.id, myAccount.copyWith(isVerified: isVerified));
+            await accountsBox?.put(
+                myAccount.id, myAccount.copyWith(isVerified: isVerified));
             notifyListeners();
           }
         } catch (_) {}
@@ -47,20 +49,27 @@ class SyncService extends BaseService {
       for (var c in snap.docChanges) {
         if (c.doc.data() == null) continue;
         final a = Account.fromMap(c.doc.data()!);
-        if (c.type == DocumentChangeType.removed) accountsBox?.delete(a.id);
-        else accountsBox?.put(a.id, a);
+        if (c.type == DocumentChangeType.removed)
+          accountsBox?.delete(a.id);
+        else
+          accountsBox?.put(a.id, a);
       }
       notifyListeners();
     });
 
-    _txSub = userDoc.collection('transactions').snapshots().listen((snap) async {
+    _txSub =
+        userDoc.collection('transactions').snapshots().listen((snap) async {
       for (var c in snap.docChanges) {
         if (c.doc.data() == null) continue;
         final t = model.Transaction.fromMap(c.doc.data()!);
-        if (c.type == DocumentChangeType.removed) await transactionsBox?.delete(t.id);
-        else await transactionsBox?.put(t.id, t);
+        if (c.type == DocumentChangeType.removed)
+          await transactionsBox?.delete(t.id);
+        else
+          await transactionsBox?.put(t.id, t);
         await _accountService.recalculateAccountBalance(t.accountId);
-        if (t.professionId != null) await _professionService.recalculateProfessionFinance(t.professionId!);
+        if (t.professionId != null)
+          await _professionService
+              .recalculateProfessionFinance(t.professionId!);
       }
       notifyListeners();
     });
@@ -69,20 +78,22 @@ class SyncService extends BaseService {
       for (var c in snap.docChanges) {
         if (c.doc.data() == null) continue;
         final cat = Category.fromMap(c.doc.data()!);
-        if (c.type == DocumentChangeType.removed) categoriesBox?.delete(cat.id);
-        else categoriesBox?.put(cat.id, cat);
+        if (c.type == DocumentChangeType.removed)
+          categoriesBox?.delete(cat.id);
+        else
+          categoriesBox?.put(cat.id, cat);
       }
       notifyListeners();
     });
 
     _proSub = userDoc.collection('professions').snapshots().listen((snap) {
       for (var c in snap.docChanges) {
-        if (c.doc.data() == null) continue;
-        final p = Profession.fromMap(c.doc.data()!);
-        if (c.type == DocumentChangeType.removed)
-          professionsBox?.delete(p.id);
-        else
+        if (c.type == DocumentChangeType.removed) {
+          professionsBox?.delete(c.doc.id);
+        } else if (c.doc.data() != null) {
+          final p = Profession.fromMap(c.doc.data()!);
           professionsBox?.put(p.id, p);
+        }
       }
       notifyListeners();
     });
@@ -117,7 +128,7 @@ class SyncService extends BaseService {
   Future<void> syncWithFirebase() async {
     final user = auth.currentUser;
     if (user == null) return;
-    
+
     final batch = firestore.batch();
     final userDoc = firestore.collection('users').doc(user.uid);
 
@@ -126,13 +137,16 @@ class SyncService extends BaseService {
     if (uDoc.exists) isVerified = uDoc.data()?['isVerified'] == true;
 
     if (accountsBox != null) {
-      for (var a in accountsBox!.values) batch.set(userDoc.collection('accounts').doc(a.id), a.toMap());
+      for (var a in accountsBox!.values)
+        batch.set(userDoc.collection('accounts').doc(a.id), a.toMap());
     }
     if (transactionsBox != null) {
-      for (var t in transactionsBox!.values) batch.set(userDoc.collection('transactions').doc(t.id), t.toMap());
+      for (var t in transactionsBox!.values)
+        batch.set(userDoc.collection('transactions').doc(t.id), t.toMap());
     }
     if (professionsBox != null) {
-      for (var p in professionsBox!.values) batch.set(userDoc.collection('professions').doc(p.id), p.toMap());
+      for (var p in professionsBox!.values)
+        batch.set(userDoc.collection('professions').doc(p.id), p.toMap());
     }
     if (categoriesBox != null) {
       for (var c in categoriesBox!.values)

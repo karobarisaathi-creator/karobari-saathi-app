@@ -34,7 +34,6 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = false;
   bool _isAscending = true;
-  bool _isSearchVisible = false; // سرچ بار کو کنٹرول کرنے کے لیے
   String _searchQuery = "";
   Map<String, dynamic>? _updateData;
   StreamSubscription<ArtisanProfile?>? _artisanSub;
@@ -79,28 +78,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  Future<void> _toggleAvailability() async {
-    if (_myArtisanProfile == null) return;
-
-    final dbService = Provider.of<DatabaseService>(context, listen: false);
-    final newStatus = _myArtisanProfile!.availability == 'available' ? 'busy' : 'available';
-    
-    final updatedProfile = _myArtisanProfile!.copyWith(
-      availability: newStatus,
-      updatedAt: DateTime.now(),
-    );
-
-    try {
-      await dbService.saveArtisanProfile(updatedProfile);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
-      }
-    }
-  }
-
   void _checkVersion() async {
     final data = await VersionCheckService().getUpdateData();
     if (mounted) {
@@ -120,7 +97,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final languageService = Provider.of<LanguageService>(context);
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-    final user = FirebaseAuth.instance.currentUser;
     final dbService = Provider.of<DatabaseService>(context);
     
     return Scaffold(
@@ -154,8 +130,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             },
             tooltip: isUrdu ? 'پارٹی شامل کریں' : 'Add Party',
           ),
-          if (_myArtisanProfile != null)
-            _buildAvailabilityToggle(isUrdu, fontFamily),
           const SizedBox(width: 8),
         ],
       ),
@@ -186,8 +160,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           double profIncome = 0;
           double profExpense = 0;
           for (var p in activeProfessions) {
-            profIncome += p.totalIncome;
-            profExpense += p.totalExpense;
+            // صرف وہی ریکارڈز لیں جو 'ماسٹر' نہیں ہیں (یعنی اصل سیزنز ہیں) اور جاری ہیں
+            if (!(p.isMaster ?? false)) {
+              profIncome += p.totalIncome;
+              profExpense += p.totalExpense;
+            }
           }
           double profProfit = profIncome - profExpense;
 
@@ -238,6 +215,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ? (netBalance >= 0 ? 'باقی دینے' : 'باقی لینے')
         : (netBalance >= 0 ? 'Net Payable' : 'Net Receivable');
 
+    // Profession Net Stats Logic
+    String profNetLabel = isUrdu ? "میزان" : "Net";
+
+    if (profProfit > 0) {
+      profNetLabel = isUrdu ? "بچت" : "Profit";
+    } else if (profProfit < 0) {
+      profNetLabel = isUrdu ? "خسارہ" : "Loss";
+    }
+
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 60,
@@ -254,11 +240,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Party Stats
           Row(
             children: [
-              _buildHeaderStatItem(isUrdu ? 'لینے ہیں' : 'To Receive', receivable, AppTheme.incomeColor, fontFamily, PhosphorIcons.arrowDownLeft()),
+              _buildHeaderStatItem(isUrdu ? 'لینے ہیں' : 'To Receive', receivable, Colors.white70, fontFamily, PhosphorIcons.arrowDownLeft()),
               _buildStatDivider(),
-              _buildHeaderStatItem(isUrdu ? 'دینے ہیں' : 'To Pay', payable, AppTheme.expenseColor, fontFamily, PhosphorIcons.arrowUpRight()),
+              _buildHeaderStatItem(isUrdu ? 'دینے ہیں' : 'To Pay', payable, Colors.white70, fontFamily, PhosphorIcons.arrowUpRight()),
               _buildStatDivider(),
-              _buildHeaderStatItem(balanceLabel, netBalance.abs(), Colors.white, fontFamily, PhosphorIcons.wallet(), isBold: true),
+              _buildHeaderStatItem(balanceLabel, netBalance.abs(), Colors.white70, fontFamily, PhosphorIcons.wallet(), isBold: true),
             ],
           ),
           if (showProfessions) ...[
@@ -269,11 +255,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // Profession Stats
             Row(
               children: [
-                _buildHeaderStatItem(isUrdu ? 'پیشہ آمدن' : 'Prof. Income', profIncome, AppTheme.incomeColor, fontFamily, PhosphorIcons.arrowDownLeft()),
+                _buildHeaderStatItem(isUrdu ? 'آمدنی' : 'Income', profIncome, Colors.white70, fontFamily, PhosphorIcons.arrowDownLeft()),
                 _buildStatDivider(),
-                _buildHeaderStatItem(isUrdu ? 'پیشہ خرچ' : 'Prof. Expense', profExpense, AppTheme.expenseColor, fontFamily, PhosphorIcons.arrowUpRight()),
+                _buildHeaderStatItem(isUrdu ? 'خرچ' : 'Expense', profExpense, Colors.white70, fontFamily, PhosphorIcons.arrowUpRight()),
                 _buildStatDivider(),
-                _buildHeaderStatItem(isUrdu ? 'پیشہ منافع' : 'Prof. Profit', profProfit.abs(), Colors.white, fontFamily, PhosphorIcons.trendUp(), isBold: true),
+                _buildHeaderStatItem(profNetLabel, profProfit.abs(), Colors.white70, fontFamily, PhosphorIcons.trendUp(), isBold: true),
               ],
             ),
           ],
@@ -323,56 +309,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Container(height: 20, width: 1, color: Colors.white12);
   }
 
-  Widget _buildAvailabilityToggle(bool isUrdu, String fontFamily) {
-    final isAvailable = _myArtisanProfile?.availability == 'available';
-    final color = isAvailable ? Colors.greenAccent : AppTheme.expenseColor;
-    final label = isAvailable 
-        ? (isUrdu ? 'دستیاب' : 'Available') 
-        : (isUrdu ? 'مصروف' : 'Busy');
-
-    return Center(
-      child: InkWell(
-        onTap: _toggleAvailability,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          margin: const EdgeInsets.only(right: 4),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: color.withOpacity(0.5)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(color: color.withOpacity(0.5), blurRadius: 4, spreadRadius: 1),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: fontFamily,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildPartyList(List<Account> parties, DatabaseService databaseService, bool isUrdu, String fontFamily) {
     final filteredParties = parties.where((p) {
       return p.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
@@ -387,7 +323,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final List<Widget> headers = [];
     headers.add(
       Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
         child: SearchSortBar(
           hintText: isUrdu ? 'پارٹی تلاش کریں...' : 'Search Party...',
           onSearchChanged: (value) => setState(() => _searchQuery = value),
@@ -420,7 +356,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(4, 0, 4, 80),
+      padding: EdgeInsets.zero,
       itemCount: headers.length + filteredParties.length + (filteredParties.isEmpty ? 1 : 0),
       itemBuilder: (context, index) {
         // Render headers first

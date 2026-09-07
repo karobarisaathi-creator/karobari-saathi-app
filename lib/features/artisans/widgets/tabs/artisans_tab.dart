@@ -373,7 +373,7 @@ class _ArtisansTabState extends State<ArtisansTab> {
 
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.zero,
       itemCount: filteredArtisans.length + (_hasMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == filteredArtisans.length) {
@@ -450,25 +450,51 @@ class _ArtisansTabState extends State<ArtisansTab> {
 
   Widget _buildShimmerLoading() {
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.only(top: 8),
       itemCount: 6,
       itemBuilder: (context, index) => SkeletonCard(
-        child: Row(
+        child: Column(
           children: [
-            const SkeletonShimmer(width: 70, height: 70, borderRadius: 12),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SkeletonShimmer(width: 120, height: 16, borderRadius: 4),
-                  const SizedBox(height: 8),
-                  const SkeletonShimmer(width: 80, height: 12, borderRadius: 4),
-                  const SizedBox(height: 8),
-                  const SkeletonShimmer(width: 150, height: 12, borderRadius: 4),
-                ],
-              ),
+            Row(
+              children: [
+                const SkeletonShimmer(width: 70, height: 70, borderRadius: 12),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const SkeletonShimmer(width: 100, height: 16, borderRadius: 4),
+                          const SkeletonShimmer(width: 60, height: 14, borderRadius: 4),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const SkeletonShimmer(width: 80, height: 12, borderRadius: 4),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const SkeletonShimmer(width: 60, height: 12, borderRadius: 4),
+                          const SizedBox(width: 8),
+                          const SkeletonShimmer(width: 40, height: 12, borderRadius: 4),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
+            const SizedBox(height: 16),
+            // Work Count Shimmer
+            Row(
+              children: [
+                const SkeletonShimmer(width: 120, height: 14, borderRadius: 4),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Description Box Shimmer
+            const SkeletonShimmer(width: double.infinity, height: 45, borderRadius: 12),
           ],
         ),
       ),

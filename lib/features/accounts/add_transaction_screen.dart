@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
-import 'package:account_app/core/services/auto_sync_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
@@ -37,10 +36,13 @@ class AddTransactionScreen extends StatefulWidget {
 }
 
 class _ItemEntry {
-  final String id = DateTime.now().microsecondsSinceEpoch.toString(); // منفرد آئی ڈی
+  final String id =
+      DateTime.now().microsecondsSinceEpoch.toString(); // منفرد آئی ڈی
   final TextEditingController descriptionController = TextEditingController();
-  final TextEditingController quantityController = TextEditingController(text: '');
-  final TextEditingController subQuantityController = TextEditingController(text: ''); // For KG or Pieces
+  final TextEditingController quantityController =
+      TextEditingController(text: '');
+  final TextEditingController subQuantityController =
+      TextEditingController(text: ''); // For KG or Pieces
   final TextEditingController rateController = TextEditingController();
   final TextEditingController totalController = TextEditingController();
   final FocusNode descriptionFocusNode = FocusNode();
@@ -58,7 +60,8 @@ class _ItemEntry {
 
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _referenceNumberController = TextEditingController();
+  final TextEditingController _referenceNumberController =
+      TextEditingController();
   final TextEditingController _dateInputController = TextEditingController();
   final List<_ItemEntry> _itemEntries = [];
   String? _selectedAccountId;
@@ -87,14 +90,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _isProfessionCentric = t.accountId == 'default_account';
 
       if (t.professionId != null) {
-        _professionSyncType = (t.category.startsWith('INC:') || t.category == 'income') ? 'income' : 'expense';
-        _selectedCategory = t.category.contains(':') ? t.category.split(':')[1] : t.category;
+        _professionSyncType =
+            (t.category.startsWith('INC:') || t.category == 'income')
+                ? 'income'
+                : 'expense';
+        _selectedCategory =
+            t.category.contains(':') ? t.category.split(':')[1] : t.category;
       }
       _referenceNumberController.text = t.referenceNumber ?? '';
       if (t.billImage != null && t.billImage!.isNotEmpty) {
         _billImages = t.billImage!.split(',').map((p) => File(p)).toList();
       }
-      
+
       if (t.items.isNotEmpty) {
         for (var item in t.items) {
           final entry = _ItemEntry();
@@ -153,12 +160,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       // Auto-insert slash after DD
       if (text.length == 2 && !text.contains('/')) {
         _dateInputController.text = '$text/';
-        _dateInputController.selection = TextSelection.fromPosition(TextPosition(offset: _dateInputController.text.length));
+        _dateInputController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _dateInputController.text.length));
       }
       // Auto-insert slash after MM
       else if (text.length == 5 && text.split('/').length == 2) {
         _dateInputController.text = '$text/';
-        _dateInputController.selection = TextSelection.fromPosition(TextPosition(offset: _dateInputController.text.length));
+        _dateInputController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _dateInputController.text.length));
       }
 
       // Update selectedDate when format is valid DD/MM/YY
@@ -168,11 +177,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           int day = int.parse(parts[0]);
           int month = int.parse(parts[1]);
           int yearPart = int.parse(parts[2]);
-          
+
           int fullYear = yearPart < 50 ? 2000 + yearPart : 1900 + yearPart;
-          
+
           DateTime newDate = DateTime(fullYear, month, day);
-          
+
           if (newDate.day == day && newDate.month == month) {
             _selectedDate = newDate;
           }
@@ -205,7 +214,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   void _setupEntryListeners(_ItemEntry entry) {
     void calculate() {
       double quantity = double.tryParse(entry.quantityController.text) ?? 0;
-      double subQuantity = double.tryParse(entry.subQuantityController.text) ?? 0;
+      double subQuantity =
+          double.tryParse(entry.subQuantityController.text) ?? 0;
       double rate = double.tryParse(entry.rateController.text) ?? 0;
 
       // Handle dual-unit logic
@@ -244,7 +254,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   }
 
   Future<void> _loadData() async {
-    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final databaseService =
+        Provider.of<DatabaseService>(context, listen: false);
     _accounts = databaseService.getAccounts();
     final masterProfessions = databaseService.getMasterProfessions();
     _professions = masterProfessions.where((p) => p.isActive ?? true).toList();
@@ -257,11 +268,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         for (var item in tx.items) {
           if (item.description.isNotEmpty) names.add(item.description);
         }
-      } else if (tx.description.isNotEmpty && tx.description != 'دیگر' && tx.description != 'Other') {
+      } else if (tx.description.isNotEmpty &&
+          tx.description != 'دیگر' &&
+          tx.description != 'Other') {
         names.add(tx.description);
       }
     }
-    
+
     if (mounted) {
       setState(() {
         _allItemNames = names.toList();
@@ -280,10 +293,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
-        title: isEditing ? (isUrdu ? 'لین دین میں ترمیم' : 'Edit Transaction') : (isUrdu ? 'نیا لین دین' : 'New Transaction'),
+        title: isEditing
+            ? (isUrdu ? 'لین دین میں ترمیم' : 'Edit Transaction')
+            : (isUrdu ? 'نیا لین دین' : 'New Transaction'),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.themeColor))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppTheme.themeColor))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -291,7 +307,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   // 1. Basic Info Card
                   _buildSectionCard(
                     children: [
-                      _buildSectionHeader(isUrdu ? 'بنیادی معلومات' : 'Basic Information', fontFamily, isUrdu, topPadding: 0),
+                      _buildSectionHeader(
+                          isUrdu ? 'بنیادی معلومات' : 'Basic Information',
+                          fontFamily,
+                          isUrdu,
+                          topPadding: 0),
                       Row(
                         children: [
                           Expanded(
@@ -306,13 +326,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: _buildEditableDateSelector(isUrdu, fontFamily, fontWeight),
+                            child: _buildEditableDateSelector(
+                                isUrdu, fontFamily, fontWeight),
                           ),
                         ],
                       ),
-                      if (widget.forcedProfession == null && _professions.isNotEmpty) ...[
+                      if (widget.forcedProfession == null &&
+                          _professions.isNotEmpty) ...[
                         const SizedBox(height: 12),
-                        _buildProfessionSelectionArea(isUrdu, fontFamily, fontWeight),
+                        _buildProfessionSelectionArea(
+                            isUrdu, fontFamily, fontWeight),
                       ],
                     ],
                   ),
@@ -321,13 +344,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   // 2. Items & Total Card
                   _buildSectionCard(
                     children: [
-                      _buildSectionHeader(isUrdu ? 'ایٹمز اور کل رقم' : 'Items & Total Amount', fontFamily, isUrdu, topPadding: 0),
+                      _buildSectionHeader(
+                          isUrdu ? 'ایٹمز اور کل رقم' : 'Items & Total Amount',
+                          fontFamily,
+                          isUrdu,
+                          topPadding: 0),
                       ListView.separated(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: _itemEntries.length,
-                        separatorBuilder: (context, index) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) => _buildItemRow(index, isUrdu, fontFamily, fontWeight),
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 12),
+                        itemBuilder: (context, index) => _buildItemRow(
+                            index, isUrdu, fontFamily, fontWeight),
                       ),
                       const SizedBox(height: 20),
                       _buildTextField(
@@ -345,10 +374,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   // 3. Attachments Card
                   _buildSectionCard(
                     children: [
-                      _buildSectionHeader(isUrdu ? 'منسلکات' : 'Attachments', fontFamily, isUrdu, topPadding: 0),
+                      _buildSectionHeader(isUrdu ? 'منسلکات' : 'Attachments',
+                          fontFamily, isUrdu,
+                          topPadding: 0),
                       ImageSelectorField(
                         selectedFiles: _billImages,
-                        onFilesChanged: (newList) => setState(() => _billImages = newList),
+                        onFilesChanged: (newList) =>
+                            setState(() => _billImages = newList),
                         maxTotal: 1,
                         isVertical: true,
                         isFullWidth: true,
@@ -364,7 +396,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       Expanded(
                         child: AppButton(
                           text: isUrdu ? 'رقم لی / جمع' : 'Received',
-                          icon: PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold),
+                          icon: PhosphorIcons.arrowUpRight(
+                              PhosphorIconsStyle.bold),
                           color: AppTheme.incomeColor,
                           variant: AppButtonVariant.primary,
                           size: AppButtonSize.large,
@@ -375,7 +408,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       Expanded(
                         child: AppButton(
                           text: isUrdu ? 'رقم دی / بنام' : 'Paid',
-                          icon: PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold),
+                          icon: PhosphorIcons.arrowDownLeft(
+                              PhosphorIconsStyle.bold),
                           color: AppTheme.expenseColor,
                           variant: AppButtonVariant.primary,
                           size: AppButtonSize.large,
@@ -390,7 +424,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-  Widget _buildItemRow(int index, bool isUrdu, String fontFamily, FontWeight fontWeight) {
+  Widget _buildItemRow(
+      int index, bool isUrdu, String fontFamily, FontWeight fontWeight) {
     final entry = _itemEntries[index];
     return Container(
       padding: const EdgeInsets.all(12),
@@ -409,68 +444,88 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   focusNode: entry.descriptionFocusNode,
                   textEditingController: entry.descriptionController,
                   optionsBuilder: (TextEditingValue textEditingValue) {
-                    if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
+                    if (textEditingValue.text.isEmpty)
+                      return const Iterable<String>.empty();
                     return _allItemNames.where((String option) {
-                      return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                      return option
+                          .toLowerCase()
+                          .contains(textEditingValue.text.toLowerCase());
                     });
                   },
                   onSelected: (String selection) {
                     entry.descriptionController.text = selection;
-                    
+
                     // Search in past transactions for the rate
-                    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+                    final databaseService =
+                        Provider.of<DatabaseService>(context, listen: false);
                     final allTxs = databaseService.getAllTransactions();
                     for (var tx in allTxs.reversed) {
                       bool found = false;
                       if (tx.items.isNotEmpty) {
                         for (var it in tx.items) {
-                          if (it.description.trim().toLowerCase() == selection.trim().toLowerCase()) {
+                          if (it.description.trim().toLowerCase() ==
+                              selection.trim().toLowerCase()) {
                             setState(() {
-                              entry.rateController.text = it.rate.toStringAsFixed(0);
+                              entry.rateController.text =
+                                  it.rate.toStringAsFixed(0);
                               entry.unit = it.unit;
                             });
                             found = true;
                             break;
                           }
                         }
-                      } else if (tx.description.trim().toLowerCase() == selection.trim().toLowerCase()) {
+                      } else if (tx.description.trim().toLowerCase() ==
+                          selection.trim().toLowerCase()) {
                         setState(() {
-                          entry.rateController.text = tx.rate.toStringAsFixed(0);
+                          entry.rateController.text =
+                              tx.rate.toStringAsFixed(0);
                         });
                         found = true;
                       }
                       if (found) break;
                     }
                   },
-                  fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                  fieldViewBuilder:
+                      (context, controller, focusNode, onFieldSubmitted) {
                     return TextFormField(
                       controller: controller,
                       focusNode: focusNode,
                       maxLines: 1,
                       keyboardType: TextInputType.multiline,
-                      textAlign: RegExp(r'[\u0600-\u06FF]').hasMatch(controller.text) ? TextAlign.right : TextAlign.left,
-                      style: TextStyle(color: AppTheme.darkColor, fontFamily: fontFamily, fontWeight: fontWeight, fontSize: 16),
+                      textAlign:
+                          RegExp(r'[\u0600-\u06FF]').hasMatch(controller.text)
+                              ? TextAlign.right
+                              : TextAlign.left,
+                      style: TextStyle(
+                          color: AppTheme.darkColor,
+                          fontFamily: fontFamily,
+                          fontWeight: fontWeight,
+                          fontSize: 16),
                       cursorColor: AppTheme.themeColor,
                       decoration: InputDecoration(
                         labelText: isUrdu ? 'تفصیل' : 'Description',
-                        labelStyle: TextStyle(fontFamily: fontFamily, color: Colors.grey.shade600, fontWeight: fontWeight, fontSize: 13),
+                        labelStyle: TextStyle(
+                            fontFamily: fontFamily,
+                            color: Colors.grey.shade600,
+                            fontWeight: fontWeight,
+                            fontSize: 13),
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
                         fillColor: Colors.white,
                         filled: true,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0), 
-                          borderSide: BorderSide(color: Colors.grey[300]!)
-                        ),
+                            borderRadius: BorderRadius.circular(12.0),
+                            borderSide: BorderSide(color: Colors.grey[300]!)),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0), 
-                          borderSide: BorderSide(color: Colors.grey[300]!)
-                        ),
+                            borderRadius: BorderRadius.circular(12.0),
+                            borderSide: BorderSide(color: Colors.grey[300]!)),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0), 
-                          borderSide: const BorderSide(color: AppTheme.themeColor, width: 1.5)
-                        ),
-                        prefixIcon: Icon(PhosphorIcons.note(), color: AppTheme.themeColor, size: 20),
+                            borderRadius: BorderRadius.circular(12.0),
+                            borderSide: const BorderSide(
+                                color: AppTheme.themeColor, width: 1.5)),
+                        prefixIcon: Icon(PhosphorIcons.note(),
+                            color: AppTheme.themeColor, size: 20),
                       ),
                     );
                   },
@@ -494,7 +549,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                             itemBuilder: (BuildContext context, int index) {
                               final String option = options.elementAt(index);
                               return ListTile(
-                                title: Text(option, style: TextStyle(fontFamily: fontFamily, fontSize: 14)),
+                                title: Text(option,
+                                    style: TextStyle(
+                                        fontFamily: fontFamily, fontSize: 14)),
                                 onTap: () => onSelected(option),
                               );
                             },
@@ -509,10 +566,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               Expanded(
                 flex: 2,
                 child: _buildSmallTextField(
-                  controller: entry.quantityController, 
-                  label: entry.unit ?? (isUrdu ? 'تعداد' : 'Qty'), 
-                  fontFamily: fontFamily, 
-                  fontWeight: FontWeight.bold, 
+                  controller: entry.quantityController,
+                  label: entry.unit ?? (isUrdu ? 'تعداد' : 'Qty'),
+                  fontFamily: fontFamily,
+                  fontWeight: FontWeight.bold,
                   isNumber: true,
                 ),
               ),
@@ -523,19 +580,36 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             children: [
               IconButton(
                 onPressed: _addNewItem,
-                icon: Icon(PhosphorIcons.plusCircle(PhosphorIconsStyle.fill), color: AppTheme.themeColor, size: 28),
+                icon: Icon(PhosphorIcons.plusCircle(PhosphorIconsStyle.fill),
+                    color: AppTheme.themeColor, size: 28),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
               const SizedBox(width: 12),
-              Expanded(flex: 3, child: _buildSmallTextField(controller: entry.rateController, label: isUrdu ? 'ریٹ' : 'Rate', fontFamily: fontFamily, fontWeight: FontWeight.bold, isNumber: true)),
+              Expanded(
+                  flex: 3,
+                  child: _buildSmallTextField(
+                      controller: entry.rateController,
+                      label: isUrdu ? 'ریٹ' : 'Rate',
+                      fontFamily: fontFamily,
+                      fontWeight: FontWeight.bold,
+                      isNumber: true)),
               const SizedBox(width: 8),
-              Expanded(flex: 3, child: _buildSmallTextField(controller: entry.totalController, label: isUrdu ? 'کل' : 'Total', fontFamily: fontFamily, fontWeight: FontWeight.bold, isNumber: true, readOnly: true)),
-              if (_itemEntries.length > 1) 
+              Expanded(
+                  flex: 3,
+                  child: _buildSmallTextField(
+                      controller: entry.totalController,
+                      label: isUrdu ? 'کل' : 'Total',
+                      fontFamily: fontFamily,
+                      fontWeight: FontWeight.bold,
+                      isNumber: true,
+                      readOnly: true)),
+              if (_itemEntries.length > 1)
                 IconButton(
-                  icon: Icon(PhosphorIcons.minusCircle(PhosphorIconsStyle.fill), color: AppTheme.expenseColor), 
-                  onPressed: () => _removeItem(index)
-                ),
+                    icon: Icon(
+                        PhosphorIcons.minusCircle(PhosphorIconsStyle.fill),
+                        color: AppTheme.expenseColor),
+                    onPressed: () => _removeItem(index)),
             ],
           ),
         ],
@@ -543,7 +617,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-  Widget _buildProfessionSelectionArea(bool isUrdu, String fontFamily, FontWeight fontWeight) {
+  Widget _buildProfessionSelectionArea(
+      bool isUrdu, String fontFamily, FontWeight fontWeight) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -567,7 +642,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 }),
                 child: Text(
                   isUrdu ? 'تبدیل کریں' : 'Change',
-                  style: TextStyle(fontSize: 11, color: AppTheme.themeColor, fontWeight: FontWeight.bold, fontFamily: fontFamily),
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.themeColor,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: fontFamily),
                 ),
               ),
           ],
@@ -579,7 +658,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ? ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: _professions.length + 1,
-                  separatorBuilder: (context, index) => const SizedBox(width: 12),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(width: 12),
                   itemBuilder: (context, index) {
                     if (index == 0) {
                       return _buildProfessionCard(
@@ -594,7 +674,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     }
                     final p = _professions[index - 1];
                     IconData displayIcon = _getProfessionIcon(p);
-                    return _buildProfessionCard(p.id, p.name, displayIcon, false, isUrdu, fontFamily, fontWeight);
+                    return _buildProfessionCard(p.id, p.name, displayIcon,
+                        false, isUrdu, fontFamily, fontWeight);
                   },
                 )
               : _buildSelectedProfessionView(isUrdu, fontFamily, fontWeight),
@@ -603,10 +684,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-  Widget _buildSelectedProfessionView(bool isUrdu, String fontFamily, FontWeight fontWeight) {
+  Widget _buildSelectedProfessionView(
+      bool isUrdu, String fontFamily, FontWeight fontWeight) {
     // Find the profession - it might be a Master ID or a Season ID
     final db = Provider.of<DatabaseService>(context, listen: false);
-    Profession? selectedProf = _professions.where((p) => p.id == _selectedProfessionId).firstOrNull;
+    Profession? selectedProf =
+        _professions.where((p) => p.id == _selectedProfessionId).firstOrNull;
 
     // If not in the filtered list (e.g. it's a season), look it up globally
     selectedProf ??= db.getProfession(_selectedProfessionId!);
@@ -641,7 +724,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           fontWeight,
         ),
         const SizedBox(width: 12),
-        Center(child: Container(width: 1.5, height: 40, color: Colors.grey.shade200)),
+        Center(
+            child:
+                Container(width: 1.5, height: 40, color: Colors.grey.shade200)),
         const SizedBox(width: 12),
         _buildSyncTypeCard(
           label: isUrdu ? 'آمدن' : 'Income',
@@ -707,13 +792,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   color: isSelected ? color : color.withValues(alpha: 0.3),
                   width: 2,
                 ),
-                boxShadow: isSelected ? [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  )
-                ] : [],
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: color.withValues(alpha: 0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        )
+                      ]
+                    : [],
               ),
               child: Icon(
                 icon,
@@ -770,19 +857,23 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: isSelected ? AppTheme.themeColor : AppTheme.backgroundColor.withValues(alpha: 0.5),
+                color: isSelected
+                    ? AppTheme.themeColor
+                    : AppTheme.backgroundColor.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: isSelected ? AppTheme.themeColor : Colors.transparent,
                   width: 2,
                 ),
-                boxShadow: isSelected ? [
-                  BoxShadow(
-                    color: AppTheme.themeColor.withValues(alpha: 0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  )
-                ] : [],
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: AppTheme.themeColor.withValues(alpha: 0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        )
+                      ]
+                    : [],
               ),
               child: Icon(
                 icon,
@@ -810,9 +901,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-  Widget _buildSectionCard({required List<Widget> children, EdgeInsets? padding}) {
+  Widget _buildSectionCard(
+      {required List<Widget> children, EdgeInsets? padding}) {
     return Container(
-      padding: padding ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding:
+          padding ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -835,7 +928,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title, String fontFamily, bool isUrdu, {double topPadding = 24}) {
+  Widget _buildSectionHeader(String title, String fontFamily, bool isUrdu,
+      {double topPadding = 24}) {
     return Padding(
       padding: EdgeInsets.only(top: topPadding, bottom: 8),
       child: Text(
@@ -850,45 +944,49 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-  Widget _buildSmallTextField({required TextEditingController controller, required String label, required String fontFamily, required FontWeight fontWeight, bool isNumber = false, bool readOnly = false, String? suffixText}) {
+  Widget _buildSmallTextField(
+      {required TextEditingController controller,
+      required String label,
+      required String fontFamily,
+      required FontWeight fontWeight,
+      bool isNumber = false,
+      bool readOnly = false,
+      String? suffixText}) {
     final isUrdu = isUrduHelper(context);
     return TextFormField(
       controller: controller,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       style: TextStyle(
-        color: readOnly ? Colors.grey : AppTheme.darkColor, 
-        fontFamily: isNumber ? '' : fontFamily, 
-        fontSize: isNumber ? 16 : 14,
-        fontWeight: fontWeight
-      ),
+          color: readOnly ? Colors.grey : AppTheme.darkColor,
+          fontFamily: isNumber ? '' : fontFamily,
+          fontSize: isNumber ? 16 : 14,
+          fontWeight: fontWeight),
       readOnly: readOnly,
       cursorColor: AppTheme.themeColor,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(
-          fontFamily: isUrdu ? 'NooriNastaleeq' : '', 
-          color: Colors.grey.shade600, 
-          fontSize: 14, 
-          fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal
-        ),
+            fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+            color: Colors.grey.shade600,
+            fontSize: 14,
+            fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         suffixText: suffixText,
         suffixStyle: const TextStyle(fontSize: 10, color: Colors.grey),
         fillColor: Colors.white,
         filled: true,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0), 
-          borderSide: BorderSide(color: Colors.grey[300]!)
-        ),
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: Colors.grey[300]!)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0), 
-          borderSide: BorderSide(color: Colors.grey[300]!)
-        ),
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: Colors.grey[300]!)),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0), 
-          borderSide: const BorderSide(color: AppTheme.themeColor, width: 1.5)
-        ),
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide:
+                const BorderSide(color: AppTheme.themeColor, width: 1.5)),
       ),
     );
   }
@@ -897,48 +995,54 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     return Provider.of<LanguageService>(context, listen: false).isUrdu;
   }
 
-  Widget _buildTextField({required TextEditingController controller, required String label, bool isNumber = false, IconData? icon, required String fontFamily, required FontWeight fontWeight}) {
+  Widget _buildTextField(
+      {required TextEditingController controller,
+      required String label,
+      bool isNumber = false,
+      IconData? icon,
+      required String fontFamily,
+      required FontWeight fontWeight}) {
     final isUrdu = isUrduHelper(context);
     return TextFormField(
       controller: controller,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       style: TextStyle(
-        color: AppTheme.darkColor, 
-        fontFamily: isNumber ? '' : fontFamily, 
-        fontSize: 16,
-        fontWeight: fontWeight
-      ),
+          color: AppTheme.darkColor,
+          fontFamily: isNumber ? '' : fontFamily,
+          fontSize: 16,
+          fontWeight: fontWeight),
       cursorColor: AppTheme.themeColor,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(
-          fontFamily: isUrdu ? 'NooriNastaleeq' : '', 
-          color: Colors.grey.shade600, 
-          fontSize: 13, 
-          fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal
-        ),
+            fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+            color: Colors.grey.shade600,
+            fontSize: 13,
+            fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         fillColor: Colors.white,
         filled: true,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0), 
-          borderSide: BorderSide(color: Colors.grey[300]!)
-        ),
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: Colors.grey[300]!)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0), 
-          borderSide: BorderSide(color: Colors.grey[300]!)
-        ),
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: Colors.grey[300]!)),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0), 
-          borderSide: const BorderSide(color: AppTheme.themeColor, width: 1.5)
-        ),
-        prefixIcon: icon != null ? Icon(icon, color: AppTheme.themeColor, size: 20) : null,
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide:
+                const BorderSide(color: AppTheme.themeColor, width: 1.5)),
+        prefixIcon: icon != null
+            ? Icon(icon, color: AppTheme.themeColor, size: 20)
+            : null,
       ),
     );
   }
 
-  Widget _buildEditableDateSelector(bool isUrdu, String fontFamily, FontWeight fontWeight) {
+  Widget _buildEditableDateSelector(
+      bool isUrdu, String fontFamily, FontWeight fontWeight) {
     return _buildTextField(
       controller: _dateInputController,
       label: isUrdu ? 'تاریخ' : 'Date',
@@ -958,9 +1062,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final databaseService = Provider.of<DatabaseService>(context, listen: false);
-      final syncService = Provider.of<AutoSyncService>(context, listen: false);
-      final notificationService = Provider.of<NotificationService>(context, listen: false);
+      final databaseService =
+          Provider.of<DatabaseService>(context, listen: false);
+      final notificationService =
+          Provider.of<NotificationService>(context, listen: false);
 
       List<TransactionItem> items = [];
       String mainDescription = "";
@@ -969,13 +1074,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         final total = double.tryParse(entry.totalController.text) ?? 0;
         if (total > 0 || desc.isNotEmpty) {
           items.add(TransactionItem(
-            description: desc, 
-            quantity: double.tryParse(entry.quantityController.text) ?? 1, 
-            rate: double.tryParse(entry.rateController.text) ?? total, 
+            description: desc,
+            quantity: double.tryParse(entry.quantityController.text) ?? 1,
+            rate: double.tryParse(entry.rateController.text) ?? total,
             total: total,
             unit: entry.unit,
           ));
-          if (desc.isNotEmpty) mainDescription += (mainDescription.isEmpty ? "" : ", ") + desc;
+          if (desc.isNotEmpty)
+            mainDescription += (mainDescription.isEmpty ? "" : ", ") + desc;
         }
       }
 
@@ -987,14 +1093,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           // Look up profession globally as it could be a Season ID
           final db = Provider.of<DatabaseService>(context, listen: false);
           Profession? prof = db.getProfession(_selectedProfessionId!);
-          
+
           if (prof != null) {
             profName = prof.name;
-            
+
             // If it's a master profession, try to find an active season
             if (prof.parentId == null) {
-              final seasons = databaseService.getSeasons(_selectedProfessionId!);
-              final activeSeason = seasons.where((s) => s.isActive ?? true).firstOrNull;
+              final seasons =
+                  databaseService.getSeasons(_selectedProfessionId!);
+              final activeSeason =
+                  seasons.where((s) => s.isActive ?? true).firstOrNull;
               if (activeSeason != null) {
                 targetProfessionId = activeSeason.id;
               }
@@ -1006,7 +1114,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       }
 
       final transaction = Transaction(
-        id: widget.transactionToEdit?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        id: widget.transactionToEdit?.id ??
+            DateTime.now().millisecondsSinceEpoch.toString(),
         accountId: _selectedAccountId ?? 'default_account',
         amount: grandTotal,
         pendingAmount: grandTotal,
@@ -1018,7 +1127,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         rate: grandTotal,
         createdAt: widget.transactionToEdit?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
-        billImage: _billImages.isNotEmpty ? _billImages.map((f) => f.path).join(',') : null,
+        billImage: _billImages.isNotEmpty
+            ? _billImages.map((f) => f.path).join(',')
+            : null,
         referenceNumber: _referenceNumberController.text.trim(),
         items: items,
         professionId: targetProfessionId,
@@ -1029,23 +1140,28 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         await databaseService.updateTransaction(transaction);
       } else {
         await databaseService.addTransaction(transaction);
-        // Sync and Notification can happen in background
-        syncService.syncNewTransaction(transaction).catchError((e) => debugPrint(e.toString()));
-        
-        final account = _accounts.firstWhere((a) => a.id == _selectedAccountId);
-        if (account.phone.isNotEmpty) {
-          notificationService.notifyPartyByPhone(
-            partyPhoneNumber: account.phone, 
-            amount: grandTotal, 
-            transactionType: type,
-            description: transaction.description,
-            items: transaction.items.map((e) => e.toMap()).toList(),
-          ).catchError((e) => debugPrint(e.toString()));
+
+        // Safely find account
+        final accountIndex =
+            _accounts.indexWhere((a) => a.id == _selectedAccountId);
+        if (accountIndex != -1) {
+          final account = _accounts[accountIndex];
+          if (account.phone.isNotEmpty) {
+            notificationService
+                .notifyPartyByPhone(
+                  partyPhoneNumber: account.phone,
+                  amount: grandTotal,
+                  transactionType: type,
+                  description: transaction.description,
+                  items: transaction.items.map((e) => e.toMap()).toList(),
+                )
+                .catchError((e) => debugPrint(e.toString()));
+          }
         }
       }
 
       if (!mounted) return;
-      
+
       // Close the screen first to avoid UI lag/spinner sticking
       Navigator.pop(context);
       _showSnackBar(isUrdu ? 'محفوظ ہوگیا' : 'Saved successfully', false);
@@ -1060,13 +1176,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   void _showSnackBar(String message, bool isError) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message), 
-        backgroundColor: isError ? AppTheme.expenseColor : AppTheme.incomeColor,
-        duration: const Duration(seconds: 2),
-      )
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+      backgroundColor: isError ? AppTheme.expenseColor : AppTheme.incomeColor,
+      duration: const Duration(seconds: 2),
+    ));
   }
 
   @override

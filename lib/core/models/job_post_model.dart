@@ -32,9 +32,6 @@ class JobPost extends HiveObject {
   @HiveField(8)
   final double? estimatedBudget;
 
-  @HiveField(9)
-  final DateTime? deadline;
-
   @HiveField(10)
   final List<String> images;
 
@@ -106,7 +103,6 @@ class JobPost extends HiveObject {
     required this.location,
     required this.categories,
     this.estimatedBudget,
-    this.deadline,
     this.images = const [],
     this.status = 'open',
     required this.createdAt,
@@ -140,7 +136,6 @@ class JobPost extends HiveObject {
       'location': location,
       'categories': categories,
       'estimatedBudget': estimatedBudget,
-      'deadline': deadline?.toIso8601String(),
       'images': images,
       'status': status,
       'createdAt': createdAt.toIso8601String(),
@@ -184,7 +179,6 @@ class JobPost extends HiveObject {
           ? List<String>.from(map['categories'])
           : (map['category'] != null ? [map['category']] : []),
       estimatedBudget: (map['estimatedBudget'] as num?)?.toDouble(),
-      deadline: map['deadline'] != null ? parseDate(map['deadline']) : null,
       images: List<String>.from(map['images'] ?? []),
       status: map['status'] ?? 'open',
       createdAt: parseDate(map['createdAt']),
@@ -218,7 +212,6 @@ class JobPost extends HiveObject {
     String? location,
     List<String>? categories,
     double? estimatedBudget,
-    DateTime? deadline,
     List<String>? images,
     String? status,
     DateTime? createdAt,
@@ -250,7 +243,6 @@ class JobPost extends HiveObject {
       location: location ?? this.location,
       categories: categories ?? this.categories,
       estimatedBudget: estimatedBudget ?? this.estimatedBudget,
-      deadline: deadline ?? this.deadline,
       images: images ?? this.images,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,

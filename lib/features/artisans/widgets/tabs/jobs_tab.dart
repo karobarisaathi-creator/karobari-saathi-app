@@ -18,7 +18,7 @@ import 'dart:async';
 class JobsTab extends StatefulWidget {
   final String selectedCategory;
   final String searchQuery;
-  
+
   const JobsTab({
     super.key,
     required this.selectedCategory,
@@ -35,18 +35,19 @@ class _JobsTabState extends State<JobsTab> {
   final JobService _jobService = JobService();
   final ArtisanService _artisanService = ArtisanService();
   final JobAlgorithmService _algorithmService = JobAlgorithmService();
-  
+
   List<JobPost> _jobs = [];
   DocumentSnapshot? _lastJobDocument;
-  
+
   bool _isLoadingMore = false;
   bool _hasMoreJobs = true;
   bool _isInitialLoading = true;
-  
+
   String? _artisanProfession;
+  double? _artisanRating;
   double? _artisanLat;
   double? _artisanLng;
-  
+
   final int _batchSize = 10;
   StreamSubscription? _jobsSubscription;
 
@@ -56,7 +57,8 @@ class _JobsTabState extends State<JobsTab> {
     _scrollController.addListener(_onScroll);
     _loadArtisanProfile();
     _fetchJobs(isRefresh: true);
-    
+    _subscribeToLiveJobs();
+
     // لوکل ڈیٹا میں تبدیلیوں پر نظر رکھنے کے لیے
     _jobService.addListener(_onServiceChanged);
   }
@@ -86,6 +88,35 @@ class _JobsTabState extends State<JobsTab> {
         }
       });
     }
+  }
+
+  void _subscribeToLiveJobs() {
+    _jobsSubscription = _jobService.getOpenJobs().listen(
+      (liveJobs) {
+        if (!mounted) return;
+
+        final liveJobsById = {
+          for (final job in liveJobs) job.id: job,
+        };
+        setState(() {
+          for (final liveJob in liveJobs) {
+            final index = _jobs.indexWhere((job) => job.id == liveJob.id);
+            if (index == -1) {
+              _jobs.add(liveJob);
+            } else {
+              _jobs[index] = liveJob;
+            }
+          }
+          _jobs.removeWhere(
+            (job) => job.status == 'open' && !liveJobsById.containsKey(job.id),
+          );
+          _isInitialLoading = false;
+        });
+      },
+      onError: (error, stackTrace) {
+        _logger.error('Live jobs stream error', error, stackTrace);
+      },
+    );
   }
 
   @override
@@ -121,11 +152,11 @@ class _JobsTabState extends State<JobsTab> {
 
       final profile = await _artisanService.getProfile(userId);
       if (!mounted) return;
-      
+
       setState(() {
-        _artisanProfession = profile != null && profile.isActive
-            ? profile.profession
-            : null;
+        _artisanProfession =
+            profile != null && profile.isActive ? profile.profession : null;
+        _artisanRating = profile?.rating;
         _artisanLat = profile?.latitude;
         _artisanLng = profile?.longitude;
       });
@@ -160,18 +191,11 @@ class _JobsTabState extends State<JobsTab> {
 
       if (snapshot.docs.isNotEmpty) {
         _lastJobDocument = snapshot.docs.last;
-        final newJobs = snapshot.docs
-            .map((doc) => JobPost.fromMap(doc.data()))
-            .toList();
+        final newJobs =
+            snapshot.docs.map((doc) => JobPost.fromMap(doc.data())).toList();
 
         final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-        final now = DateTime.now();
-
-        final validJobs = newJobs.where((job) {
-          return job.customerId == currentUserId ||
-              job.deadline == null ||
-              job.deadline!.isAfter(now);
-        }).toList();
+        final validJobs = newJobs;
 
         setState(() {
           if (isRefresh) {
@@ -205,16 +229,10 @@ class _JobsTabState extends State<JobsTab> {
 
   List<JobPost> _filterAndSortJobs() {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-    final now = DateTime.now();
-
     var jobs = _jobs.where((job) {
-      bool isNotMine = widget.selectedCategory == 'all' ||
-          job.customerId != currentUserId;
+      bool isNotMine = job.customerId != currentUserId;
       bool matchesCategory = widget.selectedCategory == 'all' ||
           job.categories.contains(widget.selectedCategory);
-      bool isNotExpired = job.customerId == currentUserId ||
-          job.deadline == null ||
-          job.deadline!.isAfter(now);
       bool isOpen = job.status == 'open' || job.customerId == currentUserId;
 
       bool matchesSearch = true;
@@ -225,7 +243,7 @@ class _JobsTabState extends State<JobsTab> {
             job.location.toLowerCase().contains(query);
       }
 
-      return isNotMine && matchesCategory && isNotExpired && isOpen && matchesSearch;
+      return isNotMine && matchesCategory && isOpen && matchesSearch;
     }).toList();
 
     return _algorithmService.applySmartSort(
@@ -234,6 +252,7 @@ class _JobsTabState extends State<JobsTab> {
       currentUserId: currentUserId,
       artisanLat: _artisanLat,
       artisanLng: _artisanLng,
+      artisanRating: _artisanRating,
     );
   }
 
@@ -264,7 +283,7 @@ class _JobsTabState extends State<JobsTab> {
 
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.zero,
       itemCount: filteredJobs.length + (_hasMoreJobs ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == filteredJobs.length) {
@@ -336,29 +355,43 @@ class _JobsTabState extends State<JobsTab> {
 
   Widget _buildShimmerLoading() {
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.only(top: 8),
       itemCount: 5,
       itemBuilder: (context, index) => SkeletonCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SkeletonShimmer(width: 150, height: 18, borderRadius: 4),
-            const SizedBox(height: 8),
-            const SkeletonShimmer(width: 100, height: 12, borderRadius: 4),
-            const SizedBox(height: 16),
-            const SkeletonShimmer(
-              width: double.infinity,
-              height: 14,
-              borderRadius: 4,
-            ),
-            const SizedBox(height: 8),
-            const SkeletonShimmer(width: 200, height: 14, borderRadius: 4),
-            const SizedBox(height: 16),
+            // Title and Date
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const SkeletonShimmer(width: 80, height: 24, borderRadius: 12),
-                const SkeletonShimmer(width: 80, height: 24, borderRadius: 12),
+                const SkeletonShimmer(width: 140, height: 18, borderRadius: 4),
+                const SkeletonShimmer(width: 60, height: 22, borderRadius: 8),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const SkeletonShimmer(width: 80, height: 12, borderRadius: 4),
+            const SizedBox(height: 16),
+            // Description
+            const SkeletonShimmer(width: double.infinity, height: 12, borderRadius: 4),
+            const SizedBox(height: 8),
+            const SkeletonShimmer(width: 200, height: 12, borderRadius: 4),
+            const SizedBox(height: 16),
+            // Chips
+            Row(
+              children: [
+                const SkeletonShimmer(width: 90, height: 24, borderRadius: 8),
+                const SizedBox(width: 8),
+                const SkeletonShimmer(width: 70, height: 24, borderRadius: 8),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Footer
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const SkeletonShimmer(width: 100, height: 14, borderRadius: 4),
+                const SkeletonShimmer(width: 80, height: 16, borderRadius: 4),
               ],
             ),
           ],

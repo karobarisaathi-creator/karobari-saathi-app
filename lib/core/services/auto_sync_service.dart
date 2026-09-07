@@ -36,43 +36,41 @@ class AutoSyncService with ChangeNotifier {
 
   Future<void> syncAllDataToCloud() async {
     final user = _auth.currentUser;
-    if (user?.phoneNumber != null) {
-      try {
-        // Hive سے اصلی ڈیٹا حاصل کریں
-        final accounts = await _getAllAccounts();
-        final transactions = await _getAllTransactions();
-        final categories = await _getAllCategories();
-        final professions = await _getAllProfessions();
+    if (user?.phoneNumber == null) {
+      throw Exception('User is not logged in');
+    }
 
-        print('اکاؤنٹس: ${accounts.length}');
-        print('لین دین: ${transactions.length}');
+    try {
+      // Hive سے اصلی ڈیٹا حاصل کریں
+      final accounts = await _getAllAccounts();
+      final transactions = await _getAllTransactions();
+      final categories = await _getAllCategories();
+      final professions = await _getAllProfessions();
 
-        await _firestore.collection('userData').doc(user!.phoneNumber).set({
-          'accounts': accounts.map((a) => a.toMap()).toList(),
-          'transactions': transactions.map((t) => t.toMap()).toList(),
-          'categories': categories.map((c) => c.toMap()).toList(),
-          'professions': professions.map((p) => p.toMap()).toList(),
-          'lastSync': DateTime.now().toIso8601String(), // String format بہتر ہے
-          'phoneNumber': user.phoneNumber,
-        }, SetOptions(merge: true));
+      print('اکاؤنٹس: ${accounts.length}');
+      print('لین دین: ${transactions.length}');
 
-        print('تمام ڈیٹا کلاؤڈ پر کامیابی سے سینک ہوگیا');
-        notifyListeners();
-      } catch (e) {
-        print('سینک میں خرابی: $e');
-        throw e; // UI کو ایرر دکھانے کے لیے
-      }
-    } else {
-      print('صارف لاگ ان نہیں ہے یا فون نمبر موجود نہیں');
+      await _firestore.collection('userData').doc(user!.phoneNumber).set({
+        'accounts': accounts.map((a) => a.toMap()).toList(),
+        'transactions': transactions.map((t) => t.toMap()).toList(),
+        'categories': categories.map((c) => c.toMap()).toList(),
+        'professions': professions.map((p) => p.toMap()).toList(),
+        'lastSync': DateTime.now().toIso8601String(), // String format بہتر ہے
+        'phoneNumber': user.phoneNumber,
+      }, SetOptions(merge: true));
+
+      print('تمام ڈیٹا کلاؤڈ پر کامیابی سے سینک ہوگیا');
+      notifyListeners();
+    } catch (e) {
+      print('سینک میں خرابی: $e');
+      rethrow; // UI کو ایرر دکھانے کے لیے
     }
   }
 
   Future<void> restoreAllDataFromPhone(String phoneNumber) async {
     try {
-      final snapshot = await _firestore
-          .collection('userData')
-          .doc(phoneNumber)
-          .get();
+      final snapshot =
+          await _firestore.collection('userData').doc(phoneNumber).get();
 
       if (snapshot.exists) {
         final data = snapshot.data()!;
@@ -83,7 +81,9 @@ class AutoSyncService with ChangeNotifier {
         if (data['accounts'] != null) {
           final accountsBox = await Hive.openBox<Account>('accounts');
           await accountsBox.clear(); // پرانا ڈیٹا صاف کریں (اختیاری)
-          final accountsList = (data['accounts'] as List).map((item) => Account.fromMap(item)).toList();
+          final accountsList = (data['accounts'] as List)
+              .map((item) => Account.fromMap(item))
+              .toList();
           for (var account in accountsList) {
             await accountsBox.put(account.id, account);
           }
@@ -91,9 +91,12 @@ class AutoSyncService with ChangeNotifier {
 
         // Transactions بحال کریں
         if (data['transactions'] != null) {
-          final transactionsBox = await Hive.openBox<model.Transaction>('transactions');
+          final transactionsBox =
+              await Hive.openBox<model.Transaction>('transactions');
           await transactionsBox.clear();
-          final transactionsList = (data['transactions'] as List).map((item) => model.Transaction.fromMap(item)).toList();
+          final transactionsList = (data['transactions'] as List)
+              .map((item) => model.Transaction.fromMap(item))
+              .toList();
           for (var transaction in transactionsList) {
             await transactionsBox.put(transaction.id, transaction);
           }
@@ -103,7 +106,9 @@ class AutoSyncService with ChangeNotifier {
         if (data['categories'] != null) {
           final categoriesBox = await Hive.openBox<Category>('categories');
           await categoriesBox.clear();
-          final categoriesList = (data['categories'] as List).map((item) => Category.fromMap(item)).toList();
+          final categoriesList = (data['categories'] as List)
+              .map((item) => Category.fromMap(item))
+              .toList();
           for (var category in categoriesList) {
             await categoriesBox.put(category.id, category);
           }
@@ -113,7 +118,9 @@ class AutoSyncService with ChangeNotifier {
         if (data['professions'] != null) {
           final professionsBox = await Hive.openBox<Profession>('professions');
           await professionsBox.clear();
-          final professionsList = (data['professions'] as List).map((item) => Profession.fromMap(item)).toList();
+          final professionsList = (data['professions'] as List)
+              .map((item) => Profession.fromMap(item))
+              .toList();
           for (var profession in professionsList) {
             await professionsBox.put(profession.id, profession);
           }

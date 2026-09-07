@@ -4,18 +4,30 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 
 class BalanceService with ChangeNotifier {
-  late Box<Account> _accountsBox;
-  late Box<Transaction> _transactionsBox;
+  Box<Account>? _accountsBox;
+  Box<Transaction>? _transactionsBox;
 
   BalanceService() {
     _init();
   }
 
   Future<void> _init() async {
-    _accountsBox = await Hive.openBox<Account>('accounts');
-    _transactionsBox = await Hive.openBox<Transaction>('transactions');
-    notifyListeners();
+    try {
+      _accountsBox = Hive.isBoxOpen('accounts') 
+          ? Hive.box<Account>('accounts') 
+          : await Hive.openBox<Account>('accounts');
+      _transactionsBox = Hive.isBoxOpen('transactions') 
+          ? Hive.box<Transaction>('transactions') 
+          : await Hive.openBox<Transaction>('transactions');
+      notifyListeners();
+    } catch (e) {
+      debugPrint("BalanceService Initialization Error: $e");
+    }
   }
+
+  // Helper to ensure boxes are ready
+  bool get _isReady => _accountsBox != null && _accountsBox!.isOpen && 
+                       _transactionsBox != null && _transactionsBox!.isOpen;
 
   // Getters for direct access
   double get totalBalance => calculateTotalBalance();
@@ -25,15 +37,15 @@ class BalanceService with ChangeNotifier {
 
   // Calculate total balance across all accounts
   double calculateTotalBalance() {
-    if (!_accountsBox.isOpen) return 0.0;
-    final accounts = _accountsBox.values.toList();
+    if (!_isReady) return 0.0;
+    final accounts = _accountsBox!.values.toList();
     return accounts.fold(0.0, (sum, account) => sum + account.balance);
   }
 
   // Calculate total income
   double calculateTotalIncome() {
-    if (!_transactionsBox.isOpen) return 0.0;
-    final transactions = _transactionsBox.values.toList();
+    if (!_isReady) return 0.0;
+    final transactions = _transactionsBox!.values.toList();
     return transactions
         .where((transaction) => transaction.type == 'income')
         .fold(0.0, (sum, transaction) => sum + transaction.amount);
@@ -41,8 +53,8 @@ class BalanceService with ChangeNotifier {
 
   // Calculate total expense
   double calculateTotalExpense() {
-    if (!_transactionsBox.isOpen) return 0.0;
-    final transactions = _transactionsBox.values.toList();
+    if (!_isReady) return 0.0;
+    final transactions = _transactionsBox!.values.toList();
     return transactions
         .where((transaction) => transaction.type == 'expense')
         .fold(0.0, (sum, transaction) => sum + transaction.amount);
@@ -50,8 +62,8 @@ class BalanceService with ChangeNotifier {
 
   // Calculate pending amount across all accounts
   double calculateTotalPending() {
-    if (!_transactionsBox.isOpen) return 0.0;
-    final transactions = _transactionsBox.values.toList();
+    if (!_isReady) return 0.0;
+    final transactions = _transactionsBox!.values.toList();
     return transactions.fold(
       0.0,
       (sum, transaction) => sum + transaction.pendingAmount,
@@ -60,13 +72,15 @@ class BalanceService with ChangeNotifier {
 
   // Calculate account-specific balance
   double calculateAccountBalance(String accountId) {
-    final account = _accountsBox.get(accountId);
+    if (!_isReady) return 0.0;
+    final account = _accountsBox!.get(accountId);
     return account?.balance ?? 0.0;
   }
 
   // Calculate account income
   double calculateAccountIncome(String accountId) {
-    final transactions = _transactionsBox.values
+    if (!_isReady) return 0.0;
+    final transactions = _transactionsBox!.values
         .where((t) => t.accountId == accountId && t.type == 'income')
         .toList();
 
@@ -78,7 +92,8 @@ class BalanceService with ChangeNotifier {
 
   // Calculate account expense
   double calculateAccountExpense(String accountId) {
-    final transactions = _transactionsBox.values
+    if (!_isReady) return 0.0;
+    final transactions = _transactionsBox!.values
         .where((t) => t.accountId == accountId && t.type == 'expense')
         .toList();
 
@@ -90,7 +105,8 @@ class BalanceService with ChangeNotifier {
 
   // Calculate account pending amount
   double calculateAccountPending(String accountId) {
-    final transactions = _transactionsBox.values
+    if (!_isReady) return 0.0;
+    final transactions = _transactionsBox!.values
         .where((t) => t.accountId == accountId)
         .toList();
 
@@ -102,7 +118,8 @@ class BalanceService with ChangeNotifier {
 
   // Calculate monthly summary
   Map<String, double> calculateMonthlySummary(int year, int month) {
-    final transactions = _transactionsBox.values
+    if (!_isReady) return {'income': 0.0, 'expense': 0.0, 'pending': 0.0, 'net': 0.0};
+    final transactions = _transactionsBox!.values
         .where((t) => t.date.year == year && t.date.month == month)
         .toList();
 
@@ -130,7 +147,8 @@ class BalanceService with ChangeNotifier {
     int year,
     int month,
   ) {
-    final transactions = _transactionsBox.values
+    if (!_isReady) return {};
+    final transactions = _transactionsBox!.values
         .where(
           (t) => t.type == type && t.date.year == year && t.date.month == month,
         )
@@ -154,7 +172,8 @@ class BalanceService with ChangeNotifier {
     int year,
     int month,
   ) {
-    final transactions = _transactionsBox.values
+    if (!_isReady) return {};
+    final transactions = _transactionsBox!.values
         .where(
           (t) =>
               t.professionId != null &&
@@ -188,17 +207,20 @@ class BalanceService with ChangeNotifier {
 
   // Get accounts with negative balance (debt)
   List<Account> getAccountsWithDebt() {
-    return _accountsBox.values.where((account) => account.balance < 0).toList();
+    if (!_isReady) return [];
+    return _accountsBox!.values.where((account) => account.balance < 0).toList();
   }
 
   // Get accounts with positive balance (credit)
   List<Account> getAccountsWithCredit() {
-    return _accountsBox.values.where((account) => account.balance > 0).toList();
+    if (!_isReady) return [];
+    return _accountsBox!.values.where((account) => account.balance > 0).toList();
   }
 
   // Calculate average transaction amount
   double calculateAverageTransactionAmount() {
-    final transactions = _transactionsBox.values.toList();
+    if (!_isReady) return 0.0;
+    final transactions = _transactionsBox!.values.toList();
     if (transactions.isEmpty) return 0.0;
 
     final total = transactions.fold(0.0, (sum, t) => sum + t.amount);
@@ -210,7 +232,7 @@ class BalanceService with ChangeNotifier {
     final totalBalance = calculateTotalBalance();
     final totalPending = calculateTotalPending();
     final accountsWithDebt = getAccountsWithDebt().length;
-    final totalAccounts = _accountsBox.values.length;
+    final totalAccounts = _accountsBox?.values.length ?? 0;
 
     double score = 100.0;
 
@@ -225,7 +247,7 @@ class BalanceService with ChangeNotifier {
     }
 
     // Deduct for too many debt accounts
-    final debtRatio = accountsWithDebt / totalAccounts;
+    final debtRatio = totalAccounts == 0 ? 0.0 : accountsWithDebt / totalAccounts;
     if (debtRatio > 0.3) {
       score -= (debtRatio * 50);
     }

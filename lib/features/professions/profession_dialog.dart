@@ -247,12 +247,13 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
             itemBuilder: (context, idx) {
               final p = items[idx];
               final isSelected = _selectedIcon == p.id;
+              final pName = widget.isUrdu ? p.nameUrdu : p.name;
               return InkWell(
                 onTap: () {
                   setState(() {
                     _selectedIcon = p.id;
                     if (_nameController.text.isEmpty) {
-                      _nameController.text = p.name;
+                      _nameController.text = pName;
                     }
                   });
                 },
@@ -277,7 +278,7 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
                     const SizedBox(height: 6),
                     Flexible(
                       child: Text(
-                        p.name,
+                        pName,
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,

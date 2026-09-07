@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
+import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/features/dashboard/dashboard_screen.dart';
 import 'package:account_app/features/dashboard/main_navigation_screen.dart';
@@ -25,12 +26,20 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   String _verificationId = '';
+  bool _loginCompleted = false;
 
   // Defined Colors
   final Color _lightColor = AppTheme.lightColor;
   final Color _themeColor = AppTheme.themeColor;
   final Color _darkColor = AppTheme.darkColor;
   final Color _goldColor = const Color(0xFFDAAD51);
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _otpController.dispose();
+    super.dispose();
+  }
 
   void _showTermsDialog(bool isUrdu, String fontFamily) {
     final fontWeight = FontWeight.normal;
@@ -323,15 +332,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                   return isUrdu
                                       ? 'نمبر درج کریں'
                                       : 'Enter number';
-                                // Normalize and validate for Pakistan numbers (10 digits after prefix)
-                                String cleaned =
-                                    value.replaceAll(RegExp(r'[^0-9]'), '');
-                                if (cleaned.startsWith('0'))
-                                  cleaned = cleaned.substring(1);
-                                if (cleaned.length != 10) {
+                                if (!Formatters.isValidPhoneNumber(value)) {
                                   return isUrdu
-                                      ? 'درست نمبر لکھیں (10 ہندسے)'
-                                      : 'Enter valid 10-digit number';
+                                      ? 'درست فون نمبر لکھیں'
+                                      : 'Enter a valid phone number';
                                 }
                                 return null;
                               },
@@ -452,16 +456,12 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    if (_isLoading || _loginCompleted) return;
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
-    // Ensure country code is present for backend, but user only types local number
-    String input = _phoneController.text.trim();
-    String cleaned = input.replaceAll(RegExp(r'[^0-9]'), '');
-    if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
-
-    String phoneNumber = '+92$cleaned';
+    final phoneNumber = Formatters.toE164(_phoneController.text);
 
     try {
       if (_verificationId.isEmpty) {
@@ -470,6 +470,8 @@ class _LoginScreenState extends State<LoginScreen> {
           phoneNumber: phoneNumber,
           verificationCompleted: (PhoneAuthCredential credential) async {
             // Android only: auto-retrieval or instant verification
+            if (_loginCompleted) return;
+            _loginCompleted = true;
             try {
               if (credential.smsCode != null) {
                 _otpController.text = credential.smsCode!;
@@ -479,6 +481,7 @@ class _LoginScreenState extends State<LoginScreen> {
               if (!mounted) return;
               await _handleSuccessfulLogin(phoneNumber);
             } catch (e) {
+              _loginCompleted = false;
               print('Auto verification error: $e');
             }
           },
@@ -511,7 +514,7 @@ class _LoginScreenState extends State<LoginScreen> {
             );
           },
           codeAutoRetrievalTimeout: (String verificationId) {
-            if (mounted) {
+            if (mounted && !_loginCompleted) {
               setState(() => _verificationId = verificationId);
             }
           },
@@ -524,6 +527,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         await FirebaseAuth.instance.signInWithCredential(credential);
+        _loginCompleted = true;
         if (!mounted) return;
         await _handleSuccessfulLogin(phoneNumber);
       }

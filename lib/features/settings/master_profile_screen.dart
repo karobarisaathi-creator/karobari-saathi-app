@@ -12,8 +12,6 @@ import 'package:account_app/core/utils/image_utils.dart';
 import 'package:account_app/core/services/artisan_service.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
-import 'package:account_app/core/services/verification_service.dart';
-import 'package:account_app/features/settings/verification_request_screen.dart';
 import 'package:account_app/features/dashboard/main_navigation_screen.dart';
 import 'package:account_app/features/profile/controllers/profile_controller.dart';
 import 'package:account_app/core/utils/artisan_validators.dart';
@@ -51,21 +49,22 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
         source: ImageSource.gallery,
         imageQuality: 70,
       );
-      
+
       if (image != null && mounted) {
         final cropped = await ImageCropper().cropImage(
           sourcePath: image.path,
           aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
           uiSettings: [
             AndroidUiSettings(
-              toolbarTitle: isProfile ? 'Crop Profile Image' : 'Crop Work Image',
+              toolbarTitle:
+                  isProfile ? 'Crop Profile Image' : 'Crop Work Image',
               toolbarColor: AppTheme.darkColor,
               toolbarWidgetColor: Colors.white,
               lockAspectRatio: true,
             ),
           ],
         );
-        
+
         if (cropped != null) {
           final compressed = await ImageUtils.compressImage(File(cropped.path));
           if (mounted) {
@@ -100,7 +99,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(isUrdu ? 'پروفائل محفوظ ہوگیا' : 'Profile saved successfully'),
+          content: Text(
+              isUrdu ? 'پروفائل محفوظ ہوگیا' : 'Profile saved successfully'),
           backgroundColor: AppTheme.incomeColor,
         ),
       );
@@ -116,7 +116,10 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_controller.errorMessage ?? (isUrdu ? 'پروفائل محفوظ کرنے میں غلطی' : 'Error saving profile')),
+          content: Text(_controller.errorMessage ??
+              (isUrdu
+                  ? 'پروفائل محفوظ کرنے میں غلطی'
+                  : 'Error saving profile')),
           backgroundColor: AppTheme.expenseColor,
         ),
       );
@@ -159,7 +162,9 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      isUrdu ? 'پروفائل ختم کر دی گئی' : 'Profile deleted successfully',
+                      isUrdu
+                          ? 'پروفائل ختم کر دی گئی'
+                          : 'Profile deleted successfully',
                     ),
                     backgroundColor: Colors.red,
                   ),
@@ -190,8 +195,6 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
   Widget _buildScreen(BuildContext context, ProfileController controller) {
     final isUrdu = Provider.of<LanguageService>(context).isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-    final verificationService = Provider.of<VerificationService>(context);
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
@@ -210,23 +213,23 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                   children: [
                     // Profile Image Section
                     _buildProfileImageSection(controller),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Personal Info Section
                     _buildPersonalInfoSection(controller, isUrdu, fontFamily),
-                    
+
                     const SizedBox(height: 20),
-                    
+
                     // Expert Info Section
                     _buildExpertInfoSection(
                       controller,
                       isUrdu,
                       fontFamily,
                     ),
-                    
+
                     const SizedBox(height: 32),
-                    
+
                     // Save Button
                     AppButton(
                       text: controller.isEditing
@@ -236,10 +239,11 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                       variant: AppButtonVariant.primary,
                       size: AppButtonSize.large,
                       isFullWidth: true,
-                      isLoading: controller.saveStatus == ProfileSaveStatus.loading,
+                      isLoading:
+                          controller.saveStatus == ProfileSaveStatus.loading,
                       onPressed: _saveProfile,
                     ),
-                    
+
                     if (controller.isEditing) ...[
                       const SizedBox(height: 16),
                       AppButton(
@@ -264,9 +268,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
   Widget _buildProfileImageSection(ProfileController controller) {
     return ImageSelectorField(
       isProfile: true,
-      selectedFiles: controller.profileImage != null
-          ? [controller.profileImage!]
-          : [],
+      selectedFiles:
+          controller.profileImage != null ? [controller.profileImage!] : [],
       remoteUrls: controller.remoteProfileImage != null &&
               controller.remoteProfileImage!.isNotEmpty
           ? [controller.remoteProfileImage!]
@@ -337,7 +340,9 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
             validator: (val) {
               if (val != null && val.isNotEmpty) {
                 if (!val.contains('@') || !val.contains('.')) {
-                  return isUrdu ? 'درست ای میل درج کریں' : 'Enter a valid email';
+                  return isUrdu
+                      ? 'درست ای میل درج کریں'
+                      : 'Enter a valid email';
                 }
               }
               return null;
@@ -370,17 +375,21 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildInvitationHeader(controller, isUrdu, fontFamily),
-          
           if (controller.showExpertFields)
             Column(
               children: [
-                const Divider(height: 1, thickness: 1, color: Color(0xFFDDDDDD)),
-                
+                const Divider(
+                    height: 1, thickness: 1, color: Color(0xFFDDDDDD)),
+
                 // 1. تعارف (سب سے اوپر)
                 _buildDynamicSection(
                   controllers: controller.descriptionControllers,
-                  label: isUrdu ? 'اپنے کام کی تفصیل (تعارف - لازمی)' : 'Work Description (Intro - Required)',
-                  hint: isUrdu ? 'کم از کم 10 لائنیں لکھیں...' : 'Min 10 lines required...',
+                  label: isUrdu
+                      ? 'اپنے کام کی تفصیل (تعارف - لازمی)'
+                      : 'Work Description (Intro - Required)',
+                  hint: isUrdu
+                      ? 'کم از کم 10 لائنیں لکھیں...'
+                      : 'Min 10 lines required...',
                   icon: PhosphorIcons.note(),
                   style: controller.descriptionBulletStyle,
                   onStyleChanged: controller.setDescriptionStyle,
@@ -390,13 +399,18 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                   isUrdu: isUrdu,
                 ),
 
-                const Divider(height: 1, thickness: 1, color: Color(0xFFDDDDDD)),
+                const Divider(
+                    height: 1, thickness: 1, color: Color(0xFFDDDDDD)),
 
                 // 2. تعلیمی قابلیت
                 _buildDynamicSection(
                   controllers: controller.qualificationControllers,
-                  label: isUrdu ? 'تعلیمی قابلیت (اختیاری)' : 'Qualification (Optional)',
-                  hint: isUrdu ? 'مثلاً: میٹرک، ڈپلومہ...' : 'e.g. Matric, Diploma...',
+                  label: isUrdu
+                      ? 'تعلیمی قابلیت (اختیاری)'
+                      : 'Qualification (Optional)',
+                  hint: isUrdu
+                      ? 'مثلاً: میٹرک، ڈپلومہ...'
+                      : 'e.g. Matric, Diploma...',
                   icon: PhosphorIcons.graduationCap(),
                   style: controller.qualificationBulletStyle,
                   onStyleChanged: controller.setQualificationStyle,
@@ -406,17 +420,21 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                   isUrdu: isUrdu,
                 ),
 
-                const Divider(height: 1, thickness: 1, color: Color(0xFFDDDDDD)),
+                const Divider(
+                    height: 1, thickness: 1, color: Color(0xFFDDDDDD)),
 
                 // 3. ایڈریس (لوکیشن)
-                _buildLocationField(controller, isUrdu, fontFamily, borderless: true),
+                _buildLocationField(controller, isUrdu, fontFamily,
+                    borderless: true),
 
-                const Divider(height: 1, thickness: 1, color: Color(0xFFDDDDDD)),
+                const Divider(
+                    height: 1, thickness: 1, color: Color(0xFFDDDDDD)),
 
                 // 4. ریٹ سیکشن
                 _buildRateSection(controller, isUrdu, fontFamily),
 
-                const Divider(height: 1, thickness: 1, color: Color(0xFFDDDDDD)),
+                const Divider(
+                    height: 1, thickness: 1, color: Color(0xFFDDDDDD)),
 
                 // تجربہ (ریٹ کے بعد منطقی جگہ)
                 _buildTextField(
@@ -441,12 +459,14 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                   },
                 ),
 
-                const Divider(height: 1, thickness: 1, color: Color(0xFFDDDDDD)),
+                const Divider(
+                    height: 1, thickness: 1, color: Color(0xFFDDDDDD)),
 
                 // 5. پروفیشن (پیشہ)
                 _buildProfessionSelector(controller, isUrdu, fontFamily),
 
-                const Divider(height: 1, thickness: 1, color: Color(0xFFDDDDDD)),
+                const Divider(
+                    height: 1, thickness: 1, color: Color(0xFFDDDDDD)),
 
                 // 6. مہارتیں (Skills)
                 Padding(
@@ -454,12 +474,14 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                   child: _buildSkillsSection(controller, isUrdu, fontFamily),
                 ),
 
-                const Divider(height: 1, thickness: 1, color: Color(0xFFDDDDDD)),
+                const Divider(
+                    height: 1, thickness: 1, color: Color(0xFFDDDDDD)),
 
                 // 7. ویب سائٹ (آخر میں)
                 _buildTextField(
                   controller: controller.websiteController,
-                  label: isUrdu ? 'ویب سائٹ (اختیاری)' : 'Website Address (Opt)',
+                  label:
+                      isUrdu ? 'ویب سائٹ (اختیاری)' : 'Website Address (Opt)',
                   icon: PhosphorIcons.globe(),
                   fontFamily: '',
                   isUrdu: isUrdu,
@@ -549,21 +571,27 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
         suffixIcon: suffixIcon,
         filled: !borderless,
         fillColor: borderless ? Colors.transparent : Colors.white,
-        border: borderless ? InputBorder.none : OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        enabledBorder: borderless ? InputBorder.none : OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        focusedBorder: borderless ? InputBorder.none : OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: AppTheme.themeColor,
-            width: 1.5,
-          ),
-        ),
+        border: borderless
+            ? InputBorder.none
+            : OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+        enabledBorder: borderless
+            ? InputBorder.none
+            : OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+        focusedBorder: borderless
+            ? InputBorder.none
+            : OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: AppTheme.themeColor,
+                  width: 1.5,
+                ),
+              ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 16,
@@ -706,7 +734,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Row(
             children: [
-              Icon(PhosphorIcons.briefcase(), size: 20, color: AppTheme.themeColor),
+              Icon(PhosphorIcons.briefcase(),
+                  size: 20, color: AppTheme.themeColor),
               const SizedBox(width: 12),
               Text(
                 isUrdu ? 'آپ کا پیشہ (لازمی)' : 'Your Profession (Required)',
@@ -725,9 +754,12 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
           child: Row(
             children: [
               _buildItemSquare(
-                onTap: () => _showAllProfessionsPicker(controller, isUrdu, fontFamily),
+                onTap: () =>
+                    _showAllProfessionsPicker(controller, isUrdu, fontFamily),
                 icon: currentProfession['icon'],
-                label: isUrdu ? currentProfession['name'] : currentProfession['id'],
+                label: isUrdu
+                    ? currentProfession['name']
+                    : currentProfession['id'],
                 isSelected: true,
                 fontFamily: fontFamily,
                 isUrdu: isUrdu,
@@ -735,9 +767,9 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
               const SizedBox(width: 16),
               Expanded(
                 child: Text(
-                  isUrdu 
-                    ? 'پیشہ تبدیل کرنے کے لیے کارڈ پر کلک کریں۔' 
-                    : 'Tap the card to change your profession.',
+                  isUrdu
+                      ? 'پیشہ تبدیل کرنے کے لیے کارڈ پر کلک کریں۔'
+                      : 'Tap the card to change your profession.',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[500],
@@ -775,17 +807,13 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                     : AppTheme.backgroundColor.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isSelected
-                      ? AppTheme.themeColor
-                      : Colors.transparent,
+                  color: isSelected ? AppTheme.themeColor : Colors.transparent,
                   width: 2,
                 ),
               ),
               child: Icon(
                 icon,
-                color: isSelected
-                    ? Colors.white
-                    : AppTheme.themeColor,
+                color: isSelected ? Colors.white : AppTheme.themeColor,
                 size: 24,
               ),
             ),
@@ -832,7 +860,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
             validator: (val) => null,
           ),
         ),
-        
+
         // درمیان کی لکیر
         Container(
           width: 1,
@@ -840,7 +868,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
           color: const Color(0xFFDDDDDD),
           margin: const EdgeInsets.symmetric(horizontal: 4),
         ),
-        
+
         // ریٹ کے یونٹ کا سلائیڈر (اسی لائن میں)
         Expanded(
           flex: 3,
@@ -887,7 +915,6 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
             ],
           ),
         ),
-        
         ...List.generate(controllers.length, (index) {
           return Dismissible(
             key: ObjectKey(controllers[index]),
@@ -916,10 +943,12 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                       style: TextStyle(fontFamily: fontFamily, fontSize: 16),
                       decoration: InputDecoration(
                         hintText: hint,
-                        hintStyle: TextStyle(fontSize: 14, color: Colors.grey[400]),
+                        hintStyle:
+                            TextStyle(fontSize: 14, color: Colors.grey[400]),
                         border: InputBorder.none,
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
                   ),
@@ -928,7 +957,6 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
             ),
           );
         }),
-        
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
@@ -937,7 +965,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                 onTap: onAdd,
                 child: Row(
                   children: [
-                    Icon(PhosphorIcons.plusCircle(), color: AppTheme.themeColor, size: 18),
+                    Icon(PhosphorIcons.plusCircle(),
+                        color: AppTheme.themeColor, size: 18),
                     const SizedBox(width: 6),
                     Text(
                       isUrdu ? 'مزید شامل کریں' : 'Add more',
@@ -963,9 +992,14 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
   Widget _buildBulletIcon(String style, int index) {
     String label = "•";
     double size = 20;
-    if (style == 'star') label = "★";
-    else if (style == 'tick') label = "✓";
-    else if (style == 'number') { label = "${index + 1}."; size = 14; }
+    if (style == 'star')
+      label = "★";
+    else if (style == 'tick')
+      label = "✓";
+    else if (style == 'number') {
+      label = "${index + 1}.";
+      size = 14;
+    }
 
     return SizedBox(
       width: 20,
@@ -981,7 +1015,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
     );
   }
 
-  Widget _buildMiniStyleSelector(String currentStyle, Function(String) onChanged) {
+  Widget _buildMiniStyleSelector(
+      String currentStyle, Function(String) onChanged) {
     return Container(
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
@@ -991,16 +1026,23 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildMiniToggle('dot', currentStyle == 'dot', Icons.circle, () => onChanged('dot')),
-          _buildMiniToggle('number', currentStyle == 'number', null, () => onChanged('number'), text: "1."),
-          _buildMiniToggle('star', currentStyle == 'star', Icons.star_rounded, () => onChanged('star')),
-          _buildMiniToggle('tick', currentStyle == 'tick', Icons.check_rounded, () => onChanged('tick')),
+          _buildMiniToggle('dot', currentStyle == 'dot', Icons.circle,
+              () => onChanged('dot')),
+          _buildMiniToggle('number', currentStyle == 'number', null,
+              () => onChanged('number'),
+              text: "1."),
+          _buildMiniToggle('star', currentStyle == 'star', Icons.star_rounded,
+              () => onChanged('star')),
+          _buildMiniToggle('tick', currentStyle == 'tick', Icons.check_rounded,
+              () => onChanged('tick')),
         ],
       ),
     );
   }
 
-  Widget _buildMiniToggle(String id, bool isSelected, IconData? icon, VoidCallback onTap, {String? text}) {
+  Widget _buildMiniToggle(
+      String id, bool isSelected, IconData? icon, VoidCallback onTap,
+      {String? text}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -1008,11 +1050,18 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
         decoration: BoxDecoration(
           color: isSelected ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          boxShadow: isSelected ? [const BoxShadow(color: Colors.black12, blurRadius: 2)] : null,
+          boxShadow: isSelected
+              ? [const BoxShadow(color: Colors.black12, blurRadius: 2)]
+              : null,
         ),
-        child: icon != null 
-          ? Icon(icon, size: 14, color: isSelected ? AppTheme.themeColor : Colors.grey)
-          : Text(text!, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isSelected ? AppTheme.themeColor : Colors.grey)),
+        child: icon != null
+            ? Icon(icon,
+                size: 14, color: isSelected ? AppTheme.themeColor : Colors.grey)
+            : Text(text!,
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? AppTheme.themeColor : Colors.grey)),
       ),
     );
   }
@@ -1062,8 +1111,6 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
       ),
     );
   }
-
-
 
   Widget _buildSkillsSection(
     ProfileController controller,
@@ -1167,7 +1214,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
         controller.jobLongitude = option['lon'];
         controller.notifyListeners();
       },
-      fieldViewBuilder: (context, textController, focusNode, onEditingComplete) {
+      fieldViewBuilder:
+          (context, textController, focusNode, onEditingComplete) {
         if (textController.text.isEmpty &&
             controller.locationController.text.isNotEmpty) {
           textController.text = controller.locationController.text;
@@ -1196,23 +1244,30 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
               horizontal: borderless ? 16 : 12,
               vertical: 12,
             ),
-            fillColor: borderless ? Colors.transparent : const Color(0xFFF5F7F9),
+            fillColor:
+                borderless ? Colors.transparent : const Color(0xFFF5F7F9),
             filled: !borderless,
-            border: borderless ? InputBorder.none : OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide: BorderSide(color: Colors.grey.shade400),
-            ),
-            enabledBorder: borderless ? InputBorder.none : OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide: BorderSide(color: Colors.grey.shade400),
-            ),
-            focusedBorder: borderless ? InputBorder.none : OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide: const BorderSide(
-                color: AppTheme.themeColor,
-                width: 1,
-              ),
-            ),
+            border: borderless
+                ? InputBorder.none
+                : OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12.0),
+                    borderSide: BorderSide(color: Colors.grey.shade400),
+                  ),
+            enabledBorder: borderless
+                ? InputBorder.none
+                : OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12.0),
+                    borderSide: BorderSide(color: Colors.grey.shade400),
+                  ),
+            focusedBorder: borderless
+                ? InputBorder.none
+                : OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12.0),
+                    borderSide: const BorderSide(
+                      color: AppTheme.themeColor,
+                      width: 1,
+                    ),
+                  ),
             prefixIcon: Icon(
               PhosphorIcons.mapPin(),
               color: AppTheme.themeColor,
@@ -1342,7 +1397,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppTheme.darkColor.withOpacity(0.05)),
+                        border: Border.all(
+                            color: AppTheme.darkColor.withOpacity(0.05)),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.02),
@@ -1392,7 +1448,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                                       decoration: BoxDecoration(
                                         color: isSelected
                                             ? AppTheme.themeColor
-                                            : AppTheme.backgroundColor.withOpacity(0.5),
+                                            : AppTheme.backgroundColor
+                                                .withOpacity(0.5),
                                         borderRadius: BorderRadius.circular(16),
                                         border: Border.all(
                                           color: isSelected

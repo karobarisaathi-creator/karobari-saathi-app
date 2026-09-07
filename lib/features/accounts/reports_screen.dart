@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
-import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 
 class ReportsScreen extends StatefulWidget {
-  final Profession? selectedProfession; // Optional profession for filtering
+  final Profession? selectedProfession; 
 
   const ReportsScreen({Key? key, this.selectedProfession}) : super(key: key);
 
@@ -19,13 +20,34 @@ class ReportsScreen extends StatefulWidget {
 }
 
 class _ReportsScreenState extends State<ReportsScreen> {
-  List<Profession> _professions = [];
-  List<model.Transaction> _transactions = [];
+  List<model.Transaction> _allTransactions = [];
+  List<Profession> _availableSeasons = [];
+  Profession? _currentViewSeason;
   bool _isLoading = true;
-  double _totalIncome = 0.0;
-  double _totalExpense = 0.0;
-  List<String> _relevantProfessionIds = []; // IDs of master + all its seasons
-  final Set<String> _expandedSeasonIds = {}; // کھلنے اور بند ہونے والے سیزنز کے لیے
+  String _selectedType = 'expense'; // 'income' or 'expense'
+
+  final List<Color> _segmentColors = [
+    const Color(0xFFFFC107), // Amber
+    const Color(0xFF03A9F4), // Light Blue
+    const Color(0xFFE91E63), // Pink
+    const Color(0xFF9C27B0), // Purple
+    const Color(0xFF4CAF50), // Green
+    const Color(0xFFFF5722), // Deep Orange
+    const Color(0xFF009688), // Teal
+    const Color(0xFF607D8B), // Blue Grey
+    const Color(0xFF795548), // Brown
+    const Color(0xFF673AB7), // Deep Purple
+    const Color(0xFF3F51B5), // Indigo
+    const Color(0xFFCDDC39), // Lime
+    const Color(0xFFFF9800), // Orange
+    const Color(0xFF00BCD4), // Cyan
+    const Color(0xFF8BC34A), // Light Green
+    const Color(0xFFF44336), // Red
+    const Color(0xFF2196F3), // Blue
+    const Color(0xFF9E9E9E), // Grey
+    const Color(0xFFFF4081), // Pink Accent
+    const Color(0xFF7C4DFF), // Deep Purple Accent
+  ];
 
   @override
   void initState() {
@@ -35,630 +57,403 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   Future<void> _loadData() async {
     try {
-      final databaseService = Provider.of<DatabaseService>(context, listen: false);
+      final db = Provider.of<DatabaseService>(context, listen: false);
+      final allProfs = db.getProfessions();
+      _allTransactions = db.getAllTransactions().where((t) => t.partnershipId == null).toList();
 
-      var allProfs = databaseService.getProfessions();
-      
-      // If a specific profession is selected, find its seasons
-      List<String> relevantIds = [];
       if (widget.selectedProfession != null) {
-        relevantIds.add(widget.selectedProfession!.id);
-        // اگر یہ ماسٹر پیشہ ہے تو اس کے سیزنز بھی ڈھونڈیں
-        final seasons = allProfs.where((p) => p.parentId == widget.selectedProfession!.id).toList();
-        relevantIds.addAll(seasons.map((s) => s.id));
-        
-        _professions = allProfs.where((p) => relevantIds.contains(p.id)).toList();
-      } else {
-        _professions = allProfs;
+        if (widget.selectedProfession!.isMaster ?? false) {
+          _availableSeasons = allProfs.where((p) => p.parentId == widget.selectedProfession!.id).toList();
+          _availableSeasons.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          
+          if (_availableSeasons.isNotEmpty) {
+            _currentViewSeason = _availableSeasons.first;
+          } else {
+            _currentViewSeason = widget.selectedProfession;
+            _availableSeasons = [widget.selectedProfession!];
+          }
+        } else {
+          _currentViewSeason = widget.selectedProfession;
+          _availableSeasons = [widget.selectedProfession!];
+        }
       }
 
-      // Filter out transactions that belong to partnerships
-      final allTransactions = databaseService.getAllTransactions();
-      _transactions = allTransactions.where((t) => t.partnershipId == null).toList();
-      _relevantProfessionIds = relevantIds;
-
       if (mounted) {
-        _calculateTotals();
         setState(() {
           _isLoading = false;
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _calculateTotals() {
-    double income = 0.0;
-    double expense = 0.0;
-
-    for (var transaction in _transactions) {
-      if (transaction.professionId == null) continue;
-      
-      // If filtering, check if transaction belongs to master or any of its seasons
-      if (widget.selectedProfession != null && !_relevantProfessionIds.contains(transaction.professionId)) {
-        continue;
-      }
-
-      if (transaction.professionSide == 'income') {
-        income += transaction.amount;
-      } else if (transaction.professionSide == 'expense') {
-        expense += transaction.amount;
-      }
-    }
-
-    _totalIncome = income;
-    _totalExpense = expense;
-  }
-
-  Map<String, double> _getIncomeCategories() {
+  Map<String, double> _getCategoryData() {
+    if (_currentViewSeason == null) return {};
+    
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-    Map<String, double> categories = {};
-    for (var transaction in _transactions.where((t) => t.partnershipId == null && t.professionId != null)) {
-      if (widget.selectedProfession != null && !_relevantProfessionIds.contains(transaction.professionId)) continue;
-      
-      if (transaction.professionSide != 'income') continue;
+    Map<String, double> data = {};
+    
+    final filtered = _allTransactions.where((t) => t.professionId == _currentViewSeason!.id).toList();
 
-      String category = transaction.category;
-      if (category.startsWith('INC:')) category = category.substring(4);
-      if (category == 'income' || category == 'دیگر') category = isUrdu ? 'آمدن' : 'Income';
-      categories[category] = (categories[category] ?? 0) + transaction.amount;
+    for (var tx in filtered) {
+      if (tx.professionSide != _selectedType) continue;
+
+      String category = _getEffectiveCategory(tx, isUrdu);
+      data[category] = (data[category] ?? 0) + tx.amount;
     }
-    return categories;
+    return data;
   }
 
-  Map<String, double> _getExpenseCategories() {
-    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-    Map<String, double> categories = {};
-    for (var transaction in _transactions.where((t) => t.partnershipId == null && t.professionId != null)) {
-      if (widget.selectedProfession != null && !_relevantProfessionIds.contains(transaction.professionId)) continue;
-      
-      if (transaction.professionSide != 'expense') continue;
-
-      String category = transaction.category;
-      if (category.startsWith('EXP:')) category = category.substring(4);
-      if (category == 'expense' || category == 'دیگر') category = isUrdu ? 'خرچ' : 'Expense';
-      categories[category] = (categories[category] ?? 0) + transaction.amount;
+  String _getEffectiveCategory(model.Transaction t, bool isUrdu) {
+    if (t.accountId != 'default_account' && t.accountId != 'artisan_internal_income') {
+      final db = Provider.of<DatabaseService>(context, listen: false);
+      final account = db.getAccount(t.accountId);
+      if (account != null) return account.name;
     }
-    return categories;
+
+    String category = t.category;
+    if (category.startsWith('INC:')) category = category.substring(4);
+    if (category.startsWith('EXP:')) category = category.substring(4);
+
+    if (category == 'income' || category == 'expense' || category == 'دیگر' || category == 'Other') {
+      return isUrdu ? (t.type == 'income' ? 'آمدن' : 'خرچ') : (t.type == 'income' ? 'Income' : 'Expense');
+    }
+    return category;
   }
 
   @override
   Widget build(BuildContext context) {
-    final languageService = Provider.of<LanguageService>(context);
-    final isUrdu = languageService.isUrdu;
+    final isUrdu = Provider.of<LanguageService>(context).isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-    final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
 
-    final content = _isLoading
-        ? const Center(
-            child: Padding(
-            padding: EdgeInsets.all(40.0),
-            child: CircularProgressIndicator(color: AppTheme.themeColor),
-          ))
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: CustomAppBar(
+        title: _buildSeasonSelector(isUrdu, fontFamily),
+        centerTitle: true,
+      ),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
         : SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // 1. Budget Alerts
-                _buildBudgetAlertsSection(isUrdu, fontFamily, fontWeight),
-
-                const SizedBox(height: 10),
-
-                // 2. سیزن وار زمرہ جات کا تفصیلی حساب
-                if (widget.selectedProfession != null)
-                  _buildDetailedSeasonCategoryBreakdown(
-                      isUrdu, fontFamily, fontWeight),
-
-                const SizedBox(height: 10),
-
-                // If viewing all, show summary.
-                if (widget.selectedProfession == null)
-                  _buildProfessionSummary(isUrdu, fontFamily, fontWeight),
-
-                const SizedBox(height: 10),
-                _buildCategorySummary(isUrdu, fontFamily, fontWeight),
-                const SizedBox(height: 20),
-              ],
-            ),
-          );
-
-    // پوپ اپ (Bottom Sheet) ڈیزائن
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppTheme.backgroundColor,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // ہینڈل بار
-          Center(
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[400],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          // ہیڈر
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  widget.selectedProfession != null
-                      ? (isUrdu
-                          ? '${widget.selectedProfession!.name} رپورٹ'
-                          : '${widget.selectedProfession!.name} Report')
-                      : (isUrdu ? 'رپورٹس (خلاصہ)' : 'Reports Summary'),
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: fontFamily,
-                    color: AppTheme.darkColor,
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close, color: AppTheme.darkColor),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          // مواد (Scrollable)
-          Flexible(child: content),
-        ],
-      ),
-    );
-  }
-
-  // Budget Alerts
-  Widget _buildBudgetAlertsSection(bool isUrdu, String fontFamily, FontWeight fontWeight) {
-    final professionsWithBudget = _professions
-        .where((p) => p.budgetLimits != null && p.budgetLimits!.isNotEmpty) 
-        .toList();
-
-    if (professionsWithBudget.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.darkColor.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-             Text(isUrdu ? 'بجٹ کنٹرول' : 'Budget Control', style: TextStyle(color: AppTheme.darkColor, fontSize: 18, fontFamily: fontFamily, fontWeight: FontWeight.bold)),
-             const SizedBox(height: 12),
-             ...professionsWithBudget.map((profession) {
-                final warnings = _generateBudgetWarnings(profession);
-                if(warnings.isEmpty) return const SizedBox.shrink();
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(profession.name, style: TextStyle(color: AppTheme.darkColor, fontFamily: fontFamily, fontWeight: FontWeight.bold)),
-                    ...warnings.map((w) => Row(
-                      children: [
-                        Icon(PhosphorIcons.warning(), color: Colors.red, size: 14),
-                        const SizedBox(width: 4),
-                        Expanded(child: Text(w, style: TextStyle(color: Colors.red, fontSize: 12, fontFamily: fontFamily, fontWeight: fontWeight))),
-                      ],
-                    )).toList(),
-                    const SizedBox(height: 8),
-                  ],
-                );
-             }).toList(),
-        ],
-      ),
-    );
-  }
-
-  // سیزن وار زمرہ جات کا تفصیلی حساب (آمدنی اور خرچ)
-  Widget _buildDetailedSeasonCategoryBreakdown(bool isUrdu, String fontFamily, FontWeight fontWeight) {
-    final relevantProfessions = _professions.where((p) => _relevantProfessionIds.contains(p.id)).toList();
-    relevantProfessions.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(PhosphorIcons.listChecks(), color: AppTheme.themeColor, size: 24),
-            const SizedBox(width: 8),
-            Text(
-              isUrdu ? 'سیزن وار تفصیلی حساب' : 'Detailed Season Breakdown',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: fontFamily, color: AppTheme.darkColor),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        ...relevantProfessions.map((profession) {
-          final seasonTxs = _transactions.where((t) => t.professionId == profession.id).toList();
-          if (seasonTxs.isEmpty) return const SizedBox.shrink();
-
-          Map<String, double> catIncome = {};
-          Map<String, double> catExpenses = {};
-          
-          for (var tx in seasonTxs) {
-            if (tx.type == 'income') {
-              catIncome[tx.category] = (catIncome[tx.category] ?? 0) + tx.amount;
-            } else {
-              catExpenses[tx.category] = (catExpenses[tx.category] ?? 0) + tx.amount;
-            }
-          }
-
-          if (catIncome.isEmpty && catExpenses.isEmpty) return const SizedBox.shrink();
-
-          final sortedIncome = catIncome.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-          final sortedExpenses = catExpenses.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-          final isExpanded = _expandedSeasonIds.contains(profession.id);
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.darkColor.withValues(alpha: 0.1)),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                InkWell(
-                  onTap: () {
-                    setState(() {
-                      if (isExpanded) {
-                        _expandedSeasonIds.remove(profession.id);
-                      } else {
-                        _expandedSeasonIds.add(profession.id);
-                      }
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Icon(
-                                isExpanded ? PhosphorIcons.caretUp() : PhosphorIcons.caretDown(),
-                                size: 16,
-                                color: AppTheme.themeColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                (profession.isMaster ?? false) ? (isUrdu ? 'بنیادی کھاتہ' : 'Base Account') : profession.season,
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.themeColor, fontFamily: fontFamily),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            Text(
-                              'Rs ${profession.totalIncome.toStringAsFixed(0)}',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.incomeColor),
-                            ),
-                            const Text(' | ', style: TextStyle(color: Colors.grey)),
-                            Text(
-                              'Rs ${profession.totalExpense.toStringAsFixed(0)}',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.expenseColor),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                if (isExpanded) ...[
-                  const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // --- آمدنی کا سیکشن ---
-                        if (sortedIncome.isNotEmpty) ...[
-                          Text(isUrdu ? 'آمدنی' : 'Income', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.incomeColor, fontFamily: fontFamily)),
-                          const SizedBox(height: 8),
-                          ...sortedIncome.map((entry) => _buildSimpleBreakdownRow(entry.key, entry.value, profession.totalIncome, AppTheme.incomeColor, fontFamily)),
-                          const SizedBox(height: 16),
-                        ],
-
-                        // --- اخراجات کا سیکشن ---
-                        if (sortedExpenses.isNotEmpty) ...[
-                          Text(isUrdu ? 'اخراجات' : 'Expenses', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.expenseColor, fontFamily: fontFamily)),
-                          const SizedBox(height: 8),
-                          ...sortedExpenses.map((entry) => _buildSimpleBreakdownRow(entry.key, entry.value, profession.totalExpense, AppTheme.expenseColor, fontFamily)),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
+                _buildComparisonBars(isUrdu, fontFamily),
+                const SizedBox(height: 32),
+                _buildTypeToggle(isUrdu, fontFamily),
+                const SizedBox(height: 40),
+                _buildChartSection(isUrdu, fontFamily),
+                const SizedBox(height: 40),
+                _buildCategoryList(isUrdu, fontFamily),
+                const SizedBox(height: 40),
               ],
             ),
-          );
-        }).toList(),
+          ),
+    );
+  }
+
+  Widget _buildSeasonSelector(bool isUrdu, String fontFamily) {
+    if (_availableSeasons.isEmpty) return const SizedBox.shrink();
+    
+    final currentYear = _currentViewSeason != null 
+        ? DateFormat('yyyy').format(_currentViewSeason!.createdAt) 
+        : DateFormat('yyyy').format(DateTime.now());
+
+    return InkWell(
+      onTap: () => _showSeasonPicker(isUrdu, fontFamily),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            isUrdu ? "رپورٹ $currentYear" : "Report $currentYear",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              fontFamily: fontFamily,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Icon(PhosphorIconsStyle.bold == PhosphorIconsStyle.bold ? Icons.unfold_more : Icons.unfold_more, color: Colors.white, size: 18),
+        ],
+      ),
+    );
+  }
+
+  void _showSeasonPicker(bool isUrdu, String fontFamily) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isUrdu ? "سیزن منتخب کریں" : "Select Season",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, fontFamily: fontFamily, color: AppTheme.darkColor),
+            ),
+            const SizedBox(height: 20),
+            Flexible(
+              child: GridView.builder(
+                shrinkWrap: true,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 2.5,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                itemCount: _availableSeasons.length,
+                itemBuilder: (context, index) {
+                  final p = _availableSeasons[index];
+                  final isSelected = _currentViewSeason?.id == p.id;
+                  final seasonName = (p.isMaster ?? false) ? (isUrdu ? 'بنیادی کھاتہ' : 'Base Record') : p.season;
+                  
+                  return InkWell(
+                    onTap: () {
+                      setState(() => _currentViewSeason = p);
+                      Navigator.pop(context);
+                    },
+                    child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppTheme.themeColor : const Color(0xFFF5F7FA),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isSelected ? AppTheme.themeColor : Colors.grey.shade200),
+                      ),
+                      child: Text(
+                        seasonName,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: fontFamily,
+                          color: isSelected ? Colors.white : AppTheme.darkColor,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildComparisonBars(bool isUrdu, String fontFamily) {
+    final double income = _currentViewSeason?.totalIncome ?? 0.0;
+    final double expense = _currentViewSeason?.totalExpense ?? 0.0;
+    final double maxVal = income > expense ? income : (expense == 0 ? 1.0 : expense);
+
+    return Column(
+      children: [
+        _buildMiniProgressBar(isUrdu ? "خرچ" : "Expense", expense, maxVal, const Color(0xFFFFC107), isUrdu, fontFamily),
+        const SizedBox(height: 16),
+        _buildMiniProgressBar(isUrdu ? "آمدنی" : "Earn", income, maxVal, const Color(0xFF3F51B5), isUrdu, fontFamily),
       ],
     );
   }
 
-  Widget _buildSimpleBreakdownRow(String label, double amount, double total, Color color, String fontFamily) {
-    double percentage = total > 0 ? (amount / total) : 0;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Expanded(flex: 2, child: Text(label, style: TextStyle(fontSize: 11, fontFamily: fontFamily))),
-          Expanded(
-            flex: 3,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: percentage,
-                backgroundColor: Colors.grey[100],
-                valueColor: AlwaysStoppedAnimation<Color>(color.withValues(alpha: 0.6)),
-                minHeight: 5,
-              ),
+  Widget _buildMiniProgressBar(String label, double val, double max, Color color, bool isUrdu, String fontFamily) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 60,
+          child: Text(label, style: TextStyle(fontSize: 13, color: Colors.grey[600], fontFamily: fontFamily, fontWeight: FontWeight.bold)),
+        ),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: val / max,
+              minHeight: 6,
+              backgroundColor: const Color(0xFFF0F2F5),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
           ),
-          const SizedBox(width: 8),
-          Text('Rs ${amount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-        ],
-      ),
+        ),
+        const SizedBox(width: 12),
+        Text("Rs ${val.toStringAsFixed(0)}", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: color)),
+      ],
     );
   }
 
-  // Profession Summary List
-  Widget _buildProfessionSummary(bool isUrdu, String fontFamily, FontWeight fontWeight) {
-    if (_professions.isEmpty) return const SizedBox.shrink();
-
-    final activeProfessions = _professions.where((p) => p.isActive ?? true).toList();
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.darkColor.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(PhosphorIcons.briefcase(), color: AppTheme.themeColor, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                isUrdu ? 'پیشوں کا خلاصہ' : 'Professions Summary',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: fontFamily,
-                  color: AppTheme.darkColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          Row(
-            children: [
-              Expanded(flex: 3, child: Text(isUrdu ? 'پیشہ' : 'Profession', style: TextStyle(color: AppTheme.darkColor, fontWeight: FontWeight.bold, fontFamily: fontFamily, fontSize: 12))),
-              Expanded(child: Center(child: Text(isUrdu ? 'آمدنی' : 'Inc', style: TextStyle(color: AppTheme.incomeColor, fontWeight: FontWeight.bold, fontFamily: fontFamily, fontSize: 12)))),
-              Expanded(child: Center(child: Text(isUrdu ? 'خرچ' : 'Exp', style: TextStyle(color: AppTheme.expenseColor, fontWeight: FontWeight.bold, fontFamily: fontFamily, fontSize: 12)))),
-              Expanded(child: Align(alignment: Alignment.centerRight, child: Text(isUrdu ? 'بچت' : 'Net', style: TextStyle(color: AppTheme.darkColor, fontWeight: FontWeight.bold, fontFamily: fontFamily, fontSize: 12)))),
-            ],
-          ),
-          Divider(color: AppTheme.darkColor.withValues(alpha: 0.1)),
-
-          ...activeProfessions.map((profession) =>
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(profession.name, style: TextStyle(color: AppTheme.darkColor, fontFamily: fontFamily, fontWeight: fontWeight, fontSize: 13)),
-                          if (profession.season.isNotEmpty)
-                            Text(
-                              profession.season,
-                              style: TextStyle(
-                                color: AppTheme.darkColor.withValues(alpha: 0.5),
-                                fontFamily: fontFamily,
-                                fontWeight: fontWeight,
-                                fontSize: 10,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            profession.totalIncome.toStringAsFixed(0),
-                            style: TextStyle(color: AppTheme.incomeColor, fontFamily: '', fontWeight: FontWeight.bold, fontSize: 12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            profession.totalExpense.toStringAsFixed(0),
-                            style: TextStyle(color: AppTheme.expenseColor, fontFamily: '', fontWeight: FontWeight.bold, fontSize: 12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            profession.netProfit.toStringAsFixed(0),
-                            style: TextStyle(
-                              color: profession.netProfit >= 0 ? AppTheme.incomeColor : AppTheme.expenseColor,
-                              fontFamily: '',
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-          ).toList(),
-        ],
-      ),
+  Widget _buildTypeToggle(bool isUrdu, String fontFamily) {
+    return Row(
+      children: [
+        _buildToggleItem(isUrdu ? "خرچ" : "Expense", 'expense', isUrdu, fontFamily),
+        const SizedBox(width: 24),
+        _buildToggleItem(isUrdu ? "آمدنی" : "Earn", 'income', isUrdu, fontFamily),
+      ],
     );
   }
 
-  // Category Summary
-  Widget _buildCategorySummary(bool isUrdu, String fontFamily, FontWeight fontWeight) {
-    final incomeCategories = _getIncomeCategories();
-    final expenseCategories = _getExpenseCategories();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.darkColor.withValues(alpha: 0.2)),
-      ),
+  Widget _buildToggleItem(String label, String type, bool isUrdu, String fontFamily) {
+    final isSelected = _selectedType == type;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedType = type),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isUrdu ? 'زمرہ وار خلاصہ' : 'Category-wise Summary',
+            label,
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              fontWeight: isSelected ? FontWeight.w900 : FontWeight.bold,
               fontFamily: fontFamily,
-              color: AppTheme.darkColor,
+              color: isSelected ? AppTheme.darkColor : Colors.grey[400],
             ),
           ),
-          const SizedBox(height: 16),
-
-          if (incomeCategories.isNotEmpty) ...[
-            _buildCategorySection(isUrdu ? 'آمدنی' : 'Income', AppTheme.incomeColor, incomeCategories, fontFamily, fontWeight),
-            const SizedBox(height: 24),
-          ],
-
-          if (expenseCategories.isNotEmpty) ...[
-            _buildCategorySection(isUrdu ? 'خرچ' : 'Expense', AppTheme.expenseColor, expenseCategories, fontFamily, fontWeight),
-          ],
+          if (isSelected)
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              height: 3, width: 24,
+              decoration: BoxDecoration(color: AppTheme.darkColor, borderRadius: BorderRadius.circular(2)),
+            ),
         ],
       ),
     );
   }
-  
-  // Helper for category section
-  Widget _buildCategorySection(String title, Color color, Map<String, double> categories, String fontFamily, FontWeight fontWeight) {
-    double total = categories.values.fold(0, (sum, amount) => sum + amount);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color, fontFamily: fontFamily)),
-        Divider(color: AppTheme.darkColor.withValues(alpha: 0.1)),
-        ...categories.entries.map((entry) {
-          double percentage = total > 0 ? (entry.value / total) : 0;
-          String percentageText = '${(percentage * 100).toStringAsFixed(1)}%';
+  Widget _buildChartSection(bool isUrdu, String fontFamily) {
+    final catData = _getCategoryData();
+    final total = catData.values.fold(0.0, (sum, v) => sum + v);
+    
+    if (catData.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 40),
+          child: Text(isUrdu ? "کوئی ڈیٹا موجود نہیں" : "No data available", style: TextStyle(color: Colors.grey, fontFamily: fontFamily)),
+        ),
+      );
+    }
 
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Row(
+    return Center(
+      child: SizedBox(
+        height: 220,
+        width: 220,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            PieChart(
+              PieChartData(
+                sectionsSpace: 0,
+                centerSpaceRadius: 75,
+                startDegreeOffset: -90,
+                sections: catData.entries.toList().asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final val = entry.value.value;
+                  return PieChartSectionData(
+                    color: _segmentColors[idx % _segmentColors.length],
+                    value: val,
+                    title: '',
+                    radius: 30,
+                  );
+                }).toList(),
+              ),
+            ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(
-                  width: 80,
-                  child: Text(
-                    entry.key,
-                    style: TextStyle(color: AppTheme.darkColor, fontFamily: fontFamily, fontWeight: fontWeight, fontSize: 13),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                Text(
+                  "Rs ${total.toStringAsFixed(0)}",
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.darkColor),
                 ),
-                const SizedBox(width: 8),
-
-                Expanded(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value: percentage,
-                          backgroundColor: AppTheme.darkColor.withValues(alpha: 0.05),
-                          valueColor: AlwaysStoppedAnimation<Color>(color),
-                          minHeight: 16,
-                        ),
-                      ),
-                      Text(
-                        percentageText,
-                        style: TextStyle(
-                          color: percentage > 0.5 ? Colors.white : AppTheme.darkColor,
-                          fontFamily: '',
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(width: 8),
-
-                SizedBox(
-                  width: 80,
-                  child: Text(
-                    'Rs ${entry.value.toStringAsFixed(0)}',
-                    textAlign: TextAlign.end,
-                    style: TextStyle(color: color, fontFamily: '', fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
+                Text(
+                  isUrdu ? "${catData.length} زمروں میں" : "in ${catData.length} categories",
+                  style: TextStyle(fontSize: 13, color: Colors.grey[500], fontFamily: fontFamily),
                 ),
               ],
             ),
-          );
-        }).toList(),
-      ],
+          ],
+        ),
+      ),
     );
   }
 
-  List<String> _generateBudgetWarnings(Profession profession) {
-    final warnings = <String>[];
-    if (profession.budgetLimits == null) return warnings;
+  Widget _buildCategoryList(bool isUrdu, String fontFamily) {
+    final catData = _getCategoryData().entries.toList();
+    catData.sort((a, b) => b.value.compareTo(a.value));
+    final total = catData.fold(0.0, (sum, e) => sum + e.value);
 
-    double totalBudget = profession.budgetLimits!.values.fold(0, (sum, val) => sum + val);
-    if (totalBudget > 0 && profession.totalExpense > totalBudget) {
-       warnings.add('کل خرچ بجٹ (${totalBudget.toStringAsFixed(0)}) سے زیادہ ہے');
-    }
-    return warnings;
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: catData.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 20),
+      itemBuilder: (context, index) {
+        final entry = catData[index];
+        final color = _segmentColors[index % _segmentColors.length];
+        final percentage = (entry.value / total) * 100;
+
+        return Row(
+          children: [
+            // Percentage
+            SizedBox(
+              width: 30,
+              child: Text(
+                "${percentage.toStringAsFixed(0)}%",
+                style: TextStyle(
+                  fontSize: 11,
+                  color: color.withValues(alpha: 0.8),
+                  fontWeight: FontWeight.bold,
+                  fontFamily: '',
+                ),
+              ),
+            ),
+            // Category Name
+            Expanded(
+              flex: 3,
+              child: Text(
+                entry.key,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: fontFamily,
+                  color: Colors.grey[700],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Progress Bar
+            Expanded(
+              flex: 5,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: LinearProgressIndicator(
+                  value: entry.value / total,
+                  minHeight: 6,
+                  backgroundColor: const Color(0xFFF0F2F5),
+                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Amount
+            Text(
+              "Rs ${entry.value.toStringAsFixed(0)}",
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                color: Colors.grey[400],
+                fontFamily: '',
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

@@ -13,14 +13,15 @@ class TransactionService extends BaseService {
     // 1. Save locally first
     await transactionsBox?.put(transaction.id, transaction);
     await _accountService.recalculateAccountBalance(transaction.accountId);
-    
+
     // Recalculate profession finance (this helper now handles master/season hierarchy)
     if (transaction.professionId != null) {
-      await _professionService.recalculateProfessionFinance(transaction.professionId!);
+      await _professionService
+          .recalculateProfessionFinance(transaction.professionId!);
     }
-    
+
     notifyListeners();
-    
+
     // 2. Background Cloud Sync
     if (auth.currentUser != null) {
       firestore
@@ -29,20 +30,31 @@ class TransactionService extends BaseService {
           .collection('transactions')
           .doc(transaction.id)
           .set(transaction.toMap())
-          .catchError((e) => debugPrint("Offline Sync: Transaction addition delayed"));
+          .catchError(
+              (e) => debugPrint("Offline Sync: Transaction addition delayed"));
     }
   }
 
   Future<void> updateTransaction(model.Transaction transaction) async {
     final oldTransaction = transactionsBox?.get(transaction.id);
-    
+    final String? oldAccountId = oldTransaction?.accountId;
+
     // 1. Update locally
     await transactionsBox?.put(transaction.id, transaction);
     await _accountService.recalculateAccountBalance(transaction.accountId);
-    
-    if (transaction.professionId != null) await _professionService.recalculateProfessionFinance(transaction.professionId!);
-    if (oldTransaction?.professionId != null && oldTransaction?.professionId != transaction.professionId) {
-      await _professionService.recalculateProfessionFinance(oldTransaction!.professionId!);
+
+    // If account was changed, recalculate the old account balance too
+    if (oldAccountId != null && oldAccountId != transaction.accountId) {
+      await _accountService.recalculateAccountBalance(oldAccountId);
+    }
+
+    if (transaction.professionId != null)
+      await _professionService
+          .recalculateProfessionFinance(transaction.professionId!);
+    if (oldTransaction?.professionId != null &&
+        oldTransaction?.professionId != transaction.professionId) {
+      await _professionService
+          .recalculateProfessionFinance(oldTransaction!.professionId!);
     }
     notifyListeners();
 
@@ -54,7 +66,8 @@ class TransactionService extends BaseService {
           .collection('transactions')
           .doc(transaction.id)
           .update(transaction.toMap())
-          .catchError((e) => debugPrint("Offline Sync: Transaction update delayed"));
+          .catchError(
+              (e) => debugPrint("Offline Sync: Transaction update delayed"));
     }
   }
 
@@ -63,7 +76,9 @@ class TransactionService extends BaseService {
     if (transaction != null) {
       await transactionsBox?.delete(transactionId);
       await _accountService.recalculateAccountBalance(transaction.accountId);
-      if (transaction.professionId != null) await _professionService.recalculateProfessionFinance(transaction.professionId!);
+      if (transaction.professionId != null)
+        await _professionService
+            .recalculateProfessionFinance(transaction.professionId!);
       if (auth.currentUser != null) {
         firestore
             .collection('users')
@@ -71,14 +86,18 @@ class TransactionService extends BaseService {
             .collection('transactions')
             .doc(transactionId)
             .delete()
-            .catchError((e) => debugPrint("Offline Sync: Transaction deletion delayed"));
+            .catchError((e) =>
+                debugPrint("Offline Sync: Transaction deletion delayed"));
       }
       notifyListeners();
     }
   }
 
-  List<model.Transaction> getTransactions(String accountId) => transactionsBox?.values.where((t) => t.accountId == accountId).toList() ?? [];
-  List<model.Transaction> getAllTransactions() => transactionsBox?.values.toList() ?? [];
+  List<model.Transaction> getTransactions(String accountId) =>
+      transactionsBox?.values.where((t) => t.accountId == accountId).toList() ??
+      [];
+  List<model.Transaction> getAllTransactions() =>
+      transactionsBox?.values.toList() ?? [];
   model.Transaction? getTransaction(String id) => transactionsBox?.get(id);
 
   Future<void> cleanUnknownTransactions({
@@ -87,9 +106,16 @@ class TransactionService extends BaseService {
   }) async {
     final txs = getAllTransactions();
     final user = auth.currentUser;
+    const protectedAccountIds = {
+      'default_account',
+      'artisan_internal_income',
+    };
 
     for (var t in txs) {
-      bool isOrphaned = !accountIds.contains(t.accountId);
+      final isProtectedInternalAccount =
+          protectedAccountIds.contains(t.accountId);
+      bool isOrphaned =
+          !accountIds.contains(t.accountId) && !isProtectedInternalAccount;
       if (!isOrphaned && t.professionId != null) {
         isOrphaned = !professionIds.contains(t.professionId);
       }
@@ -108,5 +134,4 @@ class TransactionService extends BaseService {
       }
     }
   }
-
 }

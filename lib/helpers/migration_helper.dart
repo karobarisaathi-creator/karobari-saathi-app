@@ -108,8 +108,11 @@ class MigrationHelper {
 
       // Clean transactions with invalid account IDs
       final allAccountKeys = accountsBox.keys.toSet();
+      // Whitelist internal/system account IDs that aren't in accountsBox
+      final systemAccountIds = {'default_account', 'artisan_internal_income'};
+      
       for (var tx in transactionsBox.values) {
-        if (!allAccountKeys.contains(tx.accountId)) {
+        if (!allAccountKeys.contains(tx.accountId) && !systemAccountIds.contains(tx.accountId)) {
           transactionsToDelete.add(tx.key); // Use tx.key as it's a HiveObject
           cleanedTxCount++;
           print("  🗑️ Queued orphaned transaction for deletion: ID ${tx.id}");

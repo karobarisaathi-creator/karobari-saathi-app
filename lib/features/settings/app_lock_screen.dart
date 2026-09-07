@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Import for SystemChannels
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/security_service.dart';
@@ -10,12 +9,11 @@ class AppLockScreen extends StatefulWidget {
   final bool isChangingPin;
   final VoidCallback? onUnlock;
 
-  const AppLockScreen({
-    super.key, 
-    this.isSettingUp = false, 
-    this.isChangingPin = false,
-    this.onUnlock
-  });
+  const AppLockScreen(
+      {super.key,
+      this.isSettingUp = false,
+      this.isChangingPin = false,
+      this.onUnlock});
 
   @override
   _AppLockScreenState createState() => _AppLockScreenState();
@@ -25,7 +23,8 @@ class _AppLockScreenState extends State<AppLockScreen> {
   final TextEditingController _pinController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
 
-  String? _newPinCache; // Temporary storage for the first PIN entry during setup
+  String?
+      _newPinCache; // Temporary storage for the first PIN entry during setup
   bool _isVerifyingOldPin = false;
   bool _isLoading = true;
   bool _isError = false;
@@ -40,10 +39,10 @@ class _AppLockScreenState extends State<AppLockScreen> {
     super.initState();
     _isVerifyingOldPin = widget.isChangingPin;
     _loadInitialState();
-    
+
     // Check biometrics and handle keyboard logic
     WidgetsBinding.instance.addPostFrameCallback((_) {
-       _checkBiometricsAndFocus();
+      _checkBiometricsAndFocus();
     });
   }
 
@@ -55,12 +54,13 @@ class _AppLockScreenState extends State<AppLockScreen> {
 
   Future<void> _checkBiometricsAndFocus() async {
     if (widget.isSettingUp || _isVerifyingOldPin) {
-        // If setting up or verifying old PIN for change, just focus keyboard
-        _showKeyboard();
-        return;
+      // If setting up or verifying old PIN for change, just focus keyboard
+      _showKeyboard();
+      return;
     }
 
-    final securityService = Provider.of<SecurityService>(context, listen: false);
+    final securityService =
+        Provider.of<SecurityService>(context, listen: false);
     final isAvailable = await securityService.isBiometricsAvailable();
     final isEnabled = await securityService.isBiometricEnabled();
 
@@ -78,24 +78,25 @@ class _AppLockScreenState extends State<AppLockScreen> {
       }
     }
   }
-  
+
   void _showKeyboard() {
-      if (mounted && !_isLoading) {
-          _focusNode.requestFocus();
-          SystemChannels.textInput.invokeMethod('TextInput.show');
-      }
+    if (mounted && !_isLoading) {
+      _focusNode.requestFocus();
+      SystemChannels.textInput.invokeMethod('TextInput.show');
+    }
   }
 
   Future<void> _authenticateWithBiometrics() async {
-    final securityService = Provider.of<SecurityService>(context, listen: false);
-    FocusScope.of(context).unfocus(); 
-    
+    final securityService =
+        Provider.of<SecurityService>(context, listen: false);
+    FocusScope.of(context).unfocus();
+
     final isAuthenticated = await securityService.authenticateWithBiometrics();
 
     if (isAuthenticated && mounted) {
       widget.onUnlock?.call();
     } else {
-        _showKeyboard();
+      _showKeyboard();
     }
   }
 
@@ -115,7 +116,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
       backgroundColor: _themeColor,
       resizeToAvoidBottomInset: true,
       body: GestureDetector(
-        behavior: HitTestBehavior.opaque, 
+        behavior: HitTestBehavior.opaque,
         onTap: _showKeyboard,
         child: SafeArea(
           child: _isLoading
@@ -134,14 +135,16 @@ class _AppLockScreenState extends State<AppLockScreen> {
                         focusNode: _focusNode,
                         keyboardType: TextInputType.number,
                         maxLength: 4,
-                        autofocus: false, 
+                        autofocus: false,
                         showCursor: false,
                         enableSuggestions: false,
                         autocorrect: false,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly
+                        ],
                         decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            counterText: "",
+                          border: InputBorder.none,
+                          counterText: "",
                         ),
                         style: const TextStyle(color: Colors.transparent),
                         onChanged: (value) {
@@ -154,7 +157,6 @@ class _AppLockScreenState extends State<AppLockScreen> {
                         },
                       ),
                     ),
-
                     Center(
                       child: SingleChildScrollView(
                         child: Column(
@@ -165,11 +167,11 @@ class _AppLockScreenState extends State<AppLockScreen> {
                               width: 100,
                               height: 100,
                               fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) => const Icon(Icons.lock, size: 80, color: Colors.white24),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Icon(Icons.lock,
+                                      size: 80, color: Colors.white24),
                             ),
-
                             const SizedBox(height: 40),
-
                             Text(
                               isUrdu ? 'کاروباری ساتھی' : 'Karobari Sathi',
                               style: const TextStyle(
@@ -180,21 +182,19 @@ class _AppLockScreenState extends State<AppLockScreen> {
                                 letterSpacing: 1.0,
                               ),
                             ),
-
                             const SizedBox(height: 20),
-
                             Text(
                               _getStatusText(isUrdu),
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Colors.white.withOpacity(0.7),
                                 fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                                fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
+                                fontWeight: isUrdu
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                             ),
-
                             const SizedBox(height: 30),
-
                             GestureDetector(
                               onTap: _showKeyboard,
                               child: Container(
@@ -203,29 +203,35 @@ class _AppLockScreenState extends State<AppLockScreen> {
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: List.generate(4, (index) {
-                                    bool isFilled = index < _pinController.text.length;
+                                    bool isFilled =
+                                        index < _pinController.text.length;
                                     return AnimatedContainer(
-                                      duration: const Duration(milliseconds: 200),
-                                      margin: const EdgeInsets.symmetric(horizontal: 10),
+                                      duration:
+                                          const Duration(milliseconds: 200),
+                                      margin: const EdgeInsets.symmetric(
+                                          horizontal: 10),
                                       width: 18,
                                       height: 18,
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         color: isFilled
-                                            ? (_isError ? Colors.redAccent : _greyColor)
+                                            ? (_isError
+                                                ? Colors.redAccent
+                                                : _greyColor)
                                             : Colors.white.withOpacity(0.2),
                                         border: isFilled
                                             ? null
-                                            : Border.all(color: Colors.white.withOpacity(0.5), width: 1.5),
+                                            : Border.all(
+                                                color: Colors.white
+                                                    .withOpacity(0.5),
+                                                width: 1.5),
                                       ),
                                     );
                                   }),
                                 ),
                               ),
                             ),
-
                             const SizedBox(height: 20),
-
                             if (_isError)
                               Text(
                                 _getErrorText(isUrdu),
@@ -233,36 +239,41 @@ class _AppLockScreenState extends State<AppLockScreen> {
                                   color: Colors.redAccent,
                                   fontSize: 16,
                                   fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                                  fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
+                                  fontWeight: isUrdu
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                                 ),
                               )
                             else
                               const SizedBox(height: 20),
-                            
-                            if (_isBiometricAvailable && !widget.isSettingUp && !_isVerifyingOldPin)
+                            if (_isBiometricAvailable &&
+                                !widget.isSettingUp &&
+                                !_isVerifyingOldPin)
                               Padding(
                                 padding: const EdgeInsets.only(top: 20.0),
                                 child: IconButton(
-                                  icon: Icon(Icons.fingerprint, size: 50, color: _greyColor),
+                                  icon: Icon(Icons.fingerprint,
+                                      size: 50, color: _greyColor),
                                   onPressed: _authenticateWithBiometrics,
                                 ),
                               ),
-
                             const SizedBox(height: 80),
-                            
-                            if ((widget.isSettingUp || widget.isChangingPin) && _newPinCache == null)
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: Text(
-                                    isUrdu ? 'بعد میں' : 'Later',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 16,
-                                      fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                                      fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
-                                    ),
+                            if ((widget.isSettingUp || widget.isChangingPin) &&
+                                _newPinCache == null)
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: Text(
+                                  isUrdu ? 'بعد میں' : 'Later',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 16,
+                                    fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+                                    fontWeight: isUrdu
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
                                   ),
                                 ),
+                              ),
                           ],
                         ),
                       ),
@@ -279,11 +290,13 @@ class _AppLockScreenState extends State<AppLockScreen> {
       return isUrdu ? 'پرانا پن کوڈ درج کریں' : 'Enter old PIN code';
     }
     if (widget.isSettingUp || (widget.isChangingPin && !_isVerifyingOldPin)) {
-       if (_newPinCache == null) {
-         return isUrdu ? 'نیا 4 ہندسوں کا کوڈ درج کریں' : 'Enter new 4-digit PIN';
-       } else {
-         return isUrdu ? 'تصدیق کے لیے دوبارہ درج کریں' : 'Re-enter to confirm';
-       }
+      if (_newPinCache == null) {
+        return isUrdu
+            ? 'نیا 4 ہندسوں کا کوڈ درج کریں'
+            : 'Enter new 4-digit PIN';
+      } else {
+        return isUrdu ? 'تصدیق کے لیے دوبارہ درج کریں' : 'Re-enter to confirm';
+      }
     }
     return isUrdu ? 'اپنا پن کوڈ درج کریں' : 'Enter your PIN code';
   }
@@ -302,7 +315,8 @@ class _AppLockScreenState extends State<AppLockScreen> {
     await Future.delayed(const Duration(milliseconds: 200));
     if (!mounted) return;
 
-    final securityService = Provider.of<SecurityService>(context, listen: false);
+    final securityService =
+        Provider.of<SecurityService>(context, listen: false);
     final cleanPin = enteredPin.trim();
 
     if (_isVerifyingOldPin) {
@@ -335,7 +349,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
         if (cleanPin == _newPinCache) {
           await securityService.setNewPin(cleanPin);
           if (mounted) {
-             Navigator.pop(context, true);
+            Navigator.pop(context, true);
           }
         } else {
           setState(() {

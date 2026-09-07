@@ -12,9 +12,10 @@ class SecurityService with ChangeNotifier {
   final LocalAuthentication _localAuth = LocalAuthentication();
   bool _isLockEnabled = false;
   bool _isBiometricEnabled = false;
+  late final Future<void> _initialization;
 
   SecurityService() {
-    _init();
+    _initialization = _init();
   }
 
   Future<void> _init() async {
@@ -31,7 +32,7 @@ class SecurityService with ChangeNotifier {
   // Encrypt data
   String encryptData(String data) {
     final key = encrypt.Key.fromUtf8(_encryptionKey);
-    final iv = encrypt.IV.fromLength(16); 
+    final iv = encrypt.IV.fromLength(16);
     final encrypter = encrypt.Encrypter(encrypt.AES(key));
     final encrypted = encrypter.encrypt(data, iv: iv);
     return '${base64.encode(iv.bytes)}:${encrypted.base64}';
@@ -94,21 +95,25 @@ class SecurityService with ChangeNotifier {
 
   // Set new PIN
   Future<void> setNewPin(String newPin) async {
+    await _initialization;
     final pinHash = hashData(newPin);
     await _secureStorage.write(key: 'app_pin_hash', value: pinHash);
 
     final prefs = await SharedPreferences.getInstance();
+    _isLockEnabled = true;
     await prefs.setBool('app_lock_enabled', true);
     notifyListeners();
   }
 
   // Check if app lock is enabled
   Future<bool> isAppLockEnabled() async {
+    await _initialization;
     return _isLockEnabled;
   }
 
   // Enable/disable app lock
   Future<void> setAppLockEnabled(bool enabled) async {
+    await _initialization;
     _isLockEnabled = enabled;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('app_lock_enabled', enabled);
@@ -120,9 +125,9 @@ class SecurityService with ChangeNotifier {
   // Check if biometrics are available
   Future<bool> isBiometricsAvailable() async {
     try {
-      final bool canAuthenticateWithBiometrics = await _localAuth.canCheckBiometrics;
-      final bool canAuthenticate = canAuthenticateWithBiometrics || await _localAuth.isDeviceSupported();
-      return canAuthenticate;
+      await _initialization;
+      final availableBiometrics = await _localAuth.getAvailableBiometrics();
+      return availableBiometrics.isNotEmpty;
     } catch (e) {
       print("Biometric Check Error: $e");
       return false;
@@ -131,11 +136,13 @@ class SecurityService with ChangeNotifier {
 
   // Check if biometric is enabled by user
   Future<bool> isBiometricEnabled() async {
+    await _initialization;
     return _isBiometricEnabled;
   }
 
   // Enable/Disable biometric
   Future<void> setBiometricEnabled(bool enabled) async {
+    await _initialization;
     _isBiometricEnabled = enabled;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('app_biometric_enabled', enabled);

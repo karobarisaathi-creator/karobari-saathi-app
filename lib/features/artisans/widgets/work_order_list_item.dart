@@ -20,6 +20,8 @@ class WorkOrderListItem extends StatefulWidget {
   final String fontFamily;
   final VoidCallback? onChatTap;
   final VoidCallback? onOrderUpdated;
+  final bool embedded;
+  final bool showTitleForCustomer;
 
   const WorkOrderListItem({
     super.key,
@@ -29,6 +31,8 @@ class WorkOrderListItem extends StatefulWidget {
     required this.fontFamily,
     this.onChatTap,
     this.onOrderUpdated,
+    this.embedded = false,
+    this.showTitleForCustomer = false,
   });
 
   @override
@@ -39,10 +43,10 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
   final _logger = LoggingService();
   final ArtisanWorkOrderService _workOrderService = ArtisanWorkOrderService();
   final ArtisanService _artisanService = ArtisanService();
-  
+
   final TextEditingController _descController = TextEditingController();
   final TextEditingController _rateController = TextEditingController();
-  
+
   bool _isSyncing = false;
   bool _isExpanded = false;
   Stream<DocumentSnapshot>? _orderStream;
@@ -82,7 +86,8 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(widget.isUrdu ? 'اپ ڈیٹ میں ناکامی' : 'Update failed'),
+            content:
+                Text(widget.isUrdu ? 'اپ ڈیٹ میں ناکامی' : 'Update failed'),
             backgroundColor: Colors.red,
           ),
         );
@@ -126,23 +131,29 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
     double laborFee,
     double total,
   ) {
-    final bool isDone = currentOrder.status == 'completed' || currentOrder.status == 'rated';
+    final bool isDone =
+        currentOrder.status == 'completed' || currentOrder.status == 'rated';
 
     return GestureDetector(
       onTap: () => setState(() => _isExpanded = !_isExpanded),
+      onLongPress: () => _showDeleteConfirmation(context, currentOrder),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        margin: const EdgeInsets.symmetric(vertical: 6),
+        margin: widget.embedded
+            ? EdgeInsets.zero
+            : const EdgeInsets.symmetric(vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: widget.embedded ? Colors.transparent : Colors.white,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          boxShadow: widget.embedded
+              ? const []
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,7 +234,8 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
             GestureDetector(
               onTap: () => _handleComplete(order),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 margin: const EdgeInsets.only(right: 8),
                 decoration: BoxDecoration(
                   color: Colors.green,
@@ -254,11 +266,14 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
                 ),
               ),
             ),
-          if (order.status == 'completed' && !widget.isArtisanMode && !order.isRated)
+          if (order.status == 'completed' &&
+              !widget.isArtisanMode &&
+              !order.isRated)
             GestureDetector(
               onTap: () => _showRatingDialog(context, order),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 margin: const EdgeInsets.only(right: 8),
                 decoration: BoxDecoration(
                   color: AppTheme.darkColor,
@@ -274,7 +289,8 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.star_outline, size: 12, color: Colors.white),
+                    const Icon(Icons.star_outline,
+                        size: 12, color: Colors.white),
                     const SizedBox(width: 4),
                     Text(
                       widget.isUrdu ? 'ریٹنگ دیں' : 'Rate',
@@ -296,7 +312,8 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
               decoration: BoxDecoration(
                 color: AppTheme.darkColor.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppTheme.darkColor.withValues(alpha: 0.2)),
+                border: Border.all(
+                    color: AppTheme.darkColor.withValues(alpha: 0.2)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -333,27 +350,32 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
       future: _artisanService.getProfile(order.artisanId),
       builder: (context, snapshot) {
         final profile = snapshot.data;
-        final displayName = (order.artisanName != null && order.artisanName!.isNotEmpty)
-            ? order.artisanName!
-            : (profile?.name ?? (widget.isUrdu ? 'کاریگر' : 'Artisan'));
+        final displayName =
+            (order.artisanName != null && order.artisanName!.isNotEmpty)
+                ? order.artisanName!
+                : (profile?.name ?? (widget.isUrdu ? 'کاریگر' : 'Artisan'));
 
         return ProfileInfoWidget(
           name: displayName,
           phone: '',
           profileImage: profile?.profileImage,
-          category: widget.isUrdu ? profile?.professionUrdu : profile?.profession,
+          category:
+              widget.isUrdu ? profile?.professionUrdu : profile?.profession,
           isVerticalCategory: true,
           customSize: 42,
           borderRadius: 6,
-          address: order.title ?? order.workDescription,
-          isAddressBold: true,
+          address: widget.showTitleForCustomer
+              ? (order.title ?? order.workDescription)
+              : null,
+          isAddressBold: widget.showTitleForCustomer,
           addressColor: AppTheme.themeColor,
         );
       },
     );
   }
 
-  Widget _buildItemsList(List<TransactionItem> items, double labor, bool isDone) {
+  Widget _buildItemsList(
+      List<TransactionItem> items, double labor, bool isDone) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12),
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -405,7 +427,8 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
             key: ValueKey('item_${idx}_${item.description}'),
             direction: DismissDirection.endToStart,
             confirmDismiss: (direction) async {
-              return await _showItemDeleteConfirmation(context, item.description);
+              return await _showItemDeleteConfirmation(
+                  context, item.description);
             },
             onDismissed: (direction) {
               final newList = List<TransactionItem>.from(items)..removeAt(idx);
@@ -471,7 +494,7 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
 
   Widget _buildInputBar(List<TransactionItem> items, double labor) {
     if (!widget.isArtisanMode) return const SizedBox.shrink();
-    
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
       child: Container(
@@ -554,7 +577,7 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
 
   void _addItem(List<TransactionItem> items, double labor) {
     if (_descController.text.isEmpty || _rateController.text.isEmpty) return;
-    
+
     final rate = double.tryParse(_rateController.text) ?? 0.0;
     final newItem = TransactionItem(
       description: _descController.text.trim(),
@@ -562,7 +585,7 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
       rate: rate,
       total: rate,
     );
-    
+
     final newList = List<TransactionItem>.from(items)..add(newItem);
     _descController.clear();
     _rateController.clear();
@@ -606,7 +629,9 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
       padding: const EdgeInsets.all(16),
       child: Center(
         child: Text(
-          widget.isUrdu ? "ابھی تک کوئی سامان ایڈ نہیں کیا گیا" : "No items added yet",
+          widget.isUrdu
+              ? "ابھی تک کوئی سامان ایڈ نہیں کیا گیا"
+              : "No items added yet",
           style: TextStyle(
             fontSize: 12,
             color: Colors.grey,
@@ -622,6 +647,60 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
     return const SizedBox.shrink();
   }
 
+  Future<void> _showDeleteConfirmation(
+      BuildContext context, ArtisanWorkOrder order) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          widget.isUrdu ? 'ورک آرڈر حذف کریں؟' : 'Delete Work Order?',
+          style: TextStyle(
+              fontFamily: widget.fontFamily, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          widget.isUrdu
+              ? 'کیا آپ واقعی اس ورک آرڈر کو حذف کرنا چاہتے ہیں؟ یہ عمل واپس نہیں لیا جا سکتا۔'
+              : 'Are you sure you want to delete this work order? This action cannot be undone.',
+          style: TextStyle(fontFamily: widget.fontFamily),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(widget.isUrdu ? 'منسوخ' : 'Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: Text(widget.isUrdu ? 'حذف کریں' : 'Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        setState(() => _isSyncing = true);
+        await _workOrderService.deleteWorkOrder(order.artisanId, order.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content:
+                  Text(widget.isUrdu ? 'حذف کر دیا گیا' : 'Deleted successfully')));
+          widget.onOrderUpdated?.call();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(widget.isUrdu ? 'خرابی: $e' : 'Error: $e'),
+              backgroundColor: Colors.red));
+        }
+      } finally {
+        if (mounted) setState(() => _isSyncing = false);
+      }
+    }
+  }
+
   Future<void> _handleComplete(ArtisanWorkOrder order) async {
     // اگر بل زیرو ہے تو پہلے وارننگ دکھائیں
     if ((order.amount ?? 0) <= 0) {
@@ -630,9 +709,9 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
         builder: (context) => AlertDialog(
           title: Text(widget.isUrdu ? 'بل خالی ہے' : 'Empty Bill'),
           content: Text(
-            widget.isUrdu 
-              ? 'آپ نے ابھی تک بل میں کوئی آئٹم شامل نہیں کیا ہے۔ کیا آپ واقعی بغیر بل کے کام مکمل کرنا چاہتے ہیں؟' 
-              : 'You haven\'t added any items to the bill. Are you sure you want to complete without a bill?',
+            widget.isUrdu
+                ? 'آپ نے ابھی تک بل میں کوئی آئٹم شامل نہیں کیا ہے۔ کیا آپ واقعی بغیر بل کے کام مکمل کرنا چاہتے ہیں؟'
+                : 'You haven\'t added any items to the bill. Are you sure you want to complete without a bill?',
             style: TextStyle(fontFamily: widget.fontFamily),
           ),
           actions: [
@@ -652,7 +731,7 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
 
     try {
       setState(() => _isSyncing = true);
-      
+
       final db = Provider.of<DatabaseService>(context, listen: false);
       await db.updateArtisanWorkStatus(
         order.artisanId,
@@ -687,7 +766,7 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
   Future<void> _handleStartWork(ArtisanWorkOrder order) async {
     try {
       setState(() => _isSyncing = true);
-      
+
       final db = Provider.of<DatabaseService>(context, listen: false);
       // Status transition: negotiating -> confirmed
       await db.updateArtisanWorkStatus(
@@ -700,7 +779,9 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              widget.isUrdu ? 'کام شروع کر دیا گیا ہے!' : 'Work started and added to your list!',
+              widget.isUrdu
+                  ? 'کام شروع کر دیا گیا ہے!'
+                  : 'Work started and added to your list!',
             ),
             backgroundColor: AppTheme.themeColor,
           ),
@@ -730,7 +811,8 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           backgroundColor: Colors.white,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 20),
@@ -749,7 +831,7 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
                 ),
                 const SizedBox(height: 12),
                 const Divider(height: 1),
-                
+
                 // Stars
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -771,7 +853,7 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
                   ),
                 ),
                 const Divider(height: 1),
-                
+
                 // Review Text
                 TextField(
                   controller: reviewController,
@@ -779,8 +861,8 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
                   minLines: 2,
                   style: TextStyle(fontFamily: widget.fontFamily, fontSize: 15),
                   decoration: InputDecoration(
-                    hintText: widget.isUrdu 
-                        ? 'اپنا تجربہ لکھیں...' 
+                    hintText: widget.isUrdu
+                        ? 'اپنا تجربہ لکھیں...'
                         : 'Share your experience...',
                     hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
                     contentPadding: const EdgeInsets.all(20),
@@ -818,39 +900,48 @@ class _WorkOrderListItemState extends State<WorkOrderListItem> {
                       ),
                       Expanded(
                         child: TextButton(
-                          onPressed: isSubmitting ? null : () async {
-                            setDialogState(() => isSubmitting = true);
-                            try {
-                              await _artisanService.addReview(
-                                artisanId: order.artisanId,
-                                workOrderId: order.id,
-                                rating: selectedRating,
-                                comment: reviewController.text.trim(),
-                              );
-                              if (dialogContext.mounted) Navigator.pop(dialogContext);
-                              widget.onOrderUpdated?.call();
-                              if (mounted) {
-                                ScaffoldMessenger.of(this.context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      widget.isUrdu
-                                          ? 'شکریہ! آپ کا ریویو سبمٹ ہو گیا'
-                                          : 'Thank you for your feedback!',
-                                    ),
-                                    backgroundColor: AppTheme.darkColor,
-                                  ),
-                                );
-                              }
-                            } catch (e, stack) {
-                              _logger.error("Submit review error", e, stack);
-                              if (mounted) {
-                                setDialogState(() => isSubmitting = false);
-                                ScaffoldMessenger.of(this.context).showSnackBar(
-                                  SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
-                                );
-                              }
-                            }
-                          },
+                          onPressed: isSubmitting
+                              ? null
+                              : () async {
+                                  setDialogState(() => isSubmitting = true);
+                                  try {
+                                    await _artisanService.addReview(
+                                      artisanId: order.artisanId,
+                                      workOrderId: order.id,
+                                      rating: selectedRating,
+                                      comment: reviewController.text.trim(),
+                                    );
+                                    if (dialogContext.mounted)
+                                      Navigator.pop(dialogContext);
+                                    widget.onOrderUpdated?.call();
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(this.context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            widget.isUrdu
+                                                ? 'شکریہ! آپ کا ریویو سبمٹ ہو گیا'
+                                                : 'Thank you for your feedback!',
+                                          ),
+                                          backgroundColor: AppTheme.darkColor,
+                                        ),
+                                      );
+                                    }
+                                  } catch (e, stack) {
+                                    _logger.error(
+                                        "Submit review error", e, stack);
+                                    if (mounted) {
+                                      setDialogState(
+                                          () => isSubmitting = false);
+                                      ScaffoldMessenger.of(this.context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                            content: Text(e.toString()),
+                                            backgroundColor: Colors.red),
+                                      );
+                                    }
+                                  }
+                                },
                           style: TextButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             backgroundColor: AppTheme.darkColor,

@@ -1,13 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/models/job_post_model.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/services/artisan_service.dart';
-import 'package:account_app/core/services/database/job_service.dart';
-import 'package:account_app/core/services/logging_service.dart';
-import 'package:account_app/core/widgets/app_button.dart';
-import '../post_job_screen.dart';
 
 class JobPostCard extends StatefulWidget {
   final JobPost job;
@@ -16,6 +11,7 @@ class JobPostCard extends StatefulWidget {
   final VoidCallback onTap;
   final String currentUserId;
   final VoidCallback? onDeleted;
+  final bool embedded;
 
   const JobPostCard({
     super.key,
@@ -25,6 +21,7 @@ class JobPostCard extends StatefulWidget {
     required this.onTap,
     required this.currentUserId,
     this.onDeleted,
+    this.embedded = false,
   });
 
   @override
@@ -34,8 +31,7 @@ class JobPostCard extends StatefulWidget {
 class _JobPostCardState extends State<JobPostCard> {
   @override
   Widget build(BuildContext context) {
-    final bool isOwner = widget.job.customerId == widget.currentUserId;
-
+    final bool isEmbedded = widget.embedded;
     // تفصیل سے نشانات (Bullets) ختم کریں اور تازہ ترین ڈیٹا لیں
     String cleanDescription = widget.job.description.replaceAll(RegExp(r'(•|★|✓|\d+\.)\s*'), '').trim();
     if (cleanDescription.isEmpty && widget.job.description.isNotEmpty) {
@@ -43,17 +39,19 @@ class _JobPostCardState extends State<JobPostCard> {
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: isEmbedded ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isEmbedded ? Colors.transparent : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: isEmbedded
+            ? const []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
       child: InkWell(
         onTap: widget.onTap,
@@ -87,24 +85,30 @@ class _JobPostCardState extends State<JobPostCard> {
                                   ),
                                 ),
                               ),
-                              if (widget.job.companyName != null && widget.job.companyName!.isNotEmpty)
+                              if (widget.job.companyName != null &&
+                                  widget.job.companyName!.isNotEmpty)
                                 Container(
                                   margin: const EdgeInsets.only(left: 8),
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 5),
                                   decoration: BoxDecoration(
                                     color: Colors.blue.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+                                    border: Border.all(
+                                        color: Colors.blue
+                                            .withValues(alpha: 0.2)),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(PhosphorIcons.buildings(), size: 11, color: Colors.blue),
+                                      Icon(PhosphorIcons.buildings(),
+                                          size: 11, color: Colors.blue),
                                       const SizedBox(width: 4),
                                       Text(
                                         widget.job.companyName!,
                                         style: TextStyle(
-                                          fontSize: 11, // عنوان سے تھوڑا چھوٹا اور متوازن سائز
+                                          fontSize:
+                                              11, // عنوان سے تھوڑا چھوٹا اور متوازن سائز
                                           fontWeight: FontWeight.w900,
                                           color: Colors.blue.shade900,
                                           fontFamily: widget.fontFamily,
@@ -160,14 +164,16 @@ class _JobPostCardState extends State<JobPostCard> {
                         padding: const EdgeInsets.only(right: 8),
                         child: _buildInfoChip(
                           icon: PhosphorIcons.clock(),
-                          text: '${widget.job.timeIn} - ${widget.job.timeOut}',
+                          text:
+                              '${widget.job.timeIn} - ${widget.job.timeOut}',
                           color: Colors.orange.shade800,
                         ),
                       ),
                     ...widget.job.categories.map((catId) {
                       final prof = ArtisanService.getProfessions().firstWhere(
                         (p) => p['id'] == catId,
-                        orElse: () => <String, dynamic>{'name': catId, 'id': catId},
+                        orElse: () =>
+                            <String, dynamic>{'name': catId, 'id': catId},
                       );
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),

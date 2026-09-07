@@ -31,11 +31,11 @@ class _NegotiationViewState extends State<NegotiationView> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final JobNegotiationService _negotiationService = JobNegotiationService();
-  
+
   NotificationService? _notificationService;
   Stream<List<NegotiationMessage>>? _messagesStream;
   StreamSubscription<List<NegotiationMessage>>? _messageSubscription;
-  
+
   bool _isSending = false;
   bool _hasText = false;
 
@@ -52,7 +52,7 @@ class _NegotiationViewState extends State<NegotiationView> {
       widget.workOrder.artisanId,
       isDirect: true,
     );
-    
+
     _messageSubscription = _messagesStream?.listen(
       _onMessagesReceived,
       onError: (error) {
@@ -63,10 +63,10 @@ class _NegotiationViewState extends State<NegotiationView> {
 
   void _onMessagesReceived(List<NegotiationMessage> messages) {
     if (!mounted) return;
-    
-    final hasUnread = messages.any((m) =>
-        !m.isRead && m.senderId != _negotiationService.currentUserId);
-    
+
+    final hasUnread = messages.any(
+        (m) => !m.isRead && m.senderId != _negotiationService.currentUserId);
+
     if (hasUnread) {
       _negotiationService.markConversationAsRead(
         jobId: widget.workOrder.id,
@@ -86,7 +86,8 @@ class _NegotiationViewState extends State<NegotiationView> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _notificationService = Provider.of<NotificationService>(context, listen: false);
+    _notificationService =
+        Provider.of<NotificationService>(context, listen: false);
     _notificationService?.setOpenNegotiation(widget.workOrder.id);
     _notificationService?.markNegotiationAsRead(widget.workOrder.id);
   }
@@ -168,7 +169,9 @@ class _NegotiationViewState extends State<NegotiationView> {
               if (snapshot.hasError) {
                 return Center(
                   child: Text(
-                    isUrdu ? 'پیغامات لوڈ کرنے میں ناکامی' : 'Failed to load messages',
+                    isUrdu
+                        ? 'پیغامات لوڈ کرنے میں ناکامی'
+                        : 'Failed to load messages',
                     style: const TextStyle(color: Colors.red),
                   ),
                 );
@@ -185,18 +188,21 @@ class _NegotiationViewState extends State<NegotiationView> {
                   Expanded(
                     child: ListView.builder(
                       controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 20),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 20),
                       itemCount: messages.length,
                       itemBuilder: (context, index) {
                         final msg = messages[index];
                         final bool isMe =
                             msg.senderId == _negotiationService.currentUserId;
-                        final bool showDateSeparator = _shouldShowDateSeparator(messages, index);
+                        final bool showDateSeparator =
+                            _shouldShowDateSeparator(messages, index);
 
                         return Column(
                           children: [
                             if (showDateSeparator)
-                              _buildDateSeparator(msg.timestamp, isUrdu, fontFamily),
+                              _buildDateSeparator(
+                                  msg.timestamp, isUrdu, fontFamily),
                             _buildModernBubble(msg, isMe, isUrdu, fontFamily),
                           ],
                         );
@@ -227,7 +233,7 @@ class _NegotiationViewState extends State<NegotiationView> {
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
     final msgDate = DateTime(date.year, date.month, date.day);
-    
+
     String label = DateFormat('dd MMM, yyyy').format(date);
     if (msgDate == today) {
       label = isUrdu ? 'آج' : 'Today';
@@ -267,13 +273,15 @@ class _NegotiationViewState extends State<NegotiationView> {
         child: GestureDetector(
           onLongPress: () => _showDeleteMessageDialog(msg, isUrdu, fontFamily),
           child: Column(
-            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            crossAxisAlignment:
+                isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
               Container(
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.of(context).size.width * 0.75,
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: isMe ? AppTheme.themeColor : Colors.white,
                   border: isMe ? null : Border.all(color: Colors.grey[400]!),
@@ -397,7 +405,8 @@ class _NegotiationViewState extends State<NegotiationView> {
             fontSize: 14,
             fontFamily: fontFamily,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(28),
             borderSide: BorderSide.none,
@@ -445,12 +454,13 @@ class _NegotiationViewState extends State<NegotiationView> {
 
   Widget _buildStatusBanner(bool isUrdu, String fontFamily) {
     final status = widget.workOrder.status;
-    
+
     // اگر کام شروع ہو چکا ہے تو دونوں کو اسٹیٹس دکھائیں
     if (status != 'negotiating') {
       String statusText = isUrdu ? 'کام شروع ہو چکا ہے' : 'Work In Progress';
-      if (status == 'completed') statusText = isUrdu ? 'کام مکمل ہو گیا' : 'Work Completed';
-      
+      if (status == 'completed')
+        statusText = isUrdu ? 'کام مکمل ہو گیا' : 'Work Completed';
+
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(10),
@@ -475,9 +485,9 @@ class _NegotiationViewState extends State<NegotiationView> {
         padding: const EdgeInsets.all(10),
         color: AppTheme.themeColor.withValues(alpha: 0.05),
         child: Text(
-          isUrdu 
-            ? 'گاہک کے فیصلے کا انتظار ہے...' 
-            : 'Waiting for customer to start work...',
+          isUrdu
+              ? 'گاہک کے فیصلے کا انتظار ہے...'
+              : 'Waiting for customer to start work...',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: AppTheme.themeColor,
@@ -503,8 +513,8 @@ class _NegotiationViewState extends State<NegotiationView> {
             children: [
               Expanded(
                 child: Text(
-                  isUrdu 
-                      ? 'بات چیت مکمل ہو گئی؟ کام شروع کرنے کے لیے بٹن دبائیں۔' 
+                  isUrdu
+                      ? 'بات چیت مکمل ہو گئی؟ کام شروع کرنے کے لیے بٹن دبائیں۔'
                       : 'Negotiation complete? Click the button to hire.',
                   style: TextStyle(
                     fontSize: 11,
@@ -523,7 +533,8 @@ class _NegotiationViewState extends State<NegotiationView> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   minimumSize: const Size(0, 34),
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
                 child: Text(
                   isUrdu ? 'ہائر کریں' : 'Hire Now',
@@ -543,34 +554,71 @@ class _NegotiationViewState extends State<NegotiationView> {
   }
 
   void _showStartWorkConfirmation(bool isUrdu, String fontFamily) {
+    final existingTitle = widget.workOrder.title?.trim() ?? '';
+    final hasTitle = existingTitle.isNotEmpty;
+    final titleController = TextEditingController(
+      text: existingTitle,
+    );
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           isUrdu ? 'اس کاریگر کو ہائر کریں؟' : 'Hire this Artisan?',
           style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
         ),
-        content: Text(
-          isUrdu
-              ? 'کیا آپ واقعی اس کاریگر کو ہائر کرنا چاہتے ہیں؟\n\nاس کے بعد آپ کی جاب پوسٹ براؤز اسکرین سے ختم ہو جائے گی اور کام شروع ہو جائے گا۔'
-              : 'Are you sure you want to hire this artisan?\n\nYour job post will be removed from the browse screen and work will officially begin.',
-          style: TextStyle(fontFamily: fontFamily),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!hasTitle) ...[
+              Text(
+                isUrdu
+                    ? 'کام کا عنوان لکھیں (5 سے 40 حروف)'
+                    : 'Enter work title (5 to 40 characters)',
+                style: TextStyle(fontFamily: fontFamily),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: titleController,
+                maxLength: 40,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: isUrdu ? 'مثال: گھر کی وائرنگ' : 'e.g. House wiring',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Text(
+              isUrdu
+                  ? 'کیا آپ واقعی اس کاریگر کو ہائر کرنا چاہتے ہیں؟'
+                  : 'Are you sure you want to hire this artisan?',
+              style: TextStyle(fontFamily: fontFamily),
+            ),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              titleController.dispose();
+            },
             child: Text(isUrdu ? 'کینسل' : 'Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
-              await _startWorkOrder(isUrdu);
+              final title = titleController.text.trim();
+              if (!hasTitle && (title.length < 5 || title.length > 40)) return;
+              Navigator.pop(dialogContext);
+              titleController.dispose();
+              await _startWorkOrder(isUrdu, hasTitle ? null : title);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.themeColor,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
             child: Text(isUrdu ? 'جی ہاں، ہائر کریں' : 'Yes, Hire Now'),
           ),
@@ -579,18 +627,20 @@ class _NegotiationViewState extends State<NegotiationView> {
     );
   }
 
-  Future<void> _startWorkOrder(bool isUrdu) async {
+  Future<void> _startWorkOrder(bool isUrdu, String? title) async {
     try {
       final db = Provider.of<DatabaseService>(context, listen: false);
       await db.updateArtisanWorkStatus(
         widget.workOrder.artisanId,
         widget.workOrder.id,
         'confirmed',
+        title: title,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isUrdu ? 'کام شروع کر دیا گیا ہے!' : 'Work order started!'),
+            content: Text(
+                isUrdu ? 'کام شروع کر دیا گیا ہے!' : 'Work order started!'),
             backgroundColor: AppTheme.themeColor,
           ),
         );
@@ -600,7 +650,8 @@ class _NegotiationViewState extends State<NegotiationView> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isUrdu ? 'کام شروع کرنے میں خرابی آئی' : 'Error starting work'),
+            content: Text(
+                isUrdu ? 'کام شروع کرنے میں خرابی آئی' : 'Error starting work'),
             backgroundColor: Colors.red,
           ),
         );
