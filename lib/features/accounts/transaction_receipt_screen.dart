@@ -55,25 +55,35 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-                // Bill Paper Container wrapped in Screenshot
-                Screenshot(
+                  Screenshot(
                   controller: _screenshotController,
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(20),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 5)),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
                       ],
                     ),
                     child: Column(
                       children: [
-                        // Header Style
+                        // --- Modern Header with Gradient ---
                         Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: const BoxDecoration(
-                            color: AppTheme.darkColor,
-                            borderRadius: BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppTheme.darkColor,
+                                AppTheme.darkColor.withValues(alpha: 0.8),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -88,9 +98,11 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                                   textColor: Colors.white,
                                   subtitleColor: Colors.white70,
                                   isVerified: account?.isVerified ?? false,
+                                  customSize: 40,
+                                  borderRadius: 6,
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 12),
                               Column(
                                 children: [
                                   Image.asset(
@@ -108,96 +120,95 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                           ),
                         ),
 
+                        // --- Receipt Body ---
                         Padding(
-                          padding: const EdgeInsets.all(20),
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Party Info
-                              if (widget.transaction.professionId == null || widget.transaction.professionId!.isEmpty)
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              isUrdu ? 'بل نمبر' : 'Bill Number',
-                                              style: TextStyle(fontWeight: fontWeight, fontSize: 14, fontFamily: fontFamily, color: AppTheme.textSecondary),
-                                            ),
-                                            Text(
-                                              (widget.transaction.referenceNumber != null && widget.transaction.referenceNumber!.isNotEmpty)
-                                                  ? widget.transaction.referenceNumber!
-                                                  : '#${widget.transaction.id.substring(widget.transaction.id.length - 6)}',
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.darkColor, fontFamily: ''),
-                                            ),
-                                          ],
-                                        ),
-                                        Text(
-                                          DateFormat('dd/MM/yyyy').format(widget.transaction.date),
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textSecondary, fontFamily: ''),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                )
-                              else
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          isUrdu ? 'پیشہ ورانہ ٹرانزیکشن' : 'Profession Transaction',
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: fontFamily, color: AppTheme.darkColor),
-                                        ),
-                                        Text(
-                                          DateFormat('dd/MM/yyyy').format(widget.transaction.date),
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.textSecondary),
-                                        ),
-                                      ],
-                                    ),
-                                    if (widget.transaction.professionName != null)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 4),
-                                        child: Text(
-                                          widget.transaction.professionName!,
-                                          style: TextStyle(fontSize: 14, fontFamily: fontFamily, color: AppTheme.textSecondary),
+                              // Bill Info Header
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        isUrdu ? 'بل نمبر' : 'INVOICE NO',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.2,
+                                          color: AppTheme.textSecondary,
+                                          fontFamily: fontFamily,
                                         ),
                                       ),
-                                  ],
-                                ),
-
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 15),
-                                child: Divider(thickness: 1, color: Colors.grey),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        (widget.transaction.referenceNumber != null && widget.transaction.referenceNumber!.isNotEmpty)
+                                            ? widget.transaction.referenceNumber!
+                                            : '#${widget.transaction.id.substring(widget.transaction.id.length - 6)}',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.darkColor,
+                                          fontFamily: '',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        isUrdu ? 'تاریخ' : 'DATE',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.2,
+                                          color: AppTheme.textSecondary,
+                                          fontFamily: fontFamily,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        DateFormat('dd MMM, yyyy').format(widget.transaction.date),
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.darkColor,
+                                          fontFamily: '',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
 
-                              // Items Table
+                              const SizedBox(height: 20),
+                              _buildDashedDivider(),
+                              const SizedBox(height: 20),
+
+                              // Items / Description Table
                               Directionality(
                                 textDirection: isUrdu ? ui.TextDirection.rtl : ui.TextDirection.ltr,
                                 child: Table(
                                   columnWidths: const {
-                                    0: FlexColumnWidth(),
-                                    1: IntrinsicColumnWidth(),
-                                    2: IntrinsicColumnWidth(),
-                                    3: IntrinsicColumnWidth(),
+                                    0: FlexColumnWidth(4.7),
+                                    1: FlexColumnWidth(1.5),
+                                    2: FlexColumnWidth(1.5),
+                                    3: FlexColumnWidth(1.8),
                                   },
-                                  defaultVerticalAlignment: TableCellVerticalAlignment.top,
                                   children: [
                                     TableRow(
                                       children: [
-                                        Text(isUrdu ? 'تفصیل' : 'Description', textAlign: TextAlign.start, style: TextStyle(fontWeight: fontWeight, fontFamily: fontFamily)),
-                                        Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text(isUrdu ? 'تعداد' : 'Qty', textAlign: TextAlign.center, style: TextStyle(fontWeight: fontWeight, fontFamily: fontFamily))),
-                                        Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text(isUrdu ? 'ریٹ' : 'Rate', textAlign: TextAlign.center, style: TextStyle(fontWeight: fontWeight, fontFamily: fontFamily))),
-                                        Text(isUrdu ? 'ٹوٹل' : 'Total', textAlign: TextAlign.end, style: TextStyle(fontWeight: fontWeight, fontFamily: fontFamily)),
+                                        _buildTableHeader(isUrdu ? 'تفصیل' : 'Item', TextAlign.start, fontFamily),
+                                        _buildTableHeader(isUrdu ? 'تعداد' : 'Qty', TextAlign.center, fontFamily),
+                                        _buildTableHeader(isUrdu ? 'ریٹ' : 'Rate', TextAlign.center, fontFamily),
+                                        _buildTableHeader(isUrdu ? 'ٹوٹل' : 'Amount', TextAlign.end, fontFamily),
                                       ],
                                     ),
-                                    const TableRow(children: [SizedBox(height: 10), SizedBox(), SizedBox(), SizedBox()]),
+                                    const TableRow(children: [SizedBox(height: 12), SizedBox(), SizedBox(), SizedBox()]),
                                     if (widget.transaction.items.isNotEmpty)
                                       ...widget.transaction.items.map((item) => TableRow(
                                         children: [
@@ -206,35 +217,23 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Text(
-                                                  item.description, 
-                                                  textAlign: TextAlign.start,
-                                                  style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight)
-                                                ),
+                                                Text(item.description, style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight, fontSize: 13)),
                                                 if (item.unit != null && item.unit!.isNotEmpty)
-                                                  Text(
-                                                    'Per ${item.unit}',
-                                                    textAlign: TextAlign.start,
-                                                    style: TextStyle(fontSize: 10, color: Colors.grey, fontFamily: fontFamily),
-                                                  ),
+                                                  Text(item.unit!, style: const TextStyle(fontSize: 10, color: Colors.grey)),
                                               ],
                                             ),
                                           ),
                                           Padding(
-                                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-                                            child: Text(
-                                              '${item.quantity.toStringAsFixed(0)}${item.unit != null ? " ${item.unit}" : ""}',
-                                              textAlign: TextAlign.center,
-                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, fontFamily: '')
-                                            ),
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-                                            child: Text(item.rate.toStringAsFixed(0), textAlign: TextAlign.center, style: numberStyle),
+                                            padding: const EdgeInsets.symmetric(vertical: 8),
+                                            child: Text(item.quantity.toStringAsFixed(0), textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                                           ),
                                           Padding(
                                             padding: const EdgeInsets.symmetric(vertical: 8),
-                                            child: Text(item.total.toStringAsFixed(0), textAlign: TextAlign.end, style: numberStyle),
+                                            child: Text(item.rate.toStringAsFixed(0), textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(vertical: 8),
+                                            child: Text(item.total.toStringAsFixed(0), textAlign: TextAlign.end, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                                           ),
                                         ],
                                       ))
@@ -245,15 +244,14 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                                             padding: const EdgeInsets.symmetric(vertical: 8),
                                             child: Text(
                                               widget.transaction.description.isNotEmpty ? widget.transaction.description : (isUrdu ? 'نقد لین دین' : 'Cash Transaction'), 
-                                              textAlign: TextAlign.start,
-                                              style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight)
+                                              style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight, fontSize: 14)
                                             ),
                                           ),
                                           const SizedBox(),
                                           const SizedBox(),
                                           Padding(
                                             padding: const EdgeInsets.symmetric(vertical: 8),
-                                            child: Text(widget.transaction.amount.toStringAsFixed(0), textAlign: TextAlign.end, style: numberStyle),
+                                            child: Text(widget.transaction.amount.toStringAsFixed(0), textAlign: TextAlign.end, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                                           ),
                                         ],
                                       ),
@@ -261,34 +259,76 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                                 ),
                               ),
 
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 15),
-                                child: Divider(thickness: 2, color: AppTheme.darkColor),
-                              ),
+                              const SizedBox(height: 20),
+                              _buildDashedDivider(),
+                              const SizedBox(height: 25),
 
-                              // Grand Total
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              // --- Simple Stacked Total Section ---
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    isUrdu ? 'کل رقم:' : 'Grand Total:',
-                                    style: TextStyle(fontSize: 18, fontWeight: fontWeight, fontFamily: fontFamily),
+                                    isUrdu ? 'کل رقم' : 'TOTAL AMOUNT',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.5,
+                                      color: AppTheme.textSecondary,
+                                      fontFamily: fontFamily,
+                                    ),
                                   ),
+                                  const SizedBox(height: 2),
                                   Text(
                                     'Rs. ${widget.transaction.amount.toStringAsFixed(0)}',
-                                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, fontFamily: '', color: widget.transaction.type == 'income' ? AppTheme.incomeColor : AppTheme.expenseColor),
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                      color: widget.transaction.type == 'income' ? AppTheme.incomeColor : AppTheme.expenseColor,
+                                      fontFamily: '',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    isUrdu ? (widget.transaction.type == 'income' ? 'موصول شدہ' : 'ادا شدہ') : 'Status: ${widget.transaction.type.toUpperCase()}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: widget.transaction.type == 'income' ? AppTheme.incomeColor : AppTheme.expenseColor,
+                                      fontFamily: fontFamily,
+                                    ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 20),
-
-                              if (widget.transaction.professionId == null || widget.transaction.professionId!.isEmpty)
-                                Center(
-                                  child: Text(
-                                    isUrdu ? 'آپ کے تعاون کا شکریہ!' : 'Thank you for your business!',
-                                    style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey, fontFamily: fontFamily, fontWeight: fontWeight),
-                                  ),
+                              
+                              const SizedBox(height: 24),
+                              // Footer Branding
+                              Center(
+                                child: Column(
+                                  children: [
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Image.asset(
+                                          'assets/images/icons/zalooq.png',
+                                          height: 20,
+                                          errorBuilder: (context, error, stackTrace) => Icon(PhosphorIcons.wallet(), size: 20, color: AppTheme.darkColor),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          isUrdu ? 'شکریہ! کاروباری ساتھی' : 'POWERED BY KAROBARI SAATHI',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 1,
+                                            color: Colors.grey.shade400,
+                                            fontFamily: fontFamily,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
+                              ),
                             ],
                           ),
                         ),
@@ -297,42 +337,6 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                   ),
                 ),
                 
-                const SizedBox(height: 20),
-
-                if (widget.transaction.voiceNote != null)
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(top: 10),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 5),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(PhosphorIcons.paperclip(), size: 20, color: AppTheme.darkColor),
-                            const SizedBox(width: 8),
-                            Text(
-                              isUrdu ? 'منسلک وائس نوٹ' : 'Attached Voice Note',
-                              style: TextStyle(fontWeight: fontWeight, fontFamily: fontFamily, color: AppTheme.darkColor),
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 20),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: VoiceCommentPlayer(audioUrl: widget.transaction.voiceNote!),
-                        ),
-                      ],
-                    ),
-                  ),
-
                 const SizedBox(height: 30),
 
                 Row(
@@ -388,6 +392,35 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildTableHeader(String label, TextAlign align, String fontFamily) {
+    return Text(
+      label,
+      textAlign: align,
+      style: TextStyle(
+        fontSize: 10,
+        fontWeight: FontWeight.bold,
+        letterSpacing: 0.5,
+        color: AppTheme.textSecondary,
+        fontFamily: fontFamily,
+      ),
+    );
+  }
+
+  Widget _buildDashedDivider() {
+    return Row(
+      children: List.generate(
+        30,
+        (index) => Expanded(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            height: 1,
+            color: Colors.grey.shade300,
+          ),
+        ),
       ),
     );
   }

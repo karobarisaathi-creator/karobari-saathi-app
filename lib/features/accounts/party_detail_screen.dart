@@ -857,7 +857,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
           Expanded(
             flex: 5,
             child: Text(
-              isUrdu ? "تفصیل" : "Details", 
+              isUrdu ? "تفصیل" : "Details",
               style: TextStyle(color: _themeColor, fontSize: 14, fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
               overflow: TextOverflow.ellipsis,
             ),
@@ -1209,55 +1209,6 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
   }
 
 
-  Widget _buildDateHeader(DateTime date, bool isUrdu, String fontFamily, double balance) {
-    String dateStr = DateFormat('dd/MM/yyyy').format(date);
-    String dayLabel = "";
-    final now = DateTime.now();
-    if (DateFormat('yyyy-MM-dd').format(date) == DateFormat('yyyy-MM-dd').format(now)) {
-      dayLabel = isUrdu ? "آج" : "Today";
-    } else if (DateFormat('yyyy-MM-dd').format(date) == DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 1)))) {
-      dayLabel = isUrdu ? "کل" : "Yesterday";
-    } else {
-      dayLabel = dateStr;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: Colors.white,
-      child: Row(
-        children: [
-          Text(
-            dayLabel,
-            style: TextStyle(
-              color: _themeColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 11,
-              fontFamily: (dayLabel == dateStr) ? '' : fontFamily,
-            ),
-          ),
-          const Spacer(),
-          Text(
-            isUrdu ? "بیلنس: " : "Bal ",
-            style: TextStyle(
-              color: _themeColor.withOpacity(0.6),
-              fontSize: 11,
-              fontFamily: fontFamily,
-              fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-          Text(
-            "Rs ${balance.abs().toStringAsFixed(0)}",
-            style: TextStyle(
-              color: _themeColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 11,
-              fontFamily: '',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildTransactionItem(model.Transaction t, bool isUrdu, String fontFamily, double runningBalance) {
     final isIncome = t.type == 'income';
@@ -1281,6 +1232,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         color: isHighlighted ? AppTheme.themeColor.withOpacity(0.15) : Colors.white,
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               flex: 6,
@@ -1299,54 +1251,69 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      if (t.referenceNumber != null && t.referenceNumber!.isNotEmpty) ...[
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
                         Text(
-                          "${isUrdu ? 'بل نمبر  ' : 'Bill NO'} ${t.referenceNumber}",
-                          style: TextStyle(
-                            color: AppTheme.themeColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: isUrdu ? fontFamily : '',
+                          DateFormat('dd MMM').format(t.date),
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 11,
+                            fontFamily: '',
+                            fontWeight: FontWeight.normal,
                           ),
                         ),
-                        const SizedBox(width: 16),
-                      ],
-                      if (t.professionName != null && t.professionName!.isNotEmpty) ...[
-                        Icon(PhosphorIcons.briefcase(), size: 14, color: AppTheme.themeColor.withOpacity(0.7)),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 8),
+                        if ((t.referenceNumber != null && t.referenceNumber!.isNotEmpty) || (t.professionName != null && t.professionName!.isNotEmpty))
+                          Container(
+                              width: 4,
+                              height: 4,
+                              decoration: const BoxDecoration(
+                                  color: Colors.grey, shape: BoxShape.circle)),
+                        if (t.referenceNumber != null && t.referenceNumber!.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            "${isUrdu ? 'بل نمبر ' : 'Bill NO'} ${t.referenceNumber}",
+                            style: TextStyle(
+                              color: AppTheme.themeColor,
+                              fontSize: 11,
+                              fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
+                              fontFamily: isUrdu ? fontFamily : '',
+                            ),
+                          ),
+                        ],
+                        if (t.professionName != null && t.professionName!.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            t.professionName!,
+                            style: TextStyle(
+                              color: AppTheme.themeColor,
+                              fontSize: 11,
+                              fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(width: 8),
+                        // Separator before Balance
+                        Container(
+                            width: 4,
+                            height: 4,
+                            decoration: const BoxDecoration(
+                                color: Colors.grey, shape: BoxShape.circle)),
+                        const SizedBox(width: 8),
                         Text(
-                          t.professionName!,
-                          style: TextStyle(
-                            color: AppTheme.themeColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: fontFamily,
+                          "Rs ${runningBalance.abs().toStringAsFixed(0)}",
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.normal,
+                            fontFamily: '',
                           ),
                         ),
-                        const SizedBox(width: 16),
                       ],
-                      Text(
-                        DateFormat('dd/MM/yyyy').format(t.date),
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 12,
-                          fontFamily: '',
-                          fontWeight: FontWeight.normal,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        "${isUrdu ? 'بیلنس: ' : 'Bal: '}${runningBalance.abs().toStringAsFixed(0)}",
-                        style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: isUrdu ? fontFamily : '',
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
