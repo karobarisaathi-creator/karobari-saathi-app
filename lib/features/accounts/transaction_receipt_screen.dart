@@ -71,19 +71,12 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                     ),
                     child: Column(
                       children: [
-                        // --- Modern Header with Gradient ---
+                        // --- Modern Header ---
                         Container(
                           padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                AppTheme.darkColor,
-                                AppTheme.darkColor.withValues(alpha: 0.8),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                          decoration: const BoxDecoration(
+                            color: AppTheme.darkColor,
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -101,20 +94,6 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                                   customSize: 40,
                                   borderRadius: 6,
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Column(
-                                children: [
-                                  Image.asset(
-                                    'assets/images/icons/zalooq.png',
-                                    height: 40,
-                                    errorBuilder: (context, error, stackTrace) => Icon(PhosphorIcons.wallet(), color: Colors.white, size: 40),
-                                  ),
-                                  Text(
-                                    isUrdu ? 'کاروباری ساتھی' : 'KAROBARI SAATHI',
-                                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1, fontFamily: fontFamily),
-                                  ),
-                                ],
                               ),
                             ],
                           ),
@@ -303,30 +282,33 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                               const SizedBox(height: 24),
                               // Footer Branding
                               Center(
-                                child: Column(
-                                  children: [
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Image.asset(
-                                          'assets/images/icons/zalooq.png',
-                                          height: 20,
-                                          errorBuilder: (context, error, stackTrace) => Icon(PhosphorIcons.wallet(), size: 20, color: AppTheme.darkColor),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.darkColor.withValues(alpha: 0.7),
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Image.asset(
+                                        'assets/images/icons/zalooq.png',
+                                        height: 18,
+                                        errorBuilder: (context, error, stackTrace) => Icon(PhosphorIcons.wallet(), size: 18, color: Colors.white),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        isUrdu ? 'شکریہ! کاروباری ساتھی' : 'POWERED BY KAROBARI SAATHI',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1,
+                                          color: Colors.white.withValues(alpha: 0.9),
+                                          fontFamily: fontFamily,
                                         ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          isUrdu ? 'شکریہ! کاروباری ساتھی' : 'POWERED BY KAROBARI SAATHI',
-                                          style: TextStyle(
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 1,
-                                            color: Colors.grey.shade400,
-                                            fontFamily: fontFamily,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
