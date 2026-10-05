@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/backup_service.dart';
 import 'package:account_app/core/services/database_service.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 
 class BackupScreen extends StatefulWidget {
   @override
@@ -548,18 +549,11 @@ class _BackupScreenState extends State<BackupScreen> {
   }
 
   void _showSnackBar(String message, bool isError) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(
-            fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-            fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-        backgroundColor: isError ? Colors.red : Colors.green,
-      ),
-    );
+    if (isError) {
+      AppToast.error(context, message);
+    } else {
+      AppToast.success(context, message);
+    }
   }
 
   bool get isUrdu {

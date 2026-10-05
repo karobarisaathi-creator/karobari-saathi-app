@@ -19,9 +19,6 @@ import 'package:account_app/core/models/transaction_item_model.dart'; // Added i
 import 'package:account_app/core/models/category_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/notification_model.dart';
-import 'package:account_app/core/models/artisan_profile_model.dart';
-import 'package:account_app/core/models/artisan_work_order_model.dart';
-import 'package:account_app/core/models/job_post_model.dart';
 import 'package:account_app/core/models/dispute_model.dart';
 
 // Services
@@ -36,9 +33,7 @@ import 'package:account_app/core/services/balance_service.dart';
 import 'package:account_app/core/services/pdf_service.dart';
 import 'package:account_app/core/services/excel_service.dart'; // Added ExcelService
 import 'package:account_app/core/services/backup_service.dart';
-import 'package:account_app/core/services/artisan_service.dart';
-import 'package:account_app/core/services/artisan_work_order_service.dart';
-import 'package:account_app/core/services/database/job_service.dart';
+import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/security_service.dart';
 import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/core/widgets/simple_spinning_ring.dart';
@@ -111,9 +106,6 @@ void main() async {
         ProfessionCategoryAdapter()); // ✅ Register the new adapter
     Hive.registerAdapter(AppNotificationAdapter());
     Hive.registerAdapter(NotificationTypeAdapter());
-    Hive.registerAdapter(ArtisanProfileAdapter());
-    Hive.registerAdapter(ArtisanWorkOrderAdapter());
-    Hive.registerAdapter(JobPostAdapter());
     Hive.registerAdapter(DisputeAdapter());
     Hive.registerAdapter(DisputeMessageAdapter());
 
@@ -135,7 +127,6 @@ void main() async {
     final transactionsBox = await Hive.openBox<Transaction>('transactions');
     await Hive.openBox<Category>('categories');
     final professionsBox = await Hive.openBox<Profession>('professions');
-    await Hive.openBox<JobPost>('jobs');
     await Hive.openBox('settings');
 
     try {
@@ -205,9 +196,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
             create: (_) => ExcelService()), // Added ExcelService provider
         ChangeNotifierProvider(create: (_) => BackupService()),
-        ChangeNotifierProvider(create: (_) => JobService()),
-        ChangeNotifierProvider(create: (_) => ArtisanService()),
-        ChangeNotifierProvider(create: (_) => ArtisanWorkOrderService()),
+        ChangeNotifierProvider(create: (_) => StockService()),
         ChangeNotifierProvider(create: (_) => SecurityService()),
         ChangeNotifierProvider(create: (_) => VerificationService()),
       ],

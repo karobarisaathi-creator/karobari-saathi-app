@@ -4,6 +4,7 @@ import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/config/professions_config.dart';
 
 class ProfessionDialog extends StatefulWidget {
@@ -176,16 +177,11 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
                     }
                   }
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        widget.isUrdu ? 'پیشہ کا نام اور تفصیل درج کریں' : 'Please enter profession name and description',
-                        style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight),
-                      ),
-                      backgroundColor: AppTheme.expenseColor,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
+                  AppToast.warning(
+                    context,
+                    widget.isUrdu
+                        ? 'پیشہ کا نام اور تفصیل درج کریں'
+                        : 'Please enter profession name and description',
                   );
                 }
               },

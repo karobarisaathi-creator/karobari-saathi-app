@@ -9,6 +9,7 @@ import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 
 class BulkPartyTransactionScreen extends StatefulWidget {
   final Account? party;
@@ -216,12 +217,11 @@ class _BulkPartyTransactionScreenState extends State<BulkPartyTransactionScreen>
   }
 
   void _showSnackbar(String message, bool isError) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? AppTheme.expenseColor : AppTheme.incomeColor,
-      ),
-    );
+    if (isError) {
+      AppToast.error(context, message);
+    } else {
+      AppToast.success(context, message);
+    }
   }
 
   @override

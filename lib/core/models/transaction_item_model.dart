@@ -2,7 +2,8 @@ import 'package:hive/hive.dart';
 
 part 'transaction_item_model.g.dart';
 
-@HiveType(typeId: 20) // Using typeId 20 to avoid conflict with Category (typeId 2)
+@HiveType(
+    typeId: 20) // Using typeId 20 to avoid conflict with Category (typeId 2)
 class TransactionItem extends HiveObject {
   @HiveField(0)
   final String description;
@@ -19,12 +20,16 @@ class TransactionItem extends HiveObject {
   @HiveField(4)
   final String? unit;
 
+  @HiveField(5)
+  final String? stockItemId;
+
   TransactionItem({
     required this.description,
     required this.quantity,
     required this.rate,
     required this.total,
     this.unit,
+    this.stockItemId,
   });
 
   Map<String, dynamic> toMap() {
@@ -34,6 +39,7 @@ class TransactionItem extends HiveObject {
       'rate': rate,
       'total': total,
       'unit': unit,
+      'stockItemId': stockItemId,
     };
   }
 
@@ -44,6 +50,7 @@ class TransactionItem extends HiveObject {
       rate: (map['rate'] as num?)?.toDouble() ?? 0.0,
       total: (map['total'] as num?)?.toDouble() ?? 0.0,
       unit: map['unit'],
+      stockItemId: map['stockItemId'],
     );
   }
 }

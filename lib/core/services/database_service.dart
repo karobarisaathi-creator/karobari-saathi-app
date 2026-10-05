@@ -6,10 +6,8 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/category_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
-import 'package:account_app/core/models/artisan_profile_model.dart';
-import 'package:account_app/core/models/artisan_work_order_model.dart';
-import 'package:account_app/core/models/artisan_review_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
+import 'package:account_app/core/services/stock_service.dart';
 
 import 'database/account_service.dart';
 import 'database/transaction_service.dart';
@@ -18,8 +16,6 @@ import 'database/sync_service.dart';
 import 'database/category_service.dart';
 import 'database/settings_service.dart';
 import 'database/profile_service.dart';
-import 'artisan_service.dart';
-import 'artisan_work_order_service.dart';
 
 class DatabaseService extends ChangeNotifier {
   final AccountService _accountService = AccountService();
@@ -29,9 +25,6 @@ class DatabaseService extends ChangeNotifier {
   final CategoryService _categoryService = CategoryService();
   final SettingsService _settingsService = SettingsService();
   final ProfileService _profileService = ProfileService();
-  final ArtisanService _artisanService = ArtisanService();
-  final ArtisanWorkOrderService _artisanWorkOrderService =
-      ArtisanWorkOrderService();
 
   // پراپرٹیز
   bool get isInitialized => true;
@@ -88,18 +81,24 @@ class DatabaseService extends ChangeNotifier {
   // TRANSACTION OPERATIONS
   Future<void> addTransaction(model.Transaction t) async {
     await _transactionService.addTransaction(t);
+    await _syncTransactionStock(t);
     notifyListeners();
     _triggerSync();
   }
 
   Future<void> updateTransaction(model.Transaction t) async {
     await _transactionService.updateTransaction(t);
+    await _syncTransactionStock(t);
     notifyListeners();
     _triggerSync();
   }
 
   Future<void> deleteTransaction(String id) async {
+    final transaction = _transactionService.getTransaction(id);
     await _transactionService.deleteTransaction(id);
+    if (transaction != null) {
+      await _syncTransactionStock(transaction, deleteTransaction: true);
+    }
     notifyListeners();
     _triggerSync();
   }
@@ -210,78 +209,6 @@ class DatabaseService extends ChangeNotifier {
   Future<Map<String, String>?> findPublicProfileByUid(String uid) =>
       _profileService.findPublicProfileByUid(uid);
 
-  // ARTISAN OPERATIONS
-  Future<void> saveArtisanProfile(ArtisanProfile p) async {
-    await _artisanService.saveProfile(p);
-    notifyListeners();
-  }
-
-  Future<ArtisanProfile?> getArtisanProfile(String id) =>
-      _artisanService.getProfile(id);
-  Stream<ArtisanProfile?> streamArtisanProfile(String id) =>
-      _artisanService.streamProfile(id);
-  Future<List<ArtisanProfile>> getAllArtisans() =>
-      _artisanService.getAllArtisans();
-  Stream<List<ArtisanProfile>> streamAllArtisans() =>
-      _artisanService.streamAllArtisans();
-  Future<void> addArtisanReview(
-      {required String artisanId,
-      required String workOrderId,
-      required double rating,
-      required String comment}) async {
-    await _artisanService.addReview(
-        artisanId: artisanId,
-        workOrderId: workOrderId,
-        rating: rating,
-        comment: comment);
-    notifyListeners();
-  }
-
-  Stream<List<ArtisanReview>> getArtisanReviews(String artisanId) =>
-      _artisanService.getReviews(artisanId);
-
-  // ARTISAN WORK ORDER OPERATIONS
-  Future<void> addArtisanWorkOrder(ArtisanWorkOrder o) async {
-    await _artisanWorkOrderService.addWorkOrder(o);
-    notifyListeners();
-  }
-
-  Stream<List<ArtisanWorkOrder>> getArtisanWorkOrders(String id) =>
-      _artisanWorkOrderService.getArtisanWorkOrders(id);
-  Future<List<ArtisanWorkOrder>> getCustomerWorkOrders(String id) =>
-      _artisanWorkOrderService.getCustomerWorkOrders(id);
-  Future<void> updateArtisanWorkStatus(
-    String aId,
-    String oId,
-    String s, {
-    String? title,
-  }) async {
-    await _artisanWorkOrderService.updateStatus(
-      aId,
-      oId,
-      s,
-      title: title,
-    );
-    notifyListeners();
-  }
-
-  Future<void> updateArtisanWorkOrderItems({
-    required String artisanId,
-    required String orderId,
-    required List<TransactionItem> items,
-    required double laborFee,
-    required double total,
-  }) async {
-    await _artisanWorkOrderService.updateWorkOrderItems(
-      artisanId: artisanId,
-      orderId: orderId,
-      items: items,
-      laborFee: laborFee,
-      total: total,
-    );
-    notifyListeners();
-  }
-
   // SYNC OPERATIONS
   void startRealtimeSync() => _syncService.startRealtimeSync();
   void stopRealtimeSync() => _syncService.stopRealtimeSync();
@@ -302,6 +229,20 @@ class DatabaseService extends ChangeNotifier {
   }
 
   Future<void> close() => _syncService.closeBoxes();
+
+  Future<void> _syncTransactionStock(
+    model.Transaction transaction, {
+    bool deleteTransaction = false,
+  }) async {
+    try {
+      await StockService.syncTransactionMovements(
+        transaction,
+        deleteTransaction: deleteTransaction,
+      );
+    } catch (error) {
+      debugPrint('Transaction stock sync failed: $error');
+    }
+  }
 
   Future<void> cleanUnknownTransactions() async {
     await _transactionService.cleanUnknownTransactions(

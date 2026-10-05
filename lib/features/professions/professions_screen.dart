@@ -11,6 +11,7 @@ import 'package:account_app/features/accounts/reports_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/config/professions_config.dart';
 
 class ProfessionsScreen extends StatefulWidget {
@@ -324,11 +325,10 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
     final updatedProfession = profession.copyWith(isActive: !(profession.isActive ?? true), updatedAt: DateTime.now());
     databaseService.updateProfession(updatedProfession);
     _loadProfessions();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(isUrdu ? 'پیشہ کی حیثیت تبدیل کر دی گئی' : 'Profession status updated', style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '')),
-      backgroundColor: AppTheme.themeColor,
-      behavior: SnackBarBehavior.floating,
-    ));
+    AppToast.info(
+      context,
+      isUrdu ? 'پیشہ کی حیثیت تبدیل کر دی گئی' : 'Profession status updated',
+    );
   }
 
   Widget _buildPopupItem(String text, IconData icon, Color color, String fontFamily, FontWeight fontWeight) {
@@ -393,11 +393,10 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
         _loadProfessions();
         if (mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(isUrdu ? 'ترمیم محفوظ کر لی گئی' : 'Changes saved successfully', style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '')),
-            backgroundColor: AppTheme.themeColor,
-            behavior: SnackBarBehavior.floating,
-          ));
+          AppToast.success(
+            context,
+            isUrdu ? 'ترمیم محفوظ کر لی گئی' : 'Changes saved successfully',
+          );
         }
       },
     )));
@@ -453,11 +452,10 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
                 databaseService.deleteProfession(profession.id);
                 _loadProfessions();
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(isUrdu ? 'پیشہ ڈیلیٹ کر دیا گیا' : 'Deleted successfully'), 
-                  backgroundColor: AppTheme.expenseColor, 
-                  behavior: SnackBarBehavior.floating
-                ));
+                AppToast.success(
+                  context,
+                  isUrdu ? 'پیشہ ڈیلیٹ کر دیا گیا' : 'Deleted successfully',
+                );
               } : null,
               color: AppTheme.expenseColor,
               size: AppButtonSize.small,

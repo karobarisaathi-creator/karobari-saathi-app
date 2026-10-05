@@ -31,10 +31,7 @@ class VerificationService with ChangeNotifier {
   StreamSubscription<DocumentSnapshot>? _statusSubscription;
 
   VerificationStatus get currentStatus => _currentStatus;
-  VerificationStatus get artisanStatus =>
-      _currentStatus; // Both point to the same unified status
   String? get adminNote => _adminNote;
-  String? get artisanAdminNote => _adminNote;
   bool get isLoading => _isLoading;
 
   static bool canAccessAdminPanel({
@@ -87,7 +84,6 @@ class VerificationService with ChangeNotifier {
               _adminNote = null;
               if (previousStatus == VerificationStatus.approved) {
                 await _updateUserVerifiedFlag(uid, false);
-                await _updateArtisanVerifiedFlag(uid, false);
               }
             } else {
               final statusStr = data['status'] as String?;
@@ -98,14 +94,12 @@ class VerificationService with ChangeNotifier {
                   _currentStatus = VerificationStatus.pending;
                   if (previousStatus == VerificationStatus.approved) {
                     await _updateUserVerifiedFlag(uid, false);
-                    await _updateArtisanVerifiedFlag(uid, false);
                   }
                   break;
                 case 'approved':
                   _currentStatus = VerificationStatus.approved;
                   if (previousStatus != VerificationStatus.approved) {
                     await _updateUserVerifiedFlag(uid, true);
-                    await _updateArtisanVerifiedFlag(uid, true);
                     if (previousStatus == VerificationStatus.pending) {
                       _createVerificationNotification(uid, true);
                     }
@@ -115,7 +109,6 @@ class VerificationService with ChangeNotifier {
                   _currentStatus = VerificationStatus.rejected;
                   if (previousStatus == VerificationStatus.approved) {
                     await _updateUserVerifiedFlag(uid, false);
-                    await _updateArtisanVerifiedFlag(uid, false);
                   }
                   if (previousStatus == VerificationStatus.pending) {
                     _createVerificationNotification(uid, false);
@@ -126,7 +119,6 @@ class VerificationService with ChangeNotifier {
                   _adminNote = null;
                   if (previousStatus == VerificationStatus.approved) {
                     await _updateUserVerifiedFlag(uid, false);
-                    await _updateArtisanVerifiedFlag(uid, false);
                   }
               }
             }
@@ -135,7 +127,6 @@ class VerificationService with ChangeNotifier {
             _adminNote = null;
             if (previousStatus == VerificationStatus.approved) {
               await _updateUserVerifiedFlag(uid, false);
-              await _updateArtisanVerifiedFlag(uid, false);
             }
           }
           previousStatus = _currentStatus;
@@ -154,26 +145,13 @@ class VerificationService with ChangeNotifier {
     );
   }
 
-  Future<void> _updateArtisanVerifiedFlag(String uid, bool isVerified) async {
-    try {
-      await _firestore.collection('artisans').doc(uid).set({
-        'isVerified': isVerified,
-        'verificationStatus': isVerified ? 'approved' : 'none',
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-    } catch (e) {
-      debugPrint('Failed to update artisan verification flag: $e');
-    }
-  }
-
-  /// Unified method to submit verification requests (both artisans and regular users)
+  /// Submit a verification request for the signed-in account.
   Future<void> submitVerificationRequest({
     required File cnicFront,
     required File cnicBack,
     File? shopImage,
     required String businessName,
     required String businessType,
-    bool isArtisanRequest = false,
   }) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('صارف لاگ ان نہیں ہے');
@@ -199,7 +177,7 @@ class VerificationService with ChangeNotifier {
       // Unified collection: verification_requests
       await _firestore.collection('verification_requests').doc(user.uid).set({
         'uid': user.uid,
-        'name': isArtisanRequest ? (businessName) : (user.displayName ?? ''),
+        'name': user.displayName ?? '',
         'phone': user.phoneNumber ?? '',
         'businessName': businessName,
         'businessType': businessType,
@@ -211,7 +189,6 @@ class VerificationService with ChangeNotifier {
         'adminNote': null,
         'reviewedBy': null,
         'reviewedAt': null,
-        'isArtisanRequest': isArtisanRequest,
       }, SetOptions(merge: false));
 
       debugPrint('تصدیق درخواست کامیابی سے جمع ہوگئی');
@@ -222,24 +199,6 @@ class VerificationService with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
-  }
-
-  /// Deprecated: Use submitVerificationRequest instead
-  Future<void> submitArtisanRequest({
-    required File cnicFront,
-    required File cnicBack,
-    File? shopImage,
-    required String artisanName,
-    required String profession,
-  }) async {
-    return submitVerificationRequest(
-      cnicFront: cnicFront,
-      cnicBack: cnicBack,
-      shopImage: shopImage,
-      businessName: artisanName,
-      businessType: profession,
-      isArtisanRequest: true,
-    );
   }
 
   Future<void> _updateUserVerifiedFlag(String uid, bool isVerified) async {
@@ -260,14 +219,12 @@ class VerificationService with ChangeNotifier {
     }
   }
 
-  /// Deprecated: Use submitVerificationRequest instead
   Future<void> submitRequest({
     required File cnicFront,
     required File cnicBack,
     File? shopImage,
     required String businessName,
     required String businessType,
-    bool isArtisan = false,
   }) async {
     return submitVerificationRequest(
       cnicFront: cnicFront,
@@ -275,7 +232,6 @@ class VerificationService with ChangeNotifier {
       shopImage: shopImage,
       businessName: businessName,
       businessType: businessType,
-      isArtisanRequest: isArtisan,
     );
   }
 
@@ -406,14 +362,9 @@ class VerificationService with ChangeNotifier {
           .collection('users')
           .where('isVerified', isEqualTo: true)
           .get();
-      final artisansSnapshot = await _firestore.collection('artisans').get();
-      final jobsSnapshot = await _firestore.collection('jobs').get();
-
       return {
         'totalUsers': userSnapshot.docs.length,
         'verifiedUsers': verifiedSnapshot.docs.length,
-        'totalArtisans': artisansSnapshot.docs.length,
-        'totalJobs': jobsSnapshot.docs.length,
       };
     });
   }

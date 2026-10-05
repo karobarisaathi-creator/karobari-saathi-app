@@ -9,6 +9,7 @@ import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/features/dashboard/dashboard_screen.dart';
 import 'package:account_app/features/dashboard/main_navigation_screen.dart';
 import 'package:account_app/features/settings/master_profile_screen.dart';
@@ -492,10 +493,7 @@ class _LoginScreenState extends State<LoginScreen> {
             if (e.code == 'invalid-phone-number') {
               errorMessage = 'The phone number is invalid.';
             }
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text(errorMessage), backgroundColor: Colors.red),
-            );
+            AppToast.error(context, errorMessage);
           },
           codeSent: (String verificationId, int? resendToken) {
             if (!mounted) return;
@@ -503,15 +501,7 @@ class _LoginScreenState extends State<LoginScreen> {
               _isLoading = false;
               _verificationId = verificationId;
             });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('OTP code sent'),
-                backgroundColor: _darkColor,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            );
+            AppToast.info(context, 'OTP code sent');
           },
           codeAutoRetrievalTimeout: (String verificationId) {
             if (mounted && !_loginCompleted) {
@@ -534,9 +524,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      AppToast.error(context, 'Error: $e');
     }
   }
 
@@ -606,23 +594,10 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await databaseService.fetchFromFirebase();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Data restored successfully'),
-          backgroundColor: _darkColor,
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+      AppToast.success(context, 'Data restored successfully');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to restore data: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppToast.error(context, 'Failed to restore data: $e');
     }
   }
 

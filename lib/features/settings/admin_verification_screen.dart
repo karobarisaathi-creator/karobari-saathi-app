@@ -9,6 +9,7 @@ import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 
 class AdminVerificationScreen extends StatefulWidget {
   const AdminVerificationScreen({super.key});
@@ -65,11 +66,7 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
     );
 
     if (!canAccess && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            backgroundColor: AppTheme.expenseColor,
-            content: const Text('آپ کو ایڈمن پینل تک رسائی کا اجازت نہیں ہے')),
-      );
+      AppToast.error(context, 'آپ کو ایڈمن پینل تک رسائی کا اجازت نہیں ہے');
       Navigator.pop(context);
     }
   }
@@ -151,20 +148,14 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
       );
       _noteController.clear();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              backgroundColor:
-                  approve ? AppTheme.incomeColor : AppTheme.expenseColor,
-              content: Text(approve
-                  ? 'درخواست منظور کر دی گئی'
-                  : 'درخواست مسترد کر دی گئی')),
+        AppToast.success(
+          context,
+          approve ? 'درخواست منظور کر دی گئی' : 'درخواست مسترد کر دی گئی',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            backgroundColor: AppTheme.expenseColor,
-            content: Text('Error: $e')));
+        AppToast.error(context, 'Error: $e');
       }
     }
   }
@@ -284,7 +275,8 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
                       color: AppTheme.themeColor),
                   const SizedBox(width: 8),
                   const Text('براڈکاسٹ نوٹیفیکیشن',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ],
               ),
               const SizedBox(height: 20),
@@ -317,12 +309,8 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
                 onPressed: () async {
                   if (_broadcastTitleController.text.isEmpty ||
                       _broadcastMessageController.text.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('عنوان اور پیغام دونوں ضروری ہیں'),
-                        backgroundColor: AppTheme.expenseColor,
-                      ),
-                    );
+                    AppToast.warning(
+                        context, 'عنوان اور پیغام دونوں ضروری ہیں');
                     return;
                   }
 
@@ -337,21 +325,12 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
                     _broadcastTitleController.clear();
                     _broadcastMessageController.clear();
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('تمام صارفین کو پیغام بھیج دیا گیا ہے'),
-                          backgroundColor: AppTheme.incomeColor,
-                        ),
-                      );
+                      AppToast.success(
+                          context, 'تمام صارفین کو پیغام بھیج دیا گیا ہے');
                     }
                   } catch (e) {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: AppTheme.expenseColor,
-                          content: Text('خرابی: $e'),
-                        ),
-                      );
+                      AppToast.error(context, 'خرابی: $e');
                     }
                   } finally {
                     if (mounted) setState(() => _isBroadcastSending = false);
@@ -419,28 +398,19 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
                 _buildInfoRow('کاروبار:', req['businessName'] ?? ''),
                 _buildInfoRow('قسم:', req['businessType'] ?? ''),
                 const SizedBox(height: 12),
-                if (req['isArtisanRequest'] == true) ...[
-                  Row(
-                    children: [
-                      _buildImageThumb(req['cnicFront'], 'CNIC Front'),
-                      const SizedBox(width: 12),
-                      _buildImageThumb(req['cnicBack'], 'CNIC Back'),
-                    ],
-                  ),
-                  if (req['shopImageUrl'] != null) ...[
-                    const SizedBox(height: 12),
-                    Row(children: [
-                      _buildImageThumb(req['shopImageUrl'], 'Workplace')
-                    ]),
+                Row(
+                  children: [
+                    _buildImageThumb(req['cnicFront'], 'CNIC Front'),
+                    const SizedBox(width: 12),
+                    _buildImageThumb(req['cnicBack'], 'CNIC Back'),
                   ],
-                ] else
-                  Row(
-                    children: [
-                      _buildImageThumb(req['shopImageUrl'], 'دکان'),
-                      const SizedBox(width: 12),
-                      _buildImageThumb(req['cnicFront'], 'شناختی کارڈ'),
-                    ],
-                  ),
+                ),
+                if (req['shopImageUrl'] != null) ...[
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    _buildImageThumb(req['shopImageUrl'], 'Shop / Workplace')
+                  ]),
+                ],
               ],
             ),
           ),
@@ -593,19 +563,11 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
                 await Provider.of<VerificationService>(context, listen: false)
                     .toggleUserStatus(uid, true);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        backgroundColor: AppTheme.expenseColor,
-                        content: const Text('صارف بلاک کر دیا گیا')),
-                  );
+                  AppToast.success(context, 'صارف بلاک کر دیا گیا');
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        backgroundColor: AppTheme.expenseColor,
-                        content: Text('خرابی: $e')),
-                  );
+                  AppToast.error(context, 'خرابی: $e');
                 }
               }
             },
@@ -620,19 +582,11 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen>
                 await Provider.of<VerificationService>(context, listen: false)
                     .revokeVerification(uid);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        backgroundColor: AppTheme.incomeColor,
-                        content: const Text('تصدیق منسوخ کر دی گئی')),
-                  );
+                  AppToast.success(context, 'تصدیق منسوخ کر دی گئی');
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        backgroundColor: AppTheme.expenseColor,
-                        content: Text('خرابی: $e')),
-                  );
+                  AppToast.error(context, 'خرابی: $e');
                 }
               }
             },

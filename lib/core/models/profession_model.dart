@@ -94,6 +94,19 @@ class Profession {
   @HiveField(19)
   final String? parentId;
 
+  // 🌾 زرعی فیلڈز (Farming fields)
+  @HiveField(20)
+  final String cropType;
+
+  @HiveField(21)
+  final double areaAcres;
+
+  @HiveField(22)
+  final double rentPerAcre;
+
+  @HiveField(23)
+  final double productionMun;
+
   Profession({
     required this.id,
     required this.name,
@@ -115,6 +128,10 @@ class Profession {
     this.customMetrics,
     this.isMaster = false,
     this.parentId,
+    this.cropType = '',
+    this.areaAcres = 0.0,
+    this.rentPerAcre = 0.0,
+    this.productionMun = 0.0,
   });
 
   // Map میں تبدیل
@@ -140,6 +157,10 @@ class Profession {
       'customMetrics': customMetrics,
       'isMaster': isMaster,
       'parentId': parentId,
+      'cropType': cropType,
+      'areaAcres': areaAcres,
+      'rentPerAcre': rentPerAcre,
+      'productionMun': productionMun,
     };
   }
 
@@ -185,6 +206,10 @@ class Profession {
           : null,
       isMaster: map['isMaster'] ?? false,
       parentId: map['parentId'],
+      cropType: map['cropType'] ?? '',
+      areaAcres: (map['areaAcres'] ?? 0.0).toDouble(),
+      rentPerAcre: (map['rentPerAcre'] ?? 0.0).toDouble(),
+      productionMun: (map['productionMun'] ?? 0.0).toDouble(),
     );
   }
 
@@ -210,6 +235,10 @@ class Profession {
     Map<String, dynamic>? customMetrics,
     bool? isMaster,
     String? parentId,
+    String? cropType,
+    double? areaAcres,
+    double? rentPerAcre,
+    double? productionMun,
   }) {
     return Profession(
       id: id ?? this.id,
@@ -232,6 +261,10 @@ class Profession {
       customMetrics: customMetrics ?? this.customMetrics,
       isMaster: isMaster ?? this.isMaster,
       parentId: parentId ?? this.parentId,
+      cropType: cropType ?? this.cropType,
+      areaAcres: areaAcres ?? this.areaAcres,
+      rentPerAcre: rentPerAcre ?? this.rentPerAcre,
+      productionMun: productionMun ?? this.productionMun,
     );
   }
 

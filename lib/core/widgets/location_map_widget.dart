@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:account_app/core/theme/app_theme.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/services/logging_service.dart';
 
 class LocationMapWidget extends StatefulWidget {
@@ -110,12 +111,9 @@ class _LocationMapWidgetState extends State<LocationMapWidget> {
     } catch (e, stack) {
       _logger.error("Open map error", e, stack);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.isUrdu ? 'نقشہ کھولنے میں ناکامی' : 'Failed to open map',
-            ),
-          ),
+        AppToast.error(
+          context,
+          widget.isUrdu ? 'نقشہ کھولنے میں ناکامی' : 'Failed to open map',
         );
       }
     }

@@ -69,7 +69,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       elevation: elevation,
       centerTitle: centerTitle ?? (title is! Widget), // اگر ویجیٹ ہے تو سینٹر نہیں کرے گا
       bottom: bottom,
-      shape: const RoundedRectangleBorder(
+      shape: shape ?? const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(15)),
       ),
     );

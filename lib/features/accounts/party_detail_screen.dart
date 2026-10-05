@@ -24,6 +24,7 @@ import 'package:account_app/core/widgets/custom_app_bar.dart';
 
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 
 class PartyDetailScreen extends StatefulWidget {
   final Account party;
@@ -261,11 +262,9 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
         setState(() {
           _remoteProfile = null; 
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isUrdu ? 'معلومات اپ ڈیٹ کر دی گئی ہیں' : 'Profile updated successfully'),
-            backgroundColor: AppTheme.incomeColor,
-          )
+        AppToast.success(
+          context,
+          isUrdu ? 'معلومات اپ ڈیٹ کر دی گئی ہیں' : 'Profile updated successfully',
         );
       }
     }
@@ -1387,17 +1386,14 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final scaffoldMessenger = ScaffoldMessenger.of(context);
               Navigator.pop(context);
               await Provider.of<DatabaseService>(context, listen: false).deleteTransaction(t.id);
               
               if (mounted) {
                 _loadTransactions();
-                scaffoldMessenger.showSnackBar(
-                  SnackBar(
-                    content: Text(isUrdu ? 'ٹرانزیکشن ڈیلیٹ کر دی گئی ہے' : 'Transaction deleted'),
-                    backgroundColor: Colors.red,
-                  ),
+                AppToast.success(
+                  this.context,
+                  isUrdu ? 'ٹرانزیکشن ڈیلیٹ کر دی گئی ہے' : 'Transaction deleted',
                 );
               }
             },

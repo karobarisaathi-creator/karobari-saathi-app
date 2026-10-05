@@ -3,23 +3,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:account_app/core/services/version_check_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
+import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/services/auth_service.dart';
-import 'package:account_app/core/services/alert_service.dart'; 
+import 'package:account_app/core/services/alert_service.dart';
 import 'package:account_app/core/models/account_model.dart';
-import 'package:account_app/core/models/artisan_profile_model.dart';
 // Screens
 import 'package:account_app/features/notifications/notifications_screen.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
-import 'package:account_app/features/accounts/add_party_screen.dart'; 
+import 'package:account_app/features/accounts/add_party_screen.dart';
 import 'package:account_app/features/accounts/party_history_screen.dart';
 import 'package:account_app/features/accounts/sms_invitation_screen.dart';
-import 'package:account_app/features/artisans/artisan_detail_screen.dart';
-import 'package:account_app/features/artisans/artisan_work_orders_screen.dart';
-import 'main_navigation_screen.dart'; 
+import 'main_navigation_screen.dart';
 import 'package:account_app/core/widgets/party_card.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/theme/app_theme.dart';
@@ -35,18 +32,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = false;
   bool _isAscending = true;
   String _searchQuery = "";
-  Map<String, dynamic>? _updateData;
-  StreamSubscription<ArtisanProfile?>? _artisanSub;
-  ArtisanProfile? _myArtisanProfile;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final dbService = Provider.of<DatabaseService>(context, listen: false);
-      _checkVersion();
-      _setupArtisanListener();
-
       if (!dbService.isInitialized) {
         setState(() => _isLoading = true);
         dbService.init().then((_) {
@@ -56,35 +47,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         });
       }
     });
-  }
-
-  @override
-  void dispose() {
-    _artisanSub?.cancel();
-    super.dispose();
-  }
-
-  void _setupArtisanListener() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final dbService = Provider.of<DatabaseService>(context, listen: false);
-    _artisanSub = dbService.streamArtisanProfile(user.uid).listen((profile) {
-      if (mounted) {
-        setState(() {
-          _myArtisanProfile = profile;
-        });
-      }
-    });
-  }
-
-  void _checkVersion() async {
-    final data = await VersionCheckService().getUpdateData();
-    if (mounted) {
-      setState(() {
-        _updateData = data;
-      });
-    }
   }
 
   Future<void> _refreshData() async {
@@ -98,7 +60,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
     final dbService = Provider.of<DatabaseService>(context);
-    
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       extendBodyBehindAppBar: true,
@@ -121,7 +83,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(PhosphorIcons.plusCircle(), color: Colors.white, size: 26),
+            icon:
+                Icon(PhosphorIcons.plusCircle(), color: Colors.white, size: 26),
             onPressed: () {
               Navigator.push(
                 context,
@@ -134,69 +97,78 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: SimpleSpinningRing(size: 60, duration: Duration(seconds: 2)))
+          ? const Center(
+              child:
+                  SimpleSpinningRing(size: 60, duration: Duration(seconds: 2)))
           : Consumer<DatabaseService>(
-        builder: (context, databaseService, child) {
-          final allAccounts = databaseService.getAccounts();
-          final parties = allAccounts.where((p) => p.isActive && p.category != 'Partner').toList();
-          final professions = databaseService.getProfessions();
-          
-          double totalReceivable = 0; 
-          double totalPayable = 0;    
+              builder: (context, databaseService, child) {
+                final allAccounts = databaseService.getAccounts();
+                final parties = allAccounts
+                    .where((p) =>
+                        p.isActive &&
+                        p.category != 'Partner' &&
+                        p.id != QuickBillConstants.cashCustomerAccountId)
+                    .toList();
+                final professions = databaseService.getProfessions();
 
-          for (var party in parties) {
-            final liveBalance = party.balance;
-            if (liveBalance > 0) {
-              totalPayable += liveBalance;
-            } else if (liveBalance < 0) {
-              totalReceivable += liveBalance.abs();
-            }
-          }
+                double totalReceivable = 0;
+                double totalPayable = 0;
 
-          double netBalance = totalPayable - totalReceivable;
+                for (var party in parties) {
+                  final liveBalance = party.balance;
+                  if (liveBalance > 0) {
+                    totalPayable += liveBalance;
+                  } else if (liveBalance < 0) {
+                    totalReceivable += liveBalance.abs();
+                  }
+                }
 
-          // --- Professions Logic ---
-          final activeProfessions = professions.where((p) => p.isActive ?? true).toList();
-          double profIncome = 0;
-          double profExpense = 0;
-          for (var p in activeProfessions) {
-            // صرف وہی ریکارڈز لیں جو 'ماسٹر' نہیں ہیں (یعنی اصل سیزنز ہیں) اور جاری ہیں
-            if (!(p.isMaster ?? false)) {
-              profIncome += p.totalIncome;
-              profExpense += p.totalExpense;
-            }
-          }
-          double profProfit = profIncome - profExpense;
+                double netBalance = totalPayable - totalReceivable;
 
-          return Column(
-            children: [
-              _buildLargeDarkHeader(
-                receivable: totalReceivable,
-                payable: totalPayable,
-                netBalance: netBalance,
-                profIncome: profIncome,
-                profExpense: profExpense,
-                profProfit: profProfit,
-                showProfessions: activeProfessions.isNotEmpty, // اگر کوئی پیشہ ہے تو دکھائیں
-                isUrdu: isUrdu,
-                fontFamily: fontFamily,
-              ),
+                // --- Professions Logic ---
+                final activeProfessions =
+                    professions.where((p) => p.isActive ?? true).toList();
+                double profIncome = 0;
+                double profExpense = 0;
+                for (var p in activeProfessions) {
+                  // صرف وہی ریکارڈز لیں جو 'ماسٹر' نہیں ہیں (یعنی اصل سیزنز ہیں) اور جاری ہیں
+                  if (!(p.isMaster ?? false)) {
+                    profIncome += p.totalIncome;
+                    profExpense += p.totalExpense;
+                  }
+                }
+                double profProfit = profIncome - profExpense;
 
-              Expanded(
-                child: Container(
-                  color: AppTheme.backgroundColor,
-                  child: RefreshIndicator(
-                    onRefresh: _refreshData,
-                    color: Colors.white,
-                    backgroundColor: AppTheme.themeColor,
-                    child: _buildPartyList(parties, databaseService, isUrdu, fontFamily),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+                return Column(
+                  children: [
+                    _buildLargeDarkHeader(
+                      receivable: totalReceivable,
+                      payable: totalPayable,
+                      netBalance: netBalance,
+                      profIncome: profIncome,
+                      profExpense: profExpense,
+                      profProfit: profProfit,
+                      showProfessions: activeProfessions
+                          .isNotEmpty, // اگر کوئی پیشہ ہے تو دکھائیں
+                      isUrdu: isUrdu,
+                      fontFamily: fontFamily,
+                    ),
+                    Expanded(
+                      child: Container(
+                        color: AppTheme.backgroundColor,
+                        child: RefreshIndicator(
+                          onRefresh: _refreshData,
+                          color: Colors.white,
+                          backgroundColor: AppTheme.themeColor,
+                          child: _buildPartyList(
+                              parties, databaseService, isUrdu, fontFamily),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
     );
   }
 
@@ -211,7 +183,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required bool isUrdu,
     required String fontFamily,
   }) {
-    final balanceLabel = isUrdu 
+    final balanceLabel = isUrdu
         ? (netBalance >= 0 ? 'باقی دینے' : 'باقی لینے')
         : (netBalance >= 0 ? 'Net Payable' : 'Net Receivable');
 
@@ -240,11 +212,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Party Stats
           Row(
             children: [
-              _buildHeaderStatItem(isUrdu ? 'لینے ہیں' : 'To Receive', receivable, Colors.white70, fontFamily, PhosphorIcons.arrowDownLeft()),
+              _buildHeaderStatItem(
+                  isUrdu ? 'لینے ہیں' : 'To Receive',
+                  receivable,
+                  Colors.white70,
+                  fontFamily,
+                  PhosphorIcons.arrowDownLeft()),
               _buildStatDivider(),
-              _buildHeaderStatItem(isUrdu ? 'دینے ہیں' : 'To Pay', payable, Colors.white70, fontFamily, PhosphorIcons.arrowUpRight()),
+              _buildHeaderStatItem(isUrdu ? 'دینے ہیں' : 'To Pay', payable,
+                  Colors.white70, fontFamily, PhosphorIcons.arrowUpRight()),
               _buildStatDivider(),
-              _buildHeaderStatItem(balanceLabel, netBalance.abs(), Colors.white70, fontFamily, PhosphorIcons.wallet(), isBold: true),
+              _buildHeaderStatItem(balanceLabel, netBalance.abs(),
+                  Colors.white70, fontFamily, PhosphorIcons.wallet(),
+                  isBold: true),
             ],
           ),
           if (showProfessions) ...[
@@ -255,11 +235,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // Profession Stats
             Row(
               children: [
-                _buildHeaderStatItem(isUrdu ? 'آمدنی' : 'Income', profIncome, Colors.white70, fontFamily, PhosphorIcons.arrowDownLeft()),
+                _buildHeaderStatItem(isUrdu ? 'آمدنی' : 'Income', profIncome,
+                    Colors.white70, fontFamily, PhosphorIcons.arrowDownLeft()),
                 _buildStatDivider(),
-                _buildHeaderStatItem(isUrdu ? 'خرچ' : 'Expense', profExpense, Colors.white70, fontFamily, PhosphorIcons.arrowUpRight()),
+                _buildHeaderStatItem(isUrdu ? 'خرچ' : 'Expense', profExpense,
+                    Colors.white70, fontFamily, PhosphorIcons.arrowUpRight()),
                 _buildStatDivider(),
-                _buildHeaderStatItem(profNetLabel, profProfit.abs(), Colors.white70, fontFamily, PhosphorIcons.trendUp(), isBold: true),
+                _buildHeaderStatItem(profNetLabel, profProfit.abs(),
+                    Colors.white70, fontFamily, PhosphorIcons.trendUp(),
+                    isBold: true),
               ],
             ),
           ],
@@ -268,13 +252,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildHeaderStatItem(String label, double amount, Color iconColor, String fontFamily, IconData icon, {bool isBold = false}) {
+  Widget _buildHeaderStatItem(String label, double amount, Color iconColor,
+      String fontFamily, IconData icon,
+      {bool isBold = false}) {
     return Expanded(
       child: Column(
         children: [
           Text(
             label,
-            style: TextStyle(color: Colors.white70, fontSize: 11, fontFamily: fontFamily),
+            style: TextStyle(
+                color: Colors.white70, fontSize: 11, fontFamily: fontFamily),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -309,13 +296,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Container(height: 20, width: 1, color: Colors.white12);
   }
 
-  Widget _buildPartyList(List<Account> parties, DatabaseService databaseService, bool isUrdu, String fontFamily) {
+  Widget _buildPartyList(List<Account> parties, DatabaseService databaseService,
+      bool isUrdu, String fontFamily) {
     final filteredParties = parties.where((p) {
       return p.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             p.phone.contains(_searchQuery);
+          p.phone.contains(_searchQuery);
     }).toList();
 
-    filteredParties.sort((a, b) => _isAscending 
+    filteredParties.sort((a, b) => _isAscending
         ? a.name.toLowerCase().compareTo(b.name.toLowerCase())
         : b.name.toLowerCase().compareTo(a.name.toLowerCase()));
 
@@ -341,11 +329,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
               padding: const EdgeInsets.symmetric(vertical: 40),
               child: Column(
                 children: [
-                  Icon(PhosphorIcons.users(), size: 64, color: Colors.grey[400]),
+                  Icon(PhosphorIcons.users(),
+                      size: 64, color: Colors.grey[400]),
                   const SizedBox(height: 16),
                   Text(
                     isUrdu ? 'کوئی پارٹی نہیں ملی' : 'No Parties Found',
-                    style: TextStyle(fontSize: 18, color: AppTheme.darkColor, fontFamily: fontFamily),
+                    style: TextStyle(
+                        fontSize: 18,
+                        color: AppTheme.darkColor,
+                        fontFamily: fontFamily),
                   ),
                 ],
               ),
@@ -357,7 +349,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return ListView.builder(
       padding: EdgeInsets.zero,
-      itemCount: headers.length + filteredParties.length + (filteredParties.isEmpty ? 1 : 0),
+      itemCount: headers.length +
+          filteredParties.length +
+          (filteredParties.isEmpty ? 1 : 0),
       itemBuilder: (context, index) {
         // Render headers first
         if (index < headers.length) {
@@ -372,11 +366,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
               padding: const EdgeInsets.symmetric(vertical: 40),
               child: Column(
                 children: [
-                  Icon(PhosphorIcons.users(), size: 48, color: Colors.grey[400]),
+                  Icon(PhosphorIcons.users(),
+                      size: 48, color: Colors.grey[400]),
                   const SizedBox(height: 12),
                   Text(
                     isUrdu ? 'کوئی پارٹی نہیں ملی' : 'No Parties Found',
-                    style: TextStyle(fontSize: 16, color: AppTheme.darkColor, fontFamily: fontFamily),
+                    style: TextStyle(
+                        fontSize: 16,
+                        color: AppTheme.darkColor,
+                        fontFamily: fontFamily),
                   ),
                 ],
               ),
@@ -384,14 +382,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         }
 
-        if (partyIndex >= filteredParties.length) return const SizedBox.shrink();
+        if (partyIndex >= filteredParties.length)
+          return const SizedBox.shrink();
 
         final party = filteredParties[partyIndex];
-        
-        final partyTransactions = databaseService.getAllTransactions()
+
+        final partyTransactions = databaseService
+            .getAllTransactions()
             .where((t) => t.accountId == party.id && t.partnershipId == null)
             .toList();
-        
+
         double partyTaken = 0;
         double partyGiven = 0;
         for (var t in partyTransactions) {
@@ -405,18 +405,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final updatedParty = party.copyWith(balance: liveBalance);
 
         return PartyCard(
-          key: ValueKey(party.id), // یونیک کی شامل کر دی گئی تاکہ اسٹیٹ مکس نہ ہو
+          key: ValueKey(
+              party.id), // یونیک کی شامل کر دی گئی تاکہ اسٹیٹ مکس نہ ہو
           party: updatedParty,
           onView: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => PartyDetailScreen(party: updatedParty)),
+              MaterialPageRoute(
+                  builder: (context) => PartyDetailScreen(party: updatedParty)),
             );
           },
           onMessage: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => BalanceAlertScreen(party: updatedParty)),
+              MaterialPageRoute(
+                  builder: (context) =>
+                      BalanceAlertScreen(party: updatedParty)),
             );
           },
         );

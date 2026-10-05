@@ -9,19 +9,16 @@ import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/auth_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/security_service.dart';
-import 'package:account_app/core/services/artisan_service.dart';
 import 'package:account_app/core/services/auto_sync_service.dart';
 import 'package:account_app/core/services/backup_service.dart';
 import 'package:account_app/core/services/pdf_service.dart';
 import 'package:account_app/core/services/excel_service.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/features/settings/master_profile_screen.dart';
-import 'package:account_app/features/artisans/artisan_detail_screen.dart';
-import 'package:account_app/features/artisans/customer_orders_screen.dart';
-import 'package:account_app/features/artisans/post_job_screen.dart';
-import 'package:account_app/features/artisans/favorite_artisans_screen.dart';
 import 'package:account_app/features/settings/app_lock_screen.dart';
+import 'package:account_app/features/stock/stock_list_screen.dart';
 
 class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
@@ -79,29 +76,18 @@ class _AppDrawerState extends State<AppDrawer> {
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                _buildPostJobAction(context, isUrdu, fontFamily),
+                _buildSectionHeader(isUrdu ? 'کاروباری ٹولز' : 'Business Tools',
+                    fontFamily, isUrdu),
                 _buildDrawerItem(
-                  icon: PhosphorIcons.clockCounterClockwise(),
-                  title: isUrdu ? 'میری پوسٹ کی گئی جابز' : 'My Posted Jobs',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) =>
-                                const CustomerOrdersScreen()));
-                  },
-                  fontFamily: fontFamily,
-                ),
-                _buildDrawerItem(
-                  icon: PhosphorIcons.heart(),
-                  title: isUrdu ? 'پسندیدہ کاریگر' : 'Favorite Artisans',
+                  icon: PhosphorIcons.package(),
+                  title: isUrdu ? 'اسٹاک اور انوینٹری' : 'Stock & Inventory',
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => const FavoriteArtisansScreen()),
+                        builder: (_) => const StockListScreen(),
+                      ),
                     );
                   },
                   fontFamily: fontFamily,
@@ -232,37 +218,15 @@ class _AppDrawerState extends State<AppDrawer> {
   Widget _buildHeader(
       BuildContext context, User? user, bool isUrdu, String fontFamily) {
     return GestureDetector(
-      onTap: () async {
+      onTap: () {
         if (user == null) return;
-
-        // کاریگر چیک کریں
-        final artisanService = ArtisanService();
-        final profile = await artisanService.getProfile(user.uid);
-
-        if (!context.mounted) return;
-
         Navigator.pop(context); // ڈراور بند کریں
-
-        if (profile != null && profile.isActive) {
-          // اگر کاریگر ہے تو کاریگر ڈیٹیل اسکرین
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ArtisanDetailScreen(
-                artisanId: user.uid,
-                initialArtisan: profile,
-              ),
-            ),
-          );
-        } else {
-          // اگر کاریگر نہیں ہے تو ماسٹر پروفائل
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const MasterProfileScreen(),
-            ),
-          );
-        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const MasterProfileScreen(),
+          ),
+        );
       },
       child: Container(
         padding: EdgeInsets.only(
@@ -486,48 +450,6 @@ class _AppDrawerState extends State<AppDrawer> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildPostJobAction(
-      BuildContext context, bool isUrdu, String fontFamily) {
-    Color color = AppTheme.themeColor;
-    return InkWell(
-      onTap: () {
-        Navigator.pop(context);
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const PostJobScreen()),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.25),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.8), width: 2.0),
-        ),
-        child: Row(
-          children: [
-            Icon(PhosphorIcons.plusCircle(PhosphorIconsStyle.fill),
-                color: AppTheme.darkColor, size: 22),
-            const SizedBox(width: 10),
-            Text(
-              isUrdu
-                  ? 'کوئی کام کروانا ہے؟ لکھ کر پوسٹ کریں'
-                  : 'Need work done? Write & Post',
-              style: TextStyle(
-                  color: AppTheme.darkColor,
-                  fontWeight: FontWeight.w900,
-                  fontFamily: fontFamily,
-                  fontSize: 12),
-            ),
-            const Spacer(),
-            Icon(Icons.arrow_forward_ios, size: 14, color: AppTheme.darkColor),
-          ],
-        ),
       ),
     );
   }
@@ -925,13 +847,10 @@ class _AppDrawerState extends State<AppDrawer> {
 
   void _showSnackBar(BuildContext context, String msg, bool isUrdu,
       {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg,
-            style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '')),
-        backgroundColor: isError ? Colors.red : AppTheme.darkColor,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    if (isError) {
+      AppToast.error(context, msg);
+    } else {
+      AppToast.success(context, msg);
+    }
   }
 }

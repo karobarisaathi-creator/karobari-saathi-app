@@ -4,7 +4,6 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/category_model.dart';
-import 'package:account_app/core/models/artisan_work_order_model.dart';
 import 'dart:async';
 import 'base_service.dart';
 import 'account_service.dart';
@@ -18,8 +17,7 @@ class SyncService extends BaseService {
       _txSub,
       _proSub,
       _catSub,
-      _userSub,
-      _orderSub;
+      _userSub;
 
   void startRealtimeSync() {
     final user = auth.currentUser;
@@ -97,23 +95,6 @@ class SyncService extends BaseService {
       }
       notifyListeners();
     });
-
-    // 🆕 Work Orders (History) Real-time Sync
-    _orderSub = firestore
-        .collectionGroup('work_orders')
-        .where('customerId', isEqualTo: user.uid)
-        .snapshots()
-        .listen((snap) {
-      for (var c in snap.docChanges) {
-        if (c.doc.data() == null) continue;
-        final o = ArtisanWorkOrder.fromMap(c.doc.data()!);
-        if (c.type == DocumentChangeType.removed)
-          workOrdersBox?.delete(o.id);
-        else
-          workOrdersBox?.put(o.id, o);
-      }
-      notifyListeners();
-    });
   }
 
   void stopRealtimeSync() {
@@ -122,7 +103,6 @@ class SyncService extends BaseService {
     _proSub?.cancel();
     _catSub?.cancel();
     _userSub?.cancel();
-    _orderSub?.cancel();
   }
 
   Future<void> syncWithFirebase() async {
@@ -152,8 +132,6 @@ class SyncService extends BaseService {
       for (var c in categoriesBox!.values)
         batch.set(userDoc.collection('categories').doc(c.id), c.toMap());
     }
-    // Work Orders are spread across artisans, syncWithFirebase for orders is complex
-    // Usually orders are managed by artisans. We just need to fetch them.
     await batch.commit();
   }
 
@@ -167,10 +145,6 @@ class SyncService extends BaseService {
       userDoc.collection('transactions').get(),
       userDoc.collection('professions').get(),
       userDoc.collection('categories').get(),
-      firestore
-          .collectionGroup('work_orders')
-          .where('customerId', isEqualTo: user.uid)
-          .get(),
     ]);
 
     for (var d in snaps[0].docs)
@@ -181,8 +155,6 @@ class SyncService extends BaseService {
       await professionsBox?.put(d.id, Profession.fromMap(d.data()));
     for (var d in snaps[3].docs)
       await categoriesBox?.put(d.id, Category.fromMap(d.data()));
-    for (var d in snaps[4].docs)
-      await workOrdersBox?.put(d.id, ArtisanWorkOrder.fromMap(d.data()));
 
     notifyListeners();
   }

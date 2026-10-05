@@ -7,13 +7,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/models/account_model.dart';
-import 'package:account_app/core/models/artisan_work_order_model.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
-import 'package:account_app/core/models/job_post_model.dart';
-import 'package:account_app/features/artisans/job_detail_screen.dart';
-import 'package:account_app/core/services/database/job_service.dart';
-import 'package:account_app/core/services/database/job_negotiation_service.dart';
-import 'package:account_app/features/dashboard/main_navigation_screen.dart';
 import 'database_service.dart';
 import 'auto_sync_service.dart';
 
@@ -29,32 +23,10 @@ class NotificationService with ChangeNotifier {
   StreamSubscription<QuerySnapshot>? _firestoreSubscription;
 
   GlobalKey<NavigatorState>? _navigatorKey;
-  String? _openNegotiationOrderId;
-  String? _targetExpandOrderId;
-  int _notificationsTabIndex = 0;
 
   List<AppNotification> get notifications => _notifications;
-  int get notificationsTabIndex => _notificationsTabIndex;
-  String? get targetExpandOrderId => _targetExpandOrderId;
-
-  void setNotificationsTabIndex(int index) {
-    _notificationsTabIndex = index;
-    notifyListeners();
-  }
-
-  void setTargetExpandOrderId(String? orderId) {
-    _targetExpandOrderId = orderId;
-    notifyListeners();
-  }
-  int get unreadCount => _notifications
-      .where((notification) => !_isHiddenNotification(notification))
-      .where((notification) => !notification.isRead)
-      .length;
-  int get unreadNegotiationCount => _notifications
-      .where((notification) => _isNegotiationNotification(notification))
-      .where((notification) => !notification.isRead)
-      .length;
-
+  int get unreadCount =>
+      _notifications.where((notification) => !notification.isRead).length;
   NotificationService() {
     _initNotifications();
     _auth.authStateChanges().listen((User? user) {
@@ -68,10 +40,6 @@ class NotificationService with ChangeNotifier {
 
   void setNavigatorKey(GlobalKey<NavigatorState> key) {
     _navigatorKey = key;
-  }
-
-  void setOpenNegotiation(String? orderId) {
-    _openNegotiationOrderId = orderId;
   }
 
   Future<void> _initNotifications() async {
@@ -198,13 +166,11 @@ class NotificationService with ChangeNotifier {
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      _handleBackgroundMessage(message);
       _handleNotificationTap(message.data['type'], message.data);
     });
 
     FirebaseMessaging.instance.getInitialMessage().then((message) {
       if (message != null) {
-        _handleTerminatedMessage(message);
         _handleNotificationTap(message.data['type'], message.data);
       }
     });
@@ -215,47 +181,6 @@ class NotificationService with ChangeNotifier {
     if (_navigatorKey == null) return;
 
     String? accountId = data?['accountId'] ?? data?['relatedAccountId'];
-    String? jobId = data?['jobId'];
-    String? notificationType = type ?? data?['type'];
-
-    if (notificationType == 'negotiation_message') {
-      final orderId = data?['orderId'];
-      if (orderId != null) {
-        setNotificationsTabIndex(1);
-        setTargetExpandOrderId(orderId.toString());
-        MainNavigationScreen.switchTab(4);
-      }
-      return;
-    }
-
-    if (jobId != null || notificationType == 'new_bid') {
-      final id = jobId ?? data?['jobId'];
-      if (id != null) {
-        _navigatorKey!.currentState!.push(
-          MaterialPageRoute(
-            builder: (context) => _buildJobDestinationScreen(id),
-          ),
-        );
-        return;
-      }
-    }
-
-    if (notificationType == 'artisan_response') {
-      final orderId = data?['orderId'];
-      final status = data?['status'];
-      if (status == 'negotiating' && orderId != null) {
-        setNotificationsTabIndex(1);
-        setTargetExpandOrderId(orderId.toString());
-        MainNavigationScreen.switchTab(4);
-        return;
-      }
-    }
-
-    if (notificationType == 'bid_accepted') {
-      // Chat navigation removed
-      return;
-    }
-
     if (accountId != null) {
       try {
         final context = _navigatorKey!.currentState!.context;
@@ -293,29 +218,6 @@ class NotificationService with ChangeNotifier {
     );
   }
 
-  Widget _buildJobDestinationScreen(String jobId) {
-    return Scaffold(
-      body: FutureBuilder<DocumentSnapshot>(
-        future: FirebaseFirestore.instance.collection('jobs').doc(jobId).get(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
-            if (snapshot.hasData && snapshot.data!.exists) {
-              final job = JobPost.fromMap(
-                  snapshot.data!.data() as Map<String, dynamic>);
-              return JobDetailScreen(job: job);
-            } else {
-              return Scaffold(
-                appBar: AppBar(title: const Text('Job Details')),
-                body: const Center(child: Text('Job not found or deleted.')),
-              );
-            }
-          }
-          return const Center(child: CircularProgressIndicator());
-        },
-      ),
-    );
-  }
-
   Future<Account?> _fetchAccountForNavigation(String? accountId) async {
     if (accountId == null) return null;
     try {
@@ -342,16 +244,8 @@ class NotificationService with ChangeNotifier {
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
-    if (message.data['type'] == 'negotiation_message' &&
-        message.data['orderId'] == _openNegotiationOrderId) {
-      return;
-    }
     _showLocalNotification(message);
   }
-
-  void _handleBackgroundMessage(RemoteMessage message) {}
-
-  void _handleTerminatedMessage(RemoteMessage? message) {}
 
   Future<void> _showLocalNotification(RemoteMessage message) async {
     await _showLocalNotificationRaw(
@@ -431,316 +325,18 @@ class NotificationService with ChangeNotifier {
       case 'transaction':
         return NotificationType.transaction;
       case 'share':
-        return NotificationType.share;
       case 'account_share':
         return NotificationType.share;
       case 'reminder':
         return NotificationType.reminder;
       case 'report':
-        return NotificationType.report;
       case 'price_drop':
         return NotificationType.report;
-      case 'artisan_request':
-        return NotificationType.general;
       case 'system':
         return NotificationType.system;
       default:
         return NotificationType.general;
     }
-  }
-
-  Future<void> sendArtisanWorkRequest({
-    required String artisanUid,
-    required String customerName,
-    required String workDescription,
-    double? budget,
-    DateTime? expectedDate,
-  }) async {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) return;
-
-    if (artisanUid == currentUser.uid) {
-      throw Exception('You cannot send a work request to yourself');
-    }
-
-    try {
-      final String requestId = "${currentUser.uid}_$artisanUid";
-      final String formattedDate = expectedDate != null
-          ? "${expectedDate.day}/${expectedDate.month}/${expectedDate.year}"
-          : "";
-
-      await _firestore.collection('artisan_requests').doc(requestId).set({
-        'customerUid': currentUser.uid,
-        'artisanUid': artisanUid,
-        'status': 'pending',
-        'workDescription': workDescription,
-        'budget': budget,
-        'expectedDate': expectedDate,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-
-      String budgetText =
-          budget != null ? " (بجٹ: Rs. ${budget.toStringAsFixed(0)})" : "";
-
-      final notifId = "artisan_req_${DateTime.now().millisecondsSinceEpoch}";
-      final notification = AppNotification(
-        id: notifId,
-        title: 'کام کی نئی درخواست',
-        message: '$customerName: $workDescription$budgetText',
-        type: NotificationType.general,
-        isRead: false,
-        timestamp: DateTime.now(),
-        data: {
-          'type': 'artisan_request',
-          'senderName': customerName,
-          'senderUid': currentUser.uid,
-          'senderPhone': currentUser.phoneNumber,
-          'senderPhotoUrl': currentUser.photoURL,
-          'artisanUid': artisanUid,
-          'customerUid': currentUser.uid,
-          'requestId': requestId,
-          'workDescription': workDescription,
-          'budget': budget?.toString(),
-          'expectedDate': expectedDate?.toIso8601String(),
-          'status': 'pending',
-          'needsAction': true,
-        },
-      );
-
-      await _firestore
-          .collection('users')
-          .doc(artisanUid)
-          .collection('notifications')
-          .doc(notifId)
-          .set(notification.toMap());
-    } catch (e) {
-      debugPrint('Error sending artisan request: $e');
-      rethrow;
-    }
-  }
-
-  Future<String?> respondToArtisanRequest({
-    required String customerUid,
-    required String artisanName,
-    required String response, // 'inquiry', 'accepted', 'rejected'
-    required String notificationId,
-  }) async {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) return null;
-
-    try {
-      final String requestId = "${customerUid}_${currentUser.uid}";
-      final requestDoc =
-          await _firestore.collection('artisan_requests').doc(requestId).get();
-      final requestData = requestDoc.data();
-
-      bool isAccepted = response == 'accepted';
-      bool isInquiry = response == 'inquiry';
-
-      final orderId = "order_${DateTime.now().millisecondsSinceEpoch}";
-
-      await _firestore.collection('artisan_requests').doc(requestId).set({
-        'status': response == 'rejected'
-            ? 'rejected'
-            : (isInquiry ? 'negotiating' : 'accepted'),
-        'respondedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      updateNotificationData(notificationId, {
-        'responded': true,
-        'accepted': isAccepted,
-        'status':
-            isInquiry ? 'negotiating' : (isAccepted ? 'accepted' : 'rejected'),
-        'orderId': orderId,
-      });
-
-      if (isAccepted || isInquiry) {
-        final order = ArtisanWorkOrder(
-          id: orderId,
-          artisanId: currentUser.uid,
-          customerId: customerUid,
-          customerName: requestData?['customerName'] ?? 'گاہک',
-          customerPhone: requestData?['customerPhone'] ?? '',
-          workDescription: requestData?['workDescription'] ?? 'کام کی تفصیل',
-          status: 'negotiating',
-          createdAt: DateTime.now(),
-          artisanAgreed: true,
-        );
-
-        await _firestore
-            .collection('artisans')
-            .doc(currentUser.uid)
-            .collection('work_orders')
-            .doc(orderId)
-            .set(order.toMap());
-
-        if (isInquiry) {
-          final negService = JobNegotiationService();
-          await negService.sendNegotiationMessage(
-            jobId: orderId,
-            artisanId: currentUser.uid,
-            message:
-                'السلام علیکم! میں آپ کے کام میں دلچسپی رکھتا ہوں۔ کیا ہم اس بارے میں مزید بات کر سکتے ہیں؟',
-            isDirect: true,
-          );
-        }
-      }
-
-      final notifId = "artisan_res_${DateTime.now().millisecondsSinceEpoch}";
-      String title = response == 'rejected'
-          ? 'معذرت'
-          : (isInquiry ? 'پوچھ گچھ' : 'کام کی منظوری!');
-      String message = response == 'rejected'
-          ? '$artisanName اس وقت کام کے لیے دستیاب نہیں ہیں۔'
-          : (isInquiry
-              ? '$artisanName آپ سے کام کی تفصیل پوچھ رہے ہیں۔'
-              : '$artisanName نے آپ کی کام کی درخواست قبول کر لی ہے۔ اب آپ رابطہ کر سکتے ہیں۔');
-
-      final notification = AppNotification(
-        id: notifId,
-        title: title,
-        message: message,
-        type: NotificationType.general,
-        isRead: false,
-        timestamp: DateTime.now(),
-        data: {
-          'type': 'artisan_response',
-          'artisanName': artisanName,
-          'artisanUid': currentUser.uid,
-          'customerUid': customerUid,
-          'accepted': isAccepted,
-          'status': isInquiry
-              ? 'negotiating'
-              : (isAccepted ? 'accepted' : 'rejected'),
-          'requestId': requestId,
-          'orderId': orderId,
-        },
-      );
-
-      await _firestore
-          .collection('users')
-          .doc(customerUid)
-          .collection('notifications')
-          .doc(notifId)
-          .set(notification.toMap());
-
-      return (isInquiry || isAccepted) ? orderId : null;
-    } catch (e) {
-      debugPrint('Error responding to artisan request: $e');
-      return null;
-    }
-  }
-
-  Future<void> sendBidStatusNotification({
-    required String artisanUid,
-    required String jobTitle,
-    required bool accepted,
-  }) async {
-    try {
-      final notifId =
-          "bid_${accepted ? 'acc' : 'rej'}_${DateTime.now().millisecondsSinceEpoch}";
-      final notification = AppNotification(
-        id: notifId,
-        title: accepted ? 'بولی قبول کر لی گئی!' : 'بولی مسترد',
-        message: accepted
-            ? 'آپ کی "$jobTitle" کے لیے لگائی گئی بولی قبول کر لی گئی ہے!'
-            : 'معذرت، "$jobTitle" کے لیے آپ کی بولی قبول نہیں کی گئی۔',
-        type: NotificationType.general,
-        isRead: false,
-        timestamp: DateTime.now(),
-        data: {
-          'type': 'bid_status',
-          'accepted': accepted,
-          'jobTitle': jobTitle,
-        },
-      );
-
-      await _firestore
-          .collection('users')
-          .doc(artisanUid)
-          .collection('notifications')
-          .doc(notifId)
-          .set(notification.toMap());
-    } catch (e) {
-      debugPrint('Error sending bid status notification: $e');
-    }
-  }
-
-  Future<String?> getArtisanRequestStatus(String artisanUid) async {
-    final user = _auth.currentUser;
-    if (user == null) return null;
-
-    try {
-      final doc = await _firestore
-          .collection('artisan_requests')
-          .doc("${user.uid}_$artisanUid")
-          .get();
-      if (doc.exists) {
-        final data = doc.data()!;
-        final String status = data['status'] as String;
-        final Timestamp? timestamp = data['respondedAt'] as Timestamp? ??
-            data['timestamp'] as Timestamp?;
-
-        if (timestamp != null) {
-          final DateTime lastAction = timestamp.toDate();
-          final DateTime now = DateTime.now();
-          final Duration difference = now.difference(lastAction);
-
-          if (status == 'accepted' && difference.inHours >= 24) {
-            return null;
-          }
-          if (status == 'rejected' && difference.inHours >= 12) {
-            return null;
-          }
-          if (status == 'pending' && difference.inHours >= 48) {
-            return null;
-          }
-        }
-        return status;
-      }
-    } catch (e) {
-      debugPrint('Error checking request status: $e');
-    }
-    return null;
-  }
-
-  Stream<String?> artisanRequestStatusStream(String artisanUid) {
-    final user = _auth.currentUser;
-    if (user == null) {
-      return Stream<String?>.value(null);
-    }
-
-    return _firestore
-        .collection('artisan_requests')
-        .doc("${user.uid}_$artisanUid")
-        .snapshots()
-        .map((doc) {
-      if (!doc.exists) return null;
-      final data = doc.data();
-      if (data == null) return null;
-      final String status = data['status'] as String? ?? '';
-      final Timestamp? timestamp =
-          data['respondedAt'] as Timestamp? ?? data['timestamp'] as Timestamp?;
-
-      if (timestamp != null) {
-        final DateTime lastAction = timestamp.toDate();
-        final DateTime now = DateTime.now();
-        final Duration difference = now.difference(lastAction);
-
-        if (status == 'accepted' && difference.inHours >= 24) {
-          return null;
-        }
-        if (status == 'rejected' && difference.inHours >= 12) {
-          return null;
-        }
-        if (status == 'pending' && difference.inHours >= 48) {
-          return null;
-        }
-      }
-      return status.isEmpty ? null : status;
-    }).handleError((e) {
-      debugPrint('Error listening artisan request status: $e');
-    });
   }
 
   void markAsRead(String notificationId) {
@@ -760,39 +356,6 @@ class NotificationService with ChangeNotifier {
                 (e) => debugPrint("Error marking read: $e"));
       }
     }
-  }
-
-  void markNegotiationAsRead(String orderId) {
-    final unreadMessages = _notifications.where((notification) {
-      return _isNegotiationNotification(notification) &&
-          notification.data?['orderId']?.toString() == orderId &&
-          !notification.isRead;
-    }).toList();
-
-    for (final notification in unreadMessages) {
-      notification.isRead = true;
-    }
-    if (unreadMessages.isEmpty) return;
-
-    _updateUnreadCount();
-    notifyListeners();
-
-    final user = _auth.currentUser;
-    if (user == null) return;
-
-    final batch = _firestore.batch();
-    for (final notification in unreadMessages) {
-      batch.update(
-        _firestore
-            .collection('users')
-            .doc(user.uid)
-            .collection('notifications')
-            .doc(notification.id),
-        {'isRead': true},
-      );
-    }
-    batch.commit().catchError(
-        (e) => debugPrint('Error marking negotiation messages read: $e'));
   }
 
   void markAllAsRead() {
@@ -831,38 +394,6 @@ class NotificationService with ChangeNotifier {
           .doc(notificationId)
           .delete()
           .catchError((e) => debugPrint("Error deleting notification: $e"));
-    }
-  }
-
-  Future<void> deleteNegotiationNotifications(String orderId) async {
-    final matching = _notifications.where((notification) {
-      return notification.data?['type'] == 'negotiation_message' &&
-          notification.data?['orderId']?.toString() == orderId;
-    }).toList();
-
-    for (final notification in matching) {
-      _notifications.remove(notification);
-    }
-    if (matching.isEmpty) return;
-
-    _updateUnreadCount();
-    notifyListeners();
-
-    final user = _auth.currentUser;
-    if (user == null) return;
-
-    final batch = _firestore.batch();
-    for (final notification in matching) {
-      batch.delete(_firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('notifications')
-          .doc(notification.id));
-    }
-    try {
-      await batch.commit();
-    } catch (e) {
-      debugPrint('Error deleting negotiation notifications: $e');
     }
   }
 
@@ -921,27 +452,8 @@ class NotificationService with ChangeNotifier {
   }
 
   void _updateUnreadCount() {
-    _unreadCount = _notifications
-        .where((notification) => !_isHiddenNotification(notification))
-        .where((notification) => !notification.isRead)
-        .length;
-  }
-
-  bool _isNegotiationNotification(AppNotification notification) {
-    return notification.data?['type'] == 'negotiation_message';
-  }
-
-  bool _isHiddenNotification(AppNotification notification) {
-    const hiddenTypes = {
-      'artisan_request',
-      'artisan_response',
-      'negotiation_message',
-      'quote_received',
-      'bid_status',
-      'new_bid',
-    };
-    return hiddenTypes.contains(notification.data?['type']) ||
-        _isNegotiationNotification(notification);
+    _unreadCount =
+        _notifications.where((notification) => !notification.isRead).length;
   }
 
   Future<void> notifyPartyByPhone({

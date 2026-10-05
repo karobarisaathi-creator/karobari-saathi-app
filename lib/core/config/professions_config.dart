@@ -270,6 +270,16 @@ class ProfessionsConfig {
 
     // --- زراعت اور مویشی (Agriculture & Livestock) ---
     MasterProfession(
+      id: 'farming',
+      name: 'Farming / Agriculture',
+      nameUrdu: 'کاشتکاری',
+      icon: PhosphorIcons.plant(),
+      categoryName: 'Agriculture & Livestock',
+      categoryUrdu: 'زراعت اور مویشی',
+      categoryType: ProfessionCategory.agriculture,
+      defaultUnit: 'من',
+    ),
+    MasterProfession(
       id: 'agri_expert',
       name: 'Agriculture Expert',
       nameUrdu: 'ماہرِ زراعت',

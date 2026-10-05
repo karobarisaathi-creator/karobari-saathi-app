@@ -53,51 +53,7 @@ This document provides a detailed overview of each screen and its functionality 
 
 ---
 
-## 4. Browse Jobs Screen (دستیاب کام)
-**Artisan Marketplace / کاریگروں کے لیے کام کی تلاش**
-
-*   **English:**
-    *   **Smart Sorting:** Uses an AI algorithm to show jobs based on distance, skill, and budget.
-    *   **Infinite Scrolling:** Smooth loading of jobs as you scroll (like social media).
-    *   **Category Filter:** Filter jobs by your specific skill (Electrician, Plumber, etc.).
-    *   **Shimmer Effect:** Modern loading animation for a premium feel.
-*   **اردو:**
-    *   **سمارٹ ترتیب:** فاصلے، ہنر اور بجٹ کے لحاظ سے بہترین کام سب سے اوپر دکھانا۔
-    *   **لا محدود سکرولنگ:** فیس بک کی طرح سکرول کرنے پر نئے کام خود بخود لوڈ ہونا۔
-    *   **فلٹر:** اپنے ہنر کے مطابق کام تلاش کرنا (جیسے بجلی والا، پلمبر وغیرہ)۔
-    *   **شمر ایفکٹ:** ڈیٹا لوڈ ہوتے وقت خوبصورت اینیمیشن۔
-
----
-
-## 5. Post Job Screen (کام پوسٹ کریں)
-**For Customers seeking workers / گاہکوں کے لیے کاریگر کی تلاش**
-
-*   **English:**
-    *   **Detailed Posting:** Set title, description, location, and estimated budget.
-    *   **Deadline Management:** Set a date for when the work needs to be finished.
-    *   **Job Editing:** Edit or delete your job posts anytime from the card options.
-*   **اردو:**
-    *   **مکمل تفصیل:** کام کا عنوان، تفصیل، مقام اور بجٹ درج کریں۔
-    *   **آخری تاریخ:** کام مکمل ہونے کی تاریخ مقرر کریں۔
-    *   **ترمیم:** اپنی پوسٹ کو کسی بھی وقت بدلیں یا ڈیلیٹ کریں۔
-
----
-
-## 6. Place Bid Screen (بولی لگائیں)
-**Artisan proposals / کاریگر کی پیشکش**
-
-*   **English:**
-    *   **Single Bid Logic:** Each artisan can only place one bid; subsequent bids update the original.
-    *   **Pre-filled Form:** Shows your previous bid data when you choose to edit.
-    *   **Status Colors:** Bid button turns Green on the card once you have applied.
-*   **اردو:**
-    *   **واحد بولی:** ایک کاریگر صرف ایک بولی لگا سکتا ہے، دوبارہ لگانے پر پرانی اپ ڈیٹ ہو جائے گی۔
-    *   **پہلے سے بھرا فارم:** بولی ایڈٹ کرتے وقت پرانا ڈیٹا خود بخود نظر آتا ہے۔
-    *   **بٹن کا رنگ:** بولی لگانے کے بعد کارڈ پر بٹن کا رنگ سبز ہو جاتا ہے۔
-
----
-
-## 7. Profession Detail Screen (پیشے کی مکمل رپورٹ)
+## 4. Profession Detail Screen (پیشے کی مکمل رپورٹ)
 **Business Analytics / کاروباری تجزیہ**
 
 *   **English:**
@@ -111,7 +67,7 @@ This document provides a detailed overview of each screen and its functionality 
 
 ---
 
-## 8. Party History Screen (تجزیہ و ریکارڈ)
+## 5. Party History Screen (تجزیہ و ریکارڈ)
 **Advanced analysis / گہرا تجزیہ**
 
 *   **English:**
@@ -125,7 +81,7 @@ This document provides a detailed overview of each screen and its functionality 
 
 ---
 
-## 9. Notifications Screen (اطلاعات)
+## 6. Notifications Screen (اطلاعات)
 **Real-time Alerts / الرٹس**
 
 *   **English:**

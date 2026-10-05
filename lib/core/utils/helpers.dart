@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 import 'dart:math';
 
 class AppHelpers {
@@ -52,20 +53,17 @@ class AppHelpers {
     return DateFormat('hh:mm a').format(date);
   }
 
-  // Show snackbar
+  // Show toast
   static void showSnackBar(
     BuildContext context,
     String message, {
     bool isError = false,
   }) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 3),
-      ),
-    );
+    if (isError) {
+      AppToast.error(context, message);
+    } else {
+      AppToast.success(context, message);
+    }
   }
 
   // Show confirmation dialog

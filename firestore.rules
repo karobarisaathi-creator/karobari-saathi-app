@@ -48,147 +48,15 @@ service cloud.firestore {
       match /transactions/{transactionId} {
         allow read, write: if isOwner(userId) || isAdmin();
       }
+      match /stock_items/{itemId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+      match /stock_movements/{movementId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
       match /notifications/{notificationId} {
         allow read, delete, update: if isOwner(userId) || isAdmin();
         allow create: if isSignedIn();
-      }
-      match /favorite_artisans/{artisanId} {
-        allow read, write: if isOwner(userId);
-      }
-    }
-
-    // --- کاریگر پروفائلز (Artisan Profiles) ---
-    match /artisans/{artisanId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || isOwner(artisanId);
-
-      allow update: if isSignedIn() && (
-        isOwner(artisanId) ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['workCount', 'updatedAt', 'availability', 'rating', 'totalReviews', 'showWhatsApp', 'showPhone'])
-      );
-
-      match /work_orders/{orderId} {
-        allow read: if isSignedIn() &&
-          (request.auth.uid == artisanId || resource.data.customerId == request.auth.uid);
-        allow create: if isSignedIn() &&
-          (request.resource.data.artisanId == artisanId &&
-           (request.auth.uid == request.resource.data.customerId || request.auth.uid == request.resource.data.artisanId) &&
-           request.resource.data.artisanId != request.resource.data.customerId &&
-           get(/databases/$(database)/documents/artisans/$(artisanId)).data.isActive == true);
-        allow update: if isAdmin() ||
-          // Artisan: Can update work progress and bill fields only.
-          (request.auth.uid == artisanId &&
-           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-             'status', 'updatedAt', 'completedAt', 'items', 'laborFee', 'amount', 'workImages'
-           ]) &&
-           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rating', 'review', 'isRated', 'ratedAt'])) ||
-          // Customer: Can accept a quoted/negotiating order, or rate completed work.
-           (request.auth.uid == resource.data.customerId && (
-             (resource.data.status == 'completed' && request.resource.data.status == 'rated' && resource.data.isRated != true && request.resource.data.isRated == true) ||
-           ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) ||
-             (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'title']) &&
-              request.resource.data.title is string &&
-              request.resource.data.title.size() >= 5 &&
-              request.resource.data.title.size() <= 40)) &&
-            (resource.data.status == 'negotiating' || resource.data.status == 'quoted') &&
-            request.resource.data.status == 'confirmed')
-          ));
-
-        allow delete: if isAdmin() || request.auth.uid == artisanId || resource.data.customerId == request.auth.uid;
-
-        match /negotiations/{messageId} {
-          allow read, list: if isSignedIn() &&
-            (request.auth.uid == artisanId ||
-             request.auth.uid == get(/databases/$(database)/documents/artisans/$(artisanId)/work_orders/$(orderId)).data.customerId);
-          allow create: if isSignedIn() &&
-            request.resource.data.senderId == request.auth.uid &&
-            (request.auth.uid == artisanId ||
-             request.auth.uid == get(/databases/$(database)/documents/artisans/$(artisanId)/work_orders/$(orderId)).data.customerId);
-          allow update: if isSignedIn() &&
-            (request.auth.uid == artisanId ||
-             request.auth.uid == get(/databases/$(database)/documents/artisans/$(artisanId)/work_orders/$(orderId)).data.customerId) &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
-          allow delete: if isSignedIn() &&
-            (request.auth.uid == artisanId ||
-             request.auth.uid == get(/databases/$(database)/documents/artisans/$(artisanId)/work_orders/$(orderId)).data.customerId);
-        }
-      }
-
-      match /reviews/{reviewId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn() &&
-          request.resource.data.artisanId == artisanId &&
-          request.resource.data.reviewerId == request.auth.uid &&
-          request.resource.data.workOrderId is string &&
-          get(/databases/$(database)/documents/artisans/$(artisanId)/work_orders/$(request.resource.data.workOrderId)).data.customerId == request.auth.uid &&
-          get(/databases/$(database)/documents/artisans/$(artisanId)/work_orders/$(request.resource.data.workOrderId)).data.status == 'completed' &&
-          get(/databases/$(database)/documents/artisans/$(artisanId)/work_orders/$(request.resource.data.workOrderId)).data.isRated == false &&
-          request.resource.data.rating >= 1 && request.resource.data.rating <= 5;
-        allow update, delete: if isAdmin();
-      }
-
-    }
-
-    match /artisan_requests/{requestId} {
-      allow read: if isSignedIn() && (resource == null || resource.data.customerUid == request.auth.uid || resource.data.artisanUid == request.auth.uid);
-      allow create: if isSignedIn() &&
-        request.resource.data.customerUid == request.auth.uid &&
-        request.resource.data.artisanUid != request.resource.data.customerUid;
-      allow update: if isSignedIn() &&
-        request.resource.data.artisanUid != request.resource.data.customerUid &&
-        (resource.data.customerUid == request.auth.uid || resource.data.artisanUid == request.auth.uid);
-    }
-
-    // --- جاب پوسٹنگ سسٹم (Jobs) ---
-    match /jobs/{jobId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.customerId == request.auth.uid;
-      allow update: if isAdmin() ||
-        (isSignedIn() && request.auth.uid == resource.data.customerId &&
-          request.resource.data.customerId == resource.data.customerId &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'title', 'description', 'location', 'categories',
-            'estimatedBudget', 'deadline', 'images', 'clarifications',
-            'detailedScope', 'scopeOfWork', 'exclusions', 'isComplex',
-            'estimatedDays', 'requiresHeightWork', 'requiresSpecialTools',
-            'latitude', 'longitude', 'timeIn', 'timeOut', 'status', 'website',
-            'budgetUnit', 'durationUnit', 'companyName'
-          ]));
-      allow delete: if isSignedIn() && (request.auth.uid == resource.data.customerId || isAdmin());
-
-      match /bids/{bidId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn() &&
-          request.resource.data.artisanId == request.auth.uid &&
-          request.resource.data.artisanId != get(/databases/$(database)/documents/jobs/$(jobId)).data.customerId &&
-          get(/databases/$(database)/documents/artisans/$(request.auth.uid)).data.isActive == true;
-        allow update: if isAdmin() ||
-          (isSignedIn() && request.auth.uid ==
-            get(/databases/$(database)/documents/jobs/$(jobId)).data.customerId &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
-            (request.resource.data.status == 'accepted' || request.resource.data.status == 'rejected')) ||
-          (isSignedIn() && request.auth.uid == resource.data.artisanId &&
-            request.resource.data.artisanId == resource.data.artisanId &&
-            request.resource.data.jobId == resource.data.jobId &&
-            request.resource.data.status == resource.data.status);
-        allow delete: if isAdmin() ||
-          (isSignedIn() && request.auth.uid ==
-            get(/databases/$(database)/documents/jobs/$(jobId)).data.customerId);
-
-        match /negotiations/{messageId} {
-          allow read: if isSignedIn() &&
-            (request.auth.uid == get(/databases/$(database)/documents/jobs/$(jobId)).data.customerId ||
-             request.auth.uid == get(/databases/$(database)/documents/jobs/$(jobId)/bids/$(bidId)).data.artisanId);
-          allow create: if isSignedIn() &&
-            request.resource.data.senderId == request.auth.uid &&
-            (request.auth.uid == get(/databases/$(database)/documents/jobs/$(jobId)).data.customerId ||
-             request.auth.uid == get(/databases/$(database)/documents/jobs/$(jobId)/bids/$(bidId)).data.artisanId);
-          allow update: if isSignedIn() &&
-            (request.auth.uid == get(/databases/$(database)/documents/jobs/$(jobId)).data.customerId ||
-             request.auth.uid == get(/databases/$(database)/documents/jobs/$(jobId)/bids/$(bidId)).data.artisanId) &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
-          allow delete: if false; // Keeping delete false if not needed, or add if necessary
-        }
       }
     }
 
@@ -216,8 +84,5 @@ service cloud.firestore {
     }
 
     // --- گلوبل سرچ سپورٹ ---
-    match /{path=**}/work_orders/{orderId} {
-      allow read: if isSignedIn() && (resource.data.customerId == request.auth.uid || resource.data.artisanId == request.auth.uid);
-    }
   }
 }

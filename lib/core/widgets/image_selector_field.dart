@@ -10,6 +10,7 @@ import 'package:account_app/core/utils/image_utils.dart';
 import 'package:provider/provider.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/logging_service.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 
 import 'image_gallery_viewer.dart';
 
@@ -72,15 +73,11 @@ class _ImageSelectorFieldState extends State<ImageSelectorField> {
     } catch (e, stack) {
       _logger.error("Image pick error", e, stack);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              Provider.of<LanguageService>(context, listen: false).isUrdu
-                  ? 'تصویر منتخب کرنے میں ناکامی'
-                  : 'Failed to pick image',
-            ),
-            backgroundColor: Colors.red,
-          ),
+        AppToast.error(
+          context,
+          Provider.of<LanguageService>(context, listen: false).isUrdu
+              ? 'تصویر منتخب کرنے میں ناکامی'
+              : 'Failed to pick image',
         );
       }
     } finally {

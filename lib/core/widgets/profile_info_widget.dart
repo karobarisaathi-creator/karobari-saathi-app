@@ -140,6 +140,7 @@ class ProfileInfoWidget extends StatelessWidget {
         displayName,
         phone,
         phoneHasUrdu,
+        displayCategory,
         isUrdu,
         fontFamily,
         fontWeight,
@@ -256,6 +257,7 @@ class ProfileInfoWidget extends StatelessWidget {
     String displayName,
     String phone,
     bool phoneHasUrdu,
+    String displayCategory,
     bool isUrdu,
     String fontFamily,
     FontWeight fontWeight,
@@ -275,24 +277,55 @@ class ProfileInfoWidget extends StatelessWidget {
                 displayName,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: isLarge ? 20 : 16,
+                  fontSize: isLarge ? 22 : 16,
                   fontWeight: fontWeight,
                   color: effectiveTextColor,
                   fontFamily: fontFamily,
                 ),
               ),
             ),
+            if (isVerified) ...[
+              const SizedBox(width: 4),
+              Icon(
+                PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
+                size: isLarge ? 20 : 14,
+                color: AppTheme.verifiedGold,
+              ),
+            ],
           ],
         ),
-        if (phone.isNotEmpty)
+        if (displayCategory.isNotEmpty) ...[
+          SizedBox(height: verticalSpacing),
           Text(
-            Formatters.formatPhoneNumber(phone),
+            displayCategory,
+            textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: categoryColor ?? AppTheme.themeColor,
+              fontFamily: fontFamily,
+            ),
+          ),
+        ],
+        if (phone.isNotEmpty) ...[
+          SizedBox(height: verticalSpacing),
+          Text(
+            phone,
+            style: TextStyle(
+              fontSize: 13,
               color: effectiveSubtitleColor,
               fontFamily: phoneHasUrdu ? fontFamily : '',
             ),
           ),
+        ],
+        if (suffix != null) ...[
+          SizedBox(height: verticalSpacing * 2),
+          suffix!,
+        ],
+        if (bottom != null) ...[
+          SizedBox(height: verticalSpacing),
+          bottom!,
+        ],
       ],
     );
   }

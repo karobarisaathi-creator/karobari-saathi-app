@@ -10,11 +10,14 @@ import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
+import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/config/professions_config.dart';
+import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   final Account? account;
@@ -46,7 +49,11 @@ class _ItemEntry {
   final TextEditingController rateController = TextEditingController();
   final TextEditingController totalController = TextEditingController();
   final FocusNode descriptionFocusNode = FocusNode();
-  String? unit;
+  String? unit = 'Pieces';
+  String? stockItemId;
+  double? stockSuggestedRate;
+  bool rateWasManuallyEdited = false;
+  bool applyingSuggestedRate = false;
 
   void dispose() {
     descriptionController.dispose();
@@ -59,6 +66,23 @@ class _ItemEntry {
 }
 
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
+  static const Map<String, String> _itemUnitLabels = {
+    'Pieces': 'عدد',
+    'Kg': 'کلو',
+    'Gram': 'گرام',
+    'Liter': 'لیٹر',
+    'Meter': 'میٹر',
+    'Sqft': 'مربع فٹ',
+    'Dozen': 'درجن',
+    'Box': 'ڈبہ',
+    'Bag': 'بوری',
+    'Maund': 'من',
+    'Bottle': 'بوتل',
+    'Packet': 'پیکٹ',
+    'Tola': 'تولہ',
+    'Other': 'دیگر',
+  };
+
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _referenceNumberController =
       TextEditingController();
@@ -72,6 +96,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   List<Account> _accounts = [];
   List<Profession> _professions = [];
   List<String> _allItemNames = [];
+  final Map<String, StockItem> _stockItemsByName = {};
+  late StockService _stockService;
   bool _isLoading = false;
   bool _isProfessionCentric = false;
 
@@ -80,6 +106,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   @override
   void initState() {
     super.initState();
+    _stockService = Provider.of<StockService>(context, listen: false);
+    _stockService.addListener(_loadData);
 
     if (widget.transactionToEdit != null) {
       final t = widget.transactionToEdit!;
@@ -109,7 +137,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           entry.quantityController.text = item.quantity.toString();
           entry.rateController.text = item.rate.toStringAsFixed(0);
           entry.totalController.text = item.total.toStringAsFixed(0);
-          entry.unit = item.unit;
+          entry.unit = item.unit ?? 'Pieces';
+          entry.stockItemId = item.stockItemId;
+          entry.rateWasManuallyEdited = item.stockItemId != null;
           _itemEntries.add(entry);
           _setupEntryListeners(entry);
         }
@@ -141,6 +171,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     _dateInputController.text = DateFormat('dd/MM/yy').format(_selectedDate);
     _setupDateListener();
 
+    Provider.of<StockService>(context, listen: false).addListener(_loadData);
     _loadData();
     if (widget.account != null && _selectedAccountId == null) {
       _selectedAccountId = widget.account!.id;
@@ -213,18 +244,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   void _setupEntryListeners(_ItemEntry entry) {
     void calculate() {
-      double quantity = double.tryParse(entry.quantityController.text) ?? 0;
-      double subQuantity =
-          double.tryParse(entry.subQuantityController.text) ?? 0;
+      final finalQuantity = _effectiveEntryQuantity(entry);
       double rate = double.tryParse(entry.rateController.text) ?? 0;
-
-      // Handle dual-unit logic
-      double finalQuantity = quantity;
-      if (entry.unit == 'من' || entry.unit == 'maund') {
-        finalQuantity = quantity + (subQuantity / 40);
-      } else if (entry.unit == 'درجن' || entry.unit == 'doz') {
-        finalQuantity = quantity + (subQuantity / 12);
-      }
 
       final total = finalQuantity * rate;
       if (entry.totalController.text != total.toStringAsFixed(0)) {
@@ -235,10 +256,50 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     entry.quantityController.addListener(calculate);
     entry.subQuantityController.addListener(calculate);
-    entry.rateController.addListener(calculate);
+    entry.rateController.addListener(() {
+      if (!entry.applyingSuggestedRate) entry.rateWasManuallyEdited = true;
+      calculate();
+    });
     entry.descriptionController.addListener(() {
+      final previousStockItemId = entry.stockItemId;
+      final stockItem = _stockItemsByName[
+          entry.descriptionController.text.trim().toLowerCase()];
+      if (stockItem?.id != previousStockItemId) {
+        entry.stockItemId = stockItem?.id;
+        if (stockItem != null) {
+          entry.unit = stockItem.unit;
+          if (widget.transactionToEdit != null) {
+            entry.rateWasManuallyEdited = true;
+          }
+        } else if (previousStockItemId != null) {
+          entry.unit = null;
+          entry.rateWasManuallyEdited = false;
+          entry.stockSuggestedRate = null;
+        }
+      }
       setState(() {});
     });
+  }
+
+  double _effectiveEntryQuantity(_ItemEntry entry) {
+    final quantity = double.tryParse(entry.quantityController.text) ?? 0;
+    final subQuantity = double.tryParse(entry.subQuantityController.text) ?? 0;
+    if (entry.unit == 'من' || entry.unit == 'maund') {
+      return quantity + (subQuantity / 40);
+    }
+    if (entry.unit == 'درجن' || entry.unit == 'doz') {
+      return quantity + (subQuantity / 12);
+    }
+    return quantity;
+  }
+
+  void _setSuggestedStockRate(_ItemEntry entry, double rate) {
+    if (rate <= 0) return;
+    entry.stockSuggestedRate = rate;
+    entry.rateWasManuallyEdited = false;
+    entry.applyingSuggestedRate = true;
+    entry.rateController.text = rate.toStringAsFixed(0);
+    entry.applyingSuggestedRate = false;
   }
 
   void _calculateGrandTotal() {
@@ -256,6 +317,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   Future<void> _loadData() async {
     final databaseService =
         Provider.of<DatabaseService>(context, listen: false);
+    final stockService = _stockService;
     _accounts = databaseService.getAccounts();
     final masterProfessions = databaseService.getMasterProfessions();
     _professions = masterProfessions.where((p) => p.isActive ?? true).toList();
@@ -272,6 +334,28 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           tx.description != 'دیگر' &&
           tx.description != 'Other') {
         names.add(tx.description);
+      }
+    }
+
+    _stockItemsByName.clear();
+    for (final stockItem in stockService.items) {
+      names.add(stockItem.name);
+      _stockItemsByName[stockItem.name.trim().toLowerCase()] = stockItem;
+      if (stockItem.nameUrdu.trim().isNotEmpty) {
+        names.add(stockItem.nameUrdu);
+        _stockItemsByName[stockItem.nameUrdu.trim().toLowerCase()] = stockItem;
+      }
+    }
+
+    for (final entry in _itemEntries) {
+      final stockItem = _stockItemsByName[
+          entry.descriptionController.text.trim().toLowerCase()];
+      if (stockItem != null) {
+        entry.stockItemId = stockItem.id;
+        entry.unit = stockItem.unit;
+        if (widget.transactionToEdit != null) {
+          entry.rateWasManuallyEdited = true;
+        }
       }
     }
 
@@ -446,14 +530,28 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   optionsBuilder: (TextEditingValue textEditingValue) {
                     if (textEditingValue.text.isEmpty)
                       return const Iterable<String>.empty();
+                    final query = textEditingValue.text.toLowerCase();
                     return _allItemNames.where((String option) {
-                      return option
-                          .toLowerCase()
-                          .contains(textEditingValue.text.toLowerCase());
+                      return option.toLowerCase().contains(query);
                     });
                   },
                   onSelected: (String selection) {
                     entry.descriptionController.text = selection;
+
+                    final stockItem =
+                        _stockItemsByName[selection.trim().toLowerCase()];
+                    if (stockItem != null) {
+                      setState(() {
+                        entry.stockItemId = stockItem.id;
+                        entry.unit = stockItem.unit;
+                      });
+                      final suggestedRate = stockItem.sellingPrice > 0
+                          ? stockItem.sellingPrice
+                          : stockItem.purchasePrice;
+                      _setSuggestedStockRate(entry, suggestedRate);
+                      return;
+                    }
+                    entry.stockItemId = null;
 
                     // Search in past transactions for the rate
                     final databaseService =
@@ -468,7 +566,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                             setState(() {
                               entry.rateController.text =
                                   it.rate.toStringAsFixed(0);
-                              entry.unit = it.unit;
+                              entry.unit = it.unit ?? 'Pieces';
                             });
                             found = true;
                             break;
@@ -575,6 +673,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          _buildUnitSelector(entry, isUrdu, fontFamily),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -614,6 +714,62 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildUnitSelector(
+    _ItemEntry entry,
+    bool isUrdu,
+    String fontFamily,
+  ) {
+    final currentUnit = entry.unit ?? 'Pieces';
+    final choices = entry.stockItemId == null
+        ? _itemUnitLabels.keys.toList()
+        : [currentUnit];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          isUrdu ? 'اکائی منتخب کریں' : 'Unit',
+          style: TextStyle(
+            color: Colors.grey.shade600,
+            fontSize: 11,
+            fontFamily: fontFamily,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: choices.map((unit) {
+            final selected = unit == currentUnit;
+            final label = isUrdu ? (_itemUnitLabels[unit] ?? unit) : unit;
+            return ChoiceChip(
+              label: Text(label),
+              selected: selected,
+              showCheckmark: false,
+              visualDensity: VisualDensity.compact,
+              labelStyle: TextStyle(
+                color: selected ? AppTheme.darkColor : Colors.black87,
+                fontFamily: fontFamily,
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+              ),
+              backgroundColor: Colors.white,
+              selectedColor: AppTheme.themeColor.withValues(alpha: 0.12),
+              side: BorderSide(
+                color: selected ? AppTheme.themeColor : Colors.black12,
+              ),
+              onSelected: (_) {
+                if (entry.stockItemId != null || selected) return;
+                setState(() => entry.unit = unit);
+                entry.subQuantityController.clear();
+              },
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
@@ -809,6 +965,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
             ),
             const SizedBox(height: 6),
+            const SizedBox(height: 10),
             Text(
               label,
               textAlign: TextAlign.center,
@@ -1054,6 +1211,49 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   Future<void> _saveTransaction(String type) async {
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+
+    final stockService = Provider.of<StockService>(context, listen: false);
+    for (final entry in _itemEntries) {
+      final stockItemId = entry.stockItemId;
+      if (stockItemId == null) continue;
+      final stockItem = stockService.items.firstWhere(
+        (item) => item.id == stockItemId,
+        orElse: () => StockItem(
+          id: '',
+          name: '',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+      if (stockItem.id.isEmpty) continue;
+
+      final defaultRate =
+          type == 'income' ? stockItem.sellingPrice : stockItem.purchasePrice;
+      final currentRate = double.tryParse(entry.rateController.text) ?? 0;
+      if (defaultRate > 0 &&
+          (!entry.rateWasManuallyEdited ||
+              currentRate == entry.stockSuggestedRate)) {
+        _setSuggestedStockRate(entry, defaultRate);
+      }
+
+      if (type == 'income') {
+        final requestedQuantity = _effectiveEntryQuantity(entry);
+        final availableQuantity = stockService.availableStockForTransaction(
+          stockItemId,
+          excludingTransactionId: widget.transactionToEdit?.id,
+        );
+        if (requestedQuantity > availableQuantity) {
+          _showSnackBar(
+            isUrdu
+                ? '${stockItem.name} کا دستیاب اسٹاک ${availableQuantity.toStringAsFixed(1)} ہے'
+                : 'Available ${stockItem.name} stock is ${availableQuantity.toStringAsFixed(1)}',
+            true,
+          );
+          return;
+        }
+      }
+    }
+
     double grandTotal = double.tryParse(_amountController.text) ?? 0;
     if (grandTotal <= 0) {
       _showSnackBar(isUrdu ? 'رقم درج کریں' : 'Please enter amount', true);
@@ -1075,10 +1275,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         if (total > 0 || desc.isNotEmpty) {
           items.add(TransactionItem(
             description: desc,
-            quantity: double.tryParse(entry.quantityController.text) ?? 1,
+            quantity: _effectiveEntryQuantity(entry),
             rate: double.tryParse(entry.rateController.text) ?? total,
             total: total,
             unit: entry.unit,
+            stockItemId: entry.stockItemId,
           ));
           if (desc.isNotEmpty)
             mainDescription += (mainDescription.isEmpty ? "" : ", ") + desc;
@@ -1175,16 +1376,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   }
 
   void _showSnackBar(String message, bool isError) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(message),
-      backgroundColor: isError ? AppTheme.expenseColor : AppTheme.incomeColor,
-      duration: const Duration(seconds: 2),
-    ));
+    if (isError) {
+      AppToast.error(context, message);
+    } else {
+      AppToast.success(context, message);
+    }
   }
 
   @override
   void dispose() {
+    _stockService.removeListener(_loadData);
     _amountController.dispose();
     _referenceNumberController.dispose();
     _dateInputController.dispose();

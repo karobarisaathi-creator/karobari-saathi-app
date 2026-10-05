@@ -1,67 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/services/database_service.dart';
-import 'package:account_app/core/services/artisan_work_order_service.dart';
-import 'package:account_app/core/services/database/job_negotiation_service.dart';
-import 'package:account_app/core/services/artisan_service.dart';
 import 'package:account_app/core/services/version_check_service.dart';
 import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
-import 'package:account_app/core/models/artisan_work_order_model.dart';
-import 'package:account_app/core/models/artisan_profile_model.dart';
-import 'package:account_app/core/models/job_post_model.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
-import 'package:account_app/features/artisans/job_detail_screen.dart';
-import 'package:account_app/features/artisans/widgets/negotiation_view.dart';
-import 'package:account_app/features/artisans/widgets/work_order_list_item.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/notification_card.dart';
-import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:intl/intl.dart';
 
 class NotificationsScreen extends StatefulWidget {
   final int initialIndex;
-  const NotificationsScreen({Key? key, this.initialIndex = 0}) : super(key: key);
+  const NotificationsScreen({Key? key, this.initialIndex = 0})
+      : super(key: key);
 
   @override
   _NotificationsScreenState createState() => _NotificationsScreenState();
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
+    with WidgetsBindingObserver {
   bool _isLoading = true;
   Map<String, dynamic>? _updateData;
-  late TabController _tabController;
-  int _activeIndex = 0;
   bool _isKeyboardVisible = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    
-    final service = Provider.of<NotificationService>(context, listen: false);
-    _activeIndex = service.notificationsTabIndex;
-    _tabController = TabController(
-        length: 2, vsync: this, initialIndex: _activeIndex);
-    
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
-        setState(() => _activeIndex = _tabController.index);
-        Provider.of<NotificationService>(context, listen: false)
-            .setNotificationsTabIndex(_tabController.index);
-      }
-    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadAllNotifications();
@@ -72,13 +44,13 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _tabController.dispose();
     super.dispose();
   }
 
   @override
   void didChangeMetrics() {
-    final bottomInset = WidgetsBinding.instance.platformDispatcher.views.first.viewInsets.bottom;
+    final bottomInset = WidgetsBinding
+        .instance.platformDispatcher.views.first.viewInsets.bottom;
     setState(() {
       _isKeyboardVisible = bottomInset > 0;
     });
@@ -124,52 +96,14 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       builder: (context, notificationService, child) {
         final notifications = notificationService.notifications;
         final unreadNotifCount = notificationService.unreadCount;
-        final unreadNegCount = notificationService.unreadNegotiationCount;
-
-        // Sync local index with service index if they differ
-        if (notificationService.notificationsTabIndex != _activeIndex) {
-          _activeIndex = notificationService.notificationsTabIndex;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_tabController.index != _activeIndex) {
-              _tabController.animateTo(_activeIndex);
-            }
-          });
-        }
-
         return Scaffold(
           backgroundColor: AppTheme.backgroundColor,
           appBar: _isKeyboardVisible
               ? null
               : CustomAppBar(
-                  title:
-                      isUrdu ? 'اطلاعات اور بات چیت' : 'Notifications & Chats',
+                  title: isUrdu ? 'اطلاعات' : 'Notifications',
                   showBackButton: false,
                   centerTitle: true,
-                  bottom: TabBar(
-                    controller: _tabController,
-                    indicatorColor: Colors.white,
-                    indicatorWeight: 3,
-                    labelColor: Colors.white,
-                    unselectedLabelColor: Colors.white60,
-                    labelStyle: TextStyle(
-                        fontFamily: fontFamily,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13),
-                    tabs: [
-                      Tab(
-                        child: _buildTabLabel(
-                            isUrdu ? 'نوٹیفیکیشن' : 'Notifications',
-                            unreadNotifCount,
-                            isUrdu),
-                      ),
-                      Tab(
-                        child: _buildTabLabel(
-                            isUrdu ? 'بات چیت' : 'Negotiations',
-                            unreadNegCount,
-                            isUrdu),
-                      ),
-                    ],
-                  ),
                 ),
           body: Column(
             children: [
@@ -179,53 +113,17 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                   child: _buildUpdateCard(isUrdu, fontFamily),
                 ),
               Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _NotificationListTab(
-                      notifications: notifications,
-                      isUrdu: isUrdu,
-                      fontFamily: fontFamily,
-                      onRefresh: _loadAllNotifications,
-                    ),
-                    _NegotiationsTab(isUrdu: isUrdu, fontFamily: fontFamily),
-                  ],
+                child: _NotificationListTab(
+                  notifications: notifications,
+                  isUrdu: isUrdu,
+                  fontFamily: fontFamily,
+                  onRefresh: _loadAllNotifications,
                 ),
               ),
             ],
           ),
         );
       },
-    );
-  }
-
-  Widget _buildTabLabel(String label, int count, bool isUrdu) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Text(label),
-        if (count > 0)
-          Positioned(
-            right: isUrdu ? null : -24,
-            left: isUrdu ? -24 : null,
-            top: -2,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppTheme.incomeColor,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                count.toString(),
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: ''),
-              ),
-            ),
-          ),
-      ],
     );
   }
 
@@ -299,17 +197,7 @@ class _NotificationListTabState extends State<_NotificationListTab>
   Widget build(BuildContext context) {
     super.build(context);
     final notificationService = Provider.of<NotificationService>(context);
-    const hiddenTypes = {
-      'artisan_request',
-      'artisan_response',
-      'negotiation_message',
-      'quote_received',
-      'bid_status',
-      'new_bid',
-    };
-    final allNotifications = widget.notifications
-        .where((n) => !hiddenTypes.contains(n.data?['type']))
-        .toList();
+    final allNotifications = widget.notifications;
 
     if (allNotifications.isEmpty)
       return Center(
@@ -453,363 +341,6 @@ class _NotificationListTabState extends State<_NotificationListTab>
             },
             child: Text(widget.isUrdu ? 'بنائیں' : 'Create'),
           )
-        ],
-      ),
-    );
-  }
-}
-
-class _NegotiationsTab extends StatefulWidget {
-  final bool isUrdu;
-  final String fontFamily;
-  const _NegotiationsTab({required this.isUrdu, required this.fontFamily});
-
-  @override
-  _NegotiationsTabState createState() => _NegotiationsTabState();
-}
-
-class _NegotiationsTabState extends State<_NegotiationsTab>
-    with AutomaticKeepAliveClientMixin {
-  String? _expandedOrderId;
-
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  String _formatTime(DateTime timestamp, bool isUrdu) {
-    final now = DateTime.now();
-    final difference = now.difference(timestamp);
-
-    if (difference.inMinutes < 1) return isUrdu ? 'ابھی' : 'Just now';
-    if (difference.inHours < 1)
-      return isUrdu
-          ? '${difference.inMinutes} منٹ پہلے'
-          : '${difference.inMinutes}m ago';
-    if (difference.inDays < 1) return DateFormat('hh:mm a').format(timestamp);
-    return DateFormat('dd MMM').format(timestamp);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return const SizedBox.shrink();
-
-    final notificationService = Provider.of<NotificationService>(context);
-    if (notificationService.targetExpandOrderId != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          setState(() {
-            _expandedOrderId = notificationService.targetExpandOrderId;
-          });
-          notificationService.setTargetExpandOrderId(null);
-        }
-      });
-    }
-
-    final artisanService = ArtisanWorkOrderService();
-
-    return StreamBuilder<List<ArtisanWorkOrder>>(
-      stream: artisanService.getArtisanWorkOrders(user.uid),
-      builder: (context, artisanSnapshot) {
-        return StreamBuilder<List<ArtisanWorkOrder>>(
-          stream: artisanService.streamCustomerWorkOrders(user.uid),
-          builder: (context, customerSnapshot) {
-            final artisanOrders = artisanSnapshot.data ?? [];
-            final customerOrders = customerSnapshot.data ?? [];
-
-            final allOrders = [...artisanOrders, ...customerOrders]
-                .where((o) => o.status == 'negotiating' || o.status == 'quoted')
-                .toList();
-
-            final Map<String, ArtisanWorkOrder> uniqueOrders = {};
-            for (var o in allOrders) {
-              uniqueOrders[o.id] = o;
-            }
-
-            final sortedOrders = uniqueOrders.values.toList();
-            sortedOrders.sort((a, b) {
-              final aTime = a.updatedAt ?? a.createdAt;
-              final bTime = b.updatedAt ?? b.createdAt;
-              return bTime.compareTo(aTime);
-            });
-
-            final unreadNegotiations = notificationService.notifications
-                .where((n) =>
-                    !n.isRead && n.data?['type'] == 'negotiation_message')
-                .toList();
-
-            if (sortedOrders.isEmpty) {
-              if (artisanSnapshot.connectionState == ConnectionState.waiting ||
-                  customerSnapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
-                    child: CircularProgressIndicator(strokeWidth: 2));
-              }
-              return Center(
-                  child: Text(
-                      widget.isUrdu ? 'کوئی بات چیت نہیں' : 'No negotiations',
-                      style: TextStyle(
-                          color: Colors.grey, fontFamily: widget.fontFamily)));
-            }
-
-            return ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: sortedOrders.length,
-              itemBuilder: (context, index) {
-                final order = sortedOrders[index];
-                final isExpanded = _expandedOrderId == order.id;
-                final bool isIArtisan = order.artisanId == user.uid;
-
-                final orderUnread = unreadNegotiations
-                    .where((n) => n.data?['orderId'] == order.id)
-                    .toList();
-                final bool hasUnread = orderUnread.isNotEmpty;
-                final int unreadCount = orderUnread.length;
-
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                        color: isExpanded
-                            ? AppTheme.themeColor.withValues(alpha: 0.3)
-                            : (hasUnread
-                                ? AppTheme.themeColor.withValues(alpha: 0.2)
-                                : AppTheme.darkColor.withValues(alpha: 0.05))),
-                    boxShadow: [
-                      BoxShadow(
-                        color: hasUnread
-                            ? AppTheme.themeColor.withOpacity(0.05)
-                            : Colors.black.withOpacity(0.02),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      ListTile(
-                        onLongPress: () => _showDeleteChatDialog(
-                            order, widget.isUrdu, widget.fontFamily),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        title: isIArtisan
-                            ? ProfileInfoWidget(
-                                name: order.customerName,
-                                phone: '',
-                                address:
-                                    isExpanded ? null : order.workDescription,
-                                isAddressBold: hasUnread,
-                                addressColor: hasUnread ? Colors.black : null,
-                                categorySuffix:
-                                    hasUnread ? _buildUnreadBadge(unreadCount) : null,
-                                suffix: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      _formatTime(
-                                          order.updatedAt ?? order.createdAt,
-                                          widget.isUrdu),
-                                      style: TextStyle(
-                                        color: hasUnread
-                                            ? AppTheme.themeColor
-                                            : AppTheme.darkColor
-                                                .withValues(alpha: 0.7),
-                                        fontSize: 10,
-                                        fontFamily: widget.isUrdu
-                                            ? widget.fontFamily
-                                            : '',
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                profileImage: null,
-                                customSize: 42,
-                                borderRadius: 6,
-                                verticalSpacing: 2,
-                              )
-                            : FutureBuilder<ArtisanProfile?>(
-                                future:
-                                    ArtisanService().getProfile(order.artisanId),
-                                builder: (context, snapshot) {
-                                  final profile = snapshot.data;
-                                  // ترجیح: 1. آرڈر میں موجود نام، 2. پروفائل سے ملا نام، 3. ڈیفالٹ
-                                  final String displayName =
-                                      (order.artisanName != null && order.artisanName!.isNotEmpty)
-                                          ? order.artisanName!
-                                          : (profile?.name ??
-                                              (widget.isUrdu
-                                                  ? 'کاریگر'
-                                                  : 'Artisan'));
-                                  return ProfileInfoWidget(
-                                    name: displayName,
-                                    phone: '',
-                                    category: widget.isUrdu ? profile?.professionUrdu : profile?.profession,
-                                    isVerticalCategory: true,
-                                    address: isExpanded
-                                        ? null
-                                        : order.workDescription,
-                                    isAddressBold: hasUnread,
-                                    addressColor:
-                                        hasUnread ? Colors.black : null,
-                                    categorySuffix: hasUnread
-                                        ? _buildUnreadBadge(unreadCount)
-                                        : null,
-                                    suffix: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          _formatTime(
-                                              order.updatedAt ??
-                                                  order.createdAt,
-                                              widget.isUrdu),
-                                          style: TextStyle(
-                                            color: hasUnread
-                                                ? AppTheme.themeColor
-                                                : AppTheme.darkColor
-                                                    .withValues(alpha: 0.7),
-                                            fontSize: 10,
-                                            fontFamily: widget.isUrdu
-                                                ? widget.fontFamily
-                                                : '',
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    profileImage: snapshot.data?.profileImage,
-                                    customSize: 42,
-                                    borderRadius: 6,
-                                    verticalSpacing: 2,
-                                  );
-                                },
-                              ),
-                        onTap: () {
-                          setState(() {
-                            _expandedOrderId = isExpanded ? null : order.id;
-                          });
-                        },
-                      ),
-                      if (isExpanded)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                          child: SizedBox(
-                            height: MediaQuery.of(context).size.height * 0.6,
-                            child: NegotiationView(
-                              workOrder: order,
-                              isArtisanMode: isIArtisan,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildBillButton(ArtisanWorkOrder order, bool isArtisan, bool isUrdu, String fontFamily) {
-    return GestureDetector(
-      onTap: () {
-        showDialog(
-          context: context,
-          builder: (context) => Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SingleChildScrollView(
-              child: WorkOrderListItem(
-                order: order,
-                isArtisanMode: isArtisan,
-                isUrdu: isUrdu,
-                fontFamily: fontFamily,
-                onChatTap: () => Navigator.pop(context),
-              ),
-            ),
-          ),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: AppTheme.themeColor.withOpacity(0.1),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(PhosphorIcons.receipt(), size: 16, color: AppTheme.themeColor),
-      ),
-    );
-  }
-
-  Widget _buildUnreadBadge(int count) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: AppTheme.themeColor,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        count.toString(),
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          fontFamily: '',
-        ),
-      ),
-    );
-  }
-
-  void _showDeleteChatDialog(
-      ArtisanWorkOrder order, bool isUrdu, String fontFamily) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isUrdu ? 'مکمل گفتگو حذف کریں؟' : 'Delete Entire Chat?',
-            style: TextStyle(fontFamily: fontFamily)),
-        content: Text(
-            isUrdu
-                ? 'کیا آپ واقعی اس کاریگر/گاہک کے ساتھ تمام بات چیت حذف کرنا چاہتے ہیں؟'
-                : 'Are you sure you want to delete all conversation with this artisan/customer?',
-            style: TextStyle(fontFamily: fontFamily, fontSize: 13)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(isUrdu ? 'نہیں' : 'No')),
-          TextButton(
-              onPressed: () async {
-                Navigator.pop(context);
-                try {
-                  await JobNegotiationService().deleteDirectConversation(
-                    jobId: order.id,
-                    artisanId: order.artisanId,
-                  );
-                  await ArtisanWorkOrderService()
-                      .deleteWorkOrder(order.artisanId, order.id);
-
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                          content: Text(isUrdu
-                              ? 'گفتگو حذف کر دی گئی ہے'
-                              : 'Conversation deleted')),
-                    );
-                  }
-                } catch (e) {
-                  debugPrint('Error deleting chat: $e');
-                }
-              },
-              child: Text(isUrdu ? 'ہاں' : 'Yes',
-                  style: const TextStyle(color: Colors.red))),
         ],
       ),
     );

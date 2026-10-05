@@ -12,10 +12,10 @@ import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 
 class VerificationRequestScreen extends StatefulWidget {
-  final bool isArtisanMode; // To customize labels if opened from Artisan profile
-  const VerificationRequestScreen({super.key, this.isArtisanMode = false});
+  const VerificationRequestScreen({super.key});
 
   @override
   State<VerificationRequestScreen> createState() =>
@@ -35,10 +35,8 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   @override
   void initState() {
     super.initState();
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null && widget.isArtisanMode) {
-      _businessNameController.text = user.displayName ?? '';
-    }
+    _businessNameController.text =
+        FirebaseAuth.instance.currentUser?.displayName ?? '';
   }
 
   @override
@@ -48,45 +46,43 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     super.dispose();
   }
 
-
-
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
 
     if (_cnicFront == null || _cnicBack == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(isUrdu
-                ? 'براہ کرم شناختی کارڈ کی دونوں تصویریں اپ لوڈ کریں'
-                : 'Please upload both sides of CNIC')),
+      AppToast.warning(
+        context,
+        isUrdu
+            ? 'براہ کرم شناختی کارڈ کی دونوں تصویریں اپ لوڈ کریں'
+            : 'Please upload both sides of CNIC',
       );
       return;
     }
 
     try {
       final service = Provider.of<VerificationService>(context, listen: false);
-      
+
       await service.submitRequest(
         cnicFront: _cnicFront!,
         cnicBack: _cnicBack!,
         shopImage: _shopImage,
         businessName: _businessNameController.text.trim(),
         businessType: _businessTypeController.text.trim(),
-        isArtisan: widget.isArtisanMode,
       );
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isUrdu ? 'آپ کی درخواست جمع کر دی گئی ہے' : 'Your request has been submitted')),
+        AppToast.success(
+          context,
+          isUrdu
+              ? 'آپ کی درخواست جمع کر دی گئی ہے'
+              : 'Your request has been submitted',
         );
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        AppToast.error(context, 'Error: $e');
       }
     }
   }
@@ -97,18 +93,14 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
       final service = Provider.of<VerificationService>(context, listen: false);
       await service.cancelRequest();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(isUrdu
-                  ? 'درخواست منسوخ کر دی گئی'
-                  : 'Request cancelled successfully')),
+        AppToast.success(
+          context,
+          isUrdu ? 'درخواست منسوخ کر دی گئی' : 'Request cancelled successfully',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        AppToast.error(context, 'Error: $e');
       }
     }
   }
@@ -121,7 +113,8 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: CustomAppBar(title: isUrdu ? 'پروفائل کی تصدیق' : 'Profile Verification'),
+      appBar: CustomAppBar(
+          title: isUrdu ? 'پروفائل کی تصدیق' : 'Profile Verification'),
       body: service.isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -168,7 +161,9 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                     // Business Info
                     _buildTextField(
                       controller: _businessNameController,
-                      label: isUrdu ? 'کاروبار یا اپنا مکمل نام' : 'Business or Full Name',
+                      label: isUrdu
+                          ? 'کاروبار یا اپنا مکمل نام'
+                          : 'Business or Full Name',
                       icon: PhosphorIcons.user(),
                       isUrdu: isUrdu,
                       fontFamily: fontFamily,
@@ -176,7 +171,9 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                     const SizedBox(height: 20),
                     _buildTextField(
                       controller: _businessTypeController,
-                      label: isUrdu ? 'کاروبار یا ہنر کی قسم' : 'Business or Skill Type',
+                      label: isUrdu
+                          ? 'کاروبار یا ہنر کی قسم'
+                          : 'Business or Skill Type',
                       hint: isUrdu
                           ? 'مثلاً: کریانہ، الیکٹریشن، درزی'
                           : 'e.g. Grocery, Electrician, Tailor',
@@ -194,9 +191,12 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
 
                     // CNIC Front
                     ImageSelectorField(
-                      label: isUrdu ? 'شناختی کارڈ (سامنے کی تصویر)' : 'CNIC Front Side',
+                      label: isUrdu
+                          ? 'شناختی کارڈ (سامنے کی تصویر)'
+                          : 'CNIC Front Side',
                       selectedFiles: _cnicFront != null ? [_cnicFront!] : [],
-                      onFilesChanged: (files) => setState(() => _cnicFront = files.isNotEmpty ? files.first : null),
+                      onFilesChanged: (files) => setState(() =>
+                          _cnicFront = files.isNotEmpty ? files.first : null),
                       maxTotal: 1,
                       isFullWidth: true,
                       aspectRatio: 3 / 2,
@@ -205,9 +205,12 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
 
                     // CNIC Back
                     ImageSelectorField(
-                      label: isUrdu ? 'شناختی کارڈ (پیچھے کی تصویر)' : 'CNIC Back Side',
+                      label: isUrdu
+                          ? 'شناختی کارڈ (پیچھے کی تصویر)'
+                          : 'CNIC Back Side',
                       selectedFiles: _cnicBack != null ? [_cnicBack!] : [],
-                      onFilesChanged: (files) => setState(() => _cnicBack = files.isNotEmpty ? files.first : null),
+                      onFilesChanged: (files) => setState(() =>
+                          _cnicBack = files.isNotEmpty ? files.first : null),
                       maxTotal: 1,
                       isFullWidth: true,
                       aspectRatio: 3 / 2,
@@ -216,9 +219,12 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
 
                     // Shop Image
                     ImageSelectorField(
-                      label: isUrdu ? 'دکان یا کام کی جگہ (اختیاری)' : 'Shop or Workplace (Optional)',
+                      label: isUrdu
+                          ? 'دکان یا کام کی جگہ (اختیاری)'
+                          : 'Shop or Workplace (Optional)',
                       selectedFiles: _shopImage != null ? [_shopImage!] : [],
-                      onFilesChanged: (files) => setState(() => _shopImage = files.isNotEmpty ? files.first : null),
+                      onFilesChanged: (files) => setState(() =>
+                          _shopImage = files.isNotEmpty ? files.first : null),
                       maxTotal: 1,
                       isFullWidth: true,
                       aspectRatio: 16 / 9,
@@ -229,9 +235,10 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                       text: service.currentStatus == VerificationStatus.approved
                           ? (isUrdu ? 'پہلے ہی تصدیق شدہ' : 'Already Verified')
                           : (isUrdu ? 'درخواست جمع کروائیں' : 'Submit Request'),
-                      onPressed: service.currentStatus == VerificationStatus.approved
-                          ? null
-                          : _submit,
+                      onPressed:
+                          service.currentStatus == VerificationStatus.approved
+                              ? null
+                              : _submit,
                       isFullWidth: true,
                       size: AppButtonSize.large,
                       color: AppTheme.darkColor,
@@ -382,35 +389,32 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
       enabled: enabled,
       controller: controller,
       style: TextStyle(
-        color: AppTheme.darkColor, 
-        fontFamily: fontFamily, 
+        color: AppTheme.darkColor,
+        fontFamily: fontFamily,
         fontSize: 16,
       ),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
         labelStyle: TextStyle(
-          fontFamily: isUrdu ? 'NooriNastaleeq' : '', 
-          color: Colors.grey.shade600, 
-          fontSize: 13, 
-          fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal
-        ),
+            fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+            color: Colors.grey.shade600,
+            fontSize: 13,
+            fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         fillColor: const Color(0xFFF5F7F9),
         filled: true,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0), 
-          borderSide: BorderSide(color: Colors.grey.shade400)
-        ),
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: Colors.grey.shade400)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0), 
-          borderSide: BorderSide(color: Colors.grey.shade400)
-        ),
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: Colors.grey.shade400)),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0), 
-          borderSide: const BorderSide(color: AppTheme.themeColor, width: 1)
-        ),
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: const BorderSide(color: AppTheme.themeColor, width: 1)),
         prefixIcon: Icon(icon, color: AppTheme.themeColor, size: 20),
       ),
       validator: (value) => (value == null || value.isEmpty)
@@ -418,6 +422,4 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
           : null,
     );
   }
-
-
 }

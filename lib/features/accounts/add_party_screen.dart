@@ -20,6 +20,7 @@ import 'package:account_app/core/widgets/category_chip.dart';
 import 'package:account_app/core/widgets/app_filter_chip.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/l10n/app_localizations.dart';
 
 class AddPartyScreen extends StatefulWidget {
@@ -387,16 +388,11 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
         ),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isUrdu ? 'رابطوں تک رسائی کی اجازت نہیں دی گئی' : 'Permission to access contacts denied', 
-            style: TextStyle(fontFamily: fontFamily, color: Colors.white, fontWeight: fontWeight)
-          ),
-          backgroundColor: AppTheme.expenseColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-        ),
+      AppToast.warning(
+        context,
+        isUrdu
+            ? 'رابطوں تک رسائی کی اجازت نہیں دی گئی'
+            : 'Permission to access contacts denied',
       );
     }
   }
@@ -428,16 +424,11 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
 
       if (isDuplicate) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isUrdu ? 'اس فون نمبر پر پہلے ہی ایک اکاؤنٹ موجود ہے۔' : 'An account with this phone number already exists.',
-              style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '', fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal, color: Colors.white)
-            ),
-            backgroundColor: AppTheme.expenseColor,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-          )
+        AppToast.warning(
+          context,
+          isUrdu
+              ? 'اس فون نمبر پر پہلے ہی ایک اکاؤنٹ موجود ہے۔'
+              : 'An account with this phone number already exists.',
         );
         return;
       }
@@ -470,17 +461,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
 
         await databaseService.updateAccount(updatedParty);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                l10n.updatedSuccessfully,
-                style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '', fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal, color: Colors.white)
-              ),
-              backgroundColor: AppTheme.darkColor,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-            )
-        );
+        AppToast.success(context, l10n.updatedSuccessfully);
       } else {
         // Add Mode
         final party = Account(
@@ -508,27 +489,19 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
            }
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isConnected ? l10n.addedSuccessfully : (isUrdu ? 'پارٹی محفوظ ہوگئی (آف لائن)' : 'Party saved locally (Offline)'), 
-              style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '', fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal, color: Colors.white)
-            ),
-            backgroundColor: AppTheme.darkColor,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-          ),
+        AppToast.success(
+          context,
+          isConnected
+              ? l10n.addedSuccessfully
+              : (isUrdu
+                  ? 'پارٹی محفوظ ہوگئی (آف لائن)'
+                  : 'Party saved locally (Offline)'),
         );
       }
 
       Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${l10n.error}: $e', style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '', fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppToast.error(context, '${l10n.error}: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
