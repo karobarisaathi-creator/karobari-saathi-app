@@ -7,9 +7,9 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/models/account_model.dart';
+import 'package:account_app/core/widgets/in_app_notification_banner.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
 import 'database_service.dart';
-import 'auto_sync_service.dart';
 
 class NotificationService with ChangeNotifier {
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
@@ -21,21 +21,35 @@ class NotificationService with ChangeNotifier {
   List<AppNotification> _notifications = [];
   int _unreadCount = 0;
   StreamSubscription<QuerySnapshot>? _firestoreSubscription;
+  StreamSubscription<User?>? _authStateSubscription;
+  StreamSubscription<String>? _tokenRefreshSubscription;
+  StreamSubscription<RemoteMessage>? _foregroundMessageSubscription;
+  StreamSubscription<RemoteMessage>? _openedMessageSubscription;
+  String? _fcmToken;
+  String? _activeUserId;
+  bool _isDisposed = false;
 
   GlobalKey<NavigatorState>? _navigatorKey;
 
   List<AppNotification> get notifications => _notifications;
   int get unreadCount =>
       _notifications.where((notification) => !notification.isRead).length;
+
   NotificationService() {
     _initNotifications();
-    _auth.authStateChanges().listen((User? user) {
-      if (user != null) {
-        _startFirestoreListener();
-      } else {
-        _stopFirestoreListener();
-      }
-    });
+    _authStateSubscription =
+        _auth.authStateChanges().listen(_handleAuthStateChanged);
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    _stopFirestoreListener();
+    _authStateSubscription?.cancel();
+    _tokenRefreshSubscription?.cancel();
+    _foregroundMessageSubscription?.cancel();
+    _openedMessageSubscription?.cancel();
+    super.dispose();
   }
 
   void setNavigatorKey(GlobalKey<NavigatorState> key) {
@@ -43,12 +57,119 @@ class NotificationService with ChangeNotifier {
   }
 
   Future<void> _initNotifications() async {
-    await _setupLocalNotifications();
-    await _setupFirebaseMessaging();
+    try {
+      await _setupLocalNotifications();
+    } catch (error, stackTrace) {
+      debugPrint('Local notification setup failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+
+    try {
+      await _setupFirebaseMessaging();
+    } catch (error, stackTrace) {
+      debugPrint('Firebase Messaging setup failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+
     await _loadStoredNotifications();
 
-    if (_auth.currentUser != null) {
-      _startFirestoreListener();
+    if (!_isDisposed && _auth.currentUser != null) {
+      _handleAuthStateChanged(_auth.currentUser);
+    }
+  }
+
+  Future<void> _handleAuthStateChanged(User? user) async {
+    if (_isDisposed) return;
+    final userId = user?.uid;
+    if (_activeUserId == userId) return;
+
+    _activeUserId = userId;
+    await _firestoreSubscription?.cancel();
+    _firestoreSubscription = null;
+
+    if (userId == null) {
+      _notifications = [];
+      _updateUnreadCount();
+      notifyListeners();
+      return;
+    }
+
+    _startFirestoreListener();
+    await _registerCurrentToken(userId);
+  }
+
+  Future<void> _registerCurrentToken(String userId) async {
+    try {
+      final token = _fcmToken ?? await _firebaseMessaging.getToken();
+      if (token == null || _auth.currentUser?.uid != userId) return;
+      _fcmToken = token;
+      await _firestore.collection('users').doc(userId).set({
+        'fcmToken': token,
+        'fcmTokens': FieldValue.arrayUnion([token]),
+      }, SetOptions(merge: true));
+    } catch (error, stackTrace) {
+      debugPrint('Unable to register FCM token for user $userId: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
+  Future<void> _handleTokenRefresh(String token) async {
+    final previousToken = _fcmToken;
+    _fcmToken = token;
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      final userRef = _firestore.collection('users').doc(userId);
+      if (previousToken != null && previousToken != token) {
+        await userRef.set({
+          'fcmTokens': FieldValue.arrayRemove([previousToken]),
+        }, SetOptions(merge: true));
+      }
+      await userRef.set({
+        'fcmToken': token,
+        'fcmTokens': FieldValue.arrayUnion([token]),
+      }, SetOptions(merge: true));
+    } catch (error, stackTrace) {
+      debugPrint('Unable to update refreshed FCM token: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
+  Future<void> unregisterCurrentDeviceToken() async {
+    final userId = _auth.currentUser?.uid;
+    final token = _fcmToken;
+    if (userId == null || token == null) return;
+
+    Object? unregisterError;
+    try {
+      final userRef = _firestore.collection('users').doc(userId);
+      final userDoc = await userRef.get();
+      final updates = <String, dynamic>{
+        'fcmTokens': FieldValue.arrayRemove([token]),
+      };
+      if (userDoc.data()?['fcmToken'] == token) {
+        updates['fcmToken'] = FieldValue.delete();
+      }
+      await userRef.set(updates, SetOptions(merge: true));
+    } catch (error, stackTrace) {
+      unregisterError = error;
+      debugPrint('Unable to unregister FCM token: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+
+    try {
+      await _firebaseMessaging.deleteToken();
+      _fcmToken = null;
+    } catch (error, stackTrace) {
+      debugPrint('Unable to delete local FCM token: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      unregisterError ??= error;
+    }
+
+    if (unregisterError != null) {
+      throw Exception(
+          'Unable to safely unregister device notifications: $unregisterError');
     }
   }
 
@@ -121,6 +242,14 @@ class NotificationService with ChangeNotifier {
       },
     );
 
+    final launchDetails =
+        await _localNotifications.getNotificationAppLaunchDetails();
+    if (launchDetails?.didNotificationLaunchApp == true) {
+      _handleLocalNotificationTap(
+        launchDetails?.notificationResponse?.payload,
+      );
+    }
+
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
       'account_channel',
       'Account Notifications',
@@ -137,63 +266,82 @@ class NotificationService with ChangeNotifier {
   }
 
   Future<void> _setupFirebaseMessaging() async {
-    await _firebaseMessaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    _foregroundMessageSubscription ??=
+        FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+    _openedMessageSubscription ??=
+        FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      _handleNotificationTap(message.data['type']?.toString(), message.data);
+    });
+    _tokenRefreshSubscription ??=
+        _firebaseMessaging.onTokenRefresh.listen(_handleTokenRefresh);
 
     try {
-      final String? fcmToken = await _firebaseMessaging.getToken();
-      if (_auth.currentUser != null && fcmToken != null) {
-        final userDocRef =
-            _firestore.collection('users').doc(_auth.currentUser!.uid);
-        final userDoc = await userDocRef.get();
-        if (userDoc.exists) {
-          await userDocRef.update({
-            'fcmToken': fcmToken,
-          });
-        } else {
-          await userDocRef.set({
-            'fcmToken': fcmToken,
-          }, SetOptions(merge: true));
-        }
-      }
-    } catch (e) {
-      debugPrint("Error setting up FCM: $e");
+      await _firebaseMessaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Notification permission request failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
     }
 
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      _handleNotificationTap(message.data['type'], message.data);
-    });
-
-    FirebaseMessaging.instance.getInitialMessage().then((message) {
-      if (message != null) {
-        _handleNotificationTap(message.data['type'], message.data);
+    try {
+      _fcmToken = await _firebaseMessaging.getToken();
+      final userId = _auth.currentUser?.uid;
+      if (userId != null) {
+        await _registerCurrentToken(userId);
       }
-    });
+    } catch (error, stackTrace) {
+      debugPrint('Unable to obtain FCM token: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+
+    try {
+      final initialMessage = await _firebaseMessaging.getInitialMessage();
+      if (initialMessage != null) {
+        await _handleNotificationTap(
+          initialMessage.data['type']?.toString(),
+          initialMessage.data,
+        );
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Unable to process initial FCM notification: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
-  void _handleNotificationTap(String? type,
-      [Map<String, dynamic>? data]) async {
-    if (_navigatorKey == null) return;
+  Future<void> _handleNotificationTap(
+    String? _type, [
+    Map<String, dynamic>? data,
+  ]) async {
+    NavigatorState? navigator;
+    for (var attempt = 0; attempt < 20; attempt++) {
+      navigator = _navigatorKey?.currentState;
+      if (navigator != null && navigator.mounted) break;
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
 
-    String? accountId = data?['accountId'] ?? data?['relatedAccountId'];
-    if (accountId != null) {
-      try {
-        final context = _navigatorKey!.currentState!.context;
-        await Future.delayed(const Duration(milliseconds: 500));
+    if (navigator == null || !navigator.mounted) {
+      debugPrint('Cannot open notification: app navigator is unavailable.');
+      return;
+    }
 
-        _navigatorKey!.currentState!.push(
-          MaterialPageRoute(
-            builder: (context) => _buildDestinationScreen(accountId),
-          ),
-        );
-      } catch (e) {
-        debugPrint('Navigation error: $e');
-      }
+    final accountId =
+        (data?['accountId'] ?? data?['relatedAccountId'])?.toString().trim();
+    if (accountId != null && accountId.isNotEmpty && accountId != 'null') {
+      navigator.push(
+        MaterialPageRoute(
+          builder: (context) => _buildDestinationScreen(accountId),
+        ),
+      );
+      return;
+    }
+
+    if (_navigatorKey?.currentState?.mounted == true) {
+      _navigatorKey!.currentState!.pushNamed('/notifications');
+    } else {
+      debugPrint('Cannot open notifications: app navigator was disposed.');
     }
   }
 
@@ -243,17 +391,53 @@ class NotificationService with ChangeNotifier {
     // Implementation handled by Listener
   }
 
-  void _handleForegroundMessage(RemoteMessage message) {
-    _showLocalNotification(message);
+  Future<void> _handleForegroundMessage(RemoteMessage message) async {
+    final context = _navigatorKey?.currentContext;
+    if (context == null || !context.mounted) {
+      await _showLocalNotification(message);
+      return;
+    }
+
+    try {
+      InAppNotificationBanner.show(
+        context,
+        title: message.notification?.title ??
+            message.data['title']?.toString() ??
+            'نیا نوٹیفیکیشن',
+        message: message.notification?.body ??
+            message.data['body']?.toString() ??
+            '',
+        senderName: message.data['senderName']?.toString() ?? 'Karobari Saathi',
+        imageUrl: message.data['senderPhotoUrl']?.toString() ??
+            message.data['imageUrl']?.toString(),
+        onTap: () => _handleNotificationTap(
+          message.data['type']?.toString(),
+          message.data,
+        ),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Unable to show in-app notification banner: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      await _showLocalNotification(message);
+    }
   }
 
   Future<void> _showLocalNotification(RemoteMessage message) async {
-    await _showLocalNotificationRaw(
-      title: message.notification?.title ?? 'نیا نوٹیفیکیشن',
-      body: message.notification?.body ?? '',
-      payload: message.data['type'] ?? 'general',
-      dataPayload: message.data,
-    );
+    try {
+      await _showLocalNotificationRaw(
+        title: message.notification?.title ??
+            message.data['title']?.toString() ??
+            'نیا نوٹیفیکیشن',
+        body: message.notification?.body ??
+            message.data['body']?.toString() ??
+            '',
+        payload: message.data['type']?.toString() ?? 'general',
+        dataPayload: message.data,
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Unable to show fallback local notification: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   Future<void> _showLocalNotificationRaw({
@@ -359,26 +543,14 @@ class NotificationService with ChangeNotifier {
   }
 
   void markAllAsRead() {
+    final notificationsToUpdate = List<AppNotification>.of(_notifications);
     for (var notification in _notifications) {
       notification.isRead = true;
     }
     _unreadCount = 0;
     notifyListeners();
 
-    if (_auth.currentUser != null) {
-      final batch = _firestore.batch();
-      for (var n in _notifications) {
-        final ref = _firestore
-            .collection('users')
-            .doc(_auth.currentUser!.uid)
-            .collection('notifications')
-            .doc(n.id);
-        batch.update(ref, {'isRead': true});
-      }
-      batch
-          .commit()
-          .catchError((e) => debugPrint("Error marking all read: $e"));
-    }
+    unawaited(_writeNotificationBatch(notificationsToUpdate, delete: false));
   }
 
   void deleteNotification(String notificationId) {
@@ -431,24 +603,45 @@ class NotificationService with ChangeNotifier {
   }
 
   void clearAll() {
-    if (_auth.currentUser != null && _notifications.isNotEmpty) {
-      final batch = _firestore.batch();
-      final collectionRef = _firestore
-          .collection('users')
-          .doc(_auth.currentUser!.uid)
-          .collection('notifications');
-
-      for (var n in _notifications) {
-        batch.delete(collectionRef.doc(n.id));
-      }
-
-      batch.commit().catchError((e) =>
-          debugPrint("Error clearing all notifications from Firestore: $e"));
-    }
+    final notificationsToDelete = List<AppNotification>.of(_notifications);
+    unawaited(_writeNotificationBatch(notificationsToDelete, delete: true));
 
     _notifications.clear();
     _unreadCount = 0;
     notifyListeners();
+  }
+
+  Future<void> _writeNotificationBatch(
+    List<AppNotification> notifications, {
+    required bool delete,
+  }) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null || notifications.isEmpty) return;
+
+    final collectionRef =
+        _firestore.collection('users').doc(userId).collection('notifications');
+    try {
+      for (var offset = 0; offset < notifications.length; offset += 450) {
+        final end = offset + 450 < notifications.length
+            ? offset + 450
+            : notifications.length;
+        final batch = _firestore.batch();
+        for (final notification in notifications.sublist(offset, end)) {
+          final reference = collectionRef.doc(notification.id);
+          if (delete) {
+            batch.delete(reference);
+          } else {
+            batch.update(reference, {'isRead': true});
+          }
+        }
+        await batch.commit();
+      }
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Unable to ${delete ? 'delete' : 'mark read'} notifications: $error',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   void _updateUnreadCount() {

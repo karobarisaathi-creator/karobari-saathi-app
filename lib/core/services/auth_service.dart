@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'database_service.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'notification_service.dart';
 import 'package:account_app/features/settings/login_screen.dart'; // For navigation
 
 class AuthService with ChangeNotifier {
@@ -12,9 +13,9 @@ class AuthService with ChangeNotifier {
 
   // Update Profile
   Future<void> updateProfile({
-    String? displayName, 
-    String? photoUrl, 
-    String? address, 
+    String? displayName,
+    String? photoUrl,
+    String? address,
     String? slogan,
     String? storeName,
     String? storeImage,
@@ -23,10 +24,14 @@ class AuthService with ChangeNotifier {
     if (user == null) return;
 
     try {
-      final sanitizedName = displayName != null ? Formatters.sanitizeText(displayName) : null;
-      final sanitizedAddress = address != null ? Formatters.sanitizeText(address) : null;
-      final sanitizedSlogan = slogan != null ? Formatters.sanitizeText(slogan) : null;
-      final sanitizedStoreName = storeName != null ? Formatters.sanitizeText(storeName) : null;
+      final sanitizedName =
+          displayName != null ? Formatters.sanitizeText(displayName) : null;
+      final sanitizedAddress =
+          address != null ? Formatters.sanitizeText(address) : null;
+      final sanitizedSlogan =
+          slogan != null ? Formatters.sanitizeText(slogan) : null;
+      final sanitizedStoreName =
+          storeName != null ? Formatters.sanitizeText(storeName) : null;
 
       if (sanitizedName != null) {
         await user.updateDisplayName(sanitizedName);
@@ -34,7 +39,7 @@ class AuthService with ChangeNotifier {
       if (photoUrl != null) {
         await user.updatePhotoURL(photoUrl);
       }
-      
+
       // Update Firestore as well
       Map<String, dynamic> updateData = {
         'displayName': sanitizedName ?? user.displayName,
@@ -44,10 +49,14 @@ class AuthService with ChangeNotifier {
 
       if (sanitizedAddress != null) updateData['address'] = sanitizedAddress;
       if (sanitizedSlogan != null) updateData['slogan'] = sanitizedSlogan;
-      if (sanitizedStoreName != null) updateData['storeName'] = sanitizedStoreName;
+      if (sanitizedStoreName != null)
+        updateData['storeName'] = sanitizedStoreName;
       if (storeImage != null) updateData['storeImage'] = storeImage;
 
-      await _firestore.collection('users').doc(user.uid).set(updateData, SetOptions(merge: true));
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .set(updateData, SetOptions(merge: true));
 
       notifyListeners();
     } catch (e) {
@@ -62,6 +71,7 @@ class AuthService with ChangeNotifier {
       if (context.mounted) {
         final dbService = Provider.of<DatabaseService>(context, listen: false);
         await dbService.prepareForLogout();
+        await _unregisterPushToken(context);
       }
 
       // 2. Small delay to ensure all async operations finish
@@ -79,6 +89,9 @@ class AuthService with ChangeNotifier {
     } catch (e) {
       debugPrint("Sign out error: $e");
       // Fallback signout
+      if (context.mounted) {
+        await _unregisterPushToken(context);
+      }
       await _auth.signOut();
       if (context.mounted) {
         Navigator.of(context).pushAndRemoveUntil(
@@ -102,23 +115,33 @@ class AuthService with ChangeNotifier {
       });
 
       // Sign out the user
+      await _unregisterPushToken(context);
       await _auth.signOut();
 
       // Clear local data
       if (context.mounted) {
-         final dbService = Provider.of<DatabaseService>(context, listen: false);
-         await dbService.clearLocalData();
+        final dbService = Provider.of<DatabaseService>(context, listen: false);
+        await dbService.clearLocalData();
       }
-      
+
       // Navigate to login screen and remove all previous routes
-      if (!context.mounted) return; 
+      if (!context.mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => LoginScreen()),
         (Route<dynamic> route) => false,
       );
-
     } catch (e) {
       throw Exception("Failed to deactivate account: $e");
+    }
+  }
+
+  Future<void> _unregisterPushToken(BuildContext context) async {
+    try {
+      await Provider.of<NotificationService>(context, listen: false)
+          .unregisterCurrentDeviceToken();
+    } catch (error, stackTrace) {
+      debugPrint('Push token cleanup failed during sign-out: $error');
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 

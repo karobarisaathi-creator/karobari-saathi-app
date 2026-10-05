@@ -461,11 +461,19 @@ class VerificationService with ChangeNotifier {
   }) async {
     try {
       final usersSnapshot = await _firestore.collection('users').get();
-      final batch = _firestore.batch();
+      const maxWritesPerBatch = 450;
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      var batch = _firestore.batch();
+      var writesInBatch = 0;
 
       for (var doc in usersSnapshot.docs) {
-        final notifId =
-            "broadcast_${DateTime.now().millisecondsSinceEpoch}_${doc.id.substring(0, 4)}";
+        if (writesInBatch == maxWritesPerBatch) {
+          await batch.commit();
+          batch = _firestore.batch();
+          writesInBatch = 0;
+        }
+
+        final notifId = 'broadcast_${timestamp}_${doc.id}';
         final ref = _firestore
             .collection('users')
             .doc(doc.id)
@@ -480,9 +488,10 @@ class VerificationService with ChangeNotifier {
           'type': 'system',
           'isRead': false,
         });
+        writesInBatch++;
       }
 
-      await batch.commit();
+      if (writesInBatch > 0) await batch.commit();
       debugPrint('Broadcast sent to ${usersSnapshot.docs.length} users');
     } catch (e) {
       debugPrint('Broadcast error: $e');

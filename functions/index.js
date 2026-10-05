@@ -3,67 +3,134 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
-exports.sendNotificationOnCreate = onDocumentCreated("users/{userId}/notifications/{notificationId}", async (event) => {
+exports.sendNotificationOnCreate = onDocumentCreated(
+  "users/{userId}/notifications/{notificationId}",
+  async (event) => {
     const snapshot = event.data;
     if (!snapshot) {
-        console.log("No data associated with the event");
-        return;
+      console.log("No data associated with the event");
+      return null;
     }
 
     const notification = snapshot.data();
     const userId = event.params.userId;
+    const userRef = admin.firestore().collection("users").doc(userId);
+    const userDoc = await userRef.get();
 
-    // 1. صارف کا FCM ٹوکن حاصل کریں
-    const userDoc = await admin.firestore().collection('users').doc(userId).get();
     if (!userDoc.exists) {
-        console.log('User not found');
-        return null;
+      console.log(`Notification recipient not found: ${userId}`);
+      return null;
     }
 
     const userData = userDoc.data();
-    const fcmToken = userData.fcmToken;
+    const tokens = [
+      ...new Set([
+        ...(Array.isArray(userData.fcmTokens) ? userData.fcmTokens : []),
+        ...(typeof userData.fcmToken === "string" ? [userData.fcmToken] : []),
+      ]),
+    ].filter((token) => typeof token === "string" && token.length > 0);
 
-    if (!fcmToken) {
-        console.log('No Token found for user: ', userId);
-        return null;
+    if (tokens.length === 0) {
+      console.log(`No FCM token found for user: ${userId}`);
+      return null;
     }
 
-    // Data payload setup
-    let dataPayload = {
-        click_action: 'FLUTTER_NOTIFICATION_CLICK',
-        type: notification.type || 'general',
+    const dataPayload = {
+      click_action: "FLUTTER_NOTIFICATION_CLICK",
+      type: String(notification.type || "general"),
+      notificationId: String(event.params.notificationId),
     };
-    
-    // Merge extra data if available (convert values to string for FCM)
-    if (notification.data) {
-        for (const [key, value] of Object.entries(notification.data)) {
-            dataPayload[key] = String(value);
-        }
+
+    if (notification.data && typeof notification.data === "object") {
+      for (const [key, value] of Object.entries(notification.data)) {
+        if (value == null) continue;
+        dataPayload[key] =
+          typeof value === "string" ? value : JSON.stringify(value);
+      }
     }
 
-    // 2. میسج تیار کریں
-    const payload = {
+    const message = {
+      tokens,
       notification: {
-        title: notification.title || 'نیا نوٹیفکیشن',
-        body: notification.message || 'آپ کے اکاؤنٹ میں نئی سرگرمی ہوئی ہے',
-        sound: 'default',
-        android_channel_id: 'account_channel', 
+        title: String(notification.title || "نیا نوٹیفیکیشن"),
+        body: String(
+          notification.message || "آپ کے اکاؤنٹ میں نئی سرگرمی ہوئی ہے",
+        ),
       },
-      data: dataPayload
-    };
-
-    // سکرین آف پر جگانے کے لیے یہ آپشنز لازمی ہیں
-    const options = {
+      data: dataPayload,
+      android: {
         priority: "high",
-        timeToLive: 60 * 60 * 24
+        ttl: 24 * 60 * 60 * 1000,
+        notification: {
+          channelId: "account_channel",
+          sound: "default",
+        },
+      },
+      apns: {
+        headers: {
+          "apns-priority": "10",
+        },
+        payload: {
+          aps: {
+            sound: "default",
+          },
+        },
+      },
     };
 
-    // 3. میسج بھیجیں
     try {
-      const response = await admin.messaging().sendToDevice(fcmToken, payload, options);
-      console.log('Successfully sent message:', response);
-    } catch (error) {
-      console.log('Error sending message:', error);
-    }
-});
+      const invalidTokens = [];
+      let successCount = 0;
+      let failureCount = 0;
 
+      for (let offset = 0; offset < tokens.length; offset += 500) {
+        const tokenBatch = tokens.slice(offset, offset + 500);
+        const response = await admin.messaging().sendEachForMulticast({
+          ...message,
+          tokens: tokenBatch,
+        });
+        successCount += response.successCount;
+        failureCount += response.failureCount;
+
+        response.responses.forEach((result, index) => {
+          if (result.success) return;
+
+          const code = result.error?.code;
+          console.error(
+            `FCM delivery failed for ${userId}: ${code || result.error}`,
+          );
+          if (
+            code === "messaging/invalid-registration-token" ||
+            code === "messaging/registration-token-not-registered"
+          ) {
+            invalidTokens.push(tokenBatch[index]);
+          }
+        });
+      }
+
+      if (invalidTokens.length > 0) {
+        const updates = {
+          fcmTokens: admin.firestore.FieldValue.arrayRemove(...invalidTokens),
+        };
+        if (
+          typeof userData.fcmToken === "string" &&
+          invalidTokens.includes(userData.fcmToken)
+        ) {
+          updates.fcmToken = admin.firestore.FieldValue.delete();
+        }
+        await userRef.update(updates);
+      }
+
+      console.log(
+        `FCM notification ${event.params.notificationId}: ` +
+          `${successCount} sent, ${failureCount} failed`,
+      );
+    } catch (error) {
+      console.error(
+        `Error sending notification ${event.params.notificationId}:`,
+        error,
+      );
+      throw error;
+    }
+  },
+);

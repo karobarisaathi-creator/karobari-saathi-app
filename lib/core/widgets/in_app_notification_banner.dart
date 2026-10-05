@@ -1,9 +1,14 @@
 // lib/core/widgets/in_app_notification_banner.dart
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 
 class InAppNotificationBanner {
+  static OverlayEntry? _activeEntry;
+  static Timer? _dismissTimer;
+
   static void show(
     BuildContext context, {
     required String title,
@@ -12,7 +17,10 @@ class InAppNotificationBanner {
     String? imageUrl,
     VoidCallback? onTap,
   }) {
-    final overlay = Overlay.of(context);
+    if (!context.mounted) return;
+
+    _dismissActive();
+    final overlay = Overlay.of(context, rootOverlay: true);
     late OverlayEntry overlayEntry;
 
     overlayEntry = OverlayEntry(
@@ -36,7 +44,7 @@ class InAppNotificationBanner {
             },
             child: GestureDetector(
               onTap: () {
-                if (overlayEntry.mounted) overlayEntry.remove();
+                _dismiss(overlayEntry);
                 onTap?.call();
               },
               child: Container(
@@ -64,17 +72,27 @@ class InAppNotificationBanner {
                       decoration: BoxDecoration(
                         color: AppTheme.themeColor,
                         shape: BoxShape.circle,
-                        image: imageUrl != null && imageUrl.isNotEmpty
-                            ? DecorationImage(
-                                image: NetworkImage(imageUrl),
-                                fit: BoxFit.cover,
-                              )
-                            : null,
                       ),
-                      child: imageUrl == null || imageUrl.isEmpty
-                          ? const Icon(Icons.notifications_rounded,
-                              color: Colors.white, size: 22)
-                          : null,
+                      child: ClipOval(
+                        child: imageUrl != null && imageUrl.isNotEmpty
+                            ? Image.network(
+                                imageUrl,
+                                width: 44,
+                                height: 44,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Icon(
+                                  Icons.notifications_rounded,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.notifications_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -127,15 +145,17 @@ class InAppNotificationBanner {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () {
-                        if (overlayEntry.mounted) overlayEntry.remove();
-                      },
-                      child: const Icon(
+                    IconButton(
+                      tooltip: 'Dismiss notification',
+                      onPressed: () => _dismiss(overlayEntry),
+                      icon: const Icon(
                         Icons.close_rounded,
                         color: Colors.white60,
                         size: 18,
                       ),
+                      constraints:
+                          const BoxConstraints.tightFor(width: 32, height: 32),
+                      padding: EdgeInsets.zero,
                     ),
                   ],
                 ),
@@ -147,11 +167,28 @@ class InAppNotificationBanner {
     );
 
     overlay.insert(overlayEntry);
+    _activeEntry = overlayEntry;
 
-    Future.delayed(const Duration(seconds: 4), () {
-      if (overlayEntry.mounted) {
-        overlayEntry.remove();
-      }
-    });
+    _dismissTimer = Timer(
+      const Duration(seconds: 4),
+      () => _dismiss(overlayEntry),
+    );
+  }
+
+  static void _dismissActive() {
+    final entry = _activeEntry;
+    _dismissTimer?.cancel();
+    _dismissTimer = null;
+    _activeEntry = null;
+    if (entry?.mounted == true) entry!.remove();
+  }
+
+  static void _dismiss(OverlayEntry entry) {
+    if (identical(_activeEntry, entry)) {
+      _dismissTimer?.cancel();
+      _dismissTimer = null;
+      _activeEntry = null;
+    }
+    if (entry.mounted) entry.remove();
   }
 }
