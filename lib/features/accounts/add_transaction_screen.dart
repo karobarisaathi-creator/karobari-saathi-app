@@ -18,6 +18,8 @@ import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
+import 'package:account_app/core/constants/quick_bill_constants.dart';
+import 'package:account_app/core/utils/bill_numbering.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   final Account? account;
@@ -100,6 +102,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   late StockService _stockService;
   bool _isLoading = false;
   bool _isProfessionCentric = false;
+  bool _didLoadNextBillNumber = false;
 
   List<File> _billImages = [];
 
@@ -125,6 +128,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         _selectedCategory =
             t.category.contains(':') ? t.category.split(':')[1] : t.category;
       }
+
       _referenceNumberController.text = t.referenceNumber ?? '';
       if (t.billImage != null && t.billImage!.isNotEmpty) {
         _billImages = t.billImage!.split(',').map((p) => File(p)).toList();
@@ -181,6 +185,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     if (widget.forcedProfession != null) {
       _selectedProfessionId = widget.forcedProfession!.id;
       _isProfessionCentric = true;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didLoadNextBillNumber || widget.transactionToEdit != null) return;
+    _didLoadNextBillNumber = true;
+    final nextNumber = BillNumbering.loadNextNumber(
+      Provider.of<DatabaseService>(context, listen: false),
+    );
+    if (nextNumber != null) {
+      _referenceNumberController.text = nextNumber;
     }
   }
 
@@ -318,7 +335,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final databaseService =
         Provider.of<DatabaseService>(context, listen: false);
     final stockService = _stockService;
-    _accounts = databaseService.getAccounts();
+    _accounts = databaseService.getAccounts().where((account) {
+      return account.id != QuickBillConstants.cashCustomerAccountId ||
+          account.id == _selectedAccountId;
+    }).toList();
     final masterProfessions = databaseService.getMasterProfessions();
     _professions = masterProfessions.where((p) => p.isActive ?? true).toList();
 
@@ -1236,7 +1256,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         _setSuggestedStockRate(entry, defaultRate);
       }
 
-      if (type == 'income') {
+      if (type == 'income' && stockItem.trackStock && stockItem.stopWhenOut) {
         final requestedQuantity = _effectiveEntryQuantity(entry);
         final availableQuantity = stockService.availableStockForTransaction(
           stockItemId,
@@ -1341,6 +1361,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         await databaseService.updateTransaction(transaction);
       } else {
         await databaseService.addTransaction(transaction);
+        final referenceNumber = transaction.referenceNumber?.trim() ?? '';
+        if (referenceNumber.isNotEmpty) {
+          await BillNumbering.saveNextNumber(databaseService, referenceNumber);
+        }
 
         // Safely find account
         final accountIndex =
@@ -1355,6 +1379,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   transactionType: type,
                   description: transaction.description,
                   items: transaction.items.map((e) => e.toMap()).toList(),
+                  receivedAmount: transaction.receivedAmount,
+                  pendingAmount: transaction.pendingAmount,
+                  transactionId: transaction.id,
                 )
                 .catchError((e) => debugPrint(e.toString()));
           }

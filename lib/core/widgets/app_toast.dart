@@ -1,6 +1,9 @@
 // lib/core/widgets/app_toast.dart
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/services/language_service.dart';
 
 class AppToast {
   static void show(
@@ -10,6 +13,13 @@ class AppToast {
     required IconData icon,
     required List<Color> gradient,
   }) {
+    final languageService = Provider.of<LanguageService>(context, listen: false);
+    final isUrdu = languageService.isUrdu;
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
+    final localizedSubtitle = subtitle == 'Karobari Saathi'
+        ? (isUrdu ? 'کاروباری ساتھی' : 'Karobari Saathi')
+        : subtitle;
+
     final overlay = Overlay.of(context);
     late OverlayEntry overlayEntry;
 
@@ -43,7 +53,7 @@ class AppToast {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: gradient.first.withValues(alpha: 0.3),
+                    color: gradient.first.withValues(alpha: 0.4),
                     blurRadius: 16,
                     offset: const Offset(0, 6),
                   ),
@@ -58,7 +68,7 @@ class AppToast {
                       color: Colors.white,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(icon, color: gradient.first, size: 24),
+                    child: Icon(icon, color: gradient.last, size: 24),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -68,20 +78,22 @@ class AppToast {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
+                            fontFamily: fontFamily,
                           ),
                         ),
-                        if (subtitle.isNotEmpty) ...[
+                        if (localizedSubtitle.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text(
-                            subtitle,
+                            localizedSubtitle,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.9),
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
+                              fontFamily: fontFamily,
                             ),
                           ),
                         ],
@@ -121,8 +133,8 @@ class AppToast {
       context,
       title: title,
       subtitle: subtitle,
-      icon: Icons.check_rounded,
-      gradient: [const Color(0xFF00D68F), const Color(0xFF00C896)],
+      icon: PhosphorIcons.checkCircle(),
+      gradient: [const Color(0xFF00966B), const Color(0xFF007A55)],
     );
   }
 
@@ -132,8 +144,8 @@ class AppToast {
       context,
       title: title,
       subtitle: subtitle,
-      icon: Icons.info_outline_rounded,
-      gradient: [const Color(0xFF1A9FB0), const Color(0xFF1790A5)],
+      icon: PhosphorIcons.info(),
+      gradient: [const Color(0xFF2563EB), const Color(0xFF1D4ED8)],
     );
   }
 
@@ -143,8 +155,8 @@ class AppToast {
       context,
       title: title,
       subtitle: subtitle,
-      icon: Icons.priority_high_rounded,
-      gradient: [const Color(0xFFF43F5E), const Color(0xFFEC4899)],
+      icon: PhosphorIcons.warning(),
+      gradient: [const Color(0xFFF59E0B), const Color(0xFFD97706)],
     );
   }
 
@@ -154,8 +166,8 @@ class AppToast {
       context,
       title: title,
       subtitle: subtitle,
-      icon: Icons.error_outline_rounded,
-      gradient: [const Color(0xFFEF4444), const Color(0xFFDC2626)],
+      icon: PhosphorIcons.warningCircle(),
+      gradient: [const Color(0xFFDC2626), const Color(0xFFB91C1C)],
     );
   }
 }

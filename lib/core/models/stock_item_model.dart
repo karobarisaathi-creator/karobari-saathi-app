@@ -15,6 +15,17 @@ class StockItem {
   final String unit; // Pieces, Kg, Meter, Liter, Box, Dozen etc.
   final String description;
   final String? imagePath;
+  final String sku;
+  final double mrp;
+  final String brand;
+  final String model;
+  final String supplierName;
+  final String batchNo;
+  final int warranty;
+  final bool featured;
+  final bool trackStock;
+  final bool allowReturn;
+  final bool stopWhenOut;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -33,6 +44,17 @@ class StockItem {
     this.unit = 'Pieces',
     this.description = '',
     this.imagePath,
+    this.sku = '',
+    this.mrp = 0.0,
+    this.brand = '',
+    this.model = '',
+    this.supplierName = '',
+    this.batchNo = '',
+    this.warranty = 0,
+    this.featured = false,
+    this.trackStock = true,
+    this.allowReturn = true,
+    this.stopWhenOut = true,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -60,12 +82,45 @@ class StockItem {
       'unit': unit,
       'description': description,
       'imagePath': imagePath,
+      'sku': sku,
+      'mrp': mrp,
+      'brand': brand,
+      'model': model,
+      'supplierName': supplierName,
+      'batchNo': batchNo,
+      'warranty': warranty,
+      'featured': featured,
+      'trackStock': trackStock,
+      'allowReturn': allowReturn,
+      'stopWhenOut': stopWhenOut,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
   }
 
   factory StockItem.fromMap(Map<String, dynamic> map) {
+    double readDouble(String key, [double fallback = 0.0]) {
+      final value = map[key];
+      if (value is num) return value.toDouble();
+      return double.tryParse(value?.toString() ?? '') ?? fallback;
+    }
+
+    int readInt(String key, [int fallback = 0]) {
+      final value = map[key];
+      if (value is num) return value.toInt();
+      return int.tryParse(value?.toString() ?? '') ?? fallback;
+    }
+
+    bool readBool(String key, bool fallback) {
+      final value = map[key];
+      if (value is bool) return value;
+      if (value is String) {
+        if (value.toLowerCase() == 'true') return true;
+        if (value.toLowerCase() == 'false') return false;
+      }
+      return fallback;
+    }
+
     return StockItem(
       id: map['id'] ?? '',
       name: map['name'] ?? '',
@@ -81,6 +136,17 @@ class StockItem {
       unit: map['unit'] ?? 'Pieces',
       description: map['description'] ?? '',
       imagePath: map['imagePath'],
+      sku: map['sku']?.toString() ?? '',
+      mrp: readDouble('mrp'),
+      brand: map['brand']?.toString() ?? '',
+      model: map['model']?.toString() ?? '',
+      supplierName: map['supplierName']?.toString() ?? '',
+      batchNo: map['batchNo']?.toString() ?? '',
+      warranty: readInt('warranty'),
+      featured: readBool('featured', false),
+      trackStock: readBool('trackStock', true),
+      allowReturn: readBool('allowReturn', true),
+      stopWhenOut: readBool('stopWhenOut', true),
       createdAt: map['createdAt'] != null
           ? DateTime.tryParse(map['createdAt']) ?? DateTime.now()
           : DateTime.now(),
@@ -105,6 +171,18 @@ class StockItem {
     String? unit,
     String? description,
     String? imagePath,
+    bool clearImagePath = false,
+    String? sku,
+    double? mrp,
+    String? brand,
+    String? model,
+    String? supplierName,
+    String? batchNo,
+    int? warranty,
+    bool? featured,
+    bool? trackStock,
+    bool? allowReturn,
+    bool? stopWhenOut,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -122,7 +200,19 @@ class StockItem {
       minStockAlert: minStockAlert ?? this.minStockAlert,
       unit: unit ?? this.unit,
       description: description ?? this.description,
-      imagePath: imagePath ?? this.imagePath,
+      imagePath:
+          clearImagePath ? null : (imagePath ?? this.imagePath),
+      sku: sku ?? this.sku,
+      mrp: mrp ?? this.mrp,
+      brand: brand ?? this.brand,
+      model: model ?? this.model,
+      supplierName: supplierName ?? this.supplierName,
+      batchNo: batchNo ?? this.batchNo,
+      warranty: warranty ?? this.warranty,
+      featured: featured ?? this.featured,
+      trackStock: trackStock ?? this.trackStock,
+      allowReturn: allowReturn ?? this.allowReturn,
+      stopWhenOut: stopWhenOut ?? this.stopWhenOut,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

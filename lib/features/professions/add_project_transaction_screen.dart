@@ -8,11 +8,11 @@ import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/transaction_item_model.dart' as model;
 import 'package:account_app/core/models/profession_model.dart';
+import 'package:account_app/core/config/professions_config.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
-import 'categories_management_screen.dart';
 
 class AddProjectTransactionScreen extends StatefulWidget {
   final Profession profession;
@@ -375,7 +375,10 @@ class _AddProjectTransactionScreenState
 
     // اگر لسٹ خالی ہو تو وہی ڈیفالٹ لسٹ دکھائیں جو مینجمنٹ اسکرین پر ہے
     if (cats.isEmpty) {
-      cats = getAppDefaultCategories(isUrdu);
+      cats = ProfessionsConfig.defaultCategories(
+        ProfessionsConfig.categoryTypeFor(masterProf ?? widget.profession),
+        isUrdu: isUrdu,
+      );
     }
 
     return Column(

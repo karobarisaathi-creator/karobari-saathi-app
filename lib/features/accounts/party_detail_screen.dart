@@ -53,7 +53,8 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
   String? _highlightId;
   final ScrollController _scrollController = ScrollController();
   bool _isFabVisible = true;
-  final Set<String> _expandedCycleIds = {}; // ٹریک رکھنے کے لیے کہ کون سا سائیکل کھلا ہے
+  final Set<String> _expandedCycleIds =
+      {}; // ٹریک رکھنے کے لیے کہ کون سا سائیکل کھلا ہے
 
   // App Theme Colors (Using Central Theme)
   final Color _darkColor = AppTheme.darkColor;
@@ -62,7 +63,6 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
   final Color _incomeColor = AppTheme.incomeColor;
   final Color _expenseColor = AppTheme.expenseColor;
   final Color _goldColor = AppTheme.goldColor;
-
 
   @override
   void initState() {
@@ -92,10 +92,11 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
 
   Future<void> _checkRemoteProfile() async {
     if (widget.party.phone.length < 10) return;
-    
+
     final dbService = Provider.of<DatabaseService>(context, listen: false);
-    final profile = await dbService.findPublicProfileByPhone(widget.party.phone);
-    
+    final profile =
+        await dbService.findPublicProfileByPhone(widget.party.phone);
+
     if (mounted && profile != null) {
       setState(() {
         _remoteProfile = profile;
@@ -105,10 +106,10 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
 
   Future<void> _syncRemoteProfile() async {
     if (_remoteProfile == null) return;
-    
+
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-    
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => Dialog(
@@ -119,7 +120,10 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 10)),
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10)),
             ],
           ),
           child: Column(
@@ -145,25 +149,34 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: Colors.white, 
-                          borderRadius: BorderRadius.circular(14), // تھوڑا زیادہ تاکہ اندر والا 12 فٹ آئے
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(
+                              14), // تھوڑا زیادہ تاکہ اندر والا 12 فٹ آئے
                         ),
                         child: Container(
-                          width: 80, height: 80,
+                          width: 80,
+                          height: 80,
                           decoration: BoxDecoration(
                             color: const Color(0xFFF3F4F6),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: (_remoteProfile!['photoUrl'] != null && _remoteProfile!['photoUrl']!.isNotEmpty)
-                              ? CachedNetworkImage(
-                                  imageUrl: _remoteProfile!['photoUrl']!, 
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                  errorWidget: (context, url, error) => Icon(PhosphorIcons.user(), size: 40, color: AppTheme.textSecondary),
-                                )
-                              : Icon(PhosphorIcons.user(), size: 40, color: AppTheme.textSecondary),
+                            child: (_remoteProfile!['photoUrl'] != null &&
+                                    _remoteProfile!['photoUrl']!.isNotEmpty)
+                                ? CachedNetworkImage(
+                                    imageUrl: _remoteProfile!['photoUrl']!,
+                                    fit: BoxFit.cover,
+                                    placeholder: (context, url) => const Center(
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2)),
+                                    errorWidget: (context, url, error) => Icon(
+                                        PhosphorIcons.user(),
+                                        size: 40,
+                                        color: AppTheme.textSecondary),
+                                  )
+                                : Icon(PhosphorIcons.user(),
+                                    size: 40, color: AppTheme.textSecondary),
                           ),
                         ),
                       ),
@@ -178,20 +191,30 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                 child: Column(
                   children: [
                     Text(
-                      isUrdu ? 'پروفائل اپ ڈیٹ دستیاب ہے' : 'Profile Update Available',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: fontFamily, color: AppTheme.darkColor),
+                      isUrdu
+                          ? 'پروفائل اپ ڈیٹ دستیاب ہے'
+                          : 'Profile Update Available',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: fontFamily,
+                          color: AppTheme.darkColor),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      isUrdu 
-                        ? 'ہمیں اس نمبر کے لیے ایک نیا پروفائل ملا ہے۔ کیا آپ معلومات اپ ڈیٹ کرنا چاہتے ہیں؟' 
-                        : 'We found a public profile for this number. Would you like to update the info?',
+                      isUrdu
+                          ? 'ہمیں اس نمبر کے لیے ایک نیا پروفائل ملا ہے۔ کیا آپ معلومات اپ ڈیٹ کرنا چاہتے ہیں؟'
+                          : 'We found a public profile for this number. Would you like to update the info?',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontFamily: fontFamily, color: AppTheme.textSecondary, fontSize: 13),
+                      style: TextStyle(
+                          fontFamily: fontFamily,
+                          color: AppTheme.textSecondary,
+                          fontSize: 13),
                     ),
                     const SizedBox(height: 24),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(12),
@@ -199,12 +222,28 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                       ),
                       child: Column(
                         children: [
-                          _buildInfoRow(isUrdu ? 'نام' : 'Name', _remoteProfile!['name'] ?? '', PhosphorIcons.user(), isUrdu, fontFamily),
+                          _buildInfoRow(
+                              isUrdu ? 'نام' : 'Name',
+                              _remoteProfile!['name'] ?? '',
+                              PhosphorIcons.user(),
+                              isUrdu,
+                              fontFamily),
                           const Divider(height: 20),
-                          _buildInfoRow(isUrdu ? 'فون' : 'Phone', widget.party.phone, PhosphorIcons.phone(), isUrdu, fontFamily),
-                          if (_remoteProfile!['profession'] != null && _remoteProfile!['profession']!.isNotEmpty) ...[
+                          _buildInfoRow(
+                              isUrdu ? 'فون' : 'Phone',
+                              widget.party.phone,
+                              PhosphorIcons.phone(),
+                              isUrdu,
+                              fontFamily),
+                          if (_remoteProfile!['profession'] != null &&
+                              _remoteProfile!['profession']!.isNotEmpty) ...[
                             const Divider(height: 20),
-                            _buildInfoRow(isUrdu ? 'پیشہ / نوعیت' : 'Profession', _remoteProfile!['profession']!, PhosphorIcons.briefcase(), isUrdu, fontFamily),
+                            _buildInfoRow(
+                                isUrdu ? 'پیشہ / نوعیت' : 'Profession',
+                                _remoteProfile!['profession']!,
+                                PhosphorIcons.briefcase(),
+                                isUrdu,
+                                fontFamily),
                           ],
                         ],
                       ),
@@ -223,9 +262,13 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           side: const BorderSide(color: Color(0xFFE2E8F0)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: Text(isUrdu ? 'منسوخ' : 'Cancel', style: TextStyle(fontFamily: fontFamily, color: AppTheme.textSecondary)),
+                        child: Text(isUrdu ? 'منسوخ' : 'Cancel',
+                            style: TextStyle(
+                                fontFamily: fontFamily,
+                                color: AppTheme.textSecondary)),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -236,9 +279,14 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                           backgroundColor: AppTheme.themeColor,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: Text(isUrdu ? 'اپ ڈیٹ کریں' : 'Update', style: TextStyle(fontFamily: fontFamily, color: Colors.white, fontWeight: FontWeight.bold)),
+                        child: Text(isUrdu ? 'اپ ڈیٹ کریں' : 'Update',
+                            style: TextStyle(
+                                fontFamily: fontFamily,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
@@ -253,24 +301,33 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     if (confirm == true) {
       final dbService = Provider.of<DatabaseService>(context, listen: false);
       final updatedAccount = widget.party.copyWith(
-        name: _remoteProfile!['name']?.isNotEmpty == true ? _remoteProfile!['name'] : widget.party.name,
-        profileImage: _remoteProfile!['photoUrl']?.isNotEmpty == true ? _remoteProfile!['photoUrl'] : widget.party.profileImage,
-        category: _remoteProfile!['profession']?.isNotEmpty == true ? _remoteProfile!['profession'] : widget.party.category,
+        name: _remoteProfile!['name']?.isNotEmpty == true
+            ? _remoteProfile!['name']
+            : widget.party.name,
+        profileImage: _remoteProfile!['photoUrl']?.isNotEmpty == true
+            ? _remoteProfile!['photoUrl']
+            : widget.party.profileImage,
+        category: _remoteProfile!['profession']?.isNotEmpty == true
+            ? _remoteProfile!['profession']
+            : widget.party.category,
       );
       await dbService.updateAccount(updatedAccount);
       if (mounted) {
         setState(() {
-          _remoteProfile = null; 
+          _remoteProfile = null;
         });
         AppToast.success(
           context,
-          isUrdu ? 'معلومات اپ ڈیٹ کر دی گئی ہیں' : 'Profile updated successfully',
+          isUrdu
+              ? 'معلومات اپ ڈیٹ کر دی گئی ہیں'
+              : 'Profile updated successfully',
         );
       }
     }
   }
 
-  Widget _buildInfoRow(String label, String value, IconData icon, bool isUrdu, String fontFamily) {
+  Widget _buildInfoRow(String label, String value, IconData icon, bool isUrdu,
+      String fontFamily) {
     return Row(
       children: [
         Container(
@@ -288,11 +345,18 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
             children: [
               Text(
                 label,
-                style: TextStyle(fontSize: 10, color: AppTheme.textSecondary, fontFamily: fontFamily),
+                style: TextStyle(
+                    fontSize: 10,
+                    color: AppTheme.textSecondary,
+                    fontFamily: fontFamily),
               ),
               Text(
                 value,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.darkColor, fontFamily: fontFamily),
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.darkColor,
+                    fontFamily: fontFamily),
               ),
             ],
           ),
@@ -302,16 +366,17 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
   }
 
   Future<void> _loadTransactions() async {
-    final databaseService = Provider.of<DatabaseService>(context, listen: false);
-    
-    // پارٹی کا تازہ ترین ڈیٹا لوڈ کریں تاکہ بیلنس اپڈیٹ ہو سکے
-    final updatedParty = databaseService.getAccount(widget.party.id);
-    
-    final allTransactions = await databaseService.getAllTransactions();
+    final databaseService =
+        Provider.of<DatabaseService>(context, listen: false);
+
+    await databaseService.recalculateAccountBalance(widget.party.id);
+
+    final allTransactions = databaseService.getAllTransactions();
     if (mounted) {
       setState(() {
         _transactions = allTransactions
-            .where((t) => t.accountId == widget.party.id && t.partnershipId == null)
+            .where((t) =>
+                t.accountId == widget.party.id && t.partnershipId == null)
             .toList();
         _transactions.sort((a, b) => b.date.compareTo(a.date));
 
@@ -347,11 +412,11 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
 
     for (var tx in sortedChronological) {
       if (tx.type == 'income') {
-        totalRunningIn += tx.amount;
-        currentCycleIn += tx.amount;
+        totalRunningIn += tx.accountBalanceAmount;
+        currentCycleIn += tx.accountBalanceAmount;
       } else {
-        totalRunningOut += tx.amount;
-        currentCycleOut += tx.amount;
+        totalRunningOut += tx.accountBalanceAmount;
+        currentCycleOut += tx.accountBalanceAmount;
       }
 
       // اگر حساب برابر ہو گیا ہے تو کرنٹ سائیکل کو ری سیٹ کرنے کی تیاری کریں
@@ -364,13 +429,18 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
 
     // اگر ابھی کوئی بھی انٹری نہیں ہوئی یا حساب برابر ہونے کے بعد کچھ نہیں ہوا
     // تو ہم آخری مکمل ہونے والے سائیکل کا ڈیٹا دکھائیں گے (اگر لسٹ خالی نہیں ہے)
-    if (currentCycleIn == 0 && currentCycleOut == 0 && _transactions.isNotEmpty) {
+    if (currentCycleIn == 0 &&
+        currentCycleOut == 0 &&
+        _transactions.isNotEmpty) {
       double tempIn = 0;
       double tempOut = 0;
       for (var tx in sortedChronological) {
-        if (tx.type == 'income') tempIn += tx.amount;
-        else tempOut += tx.amount;
-        
+        if (tx.type == 'income') {
+          tempIn += tx.accountBalanceAmount;
+        } else {
+          tempOut += tx.accountBalanceAmount;
+        }
+
         if ((tempIn - tempOut).abs() < 0.01) {
           currentCycleIn = tempIn;
           currentCycleOut = tempOut;
@@ -387,18 +457,22 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
           (_selectedFilter == 'payables' && t.type == 'expense') ||
           (_selectedFilter == 'receivables' && t.type == 'income');
 
-      final matchesSearch = t.description.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          t.category.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesSearch =
+          t.description.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              t.category.toLowerCase().contains(_searchQuery.toLowerCase());
 
       return matchesFilter && matchesSearch;
     }).toList();
 
     // Sort transactions
-    filteredTransactions.sort((a, b) => _isAscending ? a.date.compareTo(b.date) : b.date.compareTo(a.date));
+    filteredTransactions.sort((a, b) =>
+        _isAscending ? a.date.compareTo(b.date) : b.date.compareTo(a.date));
 
     // Determine accent color based on balance
     final databaseService = Provider.of<DatabaseService>(context);
-    final currentParty = (databaseService.getAccount(widget.party.id) ?? widget.party).copyWith(balance: currentBalance);
+    final currentParty =
+        (databaseService.getAccount(widget.party.id) ?? widget.party)
+            .copyWith(balance: currentBalance);
     final bool isPayable = currentParty.balance >= 0;
     final Color accentColor = isPayable ? _expenseColor : _incomeColor;
 
@@ -417,11 +491,13 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
         actions: [
           // تجزیہ بٹن
           _buildHeaderActionButton(
-            isUrdu ? 'تجزیہ' : 'Analysis', 
-            PhosphorIcons.chartBar(), 
+            isUrdu ? 'تجزیہ' : 'Analysis',
+            PhosphorIcons.chartBar(),
             () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => PartyHistoryScreen(party: currentParty)),
+              MaterialPageRoute(
+                  builder: (context) =>
+                      PartyHistoryScreen(party: currentParty)),
             ),
             fontFamily,
           ),
@@ -432,13 +508,16 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               if (value == 'bulk_entry') {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => BulkPartyTransactionScreen(party: currentParty)),
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          BulkPartyTransactionScreen(party: currentParty)),
                 ).then((_) => _loadTransactions());
               } else if (value == 'history') {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => PartyHistoryScreen(party: currentParty),
+                    builder: (context) =>
+                        PartyHistoryScreen(party: currentParty),
                   ),
                 );
               } else if (value == 'pdf') {
@@ -447,7 +526,8 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => AddPartyScreen(partyToEdit: currentParty),
+                    builder: (context) =>
+                        AddPartyScreen(partyToEdit: currentParty),
                   ),
                 );
                 _loadTransactions(); // Reload after edit
@@ -456,20 +536,46 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                   context: context,
                   builder: (context) => AlertDialog(
                     backgroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    title: Text(isUrdu ? 'پارٹی ختم کریں؟' : 'Delete Party?', style: TextStyle(fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
-                    content: Text(isUrdu
-                      ? 'کیا آپ واقعی اس پارٹی کو ختم کرنا چاہتے ہیں؟ تمام ریکارڈ مٹ جائے گا۔'
-                      : 'Are you sure you want to delete this party? All records will be lost.',
-                      style: TextStyle(fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    title: Text(isUrdu ? 'پارٹی ختم کریں؟' : 'Delete Party?',
+                        style: TextStyle(
+                            fontFamily: fontFamily,
+                            fontWeight:
+                                isUrdu ? FontWeight.bold : FontWeight.normal)),
+                    content: Text(
+                        isUrdu
+                            ? 'کیا آپ واقعی اس پارٹی کو ختم کرنا چاہتے ہیں؟ تمام ریکارڈ مٹ جائے گا۔'
+                            : 'Are you sure you want to delete this party? All records will be lost.',
+                        style: TextStyle(
+                            fontFamily: fontFamily,
+                            fontWeight:
+                                isUrdu ? FontWeight.bold : FontWeight.normal)),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(context, false), child: Text(isUrdu ? 'منسوخ' : 'Cancel', style: TextStyle(color: AppTheme.textSecondary, fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal))),
-                      TextButton(onPressed: () => Navigator.pop(context, true), child: Text(isUrdu ? 'ختم کریں' : 'Delete', style: TextStyle(color: AppTheme.expenseColor, fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal))),
+                      TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: Text(isUrdu ? 'منسوخ' : 'Cancel',
+                              style: TextStyle(
+                                  color: AppTheme.textSecondary,
+                                  fontFamily: fontFamily,
+                                  fontWeight: isUrdu
+                                      ? FontWeight.bold
+                                      : FontWeight.normal))),
+                      TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: Text(isUrdu ? 'ختم کریں' : 'Delete',
+                              style: TextStyle(
+                                  color: AppTheme.expenseColor,
+                                  fontFamily: fontFamily,
+                                  fontWeight: isUrdu
+                                      ? FontWeight.bold
+                                      : FontWeight.normal))),
                     ],
                   ),
                 );
                 if (confirm == true) {
-                  await Provider.of<DatabaseService>(context, listen: false).deleteAccount(currentParty.id);
+                  await Provider.of<DatabaseService>(context, listen: false)
+                      .deleteAccount(currentParty.id);
                   if (mounted) Navigator.pop(context);
                 }
               }
@@ -478,8 +584,14 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               PopupMenuItem<String>(
                 value: 'bulk_entry',
                 child: ListTile(
-                  leading: Icon(PhosphorIcons.listBullets(), color: AppTheme.darkColor),
-                  title: Text(isUrdu ? 'پیج انٹری (تیز اندراج)' : 'Page Entry (Fast)', style: TextStyle(fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+                  leading: Icon(PhosphorIcons.listBullets(),
+                      color: AppTheme.darkColor),
+                  title: Text(
+                      isUrdu ? 'پیج انٹری (تیز اندراج)' : 'Page Entry (Fast)',
+                      style: TextStyle(
+                          fontFamily: fontFamily,
+                          fontWeight:
+                              isUrdu ? FontWeight.bold : FontWeight.normal)),
                   contentPadding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -487,8 +599,16 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               PopupMenuItem<String>(
                 value: 'history',
                 child: ListTile(
-                  leading: Icon(PhosphorIcons.clockCounterClockwise(), color: AppTheme.darkColor),
-                  title: Text(isUrdu ? 'مکمل ریکارڈ و تجزیہ' : 'Full History & Analysis', style: TextStyle(fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+                  leading: Icon(PhosphorIcons.clockCounterClockwise(),
+                      color: AppTheme.darkColor),
+                  title: Text(
+                      isUrdu
+                          ? 'مکمل ریکارڈ و تجزیہ'
+                          : 'Full History & Analysis',
+                      style: TextStyle(
+                          fontFamily: fontFamily,
+                          fontWeight:
+                              isUrdu ? FontWeight.bold : FontWeight.normal)),
                   contentPadding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -496,8 +616,13 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               PopupMenuItem<String>(
                 value: 'pdf',
                 child: ListTile(
-                  leading: Icon(PhosphorIcons.filePdf(), color: AppTheme.darkColor),
-                  title: Text(isUrdu ? 'پی ڈی ایف رپورٹ' : 'PDF Report', style: TextStyle(fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+                  leading:
+                      Icon(PhosphorIcons.filePdf(), color: AppTheme.darkColor),
+                  title: Text(isUrdu ? 'پی ڈی ایف رپورٹ' : 'PDF Report',
+                      style: TextStyle(
+                          fontFamily: fontFamily,
+                          fontWeight:
+                              isUrdu ? FontWeight.bold : FontWeight.normal)),
                   contentPadding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -505,8 +630,13 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               PopupMenuItem<String>(
                 value: 'edit',
                 child: ListTile(
-                  leading: Icon(PhosphorIcons.pencilLine(), color: AppTheme.darkColor),
-                  title: Text(isUrdu ? 'ایڈٹ پارٹی' : 'Edit Party', style: TextStyle(fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+                  leading: Icon(PhosphorIcons.pencilLine(),
+                      color: AppTheme.darkColor),
+                  title: Text(isUrdu ? 'ایڈٹ پارٹی' : 'Edit Party',
+                      style: TextStyle(
+                          fontFamily: fontFamily,
+                          fontWeight:
+                              isUrdu ? FontWeight.bold : FontWeight.normal)),
                   contentPadding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -515,8 +645,14 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               PopupMenuItem<String>(
                 value: 'delete',
                 child: ListTile(
-                  leading: Icon(PhosphorIcons.trash(), color: AppTheme.expenseColor),
-                  title: Text(isUrdu ? 'ڈیلیٹ کریں' : 'Delete', style: TextStyle(color: AppTheme.expenseColor, fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+                  leading:
+                      Icon(PhosphorIcons.trash(), color: AppTheme.expenseColor),
+                  title: Text(isUrdu ? 'ڈیلیٹ کریں' : 'Delete',
+                      style: TextStyle(
+                          color: AppTheme.expenseColor,
+                          fontFamily: fontFamily,
+                          fontWeight:
+                              isUrdu ? FontWeight.bold : FontWeight.normal)),
                   contentPadding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -529,7 +665,8 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
       body: Column(
         children: [
           // نیا بڑا ڈارک ہیڈر
-          _buildLargeDarkHeader(currentParty, currentCycleOut, currentCycleIn, isUrdu, fontFamily, accentColor),
+          _buildLargeDarkHeader(currentParty, currentCycleOut, currentCycleIn,
+              isUrdu, fontFamily, accentColor),
 
           // باقی سکرین
           Expanded(
@@ -537,21 +674,26 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               color: AppTheme.scaffoldBackground,
               child: Column(
                 children: [
-                  const SizedBox(height: 8), 
+                  const SizedBox(height: 8),
                   SearchSortBar(
                     controller: _searchController,
-                    onSearchChanged: (value) => setState(() => _searchQuery = value),
-                    onSortToggled: () => setState(() => _isAscending = !_isAscending),
+                    onSearchChanged: (value) =>
+                        setState(() => _searchQuery = value),
+                    onSortToggled: () =>
+                        setState(() => _isAscending = !_isAscending),
                     isAscending: _isAscending,
                   ),
                   _buildFilterChips(isUrdu, fontFamily),
                   _buildListLabels(isUrdu, fontFamily),
                   Expanded(
                     child: _isLoading
-                        ? const Center(child: CircularProgressIndicator(color: AppTheme.themeColor))
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                                color: AppTheme.themeColor))
                         : filteredTransactions.isEmpty
                             ? _buildEmptyState(isUrdu, fontFamily)
-                            : _buildTransactionList(filteredTransactions, isUrdu, fontFamily),
+                            : _buildTransactionList(
+                                filteredTransactions, isUrdu, fontFamily),
                   ),
                 ],
               ),
@@ -567,7 +709,9 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
           onPressed: () async {
             await Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => AddTransactionScreen(account: currentParty)),
+              MaterialPageRoute(
+                  builder: (context) =>
+                      AddTransactionScreen(account: currentParty)),
             );
             _loadTransactions();
           },
@@ -582,35 +726,50 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
 
   Widget _buildDateSelector(Account party, bool isUrdu, String fontFamily) {
     // اکاؤنٹ بننے کی تاریخ
-    final String createdDateStr = DateFormat('dd MMM yyyy').format(party.createdAt);
-    
+    final String createdDateStr =
+        DateFormat('dd MMM yyyy').format(party.createdAt);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       color: Colors.white,
       child: Row(
         children: [
-          Icon(PhosphorIcons.calendar(), size: 18, color: AppTheme.textSecondary),
+          Icon(PhosphorIcons.calendar(),
+              size: 18, color: AppTheme.textSecondary),
           const SizedBox(width: 10),
           Text(
             isUrdu ? "کھاتہ شروع:" : "Account Started:",
-            style: TextStyle(fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal, fontFamily: fontFamily, fontSize: 13, color: AppTheme.darkColor),
+            style: TextStyle(
+                fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
+                fontFamily: fontFamily,
+                fontSize: 13,
+                color: AppTheme.darkColor),
           ),
           const SizedBox(width: 8),
           Text(
             createdDateStr,
-            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.bold, fontFamily: ''),
+            style: const TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                fontFamily: ''),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildLargeDarkHeader(Account party, double paid, double received, bool isUrdu, String fontFamily, Color accentColor) {
+  Widget _buildLargeDarkHeader(Account party, double paid, double received,
+      bool isUrdu, String fontFamily, Color accentColor) {
     final netBalance = party.balance;
     final isPayable = netBalance >= 0;
-    final balanceLabel = isUrdu ? (isPayable ? "کل دینا" : "کل لینا") : (isPayable ? "Payable" : "Receivable");
+    final balanceLabel = isUrdu
+        ? (isPayable ? "کل دینا" : "کل لینا")
+        : (isPayable ? "Payable" : "Receivable");
 
-    final String displayCategory = (_remoteProfile != null && _remoteProfile!['profession'] != null && _remoteProfile!['profession']!.isNotEmpty)
+    final String displayCategory = (_remoteProfile != null &&
+            _remoteProfile!['profession'] != null &&
+            _remoteProfile!['profession']!.isNotEmpty)
         ? _remoteProfile!['profession']!
         : (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account');
 
@@ -622,10 +781,12 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     final remoteProf = _remoteProfile?['profession']?.trim() ?? '';
     final localProf = (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account').trim();
 
-    final bool hasUpdate = _remoteProfile != null && 
-        ((remoteName.isNotEmpty && remoteName != localName) || 
-         (remotePhoto.isNotEmpty && remotePhoto != localPhoto) ||
-         (remoteProf.isNotEmpty && remoteProf != party.category && remoteProf != localProf));
+    final bool hasUpdate = _remoteProfile != null &&
+        ((remoteName.isNotEmpty && remoteName != localName) ||
+            (remotePhoto.isNotEmpty && remotePhoto != localPhoto) ||
+            (remoteProf.isNotEmpty &&
+                remoteProf != party.category &&
+                remoteProf != localProf));
 
     return Container(
       padding: EdgeInsets.only(
@@ -649,7 +810,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               phone: '',
               profileImage: party.profileImage,
               category: displayCategory,
-              address: party.address, 
+              address: party.address,
               isLarge: true,
               isVerticalCategory: true,
               textColor: Colors.white,
@@ -658,18 +819,28 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               customSize: 55,
               borderRadius: 8,
               isVerified: party.isVerified,
-              hasUpdate: hasUpdate, 
+              hasUpdate: hasUpdate,
             ),
           ),
           const SizedBox(height: 16),
           // Stats Row
           Row(
             children: [
-              _buildHeaderStatItem(isUrdu ? "جمع" : "In", received, Colors.white, fontFamily, PhosphorIcons.arrowDownLeft()),
+              _buildHeaderStatItem(isUrdu ? "جمع" : "In", received,
+                  Colors.white, fontFamily, PhosphorIcons.arrowDownLeft()),
               _buildStatDivider(),
-              _buildHeaderStatItem(isUrdu ? "بنام" : "Out", paid, Colors.white, fontFamily, PhosphorIcons.arrowUpRight()),
+              _buildHeaderStatItem(isUrdu ? "بنام" : "Out", paid, Colors.white,
+                  fontFamily, PhosphorIcons.arrowUpRight()),
               _buildStatDivider(),
-              _buildHeaderStatItem(balanceLabel, netBalance.abs(), Colors.white, fontFamily, isPayable ? PhosphorIcons.arrowUpRight() : PhosphorIcons.arrowDownLeft(), isBold: true),
+              _buildHeaderStatItem(
+                  balanceLabel,
+                  netBalance.abs(),
+                  Colors.white,
+                  fontFamily,
+                  isPayable
+                      ? PhosphorIcons.arrowUpRight()
+                      : PhosphorIcons.arrowDownLeft(),
+                  isBold: true),
             ],
           ),
         ],
@@ -685,13 +856,16 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     );
   }
 
-  Widget _buildHeaderStatItem(String label, double amount, Color color, String fontFamily, IconData icon, {bool isBold = false}) {
+  Widget _buildHeaderStatItem(String label, double amount, Color color,
+      String fontFamily, IconData icon,
+      {bool isBold = false}) {
     return Expanded(
       child: Column(
         children: [
           Text(
             label,
-            style: TextStyle(color: Colors.white70, fontSize: 11, fontFamily: fontFamily),
+            style: TextStyle(
+                color: Colors.white70, fontSize: 11, fontFamily: fontFamily),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -699,7 +873,13 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 12, color: isBold ? Colors.white : (label.contains('In') || label.contains('جمع') ? _incomeColor : _expenseColor)),
+              Icon(icon,
+                  size: 12,
+                  color: isBold
+                      ? Colors.white
+                      : (label.contains('In') || label.contains('جمع')
+                          ? _incomeColor
+                          : _expenseColor)),
               const SizedBox(width: 4),
               Flexible(
                 child: FittedBox(
@@ -722,7 +902,8 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     );
   }
 
-  Widget _buildHeaderActionButton(String label, IconData icon, VoidCallback onTap, String fontFamily) {
+  Widget _buildHeaderActionButton(
+      String label, IconData icon, VoidCallback onTap, String fontFamily) {
     return Center(
       child: InkWell(
         onTap: onTap,
@@ -754,7 +935,9 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     );
   }
 
-  Widget _buildSummaryRow(String label, double amount, Color color, String fontFamily, IconData icon, {bool isTotal = false}) {
+  Widget _buildSummaryRow(String label, double amount, Color color,
+      String fontFamily, IconData icon,
+      {bool isTotal = false}) {
     final isUrdu = fontFamily == 'NooriNastaleeq';
     return Row(
       children: [
@@ -765,7 +948,9 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
             style: TextStyle(
               color: isTotal ? Colors.black : AppTheme.darkColor,
               fontSize: isTotal ? 14 : 12,
-              fontWeight: isUrdu ? FontWeight.bold : (isTotal ? FontWeight.bold : FontWeight.normal),
+              fontWeight: isUrdu
+                  ? FontWeight.bold
+                  : (isTotal ? FontWeight.bold : FontWeight.normal),
               fontFamily: fontFamily,
             ),
             maxLines: 1,
@@ -804,9 +989,11 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
           children: [
             _filterChip(isUrdu ? "سب" : "All", 'all', fontFamily),
             const SizedBox(width: 30),
-            _filterChip(isUrdu ? "واجب الادا" : "Payables Due", 'payables', fontFamily),
+            _filterChip(
+                isUrdu ? "واجب الادا" : "Payables Due", 'payables', fontFamily),
             const SizedBox(width: 30),
-            _filterChip(isUrdu ? "واجب الوصول" : "Receivables Due", 'receivables', fontFamily),
+            _filterChip(isUrdu ? "واجب الوصول" : "Receivables Due",
+                'receivables', fontFamily),
           ],
         ),
       ),
@@ -857,7 +1044,11 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
             flex: 5,
             child: Text(
               isUrdu ? "تفصیل" : "Details",
-              style: TextStyle(color: _themeColor, fontSize: 14, fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
+              style: TextStyle(
+                  color: _themeColor,
+                  fontSize: 14,
+                  fontFamily: fontFamily,
+                  fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -868,12 +1059,20 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(PhosphorIcons.arrowUpRight(), size: 14, color: _themeColor),
+                  Icon(PhosphorIcons.arrowUpRight(),
+                      size: 14, color: _themeColor),
                   const SizedBox(width: 4),
                   Flexible(
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
-                      child: Text(isUrdu ? "دیا / بنام" : "Credits", style: TextStyle(color: _themeColor, fontSize: 13, fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+                      child: Text(isUrdu ? "دیا / بنام" : "Credits",
+                          style: TextStyle(
+                              color: _themeColor,
+                              fontSize: 13,
+                              fontFamily: fontFamily,
+                              fontWeight: isUrdu
+                                  ? FontWeight.bold
+                                  : FontWeight.normal)),
                     ),
                   ),
                 ],
@@ -887,12 +1086,20 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(PhosphorIcons.arrowDownLeft(), size: 14, color: _themeColor),
+                  Icon(PhosphorIcons.arrowDownLeft(),
+                      size: 14, color: _themeColor),
                   const SizedBox(width: 4),
                   Flexible(
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
-                      child: Text(isUrdu ? "لیا / جمع" : "Debits", style: TextStyle(color: _themeColor, fontSize: 13, fontFamily: fontFamily, fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal)),
+                      child: Text(isUrdu ? "لیا / جمع" : "Debits",
+                          style: TextStyle(
+                              color: _themeColor,
+                              fontSize: 13,
+                              fontFamily: fontFamily,
+                              fontWeight: isUrdu
+                                  ? FontWeight.bold
+                                  : FontWeight.normal)),
                     ),
                   ),
                 ],
@@ -916,7 +1123,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     double runningIn = 0;
     double runningOut = 0;
     DateTime? cycleStartDate;
-    
+
     // بیلنس ٹریک کرنے کے لیے
     Map<String, double> txBalances = {};
 
@@ -925,11 +1132,11 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
       currentCycleTxs.add(tx);
 
       if (tx.type == 'income') {
-        runningIn += tx.amount;
+        runningIn += tx.accountBalanceAmount;
       } else {
-        runningOut += tx.amount;
+        runningOut += tx.accountBalanceAmount;
       }
-      
+
       txBalances[tx.id] = runningIn - runningOut;
 
       if ((runningIn - runningOut).abs() < 0.01) {
@@ -962,13 +1169,13 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
 
     // اب صرف وہی سائیکلز اور ٹرانزیکشنز دکھائیں جو فلٹر شدہ لسٹ (txs) میں ہیں
     final Set<String> filteredTxIds = txs.map((t) => t.id).toSet();
-    
+
     List<Map<String, dynamic>> displayCycles = [];
     for (var cycle in cycles) {
       final cycleTxs = (cycle['transactions'] as List<model.Transaction>)
           .where((t) => filteredTxIds.contains(t.id))
           .toList();
-      
+
       if (cycleTxs.isNotEmpty) {
         displayCycles.add({
           ...cycle,
@@ -997,16 +1204,21 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
         itemCount: displayCycles.length,
         itemBuilder: (context, cycleIndex) {
           final cycle = displayCycles[cycleIndex];
-          final cycleTxs = cycle['displayTransactions'] as List<model.Transaction>;
+          final cycleTxs =
+              cycle['displayTransactions'] as List<model.Transaction>;
           final bool isSettled = cycle['isSettled'];
           final String cycleId = cycle['id'];
           final bool isExpanded = _expandedCycleIds.contains(cycleId);
 
           // اگر یہ جاری حساب ہے، یا فلٹر لگا ہوا ہے، تو ٹرانزیکشنز براہ راست دکھائیں
-          if (!isSettled || _selectedFilter != 'all' || _searchQuery.isNotEmpty) {
+          if (!isSettled ||
+              _selectedFilter != 'all' ||
+              _searchQuery.isNotEmpty) {
             return _buildTransactionSubList(
-                _isAscending ? cycleTxs : cycleTxs.reversed.toList(), 
-                isUrdu, fontFamily, txBalances);
+                _isAscending ? cycleTxs : cycleTxs.reversed.toList(),
+                isUrdu,
+                fontFamily,
+                txBalances);
           }
 
           // اگر حساب برابر ہے، تو کھلنے والا کارڈ دکھائیں
@@ -1024,8 +1236,8 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     );
   }
 
-  Widget _buildTransactionSubList(
-      List<model.Transaction> txs, bool isUrdu, String fontFamily, Map<String, double> txBalances) {
+  Widget _buildTransactionSubList(List<model.Transaction> txs, bool isUrdu,
+      String fontFamily, Map<String, double> txBalances) {
     return Column(
       children: txs.map((t) {
         return Column(
@@ -1038,8 +1250,8 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     );
   }
 
-  Widget _buildExpandableSettlementCard(
-      Map<String, dynamic> data, bool isUrdu, String fontFamily, bool isExpanded) {
+  Widget _buildExpandableSettlementCard(Map<String, dynamic> data, bool isUrdu,
+      String fontFamily, bool isExpanded) {
     final df = DateFormat('dd MMM yyyy');
     final start = df.format(data['startDate']);
     final end = df.format(data['endDate']);
@@ -1061,7 +1273,9 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
         margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isExpanded ? Colors.green.withOpacity(0.08) : Colors.green.withOpacity(0.05),
+          color: isExpanded
+              ? Colors.green.withOpacity(0.08)
+              : Colors.green.withOpacity(0.05),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.green.withOpacity(0.2), width: 1),
         ),
@@ -1075,8 +1289,10 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                     color: Colors.green,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.check,
-                      size: 10, color: Colors.white),
+                  child: Icon(
+                      isExpanded ? Icons.keyboard_arrow_up : Icons.check,
+                      size: 10,
+                      color: Colors.white),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -1097,12 +1313,14 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildSettlementDateInfo(
-                      isUrdu ? "شروع" : "From", start, PhosphorIcons.calendar()),
+                  _buildSettlementDateInfo(isUrdu ? "شروع" : "From", start,
+                      PhosphorIcons.calendar()),
                   Container(
-                      width: 1, height: 20, color: Colors.grey.withOpacity(0.2)),
-                  _buildSettlementDateInfo(
-                      isUrdu ? "ختم" : "To", end, PhosphorIcons.calendarCheck()),
+                      width: 1,
+                      height: 20,
+                      color: Colors.grey.withOpacity(0.2)),
+                  _buildSettlementDateInfo(isUrdu ? "ختم" : "To", end,
+                      PhosphorIcons.calendarCheck()),
                 ],
               ),
               const Padding(
@@ -1111,11 +1329,19 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               ),
               Row(
                 children: [
-                  _buildEnhancedSettlementStat(isUrdu ? "کل جمع" : "Total In",
-                      data['totalIn'], AppTheme.incomeColor, isUrdu, fontFamily),
+                  _buildEnhancedSettlementStat(
+                      isUrdu ? "کل جمع" : "Total In",
+                      data['totalIn'],
+                      AppTheme.incomeColor,
+                      isUrdu,
+                      fontFamily),
                   const SizedBox(width: 16),
-                  _buildEnhancedSettlementStat(isUrdu ? "کل بنام" : "Total Out",
-                      data['totalOut'], AppTheme.expenseColor, isUrdu, fontFamily),
+                  _buildEnhancedSettlementStat(
+                      isUrdu ? "کل بنام" : "Total Out",
+                      data['totalOut'],
+                      AppTheme.expenseColor,
+                      isUrdu,
+                      fontFamily),
                 ],
               ),
             ],
@@ -1162,8 +1388,8 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label,
-                  style:
-                      const TextStyle(fontSize: 9, color: AppTheme.textSecondary)),
+                  style: const TextStyle(
+                      fontSize: 9, color: AppTheme.textSecondary)),
               Text(date,
                   style: const TextStyle(
                       fontSize: 11,
@@ -1207,29 +1433,32 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     );
   }
 
-
-
-  Widget _buildTransactionItem(model.Transaction t, bool isUrdu, String fontFamily, double runningBalance) {
+  Widget _buildTransactionItem(model.Transaction t, bool isUrdu,
+      String fontFamily, double runningBalance) {
     final isIncome = t.type == 'income';
     final isHighlighted = _highlightId == t.id;
 
     return InkWell(
       onLongPress: widget.isReadOnly ? null : () => _showDeleteConfirmation(t),
-      onTap: widget.isReadOnly ? null : () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TransactionReceiptScreen(
-              transaction: t,
-            ),
-          ),
-        );
-        _loadTransactions();
-      },
+      onTap: widget.isReadOnly
+          ? null
+          : () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TransactionReceiptScreen(
+                    transaction: t,
+                  ),
+                ),
+              );
+              _loadTransactions();
+            },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 500),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        color: isHighlighted ? AppTheme.themeColor.withOpacity(0.15) : Colors.white,
+        color: isHighlighted
+            ? AppTheme.themeColor.withOpacity(0.15)
+            : Colors.white,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1239,7 +1468,9 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    t.description.isNotEmpty ? t.description : (isUrdu ? 'نقد لین دین' : 'Cash Transaction'),
+                    t.description.isNotEmpty
+                        ? t.description
+                        : (isUrdu ? 'نقد لین دین' : 'Cash Transaction'),
                     style: TextStyle(
                       color: AppTheme.darkColor,
                       fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
@@ -1249,6 +1480,28 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (t.items.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      t.items
+                          .map((item) {
+                            final quantity = item.quantity ==
+                                    item.quantity.roundToDouble()
+                                ? item.quantity.toStringAsFixed(0)
+                                : item.quantity.toStringAsFixed(1);
+                            final unit = item.unit?.trim();
+                            return '${item.description} × $quantity${unit == null || unit.isEmpty ? '' : ' $unit'}';
+                          })
+                          .join('، '),
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                        fontFamily: fontFamily,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -1264,32 +1517,39 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        if ((t.referenceNumber != null && t.referenceNumber!.isNotEmpty) || (t.professionName != null && t.professionName!.isNotEmpty))
+                        if ((t.referenceNumber != null &&
+                                t.referenceNumber!.isNotEmpty) ||
+                            (t.professionName != null &&
+                                t.professionName!.isNotEmpty))
                           Container(
                               width: 4,
                               height: 4,
                               decoration: const BoxDecoration(
                                   color: Colors.grey, shape: BoxShape.circle)),
-                        if (t.referenceNumber != null && t.referenceNumber!.isNotEmpty) ...[
+                        if (t.referenceNumber != null &&
+                            t.referenceNumber!.isNotEmpty) ...[
                           const SizedBox(width: 8),
                           Text(
                             "${isUrdu ? 'بل نمبر ' : 'Bill NO'} ${t.referenceNumber}",
                             style: TextStyle(
                               color: AppTheme.themeColor,
                               fontSize: 11,
-                              fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
+                              fontWeight:
+                                  isUrdu ? FontWeight.bold : FontWeight.normal,
                               fontFamily: isUrdu ? fontFamily : '',
                             ),
                           ),
                         ],
-                        if (t.professionName != null && t.professionName!.isNotEmpty) ...[
+                        if (t.professionName != null &&
+                            t.professionName!.isNotEmpty) ...[
                           const SizedBox(width: 8),
                           Text(
                             t.professionName!,
                             style: TextStyle(
                               color: AppTheme.themeColor,
                               fontSize: 11,
-                              fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
+                              fontWeight:
+                                  isUrdu ? FontWeight.bold : FontWeight.normal,
                               fontFamily: fontFamily,
                             ),
                           ),
@@ -1323,7 +1583,9 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  !isIncome ? t.amount.toStringAsFixed(0) : "-",
+                  !isIncome || t.isQuickBill
+                      ? t.amount.toStringAsFixed(0)
+                      : "-",
                   textAlign: TextAlign.left,
                   style: const TextStyle(
                     color: AppTheme.expenseColor,
@@ -1340,7 +1602,11 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  isIncome ? t.amount.toStringAsFixed(0) : "-",
+                  isIncome
+                      ? (t.isQuickBill
+                          ? t.receivedAmount.toStringAsFixed(0)
+                          : t.amount.toStringAsFixed(0))
+                      : "-",
                   textAlign: TextAlign.left,
                   style: const TextStyle(
                     color: AppTheme.incomeColor,
@@ -1387,13 +1653,16 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              await Provider.of<DatabaseService>(context, listen: false).deleteTransaction(t.id);
-              
+              await Provider.of<DatabaseService>(context, listen: false)
+                  .deleteTransaction(t.id);
+
               if (mounted) {
                 _loadTransactions();
                 AppToast.success(
                   this.context,
-                  isUrdu ? 'ٹرانزیکشن ڈیلیٹ کر دی گئی ہے' : 'Transaction deleted',
+                  isUrdu
+                      ? 'ٹرانزیکشن ڈیلیٹ کر دی گئی ہے'
+                      : 'Transaction deleted',
                 );
               }
             },
@@ -1417,7 +1686,10 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
           const SizedBox(height: 16),
           Text(
             isUrdu ? 'کوئی لین دین موجود نہیں' : 'No transactions found',
-            style: TextStyle(fontFamily: fontFamily, color: AppTheme.textSecondary, fontSize: 16),
+            style: TextStyle(
+                fontFamily: fontFamily,
+                color: AppTheme.textSecondary,
+                fontSize: 16),
           ),
         ],
       ),

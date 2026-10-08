@@ -655,6 +655,9 @@ class NotificationService with ChangeNotifier {
     required String transactionType,
     String? description,
     List<Map<String, dynamic>>? items,
+    double? receivedAmount,
+    double? pendingAmount,
+    String? transactionId,
   }) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
@@ -683,15 +686,37 @@ class NotificationService with ChangeNotifier {
         final dbService = DatabaseService();
         bool isVerified = await dbService.isUserVerified(currentUser.uid);
 
-        String typeText = transactionType == 'income' ? 'رقم لی' : 'رقم دی';
-        String messageBody =
-            '$myName نے آپ کے ساتھ Rs. $amount کا لین دین درج کیا ہے ($typeText)۔';
+        // Build detailed receipt message body
+        final StringBuffer bodyBuffer = StringBuffer();
+        bodyBuffer.writeln('🧾 $myName کی طرف سے بل / رسید');
+        if (description != null && description.isNotEmpty) {
+          bodyBuffer.writeln('تفصیل: $description');
+        }
+        bodyBuffer.writeln('کل رقم: Rs. ${amount.toStringAsFixed(0)}');
+
+        if (items != null && items.isNotEmpty) {
+          bodyBuffer.writeln('--- آئٹمز ---');
+          for (final item in items) {
+            final name = item['description'] ?? item['name'] ?? '';
+            final qty = item['quantity'] ?? 1;
+            final rate = item['rate'] ?? 0;
+            final total = item['total'] ?? (qty * rate);
+            bodyBuffer.writeln('• $name ($qty × $rate = $total)');
+          }
+        }
+
+        if (receivedAmount != null && pendingAmount != null) {
+          bodyBuffer.writeln('وصول شدہ: Rs. ${receivedAmount.toStringAsFixed(0)}');
+          if (pendingAmount > 0) {
+            bodyBuffer.writeln('بقایا ادھار: Rs. ${pendingAmount.toStringAsFixed(0)}');
+          }
+        }
 
         final notifId = DateTime.now().millisecondsSinceEpoch.toString();
         final notification = AppNotification(
           id: notifId,
-          title: 'نیا لین دین',
-          message: messageBody,
+          title: '📄 تفصیلی بل / رسید',
+          message: bodyBuffer.toString().trim(),
           type: NotificationType.transaction,
           isRead: false,
           timestamp: DateTime.now(),
@@ -705,6 +730,9 @@ class NotificationService with ChangeNotifier {
             'isSenderVerified': isVerified,
             'description': description ?? '',
             'items': items ?? [],
+            'receivedAmount': receivedAmount?.toString() ?? '0',
+            'pendingAmount': pendingAmount?.toString() ?? '0',
+            'transactionId': transactionId ?? notifId,
           },
         );
 
@@ -716,7 +744,7 @@ class NotificationService with ChangeNotifier {
             .set(notification.toMap());
       }
     } catch (e) {
-      debugPrint('Error notifying party: $e');
+      debugPrint('Error notifying party with receipt: $e');
     }
   }
 

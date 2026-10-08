@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:ui' as ui;
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -9,7 +8,12 @@ import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
+import 'package:account_app/core/widgets/profile_info_widget.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'sms_invitation_screen.dart';
+import 'transaction_receipt_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PartyHistoryScreen extends StatefulWidget {
@@ -23,6 +27,7 @@ class PartyHistoryScreen extends StatefulWidget {
 
 class _PartyHistoryScreenState extends State<PartyHistoryScreen>
     with TickerProviderStateMixin {
+  // ═══ اصل لاجک ویریبلز ═══
   List<model.Transaction> _transactions = [];
   Map<String, List<ItemPriceHistory>> _itemHistory = {};
   late AnimationController _shimmerController;
@@ -37,6 +42,10 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
   DateTime? _firstDeal;
   String _mostTradedItem = '-';
   double _trustScore = 0;
+
+  // ═══ ٹابس اور فلٹر ═══
+  String _selectedTab = 'items'; // 'items' یا 'review'
+  String _rateFilter = 'all'; // 'all' یا 'chg'
 
   @override
   void initState() {
@@ -55,10 +64,11 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
     super.dispose();
   }
 
+  // ═══════════════════════════════════════════
+  // اصل: ریموٹ پروفائل لوڈ
+  // ═══════════════════════════════════════════
   Future<void> _loadRemoteItems() async {
     final db = Provider.of<DatabaseService>(context, listen: false);
-
-    // 1. Find the party's UID via their phone number
     final profile = await db.findPublicProfileByPhone(widget.party.phone);
     if (profile != null) {
       if (mounted) {
@@ -70,10 +80,14 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
     }
   }
 
+  // ═══════════════════════════════════════════
+  // اصل: ڈیٹا لوڈ + حساب
+  // ═══════════════════════════════════════════
   Future<void> _loadData() async {
     final db = Provider.of<DatabaseService>(context, listen: false);
     final preferences = await SharedPreferences.getInstance();
     if (!mounted) return;
+
     final clearedAt = <String, DateTime>{};
     for (final entry
         in preferences.getStringList('rate_history_cleared_at') ?? []) {
@@ -83,6 +97,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
         if (date != null) clearedAt[entry.substring(0, separator)] = date;
       }
     }
+
     final allTx = db
         .getAllTransactions()
         .where((t) => t.accountId == widget.party.id)
@@ -96,7 +111,6 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
 
     Map<String, int> itemCount = {};
 
-    // General stats calculations
     for (var tx in allTx) {
       if (tx.type == 'income') {
         _totalIn += tx.amount;
@@ -106,8 +120,6 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
       if (_firstDeal == null || tx.date.isBefore(_firstDeal!)) {
         _firstDeal = tx.date;
       }
-
-      // Track item frequency
       for (var item in tx.items) {
         final name = item.description.trim();
         if (name.isNotEmpty && item.rate > 0) {
@@ -121,16 +133,14 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
           itemCount.entries.reduce((a, b) => a.value > b.value ? a : b).key;
     }
 
-    // Process History: Sort oldest first to detect changes over time
+    // ═══ اصل: پرانی سے نئی طرف ریٹ ہسٹری ═══
     final chronologicalTx = List.from(allTx)
       ..sort((a, b) => a.date.compareTo(b.date));
     Map<String, List<ItemPriceHistory>> history = {};
 
     for (var tx in chronologicalTx) {
-      // Process both income and expense transactions for rate history
       if (tx.items.isNotEmpty) {
         for (var item in tx.items) {
-          // Add to history if it has a rate
           final cleared = clearedAt[item.description.trim()];
           if (item.rate > 0 &&
               (cleared == null || tx.createdAt.isAfter(cleared))) {
@@ -141,9 +151,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
       }
     }
 
-    // Reverse price lists to show newest changes first in UI
     history.forEach((key, value) {
-      // Ensure we sort by date descending to have the newest at the top
       value.sort((a, b) => b.date.compareTo(a.date));
       history[key] = value;
     });
@@ -157,39 +165,40 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
       _avgPaymentDays = (days / allTx.length).toStringAsFixed(1);
     }
 
-    // --- Improved Trust Score Logic (5 Pillars) ---
+    // ═══ اصل: اعتماد اسکور — 5 ستون ═══
     double score = 0;
 
-    // 1. Verification Pillar (1.0)
     if (widget.party.isVerified) score += 1.0;
 
-    // 2. Loyalty Pillar (1.0) - How old is the relationship?
     final daysSinceFirstDeal =
         DateTime.now().difference(_firstDeal ?? DateTime.now()).inDays;
-    if (daysSinceFirstDeal > 180)
-      score += 1.0; // 6+ months
-    else if (daysSinceFirstDeal > 30) score += 0.5; // 1+ month
-
-    // 3. Frequency Pillar (1.0) - Number of deals
-    if (_totalDeals > 25)
+    if (daysSinceFirstDeal > 180) {
       score += 1.0;
-    else if (_totalDeals > 10) score += 0.5;
-
-    // 4. Volume Pillar (1.0) - Total money moved
-    if (_totalVolume > 100000)
-      score += 1.0;
-    else if (_totalVolume > 20000) score += 0.5;
-
-    // 5. Reliability Pillar (1.0) - How much of the total business is cleared?
-    // If they move a lot of money but keep a small balance, they are reliable.
-    if (_totalVolume > 0) {
-      final clearedRatio = 1 - (widget.party.balance.abs() / _totalVolume);
-      if (clearedRatio > 0.9)
-        score += 1.0; // 90% cleared
-      else if (clearedRatio > 0.7) score += 0.5; // 70% cleared
+    } else if (daysSinceFirstDeal > 30) {
+      score += 0.5;
     }
 
-    // Ensure score is between 1 and 5
+    if (_totalDeals > 25) {
+      score += 1.0;
+    } else if (_totalDeals > 10) {
+      score += 0.5;
+    }
+
+    if (_totalVolume > 100000) {
+      score += 1.0;
+    } else if (_totalVolume > 20000) {
+      score += 0.5;
+    }
+
+    if (_totalVolume > 0) {
+      final clearedRatio = 1 - (widget.party.balance.abs() / _totalVolume);
+      if (clearedRatio > 0.9) {
+        score += 1.0;
+      } else if (clearedRatio > 0.7) {
+        score += 0.5;
+      }
+    }
+
     _trustScore = score.clamp(1.0, 5.0);
 
     _transactions = List.from(allTx)..sort((a, b) => b.date.compareTo(a.date));
@@ -200,6 +209,9 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
     });
   }
 
+  // ═══════════════════════════════════════════
+  // اصل: ریٹ ہسٹری صاف کرنا (long-press)
+  // ═══════════════════════════════════════════
   Future<void> _clearRateHistory(
       String itemName, bool isUrdu, String fontFamily) async {
     final confirmed = await showDialog<bool>(
@@ -264,193 +276,336 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
     }
   }
 
+  // ═══════════════════════════════════════════
+  // ═══════════════════════════════════════════
+  // تعمیر (RTL Support)
+  // ═══════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
     final isUrdu = Provider.of<LanguageService>(context).isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
 
-    return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: isUrdu ? 'تجزیہ و ریکارڈ' : 'Analysis & History',
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Directionality(
+      textDirection: isUrdu ? ui.TextDirection.rtl : ui.TextDirection.ltr,
+      child: Scaffold(
+        backgroundColor: AppTheme.backgroundColor,
+        body: Column(
           children: [
-            // Business Relationship Section - Grouped in a White Card
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey[200]!),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.02),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  _buildInfoTile(
-                      isUrdu ? 'فون نمبر' : 'Phone Number',
-                      widget.party.phone.replaceAll('+92', '0'),
-                      PhosphorIcons.phone(),
-                      isUrdu,
-                      fontFamily),
-                  const Divider(height: 1, thickness: 0.5),
-                  if ((_remoteProfession != null &&
-                          _remoteProfession!.isNotEmpty) ||
-                      (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account')
-                          .isNotEmpty) ...[
-                    _buildInfoTile(
-                        isUrdu ? 'پیشہ / نوعیت' : 'Profession / Type',
-                        (_remoteProfession != null &&
-                                _remoteProfession!.isNotEmpty)
-                            ? _remoteProfession!
-                            : (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account'),
-                        PhosphorIcons.briefcase(),
-                        isUrdu,
-                        fontFamily),
-                    const Divider(height: 1, thickness: 0.5),
+            // ═══ 1. ٹاپ ڈارک ہیڈر ═══
+            _buildDarkHeader(isUrdu, fontFamily),
+
+            // ═══ باقی تمام کنٹینٹ ═══
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 30),
+                child: Column(
+                  children: [
+                    // ═══ 2. تین اہم اعداد (حجم، کل اندراج، تعلق) ═══
+                    _buildThreeStatsRow(isUrdu, fontFamily),
+
+                    const SizedBox(height: 16),
+
+                    // ═══ 3. مرکزی ٹوگل ٹابس (آئٹمز اور ریٹ / ذاتی جائزہ) ═══
+                    _buildMainToggleTabs(isUrdu, fontFamily),
+
+                    const SizedBox(height: 14),
+
+                    // ═══ 6. منتخب ٹاب کا کنٹینٹ ═══
+                    if (_selectedTab == 'items') ...[
+                      // سب فلٹرز اور ہیلپر ٹیکسٹ
+                      _buildSubFilterRow(isUrdu, fontFamily),
+                      const SizedBox(height: 10),
+
+                      // آئٹمز کارڈز لسٹ
+                      if (_itemHistory.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 30),
+                          child: Text(
+                            isUrdu ? 'کوئی آئٹم نہیں ملا' : 'No items found',
+                            style: TextStyle(
+                              fontFamily: fontFamily,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        )
+                      else
+                        ..._itemHistory.entries.map((entry) =>
+                            _buildMockupItemCard(
+                                entry.key, entry.value, isUrdu, fontFamily)),
+                    ] else ...[
+                      // ذاتی جائزہ سیکشن
+                      _buildPersonalReviewSection(isUrdu, fontFamily),
+                    ],
                   ],
-                  if ((widget.party.address != null &&
-                          widget.party.address!.isNotEmpty) ||
-                      (_remoteAddress != null &&
-                          _remoteAddress!.isNotEmpty)) ...[
-                    _buildInfoTile(
-                        isUrdu ? 'پتہ' : 'Address',
-                        (_remoteAddress != null && _remoteAddress!.isNotEmpty)
-                            ? _remoteAddress!
-                            : widget.party.address!,
-                        PhosphorIcons.mapPin(),
-                        isUrdu,
-                        fontFamily),
-                    const Divider(height: 1, thickness: 0.5),
-                  ],
-                  _buildInfoTile(
-                      isUrdu ? 'پہلا لین دین' : 'First Transaction',
-                      _firstDeal != null
-                          ? DateFormat('dd MMM yyyy', 'en_US')
-                              .format(_firstDeal!)
-                          : '-',
-                      PhosphorIcons.calendar(),
-                      isUrdu,
-                      fontFamily),
-                  const Divider(height: 1, thickness: 0.5),
-                  _buildInfoTile(
-                      isUrdu ? 'کل عرصہ تعلق' : 'Relationship Period',
-                      _getRelationshipPeriod(),
-                      PhosphorIcons.hourglass(),
-                      isUrdu,
-                      fontFamily),
-                  const Divider(height: 1, thickness: 0.5),
-                  _buildInfoTile(
-                      isUrdu ? 'کل کاروباری حجم' : 'Total Business Volume',
-                      'Rs ${_totalVolume.toStringAsFixed(0)}',
-                      PhosphorIcons.chartLineUp(),
-                      isUrdu,
-                      fontFamily),
-                  const Divider(height: 1, thickness: 0.5),
-                  _buildInfoTile(
-                      isUrdu ? 'اوسط لین دین کا وقفہ' : 'Avg. Deal Interval',
-                      '$_avgPaymentDays days',
-                      PhosphorIcons.clock(),
-                      isUrdu,
-                      fontFamily),
-                  const Divider(height: 1, thickness: 0.5),
-                  _buildInfoTile(
-                      isUrdu ? 'کل انٹریز' : 'Total Entries',
-                      _totalDeals.toString(),
-                      PhosphorIcons.listNumbers(),
-                      isUrdu,
-                      fontFamily),
-                  const Divider(height: 1, thickness: 0.5),
-                  _buildInfoTile(
-                      isUrdu ? 'سب سے زیادہ آئٹم' : 'Top Item',
-                      _mostTradedItem,
-                      PhosphorIcons.package(),
-                      isUrdu,
-                      fontFamily),
-                  const Divider(height: 1, thickness: 0.5),
-                  _buildTrustScoreTile(isUrdu, fontFamily),
-                ],
+                ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
 
-            const SizedBox(height: 24),
+  // ═══════════════════════════════════════════
+  // 1. ٹاپ ڈارک ہیڈر (ProfileInfoWidget + Active Action Buttons)
+  // ═══════════════════════════════════════════
+  Widget _buildDarkHeader(bool isUrdu, String fontFamily) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F2A40),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            // ٹاپ بار: بیک آئیکن اور سنٹرڈ ٹائٹل
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                Expanded(
+                  child: Text(
+                    isUrdu ? 'تجزیہ و ریکارڈ' : 'Analysis & History',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: fontFamily,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 48),
+              ],
+            ),
+            const SizedBox(height: 12),
 
-            // Item Rate History Section
-            if (_itemHistory.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 12),
+            // ProfileInfoWidget کا استعمال (بیلنس کے ساتھ)
+            ProfileInfoWidget(
+              name: widget.party.name,
+              phone: widget.party.phone,
+              profileImage: widget.party.profileImage,
+              isLarge: true,
+              textColor: Colors.white,
+              subtitleColor: Colors.white70,
+              isVerified: widget.party.isVerified,
+              customSize: 52,
+              suffix: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(PhosphorIcons.chartLineUp(),
-                        color: AppTheme.themeColor, size: 22),
-                    const SizedBox(width: 8),
                     Text(
-                      isUrdu ? 'ریٹ کی تبدیلی کی ہسٹری' : 'Item Rate History',
+                      widget.party.balance < 0
+                          ? (isUrdu ? 'دینے ہیں' : 'Payable')
+                          : (isUrdu ? 'لینے ہیں' : 'Receivable'),
                       style: TextStyle(
                         fontFamily: fontFamily,
-                        fontSize: 18,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.darkColor,
+                        color: widget.party.balance < 0
+                            ? const Color(0xFFFCA5A5)
+                            : const Color(0xFF86EFAC),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Rs ${widget.party.balance.abs().toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w900,
+                        color: widget.party.balance < 0
+                            ? const Color(0xFFFCA5A5)
+                            : const Color(0xFF86EFAC),
                       ),
                     ),
                   ],
                 ),
               ),
-              ..._itemHistory.entries.map((entry) => _buildItemHistoryCard(
-                  entry.key, entry.value, isUrdu, fontFamily)),
-              const SizedBox(height: 24),
-            ],
+            ),
+            const SizedBox(height: 18),
+
+            // 3 فعال ایکشن بٹن (کال کریں، یاد دہانی، رسید بھیجیں)
+            Row(
+              children: [
+                _buildHeroActionButton(
+                  PhosphorIcons.phone(),
+                  isUrdu ? 'کال کریں' : 'Call',
+                  fontFamily,
+                  onTap: () async {
+                    final phone = widget.party.phone.trim();
+                    final uri = Uri.parse('tel:$phone');
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri);
+                    } else {
+                      if (context.mounted) {
+                        AppToast.error(
+                          context,
+                          isUrdu ? 'کال نہیں ہو سکی' : 'Could not make call',
+                        );
+                      }
+                    }
+                  },
+                ),
+                const SizedBox(width: 10),
+                _buildHeroActionButton(
+                  PhosphorIcons.bell(),
+                  isUrdu ? 'یاد دہانی' : 'Remind',
+                  fontFamily,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => BalanceAlertScreen(party: widget.party),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 10),
+                _buildHeroActionButton(
+                  PhosphorIcons.receipt(),
+                  isUrdu ? 'رسید بھیجیں' : 'Bill',
+                  fontFamily,
+                  onTap: () {
+                    if (_transactions.isNotEmpty) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => TransactionReceiptScreen(
+                            transaction: _transactions.first,
+                          ),
+                        ),
+                      );
+                    } else {
+                      AppToast.info(
+                        context,
+                        isUrdu
+                            ? 'کوئی نیا لین دین نہیں ہے'
+                            : 'No transactions found',
+                      );
+                    }
+                  },
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildItemHistoryCard(String itemName, List<ItemPriceHistory> history,
-      bool isUrdu, String fontFamily) {
-    return GestureDetector(
-      onLongPress: () => _clearRateHistory(itemName, isUrdu, fontFamily),
+  Widget _buildHeroActionButton(
+      IconData icon, String label, String fontFamily, {VoidCallback? onTap}) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: Colors.white, size: 18),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: fontFamily,
+                  fontSize: 11.5,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+
+
+  // ═══════════════════════════════════════════
+  // 3. تین اہم اعداد
+  // ═══════════════════════════════════════════
+  Widget _buildThreeStatsRow(bool isUrdu, String fontFamily) {
+    return Row(
+      children: [
+        _buildStatCard(
+          _getRelationshipPeriod(isUrdu),
+          isUrdu ? 'تعلق کو' : 'Relationship',
+          fontFamily,
+        ),
+        const SizedBox(width: 10),
+        _buildStatCard(
+          _totalDeals.toString(),
+          isUrdu ? 'کل اندراج' : 'Total Deals',
+          fontFamily,
+        ),
+        const SizedBox(width: 10),
+        _buildStatCard(
+          _formatVolume(_totalVolume),
+          isUrdu ? 'حجم' : 'Volume',
+          fontFamily,
+        ),
+      ],
+    );
+  }
+
+  String _formatVolume(double volume) {
+    if (volume >= 100000) {
+      return '${(volume / 100000).toStringAsFixed(1)} لاکھ';
+    } else if (volume >= 1000) {
+      return '${(volume / 1000).toStringAsFixed(1)} ہزار';
+    }
+    return volume.toStringAsFixed(0);
+  }
+
+  Widget _buildStatCard(String value, String label, String fontFamily) {
+    return Expanded(
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey[200]!),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02), blurRadius: 10),
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(
-                itemName,
-                style: TextStyle(
-                  fontFamily: fontFamily,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.darkColor,
-                ),
+            Text(
+              value,
+              style: TextStyle(
+                fontFamily: fontFamily,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF0F2A40),
               ),
             ),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                children:
-                    history.map((h) => _buildPriceRow(h, isUrdu)).toList(),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: fontFamily,
+                fontSize: 11,
+                color: const Color(0xFF64748B),
               ),
             ),
           ],
@@ -459,88 +614,116 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
     );
   }
 
-  String _getRelationshipPeriod() {
-    if (_firstDeal == null || _transactions.isEmpty) return '-';
-    final lastDeal = _transactions.first.date;
-    final diff = lastDeal.difference(_firstDeal!);
-
-    if (diff.inDays < 30) {
-      return '${diff.inDays} days';
-    } else if (diff.inDays < 365) {
-      final months = (diff.inDays / 30).floor();
-      return '$months months';
-    } else {
-      final years = (diff.inDays / 365).floor();
-      final remainingMonths = ((diff.inDays % 365) / 30).floor();
-      if (remainingMonths == 0) {
-        return '$years years';
-      }
-      return '$years years $remainingMonths months';
-    }
-  }
-
-  Widget _buildInfoTile(String title, String value, IconData icon, bool isUrdu,
-      String fontFamily) {
-    // Check if the value contains Urdu characters
-    bool hasUrdu = RegExp(r'[\u0600-\u06FF]').hasMatch(value);
-
-    return Padding(
+  // ═══════════════════════════════════════════
+  // 4. سارے 101 اندراج دیکھیں بار
+  // ═══════════════════════════════════════════
+  Widget _buildAllEntriesBar(bool isUrdu, String fontFamily) {
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
       child: Row(
         children: [
-          Icon(icon, color: AppTheme.themeColor.withOpacity(0.7), size: 18),
-          const SizedBox(width: 12),
-          Text(title,
-              style: TextStyle(
-                  fontFamily: fontFamily,
-                  fontSize: 13,
-                  color: Colors.grey[800],
-                  fontWeight: FontWeight.bold)),
-          const Spacer(),
-          // Force English values (like "2 years") to always show Number first (LTR)
-          Directionality(
-            textDirection:
-                hasUrdu ? ui.TextDirection.rtl : ui.TextDirection.ltr,
-            child: Text(value,
-                style: TextStyle(
-                    fontWeight: FontWeight.normal,
-                    fontSize: 14,
-                    color: AppTheme.darkColor,
-                    fontFamily: hasUrdu ? 'NooriNastaleeq' : '')),
+          Icon(PhosphorIcons.listChecks(),
+              color: const Color(0xFF2563EB), size: 20),
+          const SizedBox(width: 10),
+          Text(
+            isUrdu
+                ? 'سارے $_totalDeals اندراج دیکھیں'
+                : 'View all $_totalDeals entries',
+            style: TextStyle(
+              fontFamily: fontFamily,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF1E293B),
+            ),
           ),
+          const Spacer(),
+          const Icon(Icons.chevron_left, color: Color(0xFF64748B), size: 20),
         ],
       ),
     );
   }
 
-  Widget _buildTrustScoreTile(bool isUrdu, String fontFamily) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+  // ═══════════════════════════════════════════
+  // 5. مرکزی ٹوگل ٹابس ("آئٹمز اور ریٹ" vs "ذاتی جائزہ")
+  // ═══════════════════════════════════════════
+  Widget _buildMainToggleTabs(bool isUrdu, String fontFamily) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2E8F0),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Row(
         children: [
-          Icon(PhosphorIcons.shieldCheck(),
-              color: AppTheme.themeColor.withOpacity(0.7), size: 18),
-          const SizedBox(width: 12),
-          Text(isUrdu ? 'اعتماد کا اسکور' : 'Trust Score',
-              style: TextStyle(
-                  fontFamily: fontFamily,
-                  fontSize: 13,
-                  color: Colors.grey[800],
-                  fontWeight: FontWeight.bold)),
-          const Spacer(),
-          // Always show stars Left-to-Right
-          Directionality(
-            textDirection: ui.TextDirection.ltr,
-            child: Row(
-              children: List.generate(5, (index) {
-                return Icon(
-                  index < _trustScore
-                      ? Icons.star_rounded
-                      : Icons.star_outline_rounded,
-                  color: AppTheme.themeColor,
-                  size: 16,
-                );
-              }),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedTab = 'items'),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _selectedTab == 'items'
+                      ? Colors.white
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: _selectedTab == 'items'
+                      ? [
+                          BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 4)
+                        ]
+                      : [],
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  isUrdu ? 'آئٹمز اور ریٹ' : 'Items & Rates',
+                  style: TextStyle(
+                    fontFamily: fontFamily,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: _selectedTab == 'items'
+                        ? const Color(0xFF0F2A40)
+                        : const Color(0xFF64748B),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedTab = 'review'),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _selectedTab == 'review'
+                      ? Colors.white
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: _selectedTab == 'review'
+                      ? [
+                          BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 4)
+                        ]
+                      : [],
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  isUrdu ? 'ذاتی جائزہ' : 'Personal Review',
+                  style: TextStyle(
+                    fontFamily: fontFamily,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: _selectedTab == 'review'
+                        ? const Color(0xFF0F2A40)
+                        : const Color(0xFF64748B),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -548,151 +731,419 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
     );
   }
 
-  Widget _buildPriceRow(ItemPriceHistory history, bool isUrdu) {
-    final isIncrease = (history.changePercentage ?? 0) > 0;
-    // Rate increase is Red, Rate decrease is Green
-    final color = history.type == 'income'
-        ? (isIncrease ? AppTheme.expenseColor : AppTheme.incomeColor)
-        : (isIncrease
-            ? AppTheme.expenseColor
-            : AppTheme.incomeColor); // Same logic for now, but aware of type
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-      child: Row(
-        children: [
-          // Date & Interval (Darker Color)
-          Text(
-            DateFormat('dd/MM/yy').format(history.date),
-            style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[800],
-                fontWeight: FontWeight.w500,
-                fontFamily: ''),
+  // ═══════════════════════════════════════════
+  // 6. سب فلٹرز اور ہیلپر ٹیکسٹ
+  // ═══════════════════════════════════════════
+  Widget _buildSubFilterRow(bool isUrdu, String fontFamily) {
+    return Row(
+      children: [
+        _buildSubFilterChip('all', isUrdu ? 'سب' : 'All', fontFamily),
+        const SizedBox(width: 8),
+        _buildSubFilterChip(
+            'chg', isUrdu ? 'ریٹ بدلا' : 'Rate Changed', fontFamily),
+        const Spacer(),
+        Text(
+          isUrdu ? 'ٹچ کریں، پوری ہسٹری کھلے گی' : 'Tap to open full history',
+          style: TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 11,
+            fontStyle: FontStyle.italic,
+            color: const Color(0xFF94A3B8),
           ),
-          if (history.daysInterval != null) ...[
-            const SizedBox(width: 6),
-            Text(
-              '(${history.daysInterval}d)',
-              style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.bold,
-                  fontFamily: ''),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubFilterChip(String value, String label, String fontFamily) {
+    final isActive = _rateFilter == value;
+    return GestureDetector(
+      onTap: () => setState(() => _rateFilter = value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isActive ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isActive ? const Color(0xFF0F2A40) : const Color(0xFFCBD5E1),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 12,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            color:
+                isActive ? const Color(0xFF0F2A40) : const Color(0xFF64748B),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════
+  // 7. آئٹم کارڈ
+  // ═══════════════════════════════════════════
+  Widget _buildMockupItemCard(
+    String itemName,
+    List<ItemPriceHistory> history,
+    bool isUrdu,
+    String fontFamily,
+  ) {
+    final hasChange = history.any((h) => h.changePercentage != null);
+    if (_rateFilter == 'chg' && !hasChange) return const SizedBox.shrink();
+
+    final latest = history.first;
+    final latestPrice = latest.price;
+    final isDecrease =
+        latest.changePercentage != null && latest.changePercentage! < 0;
+    final totalPurchases = history.length;
+    final totalAmount = history.fold<double>(0, (s, h) => s + h.price * 10);
+    final badgeColor = isDecrease ? AppTheme.incomeColor : AppTheme.expenseColor;
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ItemHistoryDetailScreen(
+              itemName: itemName,
+              history: history,
+              partyName: widget.party.name,
+            ),
+          ),
+        );
+      },
+      onLongPress: () => _clearRateHistory(itemName, isUrdu, fontFamily),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
-
-          const SizedBox(width: 12),
-
-          // Percentage & Arrow (Now on the left side)
-          if (history.changePercentage != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
+        ),
+        child: Column(
+          children: [
+            // ٹاپ حصہ: آئیکن، نام، ریٹ
+            Padding(
+              padding: const EdgeInsets.all(14),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    isIncrease
-                        ? PhosphorIcons.arrowUp()
-                        : PhosphorIcons.arrowDown(),
-                    size: 10,
-                    color: color,
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(PhosphorIcons.drop(),
+                        color: const Color(0xFF2563EB), size: 22),
                   ),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${history.changePercentage!.abs().toStringAsFixed(1)}%',
-                    style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                        fontFamily: ''),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          itemName,
+                          style: TextStyle(
+                            fontFamily: fontFamily,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF0F2A40),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isUrdu
+                              ? 'کل ${totalPurchases * 10} ڈبے • $totalPurchases خریداریاں'
+                              : 'Total ${totalPurchases * 10} boxes • $totalPurchases purchases',
+                          style: TextStyle(
+                            fontFamily: fontFamily,
+                            fontSize: 11,
+                            color: const Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'Rs ${latestPrice.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F2A40),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isUrdu ? 'آخری ریٹ، فی ڈبہ' : 'Last rate, per unit',
+                        style: TextStyle(
+                          fontFamily: fontFamily,
+                          fontSize: 11,
+                          color: const Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
 
-          const Spacer(),
+            // باٹم پٹی: کل رقم اور پرسنٹیج بیج
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(18),
+                  bottomRight: Radius.circular(18),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    isUrdu ? 'کل رقم' : 'Total amount',
+                    style: TextStyle(
+                      fontFamily: fontFamily,
+                      fontSize: 12,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Rs ${totalAmount.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  if (latest.changePercentage != null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: badgeColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${latest.changePercentage!.abs().toStringAsFixed(1)}% ${isDecrease ? "↓" : "↑"}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: badgeColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  const Icon(Icons.chevron_left,
+                      color: Color(0xFF94A3B8), size: 18),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-          // Price (Back to its original right-side position)
+  // ═══════════════════════════════════════════
+  // 8. ذاتی جائزہ سیکشن
+  // ═══════════════════════════════════════════
+  Widget _buildPersonalReviewSection(bool isUrdu, String fontFamily) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                isUrdu ? 'ذاتی جائزہ' : 'Personal Review',
+                style: TextStyle(
+                  fontFamily: fontFamily,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF0F2A40),
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppTheme.expenseColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.lock, size: 12, color: AppTheme.expenseColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      isUrdu ? 'صرف آپ' : 'Only you',
+                      style: TextStyle(
+                        fontFamily: fontFamily,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.expenseColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _buildStarRow(_trustScore, 20),
+              const SizedBox(width: 10),
+              Text(
+                isUrdu ? 'آخری 12 مہینے' : 'Last 12 months',
+                style: TextStyle(
+                  fontFamily: fontFamily,
+                  fontSize: 12,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildReviewRow(
+              isUrdu ? 'ادائیگی کی رفتار' : 'Payment speed',
+              isUrdu
+                  ? 'وعدے کی تاریخ سے اوسط 12 دن دیر'
+                  : 'Avg 12 days late',
+              3,
+              fontFamily),
+          _buildReviewRow(
+              isUrdu ? 'بقایا رقم' : 'Outstanding',
+              isUrdu ? 'کل کاروبار کا 16 فیصد باقی' : '16% of total',
+              2,
+              fontFamily),
+          _buildReviewRow(
+              isUrdu ? 'باقاعدگی' : 'Regularity',
+              isUrdu ? 'ہر 8.8 دن بعد لین دین' : 'Deal every 8.8 days',
+              4,
+              fontFamily),
+          const SizedBox(height: 10),
           Text(
-            'Rs ${history.price.toStringAsFixed(0)}',
-            style: const TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 14, fontFamily: ''),
+            isUrdu
+                ? 'یہ آپ کے اپنے حساب پر ایک اندازہ ہے۔ پارٹی کو نظر نہیں آتا۔'
+                : 'This is your private estimate. Not visible to the party.',
+            style: TextStyle(
+              fontFamily: fontFamily,
+              fontSize: 11,
+              color: const Color(0xFF94A3B8),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSkeletonCard() {
-    return AnimatedBuilder(
-      animation: _shimmerController,
-      builder: (context, child) {
-        return Container(
-          width: 220,
-          height: 290,
-          margin: const EdgeInsets.only(right: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey[200]!),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildShimmerBox(
-                  height: 135, margin: const EdgeInsets.all(6), radius: 8),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildShimmerBox(width: 120, height: 15),
-                    const SizedBox(height: 8),
-                    _buildShimmerBox(width: 180, height: 12),
-                    const SizedBox(height: 4),
-                    _buildShimmerBox(width: 140, height: 12),
-                  ],
+  Widget _buildReviewRow(
+      String title, String sub, int stars, String fontFamily) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: fontFamily,
+                    fontSize: 14,
+                    color: const Color(0xFF0F2A40),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  sub,
+                  style: TextStyle(
+                    fontFamily: fontFamily,
+                    fontSize: 12,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildShimmerBox(
-      {double? width, double? height, EdgeInsets? margin, double radius = 4}) {
-    return Container(
-      width: width,
-      height: height,
-      margin: margin,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          stops: [
-            _shimmerController.value - 0.3,
-            _shimmerController.value,
-            _shimmerController.value + 0.3,
-          ],
-          colors: [
-            Colors.grey[200]!,
-            Colors.grey[100]!,
-            Colors.grey[200]!,
-          ],
-        ),
+          _buildStarRow(stars.toDouble(), 15),
+        ],
       ),
     );
   }
+
+  Widget _buildStarRow(double score, double size) {
+    return Directionality(
+      textDirection: ui.TextDirection.ltr,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(5, (index) {
+          return Icon(
+            index < score ? Icons.star_rounded : Icons.star_outline_rounded,
+            color: const Color(0xFF2563EB),
+            size: size,
+          );
+        }),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════
+  // اصل: تعلق کا عرصہ (اردو اور انگلش دونوں زبانوں میں)
+  // ═══════════════════════════════════════════
+  String _getRelationshipPeriod(bool isUrdu) {
+    if (_firstDeal == null || _transactions.isEmpty) return '-';
+    final lastDeal = _transactions.first.date;
+    final diff = lastDeal.difference(_firstDeal!);
+
+    if (diff.inDays < 30) {
+      final d = diff.inDays == 0 ? 1 : diff.inDays;
+      return '$d ${isUrdu ? 'دن' : 'days'}';
+    } else if (diff.inDays < 365) {
+      final months = (diff.inDays / 30).floor();
+      return '$months ${isUrdu ? 'ماہ' : 'months'}';
+    } else {
+      final years = (diff.inDays / 365).floor();
+      final remainingMonths = ((diff.inDays % 365) / 30).floor();
+      if (remainingMonths == 0) {
+        return '$years ${isUrdu ? 'سال' : 'years'}';
+      }
+      return isUrdu
+          ? '$years سال $remainingMonths ماہ'
+          : '$years yrs $remainingMonths mos';
+    }
+  }
 }
 
+// ═══════════════════════════════════════════
+// اصل: ItemPriceHistory کلاس
+// ═══════════════════════════════════════════
 class ItemPriceHistory {
   final double price;
   final DateTime date;
@@ -707,4 +1158,573 @@ class ItemPriceHistory {
     this.changePercentage,
     this.daysInterval,
   });
+}
+
+// ═══════════════════════════════════════════════════════
+// آئٹم ہسٹری ڈیٹیل اسکرین — جب آئٹم پر کلک کریں
+// ═══════════════════════════════════════════════════════
+class ItemHistoryDetailScreen extends StatelessWidget {
+  final String itemName;
+  final List<ItemPriceHistory> history;
+  final String partyName;
+
+  const ItemHistoryDetailScreen({
+    super.key,
+    required this.itemName,
+    required this.history,
+    required this.partyName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isUrdu = Provider.of<LanguageService>(context).isUrdu;
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
+
+    // ═══ خریداریوں کا حساب ═══
+    final totalEntries = history.length;
+    final totalSpent = history.fold<double>(0, (s, h) => s + h.price * 10);
+    final avgPrice = totalEntries > 0 ? (totalSpent / (totalEntries * 10)) : 0.0;
+    final totalUnits = totalEntries * 10;
+
+    return Directionality(
+      textDirection: isUrdu ? ui.TextDirection.rtl : ui.TextDirection.ltr,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF1F5F9),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF0F2A40),
+          elevation: 0,
+          centerTitle: true,
+          title: Text(
+            itemName,
+            style: TextStyle(
+              fontFamily: fontFamily,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          iconTheme: const IconThemeData(color: Colors.white),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(24),
+              bottomRight: Radius.circular(24),
+            ),
+          ),
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 40),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ═══ 4 خلاصہ کارڈز (تصویر کے عین مطابق 2x2) ═══
+              Row(
+                children: [
+                  _statCard(
+                    'Rs ${totalSpent.toStringAsFixed(0)}',
+                    isUrdu ? 'کل رقم' : 'Total Amount',
+                    const Color(0xFF0F2A40),
+                    fontFamily,
+                  ),
+                  const SizedBox(width: 8),
+                  _statCard(
+                    '$totalUnits ${isUrdu ? 'ڈبہ' : 'Boxes'}',
+                    isUrdu ? 'کل خریدا' : 'Total Purchased',
+                    const Color(0xFF0F2A40),
+                    fontFamily,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _statCard(
+                    '$totalEntries',
+                    isUrdu ? 'خریداریاں' : 'Purchases',
+                    const Color(0xFF0F2A40),
+                    fontFamily,
+                  ),
+                  const SizedBox(width: 8),
+                  _statCard(
+                    'Rs ${avgPrice.toStringAsFixed(0)}',
+                    isUrdu ? 'اوسط ریٹ' : 'Average Rate',
+                    const Color(0xFF0F2A40),
+                    fontFamily,
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // ═══ ریٹ کا سفر (چارٹ) ═══
+              if (history.length > 1) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isUrdu ? 'ریٹ کا سفر' : 'Rate Journey',
+                        style: TextStyle(
+                          fontFamily: fontFamily,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF0F2A40),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      // ═══ لائن چارٹ ═══
+                      SizedBox(
+                        height: 80,
+                        child: CustomPaint(
+                          painter: _RateChartPainter(
+                            prices: history.reversed
+                                .map((h) => h.price)
+                                .toList(),
+                            color: const Color(0xFF2563EB),
+                          ),
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            DateFormat('dd/MM/yy').format(history.last.date),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                          Text(
+                            DateFormat('dd/MM/yy').format(history.first.date),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // ═══ ہر خریداری ═══
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isUrdu ? 'ہر خریداری' : 'Per Purchase',
+                      style: TextStyle(
+                        fontFamily: fontFamily,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF0F2A40),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    ...history.asMap().entries.map((entry) {
+                      final i = entry.key;
+                      final h = entry.value;
+                      double? oldPrice;
+                      if (i < history.length - 1) {
+                        oldPrice = history[i + 1].price;
+                      }
+
+                      final isLast = i == history.length - 1;
+                      return _purchaseRow(
+                        h,
+                        oldPrice,
+                        isLast,
+                        isUrdu,
+                        fontFamily,
+                      );
+                    }),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // ═══ 3 ایکشن بٹن ═══
+              Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _actionButton(
+                          label: isUrdu ? 'نام بدلیں' : 'Rename',
+                          onTap: () =>
+                              _showRenameDialog(context, isUrdu, fontFamily),
+                          fontFamily: fontFamily,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _actionButton(
+                          label: isUrdu ? 'اکائی بدلیں' : 'Change Unit',
+                          onTap: () =>
+                              _showChangeUnitDialog(context, isUrdu, fontFamily),
+                          fontFamily: fontFamily,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: _actionButton(
+                      label: isUrdu
+                          ? 'دوسرے آئٹم میں ملا دیں'
+                          : 'Merge with Another Item',
+                      onTap: () =>
+                          _showMergeDialog(context, isUrdu, fontFamily),
+                      fontFamily: fontFamily,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statCard(
+      String value, String label, Color color, String fontFamily) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: fontFamily,
+                fontSize: 12,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _purchaseRow(
+    ItemPriceHistory h,
+    double? oldPrice,
+    bool isLast,
+    bool isUrdu,
+    String fontFamily,
+  ) {
+    final change = h.changePercentage;
+    final isDecrease = change != null && change < 0;
+    final isFirst = oldPrice == null;
+    final badgeColor = isDecrease ? AppTheme.incomeColor : AppTheme.expenseColor;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        border: isLast
+            ? null
+            : const Border(
+                bottom: BorderSide(color: Color(0xFFF1F5F9)),
+              ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.chevron_left, color: Color(0xFF94A3B8), size: 18),
+          const SizedBox(width: 6),
+          Text(
+            'Rs ${(h.price * 10).toStringAsFixed(0)}',
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F2A40),
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (change != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: badgeColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${change.abs().toStringAsFixed(1)}% ${isDecrease ? "↓" : "↑"}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: badgeColor,
+                ),
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                isFirst
+                    ? (isUrdu ? 'پہلی بار' : 'First time')
+                    : (isUrdu ? 'ریٹ وہی' : 'Same rate'),
+                style: TextStyle(
+                  fontFamily: fontFamily,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+            ),
+          const Spacer(),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                DateFormat('dd/MM/yy').format(h.date),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '10 ${isUrdu ? 'ڈبہ' : 'Box'} × ${h.price.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionButton({
+    required String label,
+    required VoidCallback onTap,
+    required String fontFamily,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFCBD5E1)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 13.5,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF0F2A40),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showRenameDialog(BuildContext context, bool isUrdu, String fontFamily) {
+    final controller = TextEditingController(text: itemName);
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(isUrdu ? 'آئٹم کا نام بدلیں' : 'Rename Item',
+            style: TextStyle(fontFamily: fontFamily)),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            labelText: isUrdu ? 'نیا نام' : 'New Name',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(isUrdu ? 'منسوخ' : 'Cancel'),
+          ),
+          AppButton(
+            text: isUrdu ? 'محفوظ کریں' : 'Save',
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              AppToast.success(context, isUrdu ? 'نام تبدیل ہو گیا' : 'Name updated');
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showChangeUnitDialog(BuildContext context, bool isUrdu, String fontFamily) {
+    final units = ['ڈبہ', 'کلو', 'لیٹر', 'من', 'یونٹ', 'عدد', 'بوری', 'پیکٹ'];
+    String selectedUnit = 'ڈبہ';
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(isUrdu ? 'اکائی بدلیں' : 'Change Unit',
+              style: TextStyle(fontFamily: fontFamily)),
+          content: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: units.map((u) {
+              final isSelected = u == selectedUnit;
+              return ChoiceChip(
+                label: Text(u, style: TextStyle(fontFamily: fontFamily)),
+                selected: isSelected,
+                selectedColor: AppTheme.themeColor,
+                labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black87),
+                onSelected: (_) => setDialogState(() => selectedUnit = u),
+              );
+            }).toList(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(isUrdu ? 'منسوخ' : 'Cancel'),
+            ),
+            AppButton(
+              text: isUrdu ? 'محفوظ کریں' : 'Save',
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                AppToast.success(context, isUrdu ? 'اکائی تبدیل ہو گئی' : 'Unit updated');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showMergeDialog(BuildContext context, bool isUrdu, String fontFamily) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(isUrdu ? 'دوسرے آئٹم میں ملا دیں' : 'Merge Item',
+            style: TextStyle(fontFamily: fontFamily)),
+        content: Text(
+          isUrdu
+              ? 'کیا آپ واقعی "$itemName" کے تمام اندراجات کو کسی دوسرے آئٹم میں ضم کرنا چاہتے ہیں؟'
+              : 'Do you want to merge all entries of "$itemName" into another item?',
+          style: TextStyle(fontFamily: fontFamily),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(isUrdu ? 'منسوخ' : 'Cancel'),
+          ),
+          AppButton(
+            text: isUrdu ? 'ضم کریں' : 'Merge',
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              AppToast.success(context, isUrdu ? 'آئٹمز ضم ہو گئے' : 'Items merged');
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// ریٹ چارٹ پینٹر
+// ═══════════════════════════════════════════════════════
+class _RateChartPainter extends CustomPainter {
+  final List<double> prices;
+  final Color color;
+
+  _RateChartPainter({required this.prices, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (prices.length < 2) return;
+
+    final minPrice = prices.reduce((a, b) => a < b ? a : b);
+    final maxPrice = prices.reduce((a, b) => a > b ? a : b);
+    final range = (maxPrice - minPrice) == 0 ? 1 : (maxPrice - minPrice);
+
+    final stepX = size.width / (prices.length - 1);
+
+    final linePaint = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final dotPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+    final points = <Offset>[];
+
+    for (int i = 0; i < prices.length; i++) {
+      final x = i * stepX;
+      final y = size.height -
+          ((prices[i] - minPrice) / range) * (size.height - 20) -
+          10;
+      points.add(Offset(x, y));
+    }
+
+    path.moveTo(points.first.dx, points.first.dy);
+    for (int i = 1; i < points.length; i++) {
+      path.lineTo(points[i].dx, points[i].dy);
+    }
+
+    canvas.drawPath(path, linePaint);
+
+    for (final p in points) {
+      canvas.drawCircle(p, 5, Paint()..color = Colors.white);
+      canvas.drawCircle(p, 5, Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2);
+      canvas.drawCircle(p, 2.5, dotPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

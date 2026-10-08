@@ -1,9 +1,11 @@
 // lib/core/services/stock_service.dart
 
+import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/models/stock_movement_model.dart';
 import 'package:account_app/core/models/stock_category_model.dart';
@@ -13,6 +15,7 @@ import 'package:account_app/core/models/transaction_model.dart' as model;
 class StockService with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   List<StockItem> _items = [];
   List<StockMovement> _movements = [];
@@ -84,6 +87,16 @@ class StockService with ChangeNotifier {
 
   /// 🧮 Pure Arithmetic Computed Stock Calculation:
   /// `Current Stock = Initial Quantity + Purchases + Customer Returns - Sales - Supplier Returns + Adjustments`
+  static bool canApplyMovement({
+    required double availableStock,
+    required StockMovement movement,
+    bool stopWhenOut = true,
+  }) {
+    if (!stopWhenOut && movement.type == StockMovementType.sale) return true;
+    final stockDelta = movement.stockDelta;
+    return stockDelta >= 0 || availableStock + stockDelta >= -0.000001;
+  }
+
   double calculateCurrentStock(String itemId) {
     final item = _items.firstWhere(
       (i) => i.id == itemId,
@@ -95,27 +108,14 @@ class StockService with ChangeNotifier {
       ),
     );
 
-    if (item.id.isEmpty) return 0.0;
+    if (item.id.isEmpty || !item.trackStock) return 0.0;
 
     double stock = item.initialQuantity;
 
     final itemMovements = _movements.where((m) => m.stockItemId == itemId);
     for (var movement in itemMovements) {
       if (movement.reason == 'Initial Opening Stock') continue;
-      switch (movement.type) {
-        case StockMovementType.purchase:
-        case StockMovementType.customerReturn:
-          stock += movement.quantity;
-          break;
-        case StockMovementType.sale:
-        case StockMovementType.supplierReturn:
-          stock -= movement.quantity;
-          break;
-        case StockMovementType.adjustment:
-          // Quantity can be positive or negative for adjustments
-          stock += movement.quantity;
-          break;
-      }
+      stock += movement.stockDelta;
     }
 
     return stock;
@@ -130,22 +130,12 @@ class StockService with ChangeNotifier {
 
     for (final movement in _movements) {
       final belongsToTransaction =
-          movement.transactionId == excludingTransactionId ||
+          (excludingTransactionId != null &&
+              movement.transactionId == excludingTransactionId) ||
+              movement.transactionId == excludingTransactionId ||
               movement.note == 'Transaction $excludingTransactionId';
       if (movement.stockItemId != itemId || !belongsToTransaction) continue;
-      switch (movement.type) {
-        case StockMovementType.purchase:
-        case StockMovementType.customerReturn:
-          available -= movement.quantity;
-          break;
-        case StockMovementType.sale:
-        case StockMovementType.supplierReturn:
-          available += movement.quantity;
-          break;
-        case StockMovementType.adjustment:
-          available -= movement.quantity;
-          break;
-      }
+      available -= movement.stockDelta;
     }
     return available;
   }
@@ -190,6 +180,10 @@ class StockService with ChangeNotifier {
       final partyName = account.data()?['name']?.toString() ?? '';
 
       for (final entry in groupedItems.entries) {
+        final stockItemDoc =
+            await userDoc.collection('stock_items').doc(entry.key).get();
+        if (stockItemDoc.data()?['trackStock'] == false) continue;
+
         final quantity = entry.value.fold<double>(
           0,
           (sum, item) => sum + item.quantity,
@@ -268,13 +262,13 @@ class StockService with ChangeNotifier {
   /// ➕ Add New Stock Item
   Future<void> addStockItem(StockItem item) async {
     final user = _auth.currentUser;
-    if (user == null) return;
+    if (user == null) throw StateError('Sign in to add a stock item.');
 
     final userDoc = _firestore.collection('users').doc(user.uid);
-    await userDoc.collection('stock_items').doc(item.id).set(item.toMap());
+    final batch = _firestore.batch();
+    batch.set(userDoc.collection('stock_items').doc(item.id), item.toMap());
 
-    // If initial quantity > 0, record initial stock movement
-    if (item.initialQuantity > 0) {
+    if (item.trackStock && item.initialQuantity > 0) {
       final movement = StockMovement(
         id: 'mov_${DateTime.now().millisecondsSinceEpoch}',
         stockItemId: item.id,
@@ -285,19 +279,20 @@ class StockService with ChangeNotifier {
         reason: 'Initial Opening Stock',
         timestamp: DateTime.now(),
       );
-      await userDoc
-          .collection('stock_movements')
-          .doc(movement.id)
-          .set(movement.toMap());
+      batch.set(
+        userDoc.collection('stock_movements').doc(movement.id),
+        movement.toMap(),
+      );
     }
 
+    await batch.commit();
     notifyListeners();
   }
 
   /// ✏️ Update Existing Stock Item
   Future<void> updateStockItem(StockItem item) async {
     final user = _auth.currentUser;
-    if (user == null) return;
+    if (user == null) throw StateError('Sign in to update this stock item.');
 
     await _firestore
         .collection('users')
@@ -312,7 +307,7 @@ class StockService with ChangeNotifier {
   /// 🗑️ Delete Stock Item
   Future<void> deleteStockItem(String itemId) async {
     final user = _auth.currentUser;
-    if (user == null) return;
+    if (user == null) throw StateError('Sign in to delete this stock item.');
 
     await _firestore
         .collection('users')
@@ -322,6 +317,21 @@ class StockService with ChangeNotifier {
         .delete();
 
     notifyListeners();
+  }
+
+  Future<String> uploadStockImage(File image, String itemId) async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('Sign in to upload a stock image.');
+    if (!await image.exists()) {
+      throw FileSystemException('The selected stock image is unavailable.', image.path);
+    }
+
+    final extension = image.path.split('.').last.toLowerCase();
+    final imageRef = _storage
+        .ref()
+        .child('users/${user.uid}/stock_items/$itemId/image.$extension');
+    await imageRef.putFile(image);
+    return imageRef.getDownloadURL();
   }
 
   /// 📦 Record Stock Movement (In / Out / Adjustment / Return)
@@ -334,6 +344,40 @@ class StockService with ChangeNotifier {
     if (movements.isEmpty) return;
     final user = _auth.currentUser;
     if (user == null) throw StateError('Sign in to update stock.');
+
+    final pendingDeltas = <String, double>{};
+    for (final movement in movements) {
+      final matchingItems =
+          _items.where((item) => item.id == movement.stockItemId);
+      if (matchingItems.isEmpty) {
+        throw StateError('Stock item ${movement.stockItemId} is unavailable.');
+      }
+      final item = matchingItems.first;
+      if (!item.trackStock) {
+        throw StateError('${item.name} is configured not to track stock.');
+      }
+      if (movement.type == StockMovementType.customerReturn &&
+          !item.allowReturn) {
+        throw StateError('${item.name} does not allow customer returns.');
+      }
+
+      final available =
+          calculateCurrentStock(item.id) + (pendingDeltas[item.id] ?? 0);
+      if (!canApplyMovement(
+        availableStock: available,
+        movement: movement,
+        stopWhenOut: item.stopWhenOut,
+      )) {
+        throw StateError(
+          'Stock reduction exceeds available stock for ${item.name}.',
+        );
+      }
+      pendingDeltas.update(
+        item.id,
+        (delta) => delta + movement.stockDelta,
+        ifAbsent: () => movement.stockDelta,
+      );
+    }
 
     final userDoc = _firestore.collection('users').doc(user.uid);
     final batch = _firestore.batch();
@@ -357,6 +401,7 @@ class StockService with ChangeNotifier {
     int outOfStockCount = 0;
 
     for (var item in _items) {
+      if (!item.trackStock) continue;
       final qty = calculateCurrentStock(item.id);
       final avgCost = calculateWeightedAverageCost(item.id);
 

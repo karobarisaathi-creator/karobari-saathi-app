@@ -42,6 +42,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     final languageService = Provider.of<LanguageService>(context);
     final themeService = Provider.of<ThemeService>(context);
     final isUrdu = languageService.isUrdu;
+    final canPop = Navigator.of(context).canPop();
+    final shouldShowBackButton = showBackButton && canPop;
 
     return AppBar(
       title: title is Widget
@@ -56,7 +58,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
       leading:
           leading ??
-          (showBackButton ? _buildBackButton(context, isUrdu) : null),
+          (shouldShowBackButton ? _buildBackButton(context, isUrdu) : null),
       leadingWidth: leadingWidth,
       automaticallyImplyLeading: false,
       actions: actions,

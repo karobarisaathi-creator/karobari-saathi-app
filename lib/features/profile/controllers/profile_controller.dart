@@ -12,6 +12,7 @@ class ProfileController extends ChangeNotifier {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
+  final TextEditingController addressController = TextEditingController();
 
   bool isLoading = false;
   bool isEditing = false;
@@ -41,6 +42,7 @@ class ProfileController extends ChangeNotifier {
           (data?['displayName'] ?? data?['name'] ?? user.displayName ?? '')
               .toString();
       emailController.text = (data?['email'] ?? user.email ?? '').toString();
+      addressController.text = (data?['businessAddress'] ?? '').toString();
       remoteProfileImage = (data?['photoURL'] ?? user.photoURL)?.toString();
       isEditing = nameController.text.trim().isNotEmpty;
     } catch (error) {
@@ -81,6 +83,7 @@ class ProfileController extends ChangeNotifier {
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'displayName': nameController.text.trim(),
         'email': emailController.text.trim(),
+        'businessAddress': addressController.text.trim(),
         'photoURL': profileImageUrl,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -109,6 +112,7 @@ class ProfileController extends ChangeNotifier {
     nameController.dispose();
     phoneController.dispose();
     emailController.dispose();
+    addressController.dispose();
     super.dispose();
   }
 }

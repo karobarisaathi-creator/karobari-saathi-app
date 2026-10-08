@@ -40,7 +40,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
     if (!mounted) return;
 
     if (success) {
-      AppToast.success(context, isUrdu ? 'پروفائل محفوظ ہوگیا' : 'Profile saved');
+      AppToast.success(
+          context, isUrdu ? 'پروفائل محفوظ ہوگیا' : 'Profile saved');
       if (Navigator.canPop(context)) {
         Navigator.pop(context);
       } else {
@@ -147,6 +148,15 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                                   }
                                   return null;
                                 },
+                              ),
+                              const Divider(height: 1),
+                              _buildField(
+                                controller: controller.addressController,
+                                label: isUrdu
+                                    ? 'دکان / کاروبار کا پتہ (اختیاری)'
+                                    : 'Shop / business address (optional)',
+                                icon: PhosphorIcons.mapPin(),
+                                fontFamily: fontFamily,
                               ),
                             ],
                           ),

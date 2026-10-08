@@ -37,6 +37,19 @@ class StockMovement {
     required this.timestamp,
   });
 
+  double get stockDelta {
+    switch (type) {
+      case StockMovementType.purchase:
+      case StockMovementType.customerReturn:
+        return quantity;
+      case StockMovementType.sale:
+      case StockMovementType.supplierReturn:
+        return -quantity;
+      case StockMovementType.adjustment:
+        return quantity;
+    }
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,

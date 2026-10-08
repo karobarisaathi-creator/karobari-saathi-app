@@ -10,6 +10,12 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
+import 'package:account_app/features/accounts/transaction_receipt_screen.dart';
+import 'package:account_app/core/widgets/profile_info_widget.dart';
+import 'package:account_app/core/widgets/transaction_card.dart';
+import 'package:account_app/core/widgets/app_button.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:intl/intl.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/notification_card.dart';
@@ -213,12 +219,107 @@ class _NotificationListTabState extends State<_NotificationListTab>
         itemCount: allNotifications.length,
         itemBuilder: (context, index) {
           final n = allNotifications[index];
+          if (n.type == NotificationType.transaction && n.data != null) {
+            final data = n.data!;
+            List<TransactionItem> items = [];
+            if (data['items'] != null && data['items'] is List) {
+              for (var itemMap in (data['items'] as List)) {
+                items.add(TransactionItem.fromMap(Map<String, dynamic>.from(itemMap)));
+              }
+            }
+
+            final transaction = Transaction(
+              id: data['transactionId'] ?? n.id,
+              accountId: data['senderUid'] ?? 'remote_user',
+              amount: double.tryParse(data['amount']?.toString() ?? '0') ?? 0,
+              type: data['transactionType'] ?? 'income',
+              category: data['category'] ?? 'فروخت',
+              description: data['description'] ?? '',
+              date: n.timestamp,
+              quantity: items.length,
+              rate: 0,
+              receivedAmount:
+                  double.tryParse(data['receivedAmount']?.toString() ?? '0') ?? 0,
+              pendingAmount:
+                  double.tryParse(data['pendingAmount']?.toString() ?? '0') ?? 0,
+              items: items,
+              referenceNumber: data['referenceNumber'],
+              createdAt: n.timestamp,
+              updatedAt: n.timestamp,
+            );
+
+            final isAdded = data['isAdded'] == true;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ProfileInfoWidget(
+                          name: data['senderName'] ?? (widget.isUrdu ? 'صارف' : 'User'),
+                          phone: data['senderPhone'] ?? '',
+                          profileImage: data['senderPhotoUrl'],
+                          isVerified: data['isSenderVerified'] == true ||
+                              data['isSenderVerified'] == 'true',
+                          customSize: 36,
+                          borderRadius: 6,
+                        ),
+                      ),
+                      Text(
+                        _formatTime(n.timestamp),
+                        style: const TextStyle(fontSize: 10, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TransactionCard(transaction: transaction),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      AppButton(
+                        text: isAdded
+                            ? (widget.isUrdu ? 'کھاتے میں شامل ہے' : 'Added')
+                            : (widget.isUrdu ? 'کھاتے میں شامل کریں' : 'Add to Ledger'),
+                        variant: AppButtonVariant.outlined,
+                        size: AppButtonSize.small,
+                        color: isAdded ? Colors.grey : AppTheme.themeColor,
+                        onPressed: isAdded ? null : () => _addToLedger(n),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () => _confirmDelete(n),
+                        icon: Icon(PhosphorIcons.trash(),
+                            color: Colors.red.shade300, size: 20),
+                        tooltip: widget.isUrdu ? 'حذف کریں' : 'Delete',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }
+
           return NotificationCard(
             notification: n,
             isUrdu: widget.isUrdu,
             fontFamily: widget.fontFamily,
             onAddPressed: () => _addToLedger(n),
-            onDeletePressed: () => notificationService.deleteNotification(n.id),
+            onDeletePressed: () => _confirmDelete(n),
             onTap: () {
               if (!n.isRead) notificationService.markAsRead(n.id);
               _handleClick(n);
@@ -229,7 +330,89 @@ class _NotificationListTabState extends State<_NotificationListTab>
     );
   }
 
+  void _confirmDelete(AppNotification n) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(widget.isUrdu ? 'نوٹیفیکیشن حذف کریں؟' : 'Delete Notification?'),
+        content: Text(
+          widget.isUrdu
+              ? 'کیا آپ واقعی اس نوٹیفیکیشن کو حذف کرنا چاہتے ہیں؟'
+              : 'Are you sure you want to delete this notification?',
+          style: TextStyle(fontFamily: widget.fontFamily),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(widget.isUrdu ? 'منسوخ' : 'Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Provider.of<NotificationService>(context, listen: false)
+                  .deleteNotification(n.id);
+            },
+            child: Text(
+              widget.isUrdu ? 'حذف کریں' : 'Delete',
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTime(DateTime timestamp) {
+    final difference = DateTime.now().difference(timestamp);
+    if (difference.inMinutes < 1) return widget.isUrdu ? 'ابھی' : 'Just now';
+    if (difference.inHours < 1) {
+      return widget.isUrdu
+          ? '${difference.inMinutes} منٹ پہلے'
+          : '${difference.inMinutes}m ago';
+    }
+    if (difference.inDays < 1) return DateFormat('hh:mm a').format(timestamp);
+    return DateFormat('dd MMM').format(timestamp);
+  }
+
   void _handleClick(AppNotification n) async {
+    if (n.type == NotificationType.transaction && n.data != null) {
+      final data = n.data!;
+      List<TransactionItem> items = [];
+      if (data['items'] != null && data['items'] is List) {
+        for (var itemMap in (data['items'] as List)) {
+          items.add(TransactionItem.fromMap(Map<String, dynamic>.from(itemMap)));
+        }
+      }
+
+      final transaction = Transaction(
+        id: data['transactionId'] ?? n.id,
+        accountId: data['senderUid'] ?? 'remote_user',
+        amount: double.tryParse(data['amount']?.toString() ?? '0') ?? 0,
+        type: data['transactionType'] ?? 'income',
+        category: data['category'] ?? 'فروخت',
+        description: data['description'] ?? '',
+        date: n.timestamp,
+        quantity: items.length,
+        rate: 0,
+        receivedAmount:
+            double.tryParse(data['receivedAmount']?.toString() ?? '0') ?? 0,
+        pendingAmount:
+            double.tryParse(data['pendingAmount']?.toString() ?? '0') ?? 0,
+        items: items,
+        referenceNumber: data['referenceNumber'],
+        createdAt: n.timestamp,
+        updatedAt: n.timestamp,
+      );
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => TransactionReceiptScreen(transaction: transaction),
+        ),
+      );
+      return;
+    }
+
     final db = Provider.of<DatabaseService>(context, listen: false);
     final accountId = n.data?['accountId'];
     if (accountId != null) {
@@ -282,7 +465,7 @@ class _NotificationListTabState extends State<_NotificationListTab>
     }
 
     final tx = Transaction(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: data['transactionId'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
       accountId: account.id,
       amount: amount,
       type: type,

@@ -7,6 +7,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
+import 'package:account_app/core/config/professions_config.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_button.dart';
@@ -28,7 +29,15 @@ class CompleteSeasonScreen extends StatefulWidget {
 class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
   late TextEditingController _areaController;
   late TextEditingController _prodController;
-  late TextEditingController _incomeController;
+
+  bool get _isAgriculture =>
+      widget.season.cropType.isNotEmpty ||
+      ProfessionsConfig.categoryTypeFor(widget.season) ==
+          ProfessionCategory.agriculture;
+
+  String _workNoun(bool isUrdu) => _isAgriculture
+      ? (isUrdu ? 'سیزن' : 'Season')
+      : (isUrdu ? 'پروجیکٹ' : 'Project');
 
   @override
   void initState() {
@@ -43,18 +52,12 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
           ? widget.season.productionMun.toStringAsFixed(0)
           : '',
     );
-    _incomeController = TextEditingController(
-      text: widget.season.totalIncome > 0
-          ? widget.season.totalIncome.toStringAsFixed(0)
-          : '',
-    );
   }
 
   @override
   void dispose() {
     _areaController.dispose();
     _prodController.dispose();
-    _incomeController.dispose();
     super.dispose();
   }
 
@@ -66,7 +69,7 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
 
     final area = double.tryParse(_areaController.text) ??
         (widget.season.areaAcres > 0 ? widget.season.areaAcres : 1.0);
-    final income = double.tryParse(_incomeController.text) ?? widget.season.totalIncome;
+    final income = widget.season.totalIncome;
     final expense = widget.season.totalExpense;
 
     final costPerAcre = area > 0 ? expense / area : 0.0;
@@ -74,15 +77,22 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
     final netProfit = income - expense;
 
     final df = DateFormat('dd/MM/yy');
-    final durationStr =
-        '${df.format(widget.season.createdAt)} – ${df.format(widget.season.updatedAt)} (${widget.season.updatedAt.difference(widget.season.createdAt).inDays} دن)';
+    final durationDays =
+        widget.season.updatedAt.difference(widget.season.createdAt).inDays;
+    final durationStr = isUrdu
+        ? '${df.format(widget.season.createdAt)} – ${df.format(widget.season.updatedAt)} ($durationDays دن)'
+        : '${df.format(widget.season.createdAt)} – ${df.format(widget.season.updatedAt)} ($durationDays days)';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
         title: widget.isEditingDetails
-            ? (isUrdu ? 'سیزن کی تفصیلات' : 'Season Details')
-            : (isUrdu ? 'سیزن مکمل کریں' : 'Complete Season'),
+            ? (isUrdu
+                ? '${_workNoun(isUrdu)} کی تفصیلات'
+                : '${_workNoun(isUrdu)} Details')
+            : (isUrdu
+                ? '${_workNoun(isUrdu)} مکمل کریں'
+                : 'Complete ${_workNoun(isUrdu)}'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -100,7 +110,7 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
               child: Column(
                 children: [
                   _buildHeaderRow(
-                    isUrdu ? 'سیزن' : 'Season',
+                    _workNoun(isUrdu),
                     widget.season.season.isNotEmpty
                         ? widget.season.season
                         : widget.season.name,
@@ -125,78 +135,57 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
             ),
             const SizedBox(height: 16),
 
-            // 📝 Form Inputs Card (Master Profile Style)
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Column(
-                children: [
-                  // Area
-                  TextField(
-                    controller: _areaController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    style: const TextStyle(color: AppTheme.darkColor),
-                    decoration: InputDecoration(
-                      labelText: isUrdu ? 'رقبہ (ایکڑ)' : 'Area (Acres)',
-                      labelStyle: TextStyle(fontFamily: fontFamily),
-                      prefixIcon: Icon(PhosphorIcons.mapPin(), color: AppTheme.themeColor),
-                      border: InputBorder.none,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    ),
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  const Divider(height: 1),
-
-                  // Production
-                  TextField(
-                    controller: _prodController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    style: const TextStyle(color: AppTheme.darkColor),
-                    decoration: InputDecoration(
-                      labelText: isUrdu ? 'پیداوار (من)' : 'Yield (Mun)',
-                      hintText: 'مثلاً 552',
-                      labelStyle: TextStyle(fontFamily: fontFamily),
-                      prefixIcon: Icon(PhosphorIcons.scales(), color: AppTheme.themeColor),
-                      border: InputBorder.none,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    ),
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  const Divider(height: 1),
-
-                  // Total Income
-                  TextField(
-                    controller: _incomeController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    style: const TextStyle(color: AppTheme.darkColor),
-                    decoration: InputDecoration(
-                      labelText: isUrdu ? 'کل آمدنی' : 'Total Income',
-                      hintText: 'فروخت کے اندراج سے خودکار آئے گی',
-                      hintStyle: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[400],
-                        fontFamily: fontFamily,
+            if (_isAgriculture) ...[
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _areaController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        style: const TextStyle(color: AppTheme.darkColor),
+                        decoration: InputDecoration(
+                          labelText: isUrdu ? 'رقبہ (ایکڑ)' : 'Area (Acres)',
+                          labelStyle: TextStyle(fontFamily: fontFamily),
+                          prefixIcon: Icon(PhosphorIcons.mapPin(),
+                              color: AppTheme.themeColor),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 16),
+                        ),
+                        onChanged: (_) => setState(() {}),
                       ),
-                      labelStyle: TextStyle(fontFamily: fontFamily),
-                      prefixIcon: Icon(PhosphorIcons.currencyCircleDollar(), color: AppTheme.themeColor),
-                      border: InputBorder.none,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    ),
-                    onChanged: (_) => setState(() {}),
+                      const Divider(height: 1),
+                      TextField(
+                        controller: _prodController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        style: const TextStyle(color: AppTheme.darkColor),
+                        decoration: InputDecoration(
+                          labelText: isUrdu ? 'پیداوار (من)' : 'Yield (Mun)',
+                          hintText: 'مثلاً 552',
+                          labelStyle: TextStyle(fontFamily: fontFamily),
+                          prefixIcon: Icon(PhosphorIcons.scales(),
+                              color: AppTheme.themeColor),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 16),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+            ],
 
             // 💡 Summary Card (خلاصہ)
             Container(
@@ -227,21 +216,25 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
                   ),
                   const SizedBox(height: 12),
                   _buildSummaryRow(
-                    isUrdu ? 'فی ایکڑ خرچ' : 'Cost / Acre',
-                    'Rs. ${costPerAcre.toStringAsFixed(0)}',
+                    _isAgriculture
+                        ? (isUrdu ? 'فی ایکڑ خرچ' : 'Cost / Acre')
+                        : (isUrdu ? 'کل خرچ' : 'Total Expense'),
+                    'Rs. ${(_isAgriculture ? costPerAcre : expense).toStringAsFixed(0)}',
                     fontFamily,
                   ),
                   const Divider(height: 16, color: Color(0xFFBFDBFE)),
                   _buildSummaryRow(
-                    isUrdu ? 'فی ایکڑ آمدنی' : 'Income / Acre',
+                    _isAgriculture
+                        ? (isUrdu ? 'فی ایکڑ آمدنی' : 'Income / Acre')
+                        : (isUrdu ? 'کل آمدنی' : 'Total Income'),
                     income > 0
-                        ? 'Rs. ${incomePerAcre.toStringAsFixed(0)}'
+                        ? 'Rs. ${(_isAgriculture ? incomePerAcre : income).toStringAsFixed(0)}'
                         : (isUrdu ? 'ابھی درج نہیں' : 'Not recorded'),
                     fontFamily,
                   ),
                   const Divider(height: 16, color: Color(0xFFBFDBFE)),
                   _buildSummaryRow(
-                    isUrdu ? 'منافع' : 'Net Profit',
+                    isUrdu ? 'خالص منافع' : 'Net Profit',
                     income > 0
                         ? 'Rs. ${netProfit.toStringAsFixed(0)}'
                         : (isUrdu ? 'آمدنی درج نہیں' : 'No Income'),
@@ -256,20 +249,24 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
             // 🔵 Primary Complete Button
             AppButton(
               text: widget.isEditingDetails
-                  ? (isUrdu ? 'محفوظ کریں' : 'Save Details')
-                  : (isUrdu ? 'سیزن مکمل کریں' : 'Complete Season'),
+                  ? (isUrdu ? 'تفصیلات محفوظ کریں' : 'Save Details')
+                  : (isUrdu
+                      ? '${_workNoun(isUrdu)} مکمل کریں'
+                      : 'Complete ${_workNoun(isUrdu)}'),
               icon: PhosphorIcons.checkCircle(),
+              size: AppButtonSize.large,
+              isFullWidth: true,
               onPressed: () async {
                 final db = Provider.of<DatabaseService>(context, listen: false);
-                final areaVal = double.tryParse(_areaController.text) ?? widget.season.areaAcres;
-                final prodVal = double.tryParse(_prodController.text) ?? widget.season.productionMun;
-                final incVal = double.tryParse(_incomeController.text) ?? widget.season.totalIncome;
-
+                final areaVal = double.tryParse(_areaController.text) ??
+                    widget.season.areaAcres;
+                final prodVal = double.tryParse(_prodController.text) ??
+                    widget.season.productionMun;
                 final updated = widget.season.copyWith(
                   areaAcres: areaVal,
                   productionMun: prodVal,
-                  totalIncome: incVal,
-                  isActive: widget.isEditingDetails ? widget.season.isActive : false,
+                  isActive:
+                      widget.isEditingDetails ? widget.season.isActive : false,
                   updatedAt: DateTime.now(),
                 );
 
@@ -283,7 +280,8 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
               // Secondary Link: Complete without details
               TextButton(
                 onPressed: () async {
-                  final db = Provider.of<DatabaseService>(context, listen: false);
+                  final db =
+                      Provider.of<DatabaseService>(context, listen: false);
                   final updated = widget.season.copyWith(
                     isActive: false,
                     updatedAt: DateTime.now(),
@@ -292,7 +290,9 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
                   if (context.mounted) Navigator.pop(context);
                 },
                 child: Text(
-                  isUrdu ? 'بغیر تفصیل کے مکمل کریں' : 'Complete without details',
+                  isUrdu
+                      ? 'بغیر تفصیل کے مکمل کریں'
+                      : 'Complete without details',
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.grey[700],

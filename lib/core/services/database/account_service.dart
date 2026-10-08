@@ -86,10 +86,10 @@ class AccountService extends BaseService {
           [];
       double income = transactions
           .where((t) => t.type == 'income')
-          .fold(0.0, (sum, t) => sum + t.amount);
+          .fold(0.0, (sum, t) => sum + t.accountBalanceAmount);
       double expense = transactions
           .where((t) => t.type == 'expense')
-          .fold(0.0, (sum, t) => sum + t.amount);
+          .fold(0.0, (sum, t) => sum + t.accountBalanceAmount);
       double openingBalance = account.initialBalance;
       if (account.balanceType.toLowerCase() == 'payable') {
         openingBalance = -openingBalance;

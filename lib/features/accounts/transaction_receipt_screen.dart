@@ -3,6 +3,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:account_app/core/models/transaction_model.dart';
@@ -16,9 +18,10 @@ import 'add_transaction_screen.dart';
 import 'package:account_app/features/professions/add_project_transaction_screen.dart';
 
 import 'package:account_app/core/widgets/app_button.dart';
-import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/models/notification_model.dart';
+import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'package:screenshot/screenshot.dart';
+import 'package:account_app/features/quick_bill/quick_bill_item_selection_screen.dart';
 
 class TransactionReceiptScreen extends StatefulWidget {
   final Transaction transaction;
@@ -39,6 +42,43 @@ class TransactionReceiptScreen extends StatefulWidget {
 
 class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
   final ScreenshotController _screenshotController = ScreenshotController();
+  String _businessName = '';
+  String _businessPhone = '';
+  String _businessAddress = '';
+
+  @override
+  void initState() {
+    super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    _businessName = user?.displayName?.trim() ?? '';
+    _businessPhone = user?.phoneNumber ?? '';
+    if (user != null) _loadBusinessProfile(user.uid);
+  }
+
+  Future<void> _loadBusinessProfile(String userId) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+      if (!mounted) return;
+      final profile = snapshot.data();
+      setState(() {
+        _businessName = (profile?['displayName'] ?? profile?['name'] ?? '')
+            .toString()
+            .trim()
+            .isNotEmpty
+            ? (profile?['displayName'] ?? profile?['name']).toString().trim()
+            : _businessName;
+        _businessPhone = (profile?['phoneNumber'] ?? '').toString().isNotEmpty
+            ? profile!['phoneNumber'].toString()
+            : _businessPhone;
+        _businessAddress = (profile?['businessAddress'] ?? '').toString().trim();
+      });
+    } catch (error) {
+      debugPrint('Failed to load receipt business profile: $error');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,6 +99,29 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                 .getAccount(widget.transaction.accountId)),
         builder: (context, snapshot) {
           final account = snapshot.data;
+          final databaseService =
+              Provider.of<DatabaseService>(context, listen: false);
+          final savedTransaction =
+              databaseService.getTransaction(widget.transaction.id);
+          final transactionIsInAccountBalance =
+              account != null && savedTransaction?.accountId == account.id;
+          final transactionBalanceChange =
+              widget.transaction.type == 'income'
+                  ? widget.transaction.accountBalanceAmount
+                  : -widget.transaction.accountBalanceAmount;
+          final previousAccountBalance = account == null
+              ? 0.0
+              : account.balance -
+                  (transactionIsInAccountBalance
+                      ? transactionBalanceChange
+                      : 0.0);
+          final totalAccountBalance =
+              previousAccountBalance + transactionBalanceChange;
+          final hasPriorAccountBalance = account != null &&
+              account.id != 'default_account' &&
+              account.id != 'artisan_internal_income' &&
+              account.id != QuickBillConstants.cashCustomerAccountId &&
+              previousAccountBalance.abs() >= 0.01;
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             child: Column(
@@ -84,55 +147,124 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                         ),
                         child: Column(
                           children: [
-                            // Receipt title strip.
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 18, vertical: 13),
-                              decoration: const BoxDecoration(
-                                color: AppTheme.darkColor,
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    isUrdu ? 'رسید' : 'RECEIPT',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontFamily: fontFamily,
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Icon(
-                                    PhosphorIcons.receipt(),
-                                    color: Colors.white70,
-                                    size: 20,
-                                  ),
-                                ],
-                              ),
-                            ),
                             Container(
                               width: double.infinity,
                               padding:
                                   const EdgeInsets.fromLTRB(16, 16, 16, 14),
                               color: const Color(0xFF24445B),
-                              child: ProfileInfoWidget(
-                                name: account?.name ??
-                                    (widget.notification?.data?['senderName'] ??
-                                        (isUrdu ? 'بنام گاہک / نامعلوم' : 'Customer / Unknown')),
-                                phone: account?.phone ??
-                                    (widget.notification?.data?['senderPhone'] ?? ''),
-                                profileImage: account?.profileImage ??
-                                    widget.notification?.data?['senderPhotoUrl'],
-                                isLarge: true,
-                                textColor: Colors.white,
-                                subtitleColor: Colors.white70,
-                                isVerified: account?.isVerified ??
-                                    widget.notification?.data?['isSenderVerified'] ??
-                                    false,
-                                customSize: 45,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        TextSpan(
+                                          text: _businessName.isNotEmpty
+                                              ? _businessName
+                                              : (isUrdu
+                                                  ? 'کاروبار'
+                                                  : 'Business'),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        if (_businessPhone.isNotEmpty)
+                                          TextSpan(
+                                            text: ' · $_businessPhone',
+                                            style: const TextStyle(
+                                              color: Colors.white70,
+                                              fontWeight: FontWeight.normal,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    style: TextStyle(
+                                      fontFamily: fontFamily,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  if (_businessAddress.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _businessAddress,
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontFamily: fontFamily,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 10),
+                                  Divider(
+                                    height: 1,
+                                    color: Colors.white.withValues(alpha: 0.18),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    textDirection: isUrdu
+                                        ? ui.TextDirection.rtl
+                                        : ui.TextDirection.ltr,
+                                    children: [
+                                      Text(
+                                        isUrdu ? 'بنام' : 'Billed to',
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontFamily: fontFamily,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text.rich(
+                                          TextSpan(
+                                            children: [
+                                              TextSpan(
+                                                text: account?.name ??
+                                                    (widget.notification?.data?[
+                                                            'senderName'] ??
+                                                        (isUrdu
+                                                            ? 'گاہک / نامعلوم'
+                                                            : 'Customer / Unknown')),
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontFamily: fontFamily,
+                                                  fontSize: 17,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              if ((account?.phone ??
+                                                      widget.notification
+                                                              ?.data?[
+                                                          'senderPhone'] ??
+                                                      '')
+                                                  .toString()
+                                                  .isNotEmpty) ...[
+                                                const TextSpan(text: '  ·  '),
+                                                TextSpan(
+                                                  text: account?.phone ??
+                                                      widget.notification
+                                                              ?.data?[
+                                                          'senderPhone'] ??
+                                                      '',
+                                                  style: TextStyle(
+                                                    color: Colors.white70,
+                                                    fontFamily: fontFamily,
+                                                    fontSize: 14,
+                                                    fontWeight:
+                                                        FontWeight.normal,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
                             Padding(
@@ -171,41 +303,37 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                                     ),
                                   ),
                                   _receiptDivider(),
-                                  Align(
-                                    alignment: isUrdu
-                                        ? Alignment.centerRight
-                                        : Alignment.centerLeft,
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 10),
-                                      child: Container(
+                                  if (widget.transaction.isPending ||
+                                      widget.transaction.pendingAmount > 0)
+                                    Align(
+                                      alignment: isUrdu
+                                          ? Alignment.centerRight
+                                          : Alignment.centerLeft,
+                                      child: Padding(
                                         padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 5),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFFFF0D7),
-                                          borderRadius:
-                                              BorderRadius.circular(20),
-                                        ),
-                                        child: Text(
-                                          isUrdu
-                                              ? (widget.transaction.type ==
-                                                      'income'
-                                                  ? 'مال ادھار پر دیا گیا'
-                                                  : 'مال ادھار پر لیا گیا')
-                                              : (widget.transaction.type ==
-                                                      'income'
-                                                  ? 'CREDIT'
-                                                  : 'DEBIT'),
-                                          style: TextStyle(
-                                            color: const Color(0xFF8E5200),
-                                            fontFamily: fontFamily,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 11,
+                                            vertical: 10),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 5),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFFF0D7),
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                          ),
+                                          child: Text(
+                                            isUrdu
+                                                ? 'ادائیگی باقی ہے'
+                                                : 'PAYMENT DUE',
+                                            style: TextStyle(
+                                              color: const Color(0xFF8E5200),
+                                              fontFamily: fontFamily,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 11,
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ),
                                   _receiptDivider(),
                                   Directionality(
                                     textDirection: isUrdu
@@ -309,13 +437,31 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                                           textDirection: ui.TextDirection.ltr,
                                           style: const TextStyle(
                                             color: AppTheme.darkColor,
-                                            fontSize: 25,
+                                            fontSize: 19,
                                             fontWeight: FontWeight.w800,
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
+                                  if (hasPriorAccountBalance) ...[
+                                    _receiptDivider(),
+                                    _buildPaymentRow(
+                                      isUrdu
+                                          ? 'پہلے سے بقایا (${previousAccountBalance >= 0 ? 'لینا' : 'دینا'})'
+                                          : 'Previous balance (${previousAccountBalance >= 0 ? 'Receivable' : 'Payable'})',
+                                      previousAccountBalance.abs(),
+                                      isUrdu,
+                                      fontFamily,
+                                    ),
+                                    _buildPaymentRow(
+                                      isUrdu ? 'مجموعی کل رقم' : 'Grand Total',
+                                      (widget.transaction.amount +
+                                          previousAccountBalance.abs()),
+                                      isUrdu,
+                                      fontFamily,
+                                    ),
+                                  ],
                                   if (widget.transaction.receivedAmount > 0 ||
                                       widget.transaction.pendingAmount > 0 ||
                                       widget.transaction.isPending) ...[
@@ -327,7 +473,7 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                                       fontFamily,
                                     ),
                                     _buildPaymentRow(
-                                      isUrdu ? 'بقایا' : 'Balance due',
+                                      isUrdu ? 'فائنل بقایا' : 'Final Balance Due',
                                       widget.transaction.pendingAmount,
                                       isUrdu,
                                       fontFamily,
@@ -379,6 +525,23 @@ class _TransactionReceiptScreenState extends State<TransactionReceiptScreen> {
                       child: AppButton(
                         text: isUrdu ? 'ایڈٹ کریں' : 'Edit',
                         onPressed: () {
+                          final description = widget.transaction.description
+                              .trim()
+                              .toLowerCase();
+                          if (description == 'quick bill' ||
+                              description == 'فوری بل') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    QuickBillItemSelectionScreen(
+                                  transactionToEdit: widget.transaction,
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
                           if (widget.transaction.accountId ==
                                   'default_account' &&
                               widget.transaction.professionId != null) {

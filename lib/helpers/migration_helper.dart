@@ -3,6 +3,7 @@ import 'package:hive/hive.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
+import 'package:account_app/core/constants/quick_bill_constants.dart';
 
 class MigrationHelper {
   // Main function to run all migrations, now accepts open boxes
@@ -41,18 +42,20 @@ class MigrationHelper {
         return;
       }
 
-      print("🔄 Found ${professions.length} professions to check for migration from V1 to V2");
+      print(
+          "🔄 Found ${professions.length} professions to check for migration from V1 to V2");
       int migratedCount = 0;
       int skippedCount = 0;
       final Map<dynamic, Profession> professionsToUpdate = {};
 
-
       for (var oldProfession in professions) {
         bool needsMigration = false;
-        
+
         // Simple check: if seasonKey is null or empty but season has value, it needs key generation.
-        if (oldProfession.season.isNotEmpty && (oldProfession.seasonKey == null || oldProfession.seasonKey!.isEmpty)) {
-            needsMigration = true;
+        if (oldProfession.season.isNotEmpty &&
+            (oldProfession.seasonKey == null ||
+                oldProfession.seasonKey!.isEmpty)) {
+          needsMigration = true;
         }
 
         if (!needsMigration) {
@@ -62,14 +65,16 @@ class MigrationHelper {
 
         final migratedProfession = oldProfession.copyWith(
           updatedAt: DateTime.now(),
-          seasonKey: _generateSeasonKey(oldProfession.name, oldProfession.season),
+          seasonKey:
+              _generateSeasonKey(oldProfession.name, oldProfession.season),
         );
-        
+
         professionsToUpdate[oldProfession.id] = migratedProfession;
         migratedCount++;
-        print("  ✅ Queued for migration: ${oldProfession.name} (${oldProfession.season})");
+        print(
+            "  ✅ Queued for migration: ${oldProfession.name} (${oldProfession.season})");
       }
-      
+
       if (professionsToUpdate.isNotEmpty) {
         await box.putAll(professionsToUpdate);
       }
@@ -78,7 +83,6 @@ class MigrationHelper {
       print("   Total professions checked: ${professions.length}");
       print("   Migrated: $migratedCount");
       print("   Skipped (already V2): $skippedCount");
-
     } catch (e) {
       print("❌ Profession migration error: $e");
       throw e;
@@ -88,8 +92,15 @@ class MigrationHelper {
   // Generate season key
   static String _generateSeasonKey(String name, String season) {
     if (season.isEmpty) return "";
-    String cleanName = name.toLowerCase().replaceAll(' ', '_').replaceAll(RegExp(r'[^\w_]'), '');
-    String cleanSeason = season.toLowerCase().replaceAll(' ', '_').replaceAll('/', '_').replaceAll(RegExp(r'[^\w_]'), '');
+    String cleanName = name
+        .toLowerCase()
+        .replaceAll(' ', '_')
+        .replaceAll(RegExp(r'[^\w_]'), '');
+    String cleanSeason = season
+        .toLowerCase()
+        .replaceAll(' ', '_')
+        .replaceAll('/', '_')
+        .replaceAll(RegExp(r'[^\w_]'), '');
     return "${cleanName}_$cleanSeason";
   }
 
@@ -103,16 +114,21 @@ class MigrationHelper {
       print("🧹 Cleaning up orphaned data...");
       int cleanedTxCount = 0;
       int fixedProfessionCount = 0;
-      
+
       final List<dynamic> transactionsToDelete = [];
 
       // Clean transactions with invalid account IDs
       final allAccountKeys = accountsBox.keys.toSet();
       // Whitelist internal/system account IDs that aren't in accountsBox
-      final systemAccountIds = {'default_account', 'artisan_internal_income'};
-      
+      final systemAccountIds = {
+        'default_account',
+        'artisan_internal_income',
+        QuickBillConstants.cashCustomerAccountId,
+      };
+
       for (var tx in transactionsBox.values) {
-        if (!allAccountKeys.contains(tx.accountId) && !systemAccountIds.contains(tx.accountId)) {
+        if (!allAccountKeys.contains(tx.accountId) &&
+            !systemAccountIds.contains(tx.accountId)) {
           transactionsToDelete.add(tx.key); // Use tx.key as it's a HiveObject
           cleanedTxCount++;
           print("  🗑️ Queued orphaned transaction for deletion: ID ${tx.id}");
@@ -138,7 +154,8 @@ class MigrationHelper {
         }
 
         // Migration Fix: If parentId is null, it MUST be a Master
-        if (profession.parentId == null && (profession.isMaster == null || profession.isMaster == false)) {
+        if (profession.parentId == null &&
+            (profession.isMaster == null || profession.isMaster == false)) {
           newIsMaster = true;
           needsFix = true;
         }
@@ -153,22 +170,22 @@ class MigrationHelper {
           print("  🔧 Fixed/Migrated profession: ${profession.name}");
         }
       }
-      
-      if(professionsToUpdate.isNotEmpty) {
+
+      if (professionsToUpdate.isNotEmpty) {
         await professionsBox.putAll(professionsToUpdate);
       }
 
-      print("✅ Cleanup complete. Deleted $cleanedTxCount transactions and fixed $fixedProfessionCount professions.");
-
+      print(
+          "✅ Cleanup complete. Deleted $cleanedTxCount transactions and fixed $fixedProfessionCount professions.");
     } catch (e) {
       print("⚠️ Cleanup error: $e");
       // Don't throw, cleanup is non-critical
     }
   }
-  
+
   // Database health check, accepts OPEN boxes
   static Future<Map<String, dynamic>> checkDatabaseHealth({
-      required Box<Profession> professionsBox,
+    required Box<Profession> professionsBox,
   }) async {
     final report = <String, dynamic>{
       'status': 'healthy',
@@ -180,15 +197,17 @@ class MigrationHelper {
       final professions = professionsBox.values.toList();
       report['stats']['professions_count'] = professions.length;
 
-      final v1Professions = professions.where((p) =>
-        p.season.isNotEmpty && (p.seasonKey == null || p.seasonKey!.isEmpty)
-      ).toList();
+      final v1Professions = professions
+          .where((p) =>
+              p.season.isNotEmpty &&
+              (p.seasonKey == null || p.seasonKey!.isEmpty))
+          .toList();
 
       if (v1Professions.isNotEmpty) {
-        report['issues'].add('Found ${v1Professions.length} V1 professions that need migration');
+        report['issues'].add(
+            'Found ${v1Professions.length} V1 professions that need migration');
         report['status'] = 'needs_migration';
       }
-      
     } catch (e) {
       report['status'] = 'error';
       report['issues'].add('Error checking database: $e');

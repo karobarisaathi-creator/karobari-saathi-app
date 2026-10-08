@@ -9,9 +9,10 @@ import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/constants/quick_bill_constants.dart';
 
 class ReportsScreen extends StatefulWidget {
-  final Profession? selectedProfession; 
+  final Profession? selectedProfession;
 
   const ReportsScreen({Key? key, this.selectedProfession}) : super(key: key);
 
@@ -59,13 +60,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
     try {
       final db = Provider.of<DatabaseService>(context, listen: false);
       final allProfs = db.getProfessions();
-      _allTransactions = db.getAllTransactions().where((t) => t.partnershipId == null).toList();
+      _allTransactions = db
+          .getAllTransactions()
+          .where((t) => t.partnershipId == null)
+          .toList();
 
       if (widget.selectedProfession != null) {
         if (widget.selectedProfession!.isMaster ?? false) {
-          _availableSeasons = allProfs.where((p) => p.parentId == widget.selectedProfession!.id).toList();
+          _availableSeasons = allProfs
+              .where((p) => p.parentId == widget.selectedProfession!.id)
+              .toList();
           _availableSeasons.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          
+
           if (_availableSeasons.isNotEmpty) {
             _currentViewSeason = _availableSeasons.first;
           } else {
@@ -90,11 +96,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   Map<String, double> _getCategoryData() {
     if (_currentViewSeason == null) return {};
-    
+
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
     Map<String, double> data = {};
-    
-    final filtered = _allTransactions.where((t) => t.professionId == _currentViewSeason!.id).toList();
+
+    final filtered = _allTransactions
+        .where((t) => t.professionId == _currentViewSeason!.id)
+        .toList();
 
     for (var tx in filtered) {
       if (tx.professionSide != _selectedType) continue;
@@ -106,7 +114,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   String _getEffectiveCategory(model.Transaction t, bool isUrdu) {
-    if (t.accountId != 'default_account' && t.accountId != 'artisan_internal_income') {
+    if (t.accountId != 'default_account' &&
+        t.accountId != 'artisan_internal_income' &&
+        t.accountId != QuickBillConstants.cashCustomerAccountId) {
       final db = Provider.of<DatabaseService>(context, listen: false);
       final account = db.getAccount(t.accountId);
       if (account != null) return account.name;
@@ -116,8 +126,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (category.startsWith('INC:')) category = category.substring(4);
     if (category.startsWith('EXP:')) category = category.substring(4);
 
-    if (category == 'income' || category == 'expense' || category == 'دیگر' || category == 'Other') {
-      return isUrdu ? (t.type == 'income' ? 'آمدن' : 'خرچ') : (t.type == 'income' ? 'Income' : 'Expense');
+    if (category == 'income' ||
+        category == 'expense' ||
+        category == 'دیگر' ||
+        category == 'Other') {
+      return isUrdu
+          ? (t.type == 'income' ? 'آمدن' : 'خرچ')
+          : (t.type == 'income' ? 'Income' : 'Expense');
     }
     return category;
   }
@@ -133,32 +148,32 @@ class _ReportsScreenState extends State<ReportsScreen> {
         title: _buildSeasonSelector(isUrdu, fontFamily),
         centerTitle: true,
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildComparisonBars(isUrdu, fontFamily),
-                const SizedBox(height: 32),
-                _buildTypeToggle(isUrdu, fontFamily),
-                const SizedBox(height: 40),
-                _buildChartSection(isUrdu, fontFamily),
-                const SizedBox(height: 40),
-                _buildCategoryList(isUrdu, fontFamily),
-                const SizedBox(height: 40),
-              ],
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildComparisonBars(isUrdu, fontFamily),
+                  const SizedBox(height: 32),
+                  _buildTypeToggle(isUrdu, fontFamily),
+                  const SizedBox(height: 40),
+                  _buildChartSection(isUrdu, fontFamily),
+                  const SizedBox(height: 40),
+                  _buildCategoryList(isUrdu, fontFamily),
+                  const SizedBox(height: 40),
+                ],
+              ),
             ),
-          ),
     );
   }
 
   Widget _buildSeasonSelector(bool isUrdu, String fontFamily) {
     if (_availableSeasons.isEmpty) return const SizedBox.shrink();
-    
-    final currentYear = _currentViewSeason != null 
-        ? DateFormat('yyyy').format(_currentViewSeason!.createdAt) 
+
+    final currentYear = _currentViewSeason != null
+        ? DateFormat('yyyy').format(_currentViewSeason!.createdAt)
         : DateFormat('yyyy').format(DateTime.now());
 
     return InkWell(
@@ -177,7 +192,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ),
           ),
           const SizedBox(width: 4),
-          const Icon(PhosphorIconsStyle.bold == PhosphorIconsStyle.bold ? Icons.unfold_more : Icons.unfold_more, color: Colors.white, size: 18),
+          const Icon(
+              PhosphorIconsStyle.bold == PhosphorIconsStyle.bold
+                  ? Icons.unfold_more
+                  : Icons.unfold_more,
+              color: Colors.white,
+              size: 18),
         ],
       ),
     );
@@ -199,7 +219,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
           children: [
             Text(
               isUrdu ? "سیزن منتخب کریں" : "Select Season",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, fontFamily: fontFamily, color: AppTheme.darkColor),
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  fontFamily: fontFamily,
+                  color: AppTheme.darkColor),
             ),
             const SizedBox(height: 20),
             Flexible(
@@ -215,8 +239,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 itemBuilder: (context, index) {
                   final p = _availableSeasons[index];
                   final isSelected = _currentViewSeason?.id == p.id;
-                  final seasonName = (p.isMaster ?? false) ? (isUrdu ? 'بنیادی کھاتہ' : 'Base Record') : p.season;
-                  
+                  final seasonName = (p.isMaster ?? false)
+                      ? (isUrdu ? 'بنیادی کھاتہ' : 'Base Record')
+                      : p.season;
+
                   return InkWell(
                     onTap: () {
                       setState(() => _currentViewSeason = p);
@@ -225,9 +251,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     child: Container(
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: isSelected ? AppTheme.themeColor : const Color(0xFFF5F7FA),
+                        color: isSelected
+                            ? AppTheme.themeColor
+                            : const Color(0xFFF5F7FA),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: isSelected ? AppTheme.themeColor : Colors.grey.shade200),
+                        border: Border.all(
+                            color: isSelected
+                                ? AppTheme.themeColor
+                                : Colors.grey.shade200),
                       ),
                       child: Text(
                         seasonName,
@@ -253,23 +284,32 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget _buildComparisonBars(bool isUrdu, String fontFamily) {
     final double income = _currentViewSeason?.totalIncome ?? 0.0;
     final double expense = _currentViewSeason?.totalExpense ?? 0.0;
-    final double maxVal = income > expense ? income : (expense == 0 ? 1.0 : expense);
+    final double maxVal =
+        income > expense ? income : (expense == 0 ? 1.0 : expense);
 
     return Column(
       children: [
-        _buildMiniProgressBar(isUrdu ? "خرچ" : "Expense", expense, maxVal, const Color(0xFFFFC107), isUrdu, fontFamily),
+        _buildMiniProgressBar(isUrdu ? "خرچ" : "Expense", expense, maxVal,
+            const Color(0xFFFFC107), isUrdu, fontFamily),
         const SizedBox(height: 16),
-        _buildMiniProgressBar(isUrdu ? "آمدنی" : "Earn", income, maxVal, const Color(0xFF3F51B5), isUrdu, fontFamily),
+        _buildMiniProgressBar(isUrdu ? "آمدنی" : "Earn", income, maxVal,
+            const Color(0xFF3F51B5), isUrdu, fontFamily),
       ],
     );
   }
 
-  Widget _buildMiniProgressBar(String label, double val, double max, Color color, bool isUrdu, String fontFamily) {
+  Widget _buildMiniProgressBar(String label, double val, double max,
+      Color color, bool isUrdu, String fontFamily) {
     return Row(
       children: [
         SizedBox(
           width: 60,
-          child: Text(label, style: TextStyle(fontSize: 13, color: Colors.grey[600], fontFamily: fontFamily, fontWeight: FontWeight.bold)),
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey[600],
+                  fontFamily: fontFamily,
+                  fontWeight: FontWeight.bold)),
         ),
         Expanded(
           child: ClipRRect(
@@ -283,7 +323,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
         ),
         const SizedBox(width: 12),
-        Text("Rs ${val.toStringAsFixed(0)}", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: color)),
+        Text("Rs ${val.toStringAsFixed(0)}",
+            style: TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w900, color: color)),
       ],
     );
   }
@@ -291,14 +333,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget _buildTypeToggle(bool isUrdu, String fontFamily) {
     return Row(
       children: [
-        _buildToggleItem(isUrdu ? "خرچ" : "Expense", 'expense', isUrdu, fontFamily),
+        _buildToggleItem(
+            isUrdu ? "خرچ" : "Expense", 'expense', isUrdu, fontFamily),
         const SizedBox(width: 24),
-        _buildToggleItem(isUrdu ? "آمدنی" : "Earn", 'income', isUrdu, fontFamily),
+        _buildToggleItem(
+            isUrdu ? "آمدنی" : "Earn", 'income', isUrdu, fontFamily),
       ],
     );
   }
 
-  Widget _buildToggleItem(String label, String type, bool isUrdu, String fontFamily) {
+  Widget _buildToggleItem(
+      String label, String type, bool isUrdu, String fontFamily) {
     final isSelected = _selectedType == type;
     return GestureDetector(
       onTap: () => setState(() => _selectedType = type),
@@ -317,8 +362,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
           if (isSelected)
             Container(
               margin: const EdgeInsets.only(top: 4),
-              height: 3, width: 24,
-              decoration: BoxDecoration(color: AppTheme.darkColor, borderRadius: BorderRadius.circular(2)),
+              height: 3,
+              width: 24,
+              decoration: BoxDecoration(
+                  color: AppTheme.darkColor,
+                  borderRadius: BorderRadius.circular(2)),
             ),
         ],
       ),
@@ -328,12 +376,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget _buildChartSection(bool isUrdu, String fontFamily) {
     final catData = _getCategoryData();
     final total = catData.values.fold(0.0, (sum, v) => sum + v);
-    
+
     if (catData.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 40),
-          child: Text(isUrdu ? "کوئی ڈیٹا موجود نہیں" : "No data available", style: TextStyle(color: Colors.grey, fontFamily: fontFamily)),
+          child: Text(isUrdu ? "کوئی ڈیٹا موجود نہیں" : "No data available",
+              style: TextStyle(color: Colors.grey, fontFamily: fontFamily)),
         ),
       );
     }
@@ -367,11 +416,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
               children: [
                 Text(
                   "Rs ${total.toStringAsFixed(0)}",
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.darkColor),
+                  style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.darkColor),
                 ),
                 Text(
-                  isUrdu ? "${catData.length} زمروں میں" : "in ${catData.length} categories",
-                  style: TextStyle(fontSize: 13, color: Colors.grey[500], fontFamily: fontFamily),
+                  isUrdu
+                      ? "${catData.length} زمروں میں"
+                      : "in ${catData.length} categories",
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[500],
+                      fontFamily: fontFamily),
                 ),
               ],
             ),

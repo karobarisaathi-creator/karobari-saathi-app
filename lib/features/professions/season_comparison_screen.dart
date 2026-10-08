@@ -10,17 +10,16 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class SeasonComparisonScreen extends StatefulWidget {
   final Profession seasonA;
-  final Profession seasonB;
+  final Profession? seasonB;
 
   const SeasonComparisonScreen({
     super.key,
     required this.seasonA,
-    required this.seasonB,
+    this.seasonB,
   });
 
   @override
-  State<SeasonComparisonScreen> createState() =>
-      _SeasonComparisonScreenState();
+  State<SeasonComparisonScreen> createState() => _SeasonComparisonScreenState();
 }
 
 class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
@@ -30,12 +29,17 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   @override
   void initState() {
     super.initState();
-    // Sort seasons so newer season is seasonA and older is seasonB
-    if (widget.seasonA.createdAt.isAfter(widget.seasonB.createdAt)) {
+    if (widget.seasonB == null) {
       _newSeason = widget.seasonA;
-      _oldSeason = widget.seasonB;
+      _oldSeason = widget.seasonA;
+      return;
+    }
+    // Sort seasons so newer season is seasonA and older is seasonB
+    if (widget.seasonA.createdAt.isAfter(widget.seasonB!.createdAt)) {
+      _newSeason = widget.seasonA;
+      _oldSeason = widget.seasonB!;
     } else {
-      _newSeason = widget.seasonB;
+      _newSeason = widget.seasonB!;
       _oldSeason = widget.seasonA;
     }
   }
@@ -45,6 +49,11 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
     final languageService = Provider.of<LanguageService>(context);
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
+    final isSingleSeason = widget.seasonB == null;
+    final hasAgricultureData = _newSeason.areaAcres > 0 ||
+        _oldSeason.areaAcres > 0 ||
+        _newSeason.productionMun > 0 ||
+        _oldSeason.productionMun > 0;
 
     final areaA = _newSeason.areaAcres > 0 ? _newSeason.areaAcres : 1.0;
     final areaB = _oldSeason.areaAcres > 0 ? _oldSeason.areaAcres : 1.0;
@@ -72,7 +81,9 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: CustomAppBar(
-        title: isUrdu ? 'سیزن کا موازنہ' : 'Season Comparison',
+        title: isSingleSeason
+            ? (isUrdu ? 'سیزن کی تفصیل' : 'Season Details')
+            : (isUrdu ? 'سیزن کا موازنہ' : 'Season Comparison'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -95,69 +106,77 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                         : _newSeason.name,
                     const Color(0xFF2563EB),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      isUrdu ? 'بمقابلہ' : 'VS',
-                      style: TextStyle(
-                        fontFamily: fontFamily,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[600],
+                  if (!isSingleSeason) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        isUrdu ? 'بمقابلہ' : 'VS',
+                        style: TextStyle(
+                          fontFamily: fontFamily,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[600],
+                        ),
                       ),
                     ),
-                  ),
-                  _buildSeasonPill(
-                    _oldSeason.season.isNotEmpty
-                        ? _oldSeason.season
-                        : _oldSeason.name,
-                    const Color(0xFFD97706),
-                  ),
+                    _buildSeasonPill(
+                      _oldSeason.season.isNotEmpty
+                          ? _oldSeason.season
+                          : _oldSeason.name,
+                      const Color(0xFFD97706),
+                    ),
+                  ],
                 ],
               ),
             ),
             const SizedBox(height: 14),
 
-            // 💡 Summary Card
-            _buildSummaryCard(
-              costDiff: costDiff,
-              prodDiff: prodDiff,
-              profitDiff: profitDiff,
-              rateDiff: rateDiff,
-              isUrdu: isUrdu,
-              fontFamily: fontFamily,
-            ),
-            const SizedBox(height: 14),
+            if (isSingleSeason)
+              _buildSingleSeasonDetails(_newSeason, isUrdu, fontFamily)
+            else if (hasAgricultureData) ...[
+              // 💡 Summary Card
+              _buildSummaryCard(
+                costDiff: costDiff,
+                prodDiff: prodDiff,
+                profitDiff: profitDiff,
+                rateDiff: rateDiff,
+                isUrdu: isUrdu,
+                fontFamily: fontFamily,
+              ),
+              const SizedBox(height: 14),
 
-            // 📊 Key Metrics Table
-            _buildMetricsTable(
-              areaA: areaA,
-              areaB: areaB,
-              costPerAcreA: costPerAcreA,
-              costPerAcreB: costPerAcreB,
-              costDiff: costDiff,
-              prodPerAcreA: prodPerAcreA,
-              prodPerAcreB: prodPerAcreB,
-              prodDiff: prodDiff,
-              rateA: rateA,
-              rateB: rateB,
-              rateDiff: rateDiff,
-              profitPerAcreA: profitPerAcreA,
-              profitPerAcreB: profitPerAcreB,
-              profitDiff: profitDiff,
-              isUrdu: isUrdu,
-              fontFamily: fontFamily,
-            ),
-            const SizedBox(height: 14),
-
-            // 🌾 Expense Breakdown Section
-            _buildExpenseBreakdownCard(isUrdu, fontFamily),
+              // 📊 Key Metrics Table
+              _buildMetricsTable(
+                areaA: areaA,
+                areaB: areaB,
+                costPerAcreA: costPerAcreA,
+                costPerAcreB: costPerAcreB,
+                costDiff: costDiff,
+                prodPerAcreA: prodPerAcreA,
+                prodPerAcreB: prodPerAcreB,
+                prodDiff: prodDiff,
+                rateA: rateA,
+                rateB: rateB,
+                rateDiff: rateDiff,
+                profitPerAcreA: profitPerAcreA,
+                profitPerAcreB: profitPerAcreB,
+                profitDiff: profitDiff,
+                isUrdu: isUrdu,
+                fontFamily: fontFamily,
+              ),
+              const SizedBox(height: 14),
+            ] else
+              _buildGeneralComparison(isUrdu, fontFamily),
             const SizedBox(height: 16),
 
             // Footer Note
             Text(
-              isUrdu
-                  ? 'صرف بند شدہ سیزن کا موازنہ ہوتا ہے۔ پارٹیوں کا ادھار اس میں شامل نہیں۔ سبز کا مطلب آپ کے لیے بہتر، سرخ کا مطلب کمزور۔'
-                  : 'Comparison is based on closed seasons. Green indicates improvement, red indicates decline.',
+              isSingleSeason
+                  ? (isUrdu
+                      ? 'اس سیزن کے درج شدہ آمدن اور اخراجات کی تفصیل۔'
+                      : 'Recorded income and expenses for this season.')
+                  : isUrdu
+                      ? 'صرف بند شدہ سیزن کا موازنہ ہوتا ہے۔ پارٹیوں کا ادھار اس میں شامل نہیں۔ سبز کا مطلب آپ کے لیے بہتر، سرخ کا مطلب کمزور۔'
+                      : 'Comparison is based on closed seasons. Green indicates improvement, red indicates decline.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 11.5,
@@ -168,6 +187,88 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             const SizedBox(height: 24),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSingleSeasonDetails(
+    Profession season,
+    bool isUrdu,
+    String fontFamily,
+  ) {
+    final metrics = <MapEntry<String, double>>[
+      MapEntry(isUrdu ? 'کل آمدن' : 'Total Income', season.totalIncome),
+      MapEntry(isUrdu ? 'کل خرچ' : 'Total Expense', season.totalExpense),
+      MapEntry(isUrdu ? 'خالص منافع' : 'Net Profit', season.netProfit),
+      if (season.areaAcres > 0)
+        MapEntry(isUrdu ? 'رقبہ (ایکڑ)' : 'Area (Acres)', season.areaAcres),
+      if (season.productionMun > 0)
+        MapEntry(
+            isUrdu ? 'پیداوار (من)' : 'Production (Mun)', season.productionMun),
+    ];
+    return _buildValueCard(metrics, fontFamily);
+  }
+
+  Widget _buildGeneralComparison(bool isUrdu, String fontFamily) {
+    final metrics = <MapEntry<String, double>>[
+      MapEntry(isUrdu ? 'کل آمدن' : 'Total Income', _newSeason.totalIncome),
+      MapEntry(isUrdu ? 'کل خرچ' : 'Total Expense', _newSeason.totalExpense),
+      MapEntry(isUrdu ? 'خالص منافع' : 'Net Profit', _newSeason.netProfit),
+    ];
+    return _buildValueCard(
+      metrics,
+      fontFamily,
+      previousValues: [
+        _oldSeason.totalIncome,
+        _oldSeason.totalExpense,
+        _oldSeason.netProfit,
+      ],
+    );
+  }
+
+  Widget _buildValueCard(
+    List<MapEntry<String, double>> metrics,
+    String fontFamily, {
+    List<double>? previousValues,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black12, width: 0.5),
+      ),
+      child: Column(
+        children: [
+          for (var index = 0; index < metrics.length; index++) ...[
+            if (index > 0) const Divider(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    metrics[index].key,
+                    style: TextStyle(
+                      color: AppTheme.darkColor,
+                      fontFamily: fontFamily,
+                    ),
+                  ),
+                ),
+                if (previousValues != null)
+                  Text(
+                    '${previousValues[index].toStringAsFixed(0)}  →  ',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                Text(
+                  metrics[index].value.toStringAsFixed(0),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -493,93 +594,6 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                   color: pillText,
                 ),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildExpenseBreakdownCard(bool isUrdu, String fontFamily) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.black12, width: 0.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            isUrdu ? 'خرچ کی قسم، فی ایکڑ' : 'Expense Breakdown per Acre',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.darkColor,
-              fontFamily: fontFamily,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildExpenseBarRow(isUrdu ? 'کھاد' : 'Fertilizer', 3500, -3500, fontFamily),
-          _buildExpenseBarRow(isUrdu ? 'مزدوری' : 'Labor', 2400, -400, fontFamily),
-          _buildExpenseBarRow(isUrdu ? 'سپرے' : 'Spray', 1200, 500, fontFamily),
-          _buildExpenseBarRow(isUrdu ? 'بیج' : 'Seeds', 1800, 0, fontFamily),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildExpenseBarRow(
-    String category,
-    double amount,
-    double diff,
-    String fontFamily,
-  ) {
-    final isGood = diff <= 0;
-    final sign = diff >= 0 ? '+' : '';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                category,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: fontFamily,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isGood ? const Color(0xFFD1FAE5) : const Color(0xFFFEE2E2),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  '$sign${diff.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.bold,
-                    color: isGood ? const Color(0xFF059669) : const Color(0xFFDC2626),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: 0.6,
-              minHeight: 6,
-              backgroundColor: const Color(0xFFF1F5F9),
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
             ),
           ),
         ],

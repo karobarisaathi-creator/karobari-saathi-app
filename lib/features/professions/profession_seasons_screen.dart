@@ -9,6 +9,7 @@ import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/transaction_model.dart'
     as transaction_model;
+import 'package:account_app/core/config/professions_config.dart';
 import 'categories_management_screen.dart';
 import 'season_comparison_screen.dart';
 import 'complete_season_screen.dart';
@@ -16,7 +17,6 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/features/accounts/transaction_receipt_screen.dart';
-import 'package:account_app/features/accounts/reports_screen.dart';
 import 'package:account_app/features/professions/add_project_transaction_screen.dart';
 
 class ProfessionSeasonsScreen extends StatefulWidget {
@@ -39,6 +39,21 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
     'دیگر'
   ];
   String? _expandedSeasonId;
+
+  bool get _isAgriculture =>
+      ProfessionsConfig.categoryTypeFor(widget.masterProfession) ==
+      ProfessionCategory.agriculture;
+
+  String _workNoun(bool isUrdu, {bool plural = false}) {
+    if (_isAgriculture) {
+      return isUrdu
+          ? (plural ? 'سیزنز' : 'سیزن')
+          : (plural ? 'Seasons' : 'Season');
+    }
+    return isUrdu
+        ? (plural ? 'پروجیکٹس' : 'پروجیکٹ')
+        : (plural ? 'Projects' : 'Project');
+  }
 
   @override
   void initState() {
@@ -108,36 +123,6 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
               fontSize: 20),
         ),
         actions: [
-          Consumer<DatabaseService>(
-            builder: (context, db, child) {
-              final completed = db
-                  .getSeasons(widget.masterProfession.id)
-                  .where((s) => !(s.isActive ?? true))
-                  .toList();
-              if (completed.length < 2) return const SizedBox.shrink();
-
-              return IconButton(
-                icon:
-                    Icon(PhosphorIcons.arrowsLeftRight(), color: Colors.white),
-                onPressed: () => _openComparison(context, completed),
-                tooltip: isUrdu ? 'سیزن کا موازنہ' : 'Compare Seasons',
-              );
-            },
-          ),
-          IconButton(
-            icon: Icon(PhosphorIcons.presentationChart(), color: Colors.white),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ReportsScreen(
-                    selectedProfession: widget.masterProfession,
-                  ),
-                ),
-              );
-            },
-            tooltip: isUrdu ? 'رپورٹ' : 'Report',
-          ),
           IconButton(
             icon: Icon(PhosphorIcons.gear(), color: Colors.white),
             onPressed: () => _navigateToCategoriesScreen(context, isUrdu),
@@ -158,8 +143,11 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
 
           completedSeasons.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
-          final double headerIncome = widget.masterProfession.totalIncome;
-          final double headerExpense = widget.masterProfession.totalExpense;
+          final masterProfession =
+              databaseService.getProfession(widget.masterProfession.id) ??
+                  widget.masterProfession;
+          final double headerIncome = masterProfession.totalIncome;
+          final double headerExpense = masterProfession.totalExpense;
           final netProfit = headerIncome - headerExpense;
 
           return Column(
@@ -369,8 +357,8 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                                 const SizedBox(height: 12),
                                 Text(
                                   isUrdu
-                                      ? 'کوئی جاری سیزن نہیں ہے'
-                                      : 'No active season found',
+                                      ? 'کوئی جاری ${_workNoun(isUrdu)} نہیں ہے'
+                                      : 'No active ${_workNoun(isUrdu).toLowerCase()} found',
                                   style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -380,8 +368,8 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                                 const SizedBox(height: 8),
                                 Text(
                                   isUrdu
-                                      ? 'نیا سیزن شروع کریں تاکہ آپ اپنا حساب الگ رکھ سکیں۔'
-                                      : 'Start a new season to keep your records organized.',
+                                      ? 'نیا ${_workNoun(isUrdu)} شروع کریں تاکہ آپ اپنا حساب الگ رکھ سکیں۔'
+                                      : 'Start a new ${_workNoun(isUrdu).toLowerCase()} to keep your records organized.',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                       fontSize: 13,
@@ -401,8 +389,8 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                                   ),
                                   child: Text(
                                       isUrdu
-                                          ? 'نیا سیزن شروع کریں'
-                                          : 'Start New Season',
+                                          ? 'نیا ${_workNoun(isUrdu)} شروع کریں'
+                                          : 'Start New ${_workNoun(isUrdu)}',
                                       style: TextStyle(fontFamily: fontFamily)),
                                 ),
                               ],
@@ -429,28 +417,18 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                             children: [
                               Text(
                                 isUrdu
-                                    ? 'مکمل شدہ ریکارڈز (پرانے)'
-                                    : 'Completed Records',
+                                    ? 'مکمل شدہ ${_workNoun(isUrdu, plural: true)}'
+                                    : 'Completed ${_workNoun(isUrdu, plural: true)}',
                                 style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
                                     color: AppTheme.darkColor,
                                     fontFamily: fontFamily),
                               ),
-                              if (completedSeasons.length >= 2)
+                              if (completedSeasons.isNotEmpty)
                                 InkWell(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            SeasonComparisonScreen(
-                                          seasonA: completedSeasons[0],
-                                          seasonB: completedSeasons[1],
-                                        ),
-                                      ),
-                                    );
-                                  },
+                                  onTap: () => _openComparison(
+                                      context, completedSeasons),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 8, vertical: 4),
@@ -459,9 +437,13 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
-                                      isUrdu
-                                          ? 'سیزن کا موازنہ'
-                                          : 'Compare Seasons',
+                                      completedSeasons.length == 1
+                                          ? (isUrdu
+                                              ? 'ریکارڈ دیکھیں'
+                                              : 'View Record')
+                                          : (isUrdu
+                                              ? 'موازنہ دیکھیں'
+                                              : 'Compare Records'),
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 11,
@@ -902,6 +884,8 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
             builder: (context) => CategoriesManagementScreen(
                 categories: cleanCategories,
                 isUrdu: isUrdu,
+                categoryType:
+                    ProfessionsConfig.categoryTypeFor(widget.masterProfession),
                 onCategoriesUpdated: (newCats) async {
                   final db =
                       Provider.of<DatabaseService>(context, listen: false);
@@ -936,13 +920,20 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
   void _showStartSeasonDialog(
       BuildContext context, bool isUrdu, String fontFamily) {
     final db = Provider.of<DatabaseService>(context, listen: false);
-
+    final categoryType =
+        ProfessionsConfig.categoryTypeFor(widget.masterProfession);
+    final isAgriculture = categoryType == ProfessionCategory.agriculture;
     String selectedCrop = 'دھان';
     final TextEditingController nameController = TextEditingController(
-      text: 'دھان ${DateTime.now().year}',
+      text: isAgriculture ? 'دھان ${DateTime.now().year}' : '',
     );
     final TextEditingController areaController = TextEditingController();
     final TextEditingController rentController = TextEditingController();
+    final nameFocusNode = FocusNode();
+    final areaFocusNode = FocusNode();
+    final rentFocusNode = FocusNode();
+    bool hasFocusedInput = false;
+    bool focusListenersAttached = false;
 
     final crops = [
       {'name': 'دھان', 'icon': PhosphorIcons.plant()},
@@ -955,238 +946,235 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
       {'name': 'دیگر', 'icon': PhosphorIcons.plus()},
     ];
 
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          insetPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(
-            isUrdu ? 'نیا سیزن شروع کریں' : 'Start New Season',
-            style:
-                TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
-          ),
-          content: SizedBox(
-            width: MediaQuery.of(context).size.width * 0.9,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isUrdu ? 'فصل کی قسم منتخب کریں' : 'Select Crop Type',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[700],
-                        fontFamily: fontFamily),
-                  ),
-                  const SizedBox(height: 8),
+        builder: (context, setDialogState) {
+          if (!focusListenersAttached) {
+            focusListenersAttached = true;
+            for (final focusNode in [
+              nameFocusNode,
+              if (isAgriculture) areaFocusNode,
+              if (isAgriculture) rentFocusNode,
+            ]) {
+              focusNode.addListener(() {
+                final isFocused = nameFocusNode.hasFocus ||
+                    (isAgriculture &&
+                        (areaFocusNode.hasFocus || rentFocusNode.hasFocus));
+                if (isFocused != hasFocusedInput) {
+                  setDialogState(() => hasFocusedInput = isFocused);
+                }
+              });
+            }
+          }
 
-                  // Crop Choice Rows (Exactly 3 items per row)
-                  Column(
-                    children: [
-                      for (int i = 0; i < crops.length; i += 3)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Row(
-                            children: [
-                              for (int j = i; j < i + 3; j++)
-                                if (j < crops.length)
-                                  Expanded(
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 3),
-                                      child: InkWell(
-                                        onTap: () {
-                                          final cropName =
-                                              crops[j]['name'] as String;
-                                          setDialogState(() {
-                                            selectedCrop = cropName;
-                                            nameController.text =
-                                                '$cropName ${DateTime.now().year}';
-                                          });
-                                        },
-                                        borderRadius: BorderRadius.circular(10),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: 10),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                selectedCrop == crops[j]['name']
-                                                    ? AppTheme.themeColor
-                                                        .withValues(alpha: 0.12)
-                                                    : Colors.grey[100],
-                                            borderRadius:
-                                                BorderRadius.circular(10),
-                                            border: Border.all(
-                                              color: selectedCrop ==
-                                                      crops[j]['name']
-                                                  ? AppTheme.themeColor
-                                                  : Colors.grey[300]!,
-                                              width: selectedCrop ==
-                                                      crops[j]['name']
-                                                  ? 2
-                                                  : 1,
-                                            ),
-                                          ),
-                                          child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                crops[j]['icon'] as IconData,
-                                                size: 18,
-                                                color: selectedCrop ==
-                                                        crops[j]['name']
-                                                    ? AppTheme.themeColor
-                                                    : Colors.black87,
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                crops[j]['name'] as String,
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: selectedCrop ==
-                                                          crops[j]['name']
-                                                      ? FontWeight.bold
-                                                      : FontWeight.normal,
-                                                  color: selectedCrop ==
-                                                          crops[j]['name']
-                                                      ? AppTheme.themeColor
-                                                      : Colors.black87,
-                                                  fontFamily: fontFamily,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                else
-                                  const Expanded(child: SizedBox.shrink()),
-                            ],
-                          ),
-                        ),
+          return AlertDialog(
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text(
+              isAgriculture
+                  ? (isUrdu ? 'نیا سیزن شروع کریں' : 'Start New Season')
+                  : (isUrdu ? 'نیا پروجیکٹ شروع کریں' : 'Start New Project'),
+              style: TextStyle(
+                  fontFamily: fontFamily, fontWeight: FontWeight.bold),
+            ),
+            content: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.9,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (isAgriculture) ...[
+                      Text(
+                        isUrdu ? 'فصل کی قسم منتخب کریں' : 'Select Crop Type',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                            fontFamily: fontFamily),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: crops.map((crop) {
+                          final cropName = crop['name'] as String;
+                          return ChoiceChip(
+                            label: Text(cropName),
+                            avatar: Icon(
+                              crop['icon'] as IconData,
+                              size: 16,
+                              color: selectedCrop == cropName
+                                  ? AppTheme.themeColor
+                                  : AppTheme.darkColor,
+                            ),
+                            selected: selectedCrop == cropName,
+                            onSelected: (_) {
+                              setDialogState(() {
+                                selectedCrop = cropName;
+                                nameController.text =
+                                    '$cropName ${DateTime.now().year}';
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
                     ],
-                  ),
-                  const SizedBox(height: 16),
 
-                  // Grouped Inputs Container (Master Profile Style)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
+                    // Grouped Inputs Container (Master Profile Style)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: hasFocusedInput
+                              ? AppTheme.themeColor
+                              : Colors.grey.shade200,
+                          width: hasFocusedInput ? 1.5 : 1,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Column(
+                          children: [
+                            TextField(
+                              controller: nameController,
+                              focusNode: nameFocusNode,
+                              style: const TextStyle(color: AppTheme.darkColor),
+                              decoration: InputDecoration(
+                                labelText: isAgriculture
+                                    ? (isUrdu ? 'سیزن کا نام' : 'Season Name')
+                                    : (isUrdu
+                                        ? 'پروجیکٹ / کام کا نام'
+                                        : 'Project / Work Name'),
+                                labelStyle: TextStyle(fontFamily: fontFamily),
+                                prefixIcon: Icon(PhosphorIcons.textT(),
+                                    color: AppTheme.themeColor),
+                                border: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 14),
+                              ),
+                            ),
+                            if (isAgriculture) ...[
+                              const Divider(height: 1),
+                              TextField(
+                                controller: areaController,
+                                focusNode: areaFocusNode,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                style:
+                                    const TextStyle(color: AppTheme.darkColor),
+                                decoration: InputDecoration(
+                                  labelText: isUrdu
+                                      ? 'رقبہ (ایکڑ) — اختیاری'
+                                      : 'Area (Acres) - Optional',
+                                  hintText: 'مثلاً 12',
+                                  labelStyle: TextStyle(fontFamily: fontFamily),
+                                  prefixIcon: Icon(PhosphorIcons.mapPin(),
+                                      color: AppTheme.themeColor),
+                                  border: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 14),
+                                ),
+                              ),
+                              const Divider(height: 1),
+                              TextField(
+                                controller: rentController,
+                                focusNode: rentFocusNode,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                style:
+                                    const TextStyle(color: AppTheme.darkColor),
+                                decoration: InputDecoration(
+                                  labelText: isUrdu
+                                      ? 'کرایہ زمین فی ایکڑ — اختیاری'
+                                      : 'Land Rent per Acre - Optional',
+                                  hintText: 'اگر اپنی زمین ہے تو خالی چھوڑیں',
+                                  hintStyle: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey[400],
+                                      fontFamily: fontFamily),
+                                  labelStyle: TextStyle(fontFamily: fontFamily),
+                                  prefixIcon: Icon(PhosphorIcons.money(),
+                                      color: AppTheme.themeColor),
+                                  border: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 14),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
-                    child: Column(
-                      children: [
-                        // Season Name
-                        TextField(
-                          controller: nameController,
-                          style: const TextStyle(color: AppTheme.darkColor),
-                          decoration: InputDecoration(
-                            labelText: isUrdu ? 'سیزن کا نام' : 'Season Name',
-                            labelStyle: TextStyle(fontFamily: fontFamily),
-                            prefixIcon: Icon(PhosphorIcons.textT(),
-                                color: AppTheme.themeColor),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 14),
-                          ),
-                        ),
-                        const Divider(height: 1),
-
-                        // Area in Acres
-                        TextField(
-                          controller: areaController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          style: const TextStyle(color: AppTheme.darkColor),
-                          decoration: InputDecoration(
-                            labelText: isUrdu
-                                ? 'رقبہ (ایکڑ) — اختیاری'
-                                : 'Area (Acres) - Optional',
-                            hintText: 'مثلاً 12',
-                            labelStyle: TextStyle(fontFamily: fontFamily),
-                            prefixIcon: Icon(PhosphorIcons.mapPin(),
-                                color: AppTheme.themeColor),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 14),
-                          ),
-                        ),
-                        const Divider(height: 1),
-
-                        // Rent per Acre
-                        TextField(
-                          controller: rentController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          style: const TextStyle(color: AppTheme.darkColor),
-                          decoration: InputDecoration(
-                            labelText: isUrdu
-                                ? 'کرایہ زمین فی ایکڑ — اختیاری'
-                                : 'Land Rent per Acre - Optional',
-                            hintText: 'اگر اپنی زمین ہے تو خالی چھوڑیں',
-                            hintStyle: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[400],
-                                fontFamily: fontFamily),
-                            labelStyle: TextStyle(fontFamily: fontFamily),
-                            prefixIcon: Icon(PhosphorIcons.money(),
-                                color: AppTheme.themeColor),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 14),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(isUrdu ? 'منسوخ' : 'Cancel'),
-            ),
-            AppButton(
-              text: isUrdu ? 'سیزن شروع کریں' : 'Start Season',
-              onPressed: () async {
-                final area = double.tryParse(areaController.text) ?? 0.0;
-                final rent = double.tryParse(rentController.text) ?? 0.0;
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(isUrdu ? 'منسوخ' : 'Cancel'),
+              ),
+              AppButton(
+                text: isAgriculture
+                    ? (isUrdu ? 'سیزن شروع کریں' : 'Start Season')
+                    : (isUrdu ? 'پروجیکٹ شروع کریں' : 'Start Project'),
+                onPressed: () async {
+                  final seasonName = nameController.text.trim();
+                  if (seasonName.isEmpty) {
+                    AppToast.warning(
+                      context,
+                      isUrdu ? 'نام درج کریں' : 'Please enter a name',
+                    );
+                    return;
+                  }
+                  final area = double.tryParse(areaController.text) ?? 0.0;
+                  final rent = double.tryParse(rentController.text) ?? 0.0;
 
-                final newSeason = Profession(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  name: widget.masterProfession.name,
-                  categories: widget.masterProfession.categories,
-                  description: widget.masterProfession.description,
-                  totalProduction: 0,
-                  productionUnit: widget.masterProfession.productionUnit,
-                  season: nameController.text.trim(),
-                  cropType: selectedCrop,
-                  areaAcres: area,
-                  rentPerAcre: rent,
-                  createdAt: DateTime.now(),
-                  updatedAt: DateTime.now(),
-                  isActive: true,
-                  isMaster: false,
-                  parentId: widget.masterProfession.id,
-                );
+                  final newSeason = Profession(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    name: widget.masterProfession.name,
+                    categories: widget.masterProfession.categories,
+                    description: widget.masterProfession.description,
+                    totalProduction: 0,
+                    productionUnit: widget.masterProfession.productionUnit,
+                    season: seasonName,
+                    categoryType: categoryType,
+                    cropType: isAgriculture ? selectedCrop : '',
+                    areaAcres: area,
+                    rentPerAcre: rent,
+                    createdAt: DateTime.now(),
+                    updatedAt: DateTime.now(),
+                    isActive: true,
+                    isMaster: false,
+                    parentId: widget.masterProfession.id,
+                  );
 
-                await db.addProfession(newSeason);
-                if (context.mounted) Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
+                  await db.addProfession(newSeason);
+                  if (context.mounted) Navigator.pop(context);
+                },
+              ),
+            ],
+          );
+        },
       ),
-    );
+    ).whenComplete(() {
+      nameController.dispose();
+      areaController.dispose();
+      rentController.dispose();
+      nameFocusNode.dispose();
+      areaFocusNode.dispose();
+      rentFocusNode.dispose();
+    });
   }
 
   void _showSeasonOptions(BuildContext context, Profession season, bool isUrdu,
@@ -1208,7 +1196,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                     ? (isUrdu
                         ? 'بنیادی ریکارڈ کے اختیارات'
                         : 'Base Record Options')
-                    : '${isUrdu ? 'سیزن' : 'Season'}: ${season.season}',
+                    : '${_workNoun(isUrdu)}: ${season.season}',
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -1220,7 +1208,9 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                 leading: Icon(PhosphorIcons.checkCircle(),
                     color: AppTheme.incomeColor),
                 title: Text(
-                  isUrdu ? 'سیزن مکمل کریں' : 'Complete Season',
+                  isUrdu
+                      ? '${_workNoun(isUrdu)} مکمل کریں'
+                      : 'Complete ${_workNoun(isUrdu)}',
                   style: TextStyle(
                       fontFamily: fontFamily,
                       fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal),
@@ -1317,8 +1307,8 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
             children: [
               Text(
                 isUrdu
-                    ? 'کیا آپ واقعی اس پیشے کا بنیادی ریکارڈ (وہ ٹرانزیکشنز جو کسی سیزن میں نہیں ہیں) صاف کرنا چاہتے ہیں؟ اس سے صرف پرانا ڈیٹا مٹے گا، نئے سیزنز محفوظ رہیں گے۔'
-                    : 'Are you sure you want to clear the base record (transactions not linked to any season)? This will only delete legacy data; active seasons will remain safe.',
+                    ? 'کیا آپ واقعی اس پیشے کا بنیادی ریکارڈ (وہ ٹرانزیکشنز جو کسی ${_workNoun(isUrdu)} سے منسلک نہیں) صاف کرنا چاہتے ہیں؟ اس سے صرف پرانا ڈیٹا مٹے گا، نئے ریکارڈز محفوظ رہیں گے۔'
+                    : 'Are you sure you want to clear the base record (transactions not linked to any ${_workNoun(isUrdu).toLowerCase()})? This will only delete legacy data; active records will remain safe.',
                 style: TextStyle(fontFamily: fontFamily, fontSize: 13),
               ),
               const SizedBox(height: 16),
@@ -1395,7 +1385,9 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           title: Text(
-            isUrdu ? 'حذف کریں؟' : 'Delete Season?',
+            isUrdu
+                ? '${_workNoun(isUrdu)} حذف کریں؟'
+                : 'Delete ${_workNoun(isUrdu)}?',
             style:
                 TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
           ),
@@ -1470,8 +1462,8 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
       AppToast.success(
         context,
         isUrdu
-            ? 'سیزن دوبارہ فعال کر دیا گیا ہے'
-            : 'Season reactivated successfully',
+            ? '${_workNoun(isUrdu)} دوبارہ فعال کر دیا گیا ہے'
+            : '${_workNoun(isUrdu)} reactivated successfully',
       );
     }
   }
@@ -1511,7 +1503,16 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
 
   void _openComparison(
       BuildContext context, List<Profession> completedSeasons) {
-    if (completedSeasons.length == 2) {
+    if (completedSeasons.length == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SeasonComparisonScreen(
+            seasonA: completedSeasons.single,
+          ),
+        ),
+      );
+    } else if (completedSeasons.length == 2) {
       Navigator.push(
         context,
         MaterialPageRoute(

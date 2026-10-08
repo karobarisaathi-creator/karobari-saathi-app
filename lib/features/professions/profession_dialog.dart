@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
@@ -11,7 +10,20 @@ class ProfessionDialog extends StatefulWidget {
   final bool isUrdu;
   final Profession? profession;
   final String? parentId; // Added parentId for seasons
-  final Future<void> Function(String name, List<String> categories, String? description, double totalProduction, String productionUnit, String season, double targetProduction, Map<String, double>? budgetLimits, double benchmarkCostPerUnit, bool isMaster, String? parentId) onSave;
+  final Future<void> Function(
+    String name,
+    List<String> categories,
+    String? description,
+    double totalProduction,
+    String productionUnit,
+    String season,
+    double targetProduction,
+    Map<String, double>? budgetLimits,
+    double benchmarkCostPerUnit,
+    ProfessionCategory categoryType,
+    bool isMaster,
+    String? parentId,
+  ) onSave;
 
   const ProfessionDialog({
     required this.isUrdu,
@@ -25,33 +37,31 @@ class ProfessionDialog extends StatefulWidget {
 }
 
 class _ProfessionDialogState extends State<ProfessionDialog> {
-  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
 
-  String _selectedIcon = 'tools';
+  String _selectedIcon = 'services';
   bool _isSaving = false;
 
-  Map<String, List<MasterProfession>> get _groupedProfessions {
-    final Map<String, List<MasterProfession>> grouped = {};
-    for (var p in ProfessionsConfig.allProfessions) {
-      final cat = widget.isUrdu ? p.categoryUrdu : p.categoryName;
-      if (!grouped.containsKey(cat)) grouped[cat] = [];
-      grouped[cat]!.add(p);
-    }
-    return grouped;
-  }
+  ProfessionGroup get _selectedGroup => ProfessionsConfig.professionGroups
+      .firstWhere((group) => group.id == _selectedIcon);
 
   @override
   void initState() {
     super.initState();
     if (widget.profession != null) {
-      _nameController.text = widget.profession!.name;
+      final categoryType =
+          ProfessionsConfig.categoryTypeFor(widget.profession!);
+      _selectedIcon = ProfessionsConfig.professionGroups
+          .firstWhere(
+            (group) => group.categoryType == categoryType,
+            orElse: () => ProfessionsConfig.professionGroups.last,
+          )
+          .id;
 
       String desc = widget.profession!.description ?? '';
       if (desc.startsWith('ICON:')) {
         try {
           final parts = desc.split('|');
-          _selectedIcon = parts[0].substring(5);
           if (parts.length > 1) {
             _descriptionController.text = parts.sublist(1).join('|');
           } else {
@@ -94,24 +104,17 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
             ),
             const SizedBox(height: 16),
 
-            // Form Fields at Top
+            // Profession description
             Column(
               children: [
-                // Profession Name
-                _buildTextField(
-                  controller: _nameController,
-                  label: widget.isUrdu ? 'پیشہ کا نام' : 'Profession Name',
-                  fontFamily: fontFamily,
-                  fontWeight: fontWeight,
-                ),
-
-                const SizedBox(height: 16),
-
-                // Description
                 _buildTextField(
                   controller: _descriptionController,
-                  label: widget.isUrdu ? 'تفصیل (لازمی)' : 'Description (Required)',
-                  hint: widget.isUrdu ? 'کم از کم 3 سے 4 لائنوں کی تفصیل لکھیں۔' : 'Enter 3-4 lines of description.',
+                  label: widget.isUrdu
+                      ? 'تفصیل (لازمی)'
+                      : 'Description (Required)',
+                  hint: widget.isUrdu
+                      ? 'کم از کم 3 سے 4 لائنوں کی تفصیل لکھیں۔'
+                      : 'Enter 3-4 lines of description.',
                   fontFamily: fontFamily,
                   fontWeight: fontWeight,
                   maxLines: 4,
@@ -122,7 +125,9 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
             const SizedBox(height: 24),
 
             Text(
-              widget.isUrdu ? 'شعبہ یا آئیکن منتخب کریں' : 'Select Profession / Icon',
+              widget.isUrdu
+                  ? 'پیشہ کا شعبہ منتخب کریں'
+                  : 'Select a Profession Category',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
@@ -132,15 +137,7 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
             ),
             const SizedBox(height: 16),
 
-            // Grouped Professions in Cards
-            ..._groupedProfessions.entries.map((entry) {
-              return _buildCategoryCard(
-                category: entry.key,
-                items: entry.value,
-                isUrdu: widget.isUrdu,
-                fontFamily: fontFamily,
-              );
-            }).toList(),
+            _buildCategoryGrid(widget.isUrdu, fontFamily),
 
             const SizedBox(height: 24),
 
@@ -148,16 +145,20 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
             AppButton(
               text: widget.isUrdu ? 'محفوظ کریں' : 'Save Profession',
               onPressed: () async {
-                if (_nameController.text.isNotEmpty && _descriptionController.text.isNotEmpty) {
+                if (_descriptionController.text.trim().isNotEmpty) {
                   setState(() {
                     _isSaving = true;
                   });
-                  
+
                   try {
-                    String finalDescription = "ICON:$_selectedIcon|${_descriptionController.text}";
+                    String finalDescription =
+                        "ICON:$_selectedIcon|${_descriptionController.text}";
 
                     await widget.onSave(
-                      _nameController.text,
+                      widget.profession?.name ??
+                          (widget.isUrdu
+                              ? _selectedGroup.nameUrdu
+                              : _selectedGroup.name),
                       [],
                       finalDescription,
                       widget.profession?.totalProduction ?? 0.0,
@@ -166,7 +167,10 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
                       widget.profession?.targetProduction ?? 0.0,
                       widget.profession?.budgetLimits,
                       widget.profession?.benchmarkCostPerUnit ?? 0.0,
-                      widget.parentId == null && widget.profession == null ? true : (widget.profession?.isMaster ?? false),
+                      _selectedGroup.categoryType,
+                      widget.parentId == null && widget.profession == null
+                          ? true
+                          : (widget.profession?.isMaster ?? false),
                       widget.parentId ?? widget.profession?.parentId,
                     );
                   } finally {
@@ -180,8 +184,8 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
                   AppToast.warning(
                     context,
                     widget.isUrdu
-                        ? 'پیشہ کا نام اور تفصیل درج کریں'
-                        : 'Please enter profession name and description',
+                        ? 'پیشہ کی تفصیل درج کریں'
+                        : 'Please enter a profession description',
                   );
                 }
               },
@@ -196,104 +200,64 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
     );
   }
 
-  Widget _buildCategoryCard({
-    required String category,
-    required List<MasterProfession> items,
-    required bool isUrdu,
-    required String fontFamily,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.darkColor.withOpacity(0.05)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+  Widget _buildCategoryGrid(bool isUrdu, String fontFamily) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 2.6,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            category,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-              color: AppTheme.themeColor,
-              fontFamily: fontFamily,
+      itemCount: ProfessionsConfig.professionGroups.length,
+      itemBuilder: (context, index) {
+        final group = ProfessionsConfig.professionGroups[index];
+        final isSelected = group.id == _selectedIcon;
+        return InkWell(
+          onTap: () => setState(() => _selectedIcon = group.id),
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? AppTheme.themeColor.withOpacity(0.1)
+                  : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isSelected
+                    ? AppTheme.themeColor
+                    : AppTheme.darkColor.withOpacity(0.1),
+                width: isSelected ? 1.5 : 1,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              childAspectRatio: 0.75,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-            ),
-            itemCount: items.length,
-            itemBuilder: (context, idx) {
-              final p = items[idx];
-              final isSelected = _selectedIcon == p.id;
-              final pName = widget.isUrdu ? p.nameUrdu : p.name;
-              return InkWell(
-                onTap: () {
-                  setState(() {
-                    _selectedIcon = p.id;
-                    if (_nameController.text.isEmpty) {
-                      _nameController.text = pName;
-                    }
-                  });
-                },
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: isSelected ? AppTheme.themeColor : AppTheme.backgroundColor.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isSelected ? AppTheme.themeColor : Colors.transparent,
-                          width: 2,
-                        ),
-                      ),
-                      child: Icon(
-                        p.icon,
-                        color: isSelected ? Colors.white : AppTheme.themeColor,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Flexible(
-                      child: Text(
-                        pName,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                          fontFamily: fontFamily,
-                          color: isSelected ? AppTheme.themeColor : AppTheme.darkColor,
-                          height: 1.1,
-                        ),
-                      ),
-                    ),
-                  ],
+            child: Row(
+              children: [
+                Icon(
+                  group.icon,
+                  color: AppTheme.themeColor,
+                  size: 23,
                 ),
-              );
-            },
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isUrdu ? group.nameUrdu : group.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.w600,
+                      fontFamily: fontFamily,
+                      color: AppTheme.darkColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -347,7 +311,6 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
 
   @override
   void dispose() {
-    _nameController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }

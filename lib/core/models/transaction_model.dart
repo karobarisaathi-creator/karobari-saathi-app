@@ -163,6 +163,20 @@ class Transaction extends HiveObject {
 
   double get totalAmount => quantity * rate;
   bool get isFullyPaid => receivedAmount >= amount;
+  bool get isQuickBill {
+    final normalizedDescription = description.trim().toLowerCase();
+    return normalizedDescription == 'quick bill' ||
+        normalizedDescription == 'فوری بل';
+  }
+
+  double get accountBalanceAmount {
+    if (!isQuickBill ||
+        (receivedAmount == 0 && pendingAmount == 0 && amount != 0)) {
+      return amount;
+    }
+    return pendingAmount;
+  }
+
   String get formattedDate => DateFormat('dd/MM/yyyy').format(date);
   String get formattedTime => DateFormat('hh:mm a').format(date);
 

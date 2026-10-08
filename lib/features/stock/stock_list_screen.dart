@@ -1,14 +1,14 @@
 // lib/features/stock/stock_list_screen.dart
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/models/stock_movement_model.dart';
+import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/stock_card.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'add_edit_stock_item_screen.dart';
@@ -27,6 +27,7 @@ class _StockListScreenState extends State<StockListScreen>
   late TabController _tabController;
   String _searchQuery = '';
   bool _isAscending = true;
+  bool _showSearch = false;
 
   @override
   void initState() {
@@ -51,51 +52,91 @@ class _StockListScreenState extends State<StockListScreen>
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: isUrdu ? 'اسٹاک اور انوینٹری' : 'Stock & Inventory',
-        showBackButton: false,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         centerTitle: true,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          indicatorWeight: 3,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          labelStyle: TextStyle(
+        title: Text(
+          isUrdu ? 'اسٹاک اور انوینٹری' : 'Stock & Inventory',
+          style: TextStyle(
+            color: Colors.white,
             fontFamily: fontFamily,
             fontWeight: FontWeight.bold,
-            fontSize: 13,
+            fontSize: 18,
           ),
-          tabs: [
-            Tab(text: isUrdu ? 'میری آئٹمز' : 'My Items'),
-            Tab(text: isUrdu ? 'کم اسٹاک' : 'Low Stock'),
-            Tab(text: isUrdu ? 'اسٹاک ہسٹری' : 'History Log'),
-          ],
         ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+          tooltip: isUrdu ? 'پیچھے جائیں' : 'Back',
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              _showSearch ? Icons.search_off : PhosphorIcons.magnifyingGlass(),
+              color: Colors.white,
+            ),
+            onPressed: () {
+              setState(() {
+                _showSearch = !_showSearch;
+                if (!_showSearch) {
+                  _searchQuery = '';
+                }
+              });
+            },
+            tooltip: isUrdu ? 'تلاش' : 'Search',
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Column(
         children: [
           // 📊 Top Valuation Summary Header
           _buildSummaryHeader(summary, isUrdu, fontFamily),
 
-          // 🔍 Search Bar
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: SearchSortBar(
-              hintText: isUrdu ? 'آئٹم تلاش کریں...' : 'Search stock item...',
-              onSearchChanged: (val) => setState(() => _searchQuery = val),
-              onSortToggled: () => setState(() => _isAscending = !_isAscending),
-              isAscending: _isAscending,
+          // TabBar
+          Container(
+            color: Colors.white,
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: AppTheme.themeColor,
+              labelColor: AppTheme.darkColor,
+              unselectedLabelColor: Colors.grey,
+              labelStyle: TextStyle(
+                fontFamily: fontFamily,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+              tabs: [
+                Tab(text: isUrdu ? 'میری آئٹمز' : 'My Items'),
+                Tab(text: isUrdu ? 'کم اسٹاک' : 'Low Stock'),
+                Tab(text: isUrdu ? 'اسٹاک ہسٹری' : 'History Log'),
+              ],
             ),
           ),
+
+          // 🔍 Search Bar (Conditional)
+          if (_showSearch)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: SearchSortBar(
+                hintText: isUrdu ? 'آئٹم تلاش کریں...' : 'Search stock item...',
+                onSearchChanged: (val) => setState(() => _searchQuery = val),
+                onSortToggled: () => setState(() => _isAscending = !_isAscending),
+                isAscending: _isAscending,
+              ),
+            ),
 
           // 📄 Tab Views
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildItemListTab(stockService, isUrdu, fontFamily, filterLowStock: false),
-                _buildItemListTab(stockService, isUrdu, fontFamily, filterLowStock: true),
+                _buildItemListTab(stockService, isUrdu, fontFamily,
+                    filterLowStock: false),
+                _buildItemListTab(stockService, isUrdu, fontFamily,
+                    filterLowStock: true),
                 _buildHistoryTab(stockService, isUrdu, fontFamily),
               ],
             ),
@@ -131,14 +172,20 @@ class _StockListScreenState extends State<StockListScreen>
     String fontFamily,
   ) {
     final totalPurchaseValue = summary['totalPurchaseValue'] as double? ?? 0.0;
-    final totalSalesPotentialValue = summary['totalSalesPotentialValue'] as double? ?? 0.0;
+    final totalSalesPotentialValue =
+        summary['totalSalesPotentialValue'] as double? ?? 0.0;
     final lowStockCount = summary['lowStockCount'] as int? ?? 0;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 56,
+        bottom: 16,
+        left: 16,
+        right: 16,
+      ),
       decoration: const BoxDecoration(
         color: AppTheme.darkColor,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
       ),
       child: Row(
         children: [
@@ -192,7 +239,9 @@ class _StockListScreenState extends State<StockListScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 12, color: isWarning ? const Color(0xFFFBBF24) : Colors.white70),
+              Icon(icon,
+                  size: 12,
+                  color: isWarning ? const Color(0xFFFBBF24) : Colors.white70),
               const SizedBox(width: 4),
               Flexible(
                 child: FittedBox(
@@ -228,17 +277,20 @@ class _StockListScreenState extends State<StockListScreen>
 
     if (_searchQuery.isNotEmpty) {
       items = items.where((i) {
-        final nameMatches = i.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            i.nameUrdu.contains(_searchQuery);
-        final codeMatches = i.barcode.contains(_searchQuery);
+        final nameMatches =
+            i.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                i.nameUrdu.contains(_searchQuery);
+        final codeMatches = i.barcode.contains(_searchQuery) ||
+            i.sku.toLowerCase().contains(_searchQuery.toLowerCase());
         return nameMatches || codeMatches;
       }).toList();
     }
 
     if (filterLowStock) {
       items = items.where((i) {
+        if (!i.trackStock) return false;
         final stock = stockService.calculateCurrentStock(i.id);
-        return stock <= i.minStockAlert;
+        return stock > 0 && stock <= i.minStockAlert;
       }).toList();
     }
 
@@ -257,7 +309,9 @@ class _StockListScreenState extends State<StockListScreen>
               const SizedBox(height: 12),
               Text(
                 filterLowStock
-                    ? (isUrdu ? 'تمام اسٹاک تسلی بخش ہے' : 'No low stock alerts!')
+                    ? (isUrdu
+                        ? 'تمام اسٹاک تسلی بخش ہے'
+                        : 'No low stock alerts!')
                     : (isUrdu ? 'کوئی آئٹم نہیں ملی' : 'No stock items found'),
                 style: TextStyle(
                   fontSize: 15,
@@ -331,11 +385,47 @@ class _StockListScreenState extends State<StockListScreen>
       itemCount: movements.length,
       itemBuilder: (context, index) {
         final m = movements[index];
+        StockItem? stockItem;
+        if (m.stockItemId.isNotEmpty) {
+          stockItem = stockService.items
+              .where((item) => item.id == m.stockItemId)
+              .firstOrNull;
+        }
+
+        String typeLabel;
+        switch (m.type) {
+          case StockMovementType.purchase:
+          case StockMovementType.customerReturn:
+            typeLabel = m.type == StockMovementType.purchase
+                ? (isUrdu ? 'خریداری (Stock In)' : 'Purchase')
+                : (isUrdu ? 'گاہک کی واپسی' : 'Customer Return');
+            break;
+          case StockMovementType.sale:
+          case StockMovementType.supplierReturn:
+            typeLabel = m.type == StockMovementType.sale
+                ? (isUrdu ? 'فروخت (Stock Out)' : 'Sale')
+                : (isUrdu ? 'سپلاٸر کو واپسی' : 'Supplier Return');
+            break;
+          case StockMovementType.adjustment:
+            typeLabel = isUrdu ? 'ایڈجسٹمنٹ' : 'Adjustment';
+            break;
+        }
+
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: ListTile(
+            leading: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: 40,
+                height: 40,
+                color: AppTheme.themeColor.withValues(alpha: 0.1),
+                child: _buildMovementAvatar(stockItem, m, isUrdu),
+              ),
+            ),
             title: Text(
               m.stockItemName,
               style: TextStyle(
@@ -345,7 +435,7 @@ class _StockListScreenState extends State<StockListScreen>
               ),
             ),
             subtitle: Text(
-              '${m.type.name.toUpperCase()} • ${m.reason}',
+              '$typeLabel • ${m.reason}',
               style: const TextStyle(fontSize: 11, color: Colors.grey),
             ),
             trailing: Text(
@@ -356,5 +446,51 @@ class _StockListScreenState extends State<StockListScreen>
         );
       },
     );
+  }
+
+  Widget _buildMovementAvatar(
+      StockItem? stockItem, StockMovement m, bool isUrdu) {
+    final path = stockItem?.imagePath;
+    if (path == null || path.isEmpty) {
+      return Center(
+        child: Text(
+          m.stockItemName.isNotEmpty ? m.stockItemName[0] : '?',
+          style: TextStyle(
+              color: AppTheme.darkColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 14),
+        ),
+      );
+    }
+    final uri = Uri.tryParse(path);
+    final isRemote =
+        uri != null && (uri.scheme == 'https' || uri.scheme == 'http');
+    return isRemote
+        ? Image.network(
+            path,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Center(
+              child: Text(
+                m.stockItemName.isNotEmpty ? m.stockItemName[0] : '?',
+                style: TextStyle(
+                    color: AppTheme.darkColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14),
+              ),
+            ),
+          )
+        : Image.file(
+            File(path),
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Center(
+              child: Text(
+                m.stockItemName.isNotEmpty ? m.stockItemName[0] : '?',
+                style: TextStyle(
+                    color: AppTheme.darkColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14),
+              ),
+            ),
+          );
   }
 }

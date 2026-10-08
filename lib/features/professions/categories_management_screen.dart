@@ -1,32 +1,29 @@
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/config/professions_config.dart';
+import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
-
-// مرکزی ڈیفالٹ لسٹ جو پوری ایپ میں استعمال ہوگی
-List<String> getAppDefaultCategories(bool isUrdu) {
-  return isUrdu 
-      ? ['مزدوری', 'مٹیریل', 'ٹرانسپورٹ', 'فروخت', 'کرایہ', 'کھاد', 'بیج', 'دیگر'] 
-      : ['Labor', 'Material', 'Transport', 'Sale', 'Rent', 'Fertilizer', 'Seed', 'Other'];
-}
 
 class CategoriesManagementScreen extends StatefulWidget {
   final List<String> categories;
   final bool isUrdu;
+  final ProfessionCategory categoryType;
   final Function(List<String>) onCategoriesUpdated;
 
-  const CategoriesManagementScreen({
-    super.key, 
-    required this.categories, 
-    required this.isUrdu, 
-    required this.onCategoriesUpdated
-  });
+  const CategoriesManagementScreen(
+      {super.key,
+      required this.categories,
+      required this.isUrdu,
+      required this.categoryType,
+      required this.onCategoriesUpdated});
 
   @override
-  _CategoriesManagementScreenState createState() => _CategoriesManagementScreenState();
+  _CategoriesManagementScreenState createState() =>
+      _CategoriesManagementScreenState();
 }
 
-class _CategoriesManagementScreenState extends State<CategoriesManagementScreen> {
+class _CategoriesManagementScreenState
+    extends State<CategoriesManagementScreen> {
   late List<String> _categories;
 
   @override
@@ -37,15 +34,21 @@ class _CategoriesManagementScreenState extends State<CategoriesManagementScreen>
 
   void _loadCategories() {
     // پرانے کوڈ کے سابقے (Prefixes) صاف کریں
-    _categories = widget.categories.map((c) {
-      if (c.startsWith('INC:')) return c.substring(4);
-      if (c.startsWith('EXP:')) return c.substring(4);
-      return c;
-    }).toSet().toList();
+    _categories = widget.categories
+        .map((c) {
+          if (c.startsWith('INC:')) return c.substring(4);
+          if (c.startsWith('EXP:')) return c.substring(4);
+          return c;
+        })
+        .toSet()
+        .toList();
 
     // اگر لسٹ خالی ہو تو ڈیفالٹ زمرے دکھائیں
     if (_categories.isEmpty) {
-      _categories = getAppDefaultCategories(widget.isUrdu);
+      _categories = ProfessionsConfig.defaultCategories(
+        widget.categoryType,
+        isUrdu: widget.isUrdu,
+      );
     }
   }
 
@@ -60,9 +63,8 @@ class _CategoriesManagementScreenState extends State<CategoriesManagementScreen>
         title: widget.isUrdu ? 'زمرے مینج کریں' : 'Manage Categories',
         actions: [
           IconButton(
-            icon: const Icon(Icons.check, color: Colors.white), 
-            onPressed: _saveCategories
-          )
+              icon: const Icon(Icons.check, color: Colors.white),
+              onPressed: _saveCategories)
         ],
       ),
       body: Column(
@@ -77,14 +79,19 @@ class _CategoriesManagementScreenState extends State<CategoriesManagementScreen>
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, color: AppTheme.themeColor, size: 20),
+                  const Icon(Icons.info_outline,
+                      color: AppTheme.themeColor, size: 20),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      widget.isUrdu 
-                        ? 'یہ زمرے آپ کے پیشے کے لین دین میں استعمال ہوں گے۔' 
-                        : 'These categories will be used in your profession transactions.',
-                      style: TextStyle(fontSize: 12, color: AppTheme.themeColor, fontFamily: fontFamily, fontWeight: fontWeight),
+                      widget.isUrdu
+                          ? 'یہ زمرے آپ کے پیشے کے لین دین میں استعمال ہوں گے۔'
+                          : 'These categories will be used in your profession transactions.',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.themeColor,
+                          fontFamily: fontFamily,
+                          fontWeight: fontWeight),
                     ),
                   ),
                 ],
@@ -102,13 +109,23 @@ class _CategoriesManagementScreenState extends State<CategoriesManagementScreen>
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 5)],
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 5)
+                    ],
                   ),
                   child: ListTile(
-                    title: Text(cat, style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight, fontSize: 15)),
+                    title: Text(cat,
+                        style: TextStyle(
+                            fontFamily: fontFamily,
+                            fontWeight: fontWeight,
+                            fontSize: 15)),
                     trailing: IconButton(
-                      icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
-                      onPressed: () => setState(() => _categories.removeAt(index)),
+                      icon: const Icon(Icons.remove_circle_outline,
+                          color: Colors.red, size: 20),
+                      onPressed: () =>
+                          setState(() => _categories.removeAt(index)),
                     ),
                   ),
                 );
@@ -121,7 +138,8 @@ class _CategoriesManagementScreenState extends State<CategoriesManagementScreen>
         onPressed: _showAddCategoryDialog,
         backgroundColor: AppTheme.darkColor,
         icon: const Icon(Icons.add, color: Colors.white),
-        label: Text(widget.isUrdu ? 'نیا زمرہ' : 'Add Category', style: TextStyle(fontFamily: fontFamily, color: Colors.white)),
+        label: Text(widget.isUrdu ? 'نیا زمرہ' : 'Add Category',
+            style: TextStyle(fontFamily: fontFamily, color: Colors.white)),
       ),
     );
   }
@@ -133,18 +151,23 @@ class _CategoriesManagementScreenState extends State<CategoriesManagementScreen>
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(widget.isUrdu ? 'نیا زمرہ' : 'New Category', style: TextStyle(fontFamily: fontFamily)),
+        title: Text(widget.isUrdu ? 'نیا زمرہ' : 'New Category',
+            style: TextStyle(fontFamily: fontFamily)),
         content: TextField(
           controller: controller,
           autofocus: true,
           style: TextStyle(fontFamily: fontFamily),
           decoration: InputDecoration(
-            hintText: widget.isUrdu ? 'زمرہ کا نام لکھیں...' : 'Enter category name...',
+            hintText: widget.isUrdu
+                ? 'زمرہ کا نام لکھیں...'
+                : 'Enter category name...',
             hintStyle: TextStyle(fontFamily: fontFamily, fontSize: 13),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text(widget.isUrdu ? 'منسوخ' : 'Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(widget.isUrdu ? 'منسوخ' : 'Cancel')),
           ElevatedButton(
             onPressed: () {
               if (controller.text.trim().isNotEmpty) {
@@ -152,7 +175,8 @@ class _CategoriesManagementScreenState extends State<CategoriesManagementScreen>
                 Navigator.pop(context);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.darkColor),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppTheme.darkColor),
             child: Text(widget.isUrdu ? 'شامل کریں' : 'Add'),
           ),
         ],
