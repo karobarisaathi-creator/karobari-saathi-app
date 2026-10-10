@@ -81,7 +81,6 @@ class _PartyCardState extends State<PartyCard> {
     final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
 
     final bool isPayable = widget.party.balance > 0;
-    final bool isReceivable = widget.party.balance < 0;
     final bool isSettled = widget.party.balance == 0;
 
     final Color balanceColor = isSettled 
@@ -220,14 +219,6 @@ class _PartyCardState extends State<PartyCard> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              if (widget.party.isVerified) ...[
-                                const SizedBox(width: 4),
-                                Icon(
-                                  PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
-                                  size: 16,
-                                  color: AppTheme.verifiedGold,
-                                ),
-                              ],
                             ],
                           ),
                           const SizedBox(height: 4),

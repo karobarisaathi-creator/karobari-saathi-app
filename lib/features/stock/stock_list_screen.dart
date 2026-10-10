@@ -14,6 +14,7 @@ import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'add_edit_stock_item_screen.dart';
 import 'stock_detail_screen.dart';
 import 'stock_adjustment_dialog.dart';
+import 'sales_analytics_screen.dart';
 
 class StockListScreen extends StatefulWidget {
   const StockListScreen({super.key});
@@ -57,6 +58,7 @@ class _StockListScreenState extends State<StockListScreen>
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
+        automaticallyImplyLeading: false,
         title: Text(
           isUrdu ? 'اسٹاک اور انوینٹری' : 'Stock & Inventory',
           style: TextStyle(
@@ -65,11 +67,6 @@ class _StockListScreenState extends State<StockListScreen>
             fontWeight: FontWeight.bold,
             fontSize: 18,
           ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-          tooltip: isUrdu ? 'پیچھے جائیں' : 'Back',
         ),
         actions: [
           IconButton(
@@ -86,6 +83,22 @@ class _StockListScreenState extends State<StockListScreen>
               });
             },
             tooltip: isUrdu ? 'تلاش' : 'Search',
+          ),
+          IconButton(
+            icon: Icon(
+              PhosphorIcons.plusCircle(),
+              color: Colors.white,
+              size: 26,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AddEditStockItemScreen(),
+                ),
+              );
+            },
+            tooltip: isUrdu ? 'نیا آئٹم' : 'Add Item',
           ),
           const SizedBox(width: 8),
         ],
@@ -123,7 +136,8 @@ class _StockListScreenState extends State<StockListScreen>
               child: SearchSortBar(
                 hintText: isUrdu ? 'آئٹم تلاش کریں...' : 'Search stock item...',
                 onSearchChanged: (val) => setState(() => _searchQuery = val),
-                onSortToggled: () => setState(() => _isAscending = !_isAscending),
+                onSortToggled: () =>
+                    setState(() => _isAscending = !_isAscending),
                 isAscending: _isAscending,
               ),
             ),
@@ -142,26 +156,6 @@ class _StockListScreenState extends State<StockListScreen>
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const AddEditStockItemScreen(),
-            ),
-          );
-        },
-        backgroundColor: AppTheme.darkColor,
-        icon: Icon(PhosphorIcons.plus(), color: Colors.white),
-        label: Text(
-          isUrdu ? 'نیا آئٹم' : 'Add Item',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontFamily: fontFamily,
-          ),
-        ),
       ),
     );
   }
@@ -185,30 +179,89 @@ class _StockListScreenState extends State<StockListScreen>
       ),
       decoration: const BoxDecoration(
         color: AppTheme.darkColor,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(15)),
       ),
-      child: Row(
+      child: Column(
         children: [
-          _buildSummaryItem(
-            isUrdu ? 'خرید مالیت' : 'Purchase Value',
-            'Rs. ${totalPurchaseValue.toStringAsFixed(0)}',
-            PhosphorIcons.arrowDownLeft(),
-            fontFamily,
+          Row(
+            children: [
+              _buildSummaryItem(
+                isUrdu ? 'خرید مالیت' : 'Purchase Value',
+                'Rs. ${totalPurchaseValue.toStringAsFixed(0)}',
+                PhosphorIcons.arrowDownLeft(),
+                fontFamily,
+              ),
+              _buildDivider(),
+              _buildSummaryItem(
+                isUrdu ? 'فروخت مالیت' : 'Sales Value',
+                'Rs. ${totalSalesPotentialValue.toStringAsFixed(0)}',
+                PhosphorIcons.arrowUpRight(),
+                fontFamily,
+              ),
+              _buildDivider(),
+              _buildSummaryItem(
+                isUrdu ? 'کم اسٹاک الرٹس' : 'Low Stock',
+                '$lowStockCount ${isUrdu ? 'آئٹمز' : 'items'}',
+                PhosphorIcons.bellRinging(),
+                fontFamily,
+                isWarning: lowStockCount > 0,
+              ),
+            ],
           ),
-          _buildDivider(),
-          _buildSummaryItem(
-            isUrdu ? 'فروخت مالیت' : 'Sales Value',
-            'Rs. ${totalSalesPotentialValue.toStringAsFixed(0)}',
-            PhosphorIcons.arrowUpRight(),
-            fontFamily,
-          ),
-          _buildDivider(),
-          _buildSummaryItem(
-            isUrdu ? 'کم اسٹاک الرٹس' : 'Low Stock',
-            '$lowStockCount ${isUrdu ? 'آئٹمز' : 'items'}',
-            PhosphorIcons.bellRinging(),
-            fontFamily,
-            isWarning: lowStockCount > 0,
+          const SizedBox(height: 14),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SalesAnalyticsScreen(),
+                  ),
+                );
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      PhosphorIcons.chartLine(),
+                      size: 16,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isUrdu
+                          ? 'سیلز اور سرمایہ کاری کا تفصیلی تجزیہ'
+                          : 'Sales & Investment Analytics',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        fontFamily: fontFamily,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 12,
+                      color: Colors.white70,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),

@@ -41,9 +41,6 @@ class Account {
   @HiveField(13, defaultValue: true)
   final bool isActive;
 
-  @HiveField(14, defaultValue: false)
-  final bool isVerified;
-
   @HiveField(15)
   final String? storeName;
 
@@ -63,7 +60,6 @@ class Account {
     required this.createdAt,
     required this.updatedAt,
     this.isActive = true,
-    this.isVerified = false,
     this.storeName,
     this.storeImage,
   });
@@ -82,7 +78,6 @@ class Account {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'isActive': isActive,
-      'isVerified': isVerified,
       'storeName': storeName,
       'storeImage': storeImage,
     };
@@ -110,7 +105,6 @@ class Account {
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
       isActive: map['isActive'] ?? true,
-      isVerified: map['isVerified'] ?? false,
       storeName: map['storeName']?.toString(),
       storeImage: map['storeImage']?.toString(),
     );
@@ -128,7 +122,6 @@ class Account {
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isActive,
-    bool? isVerified,
     String? storeName,
     String? storeImage,
   }) {
@@ -145,7 +138,6 @@ class Account {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
       isActive: isActive ?? this.isActive,
-      isVerified: isVerified ?? this.isVerified,
       storeName: storeName ?? this.storeName,
       storeImage: storeImage ?? this.storeImage,
     );

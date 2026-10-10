@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/profession_model.dart';
@@ -17,31 +18,18 @@ class SyncService extends BaseService {
       _txSub,
       _proSub,
       _catSub,
-      _userSub;
+      _connectivitySub;
+  bool _hasCompletedInitialFetch = false;
+  String? _listeningUserId;
 
   void startRealtimeSync() {
     final user = auth.currentUser;
     if (user == null) return;
+    if (_listeningUserId == user.uid && _accountsSub != null) return;
     stopRealtimeSync();
+    _listeningUserId = user.uid;
 
     final userDoc = firestore.collection('users').doc(user.uid);
-
-    // User Profile Listener for verification status
-    _userSub = userDoc.snapshots().listen((doc) async {
-      if (doc.exists) {
-        final data = doc.data()!;
-        final isVerified = data['isVerified'] == true;
-        try {
-          final myAccount = accountsBox?.values
-              .firstWhere((a) => a.phone == user.phoneNumber);
-          if (myAccount != null && myAccount.isVerified != isVerified) {
-            await accountsBox?.put(
-                myAccount.id, myAccount.copyWith(isVerified: isVerified));
-            notifyListeners();
-          }
-        } catch (_) {}
-      }
-    });
 
     _accountsSub = userDoc.collection('accounts').snapshots().listen((snap) {
       for (var c in snap.docChanges) {
@@ -102,7 +90,11 @@ class SyncService extends BaseService {
     _txSub?.cancel();
     _proSub?.cancel();
     _catSub?.cancel();
-    _userSub?.cancel();
+    _accountsSub = null;
+    _txSub = null;
+    _proSub = null;
+    _catSub = null;
+    _listeningUserId = null;
   }
 
   Future<void> syncWithFirebase() async {
@@ -111,10 +103,6 @@ class SyncService extends BaseService {
 
     final batch = firestore.batch();
     final userDoc = firestore.collection('users').doc(user.uid);
-
-    bool isVerified = false;
-    final uDoc = await userDoc.get();
-    if (uDoc.exists) isVerified = uDoc.data()?['isVerified'] == true;
 
     if (accountsBox != null) {
       for (var a in accountsBox!.values)
@@ -138,6 +126,7 @@ class SyncService extends BaseService {
   Future<void> fetchFromFirebase() async {
     final user = auth.currentUser;
     if (user == null) return;
+    startRealtimeSync();
     final userDoc = firestore.collection('users').doc(user.uid);
 
     final snaps = await Future.wait([
@@ -156,17 +145,46 @@ class SyncService extends BaseService {
     for (var d in snaps[3].docs)
       await categoriesBox?.put(d.id, Category.fromMap(d.data()));
 
+    for (final account in accountsBox?.values ?? <Account>[]) {
+      await _accountService.recalculateAccountBalance(account.id);
+    }
+    for (final profession in professionsBox?.values ?? <Profession>[]) {
+      await _professionService.recalculateProfessionFinance(profession.id);
+    }
+    _hasCompletedInitialFetch = true;
     notifyListeners();
   }
 
   void setupConnectivityListener() {
-    Connectivity().onConnectivityChanged.listen((results) {
-      if (results.any((r) => r != ConnectivityResult.none)) syncWithFirebase();
-    });
+    if (_connectivitySub != null) return;
+    _connectivitySub =
+        Connectivity().onConnectivityChanged.listen(_handleConnectivityChange);
+  }
+
+  void stopConnectivityListener() {
+    _connectivitySub?.cancel();
+    _connectivitySub = null;
+  }
+
+  Future<void> _handleConnectivityChange(
+    List<ConnectivityResult> results,
+  ) async {
+    if (!results.any((result) => result != ConnectivityResult.none)) return;
+    try {
+      if (_hasCompletedInitialFetch) {
+        await syncWithFirebase();
+      } else {
+        await fetchFromFirebase();
+      }
+    } catch (error) {
+      debugPrint('Connectivity data sync failed: $error');
+    }
   }
 
   Future<void> prepareForLogout() async {
     stopRealtimeSync();
+    stopConnectivityListener();
+    _hasCompletedInitialFetch = false;
     await clearAllBoxes();
   }
 }

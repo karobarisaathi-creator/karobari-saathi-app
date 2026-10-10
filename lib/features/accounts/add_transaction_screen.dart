@@ -1233,6 +1233,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
 
     final stockService = Provider.of<StockService>(context, listen: false);
+    final requestedStockById = <String, double>{};
     for (final entry in _itemEntries) {
       final stockItemId = entry.stockItemId;
       if (stockItemId == null) continue;
@@ -1256,21 +1257,35 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         _setSuggestedStockRate(entry, defaultRate);
       }
 
-      if (type == 'income' && stockItem.trackStock && stockItem.stopWhenOut) {
-        final requestedQuantity = _effectiveEntryQuantity(entry);
-        final availableQuantity = stockService.availableStockForTransaction(
+      if (type == 'income' && stockItem.trackStock) {
+        requestedStockById.update(
           stockItemId,
-          excludingTransactionId: widget.transactionToEdit?.id,
+          (quantity) => quantity + _effectiveEntryQuantity(entry),
+          ifAbsent: () => _effectiveEntryQuantity(entry),
         );
-        if (requestedQuantity > availableQuantity) {
-          _showSnackBar(
-            isUrdu
-                ? '${stockItem.name} کا دستیاب اسٹاک ${availableQuantity.toStringAsFixed(1)} ہے'
-                : 'Available ${stockItem.name} stock is ${availableQuantity.toStringAsFixed(1)}',
-            true,
-          );
-          return;
-        }
+      }
+    }
+
+    for (final requested in requestedStockById.entries) {
+      final stockItem = stockService.items.firstWhere(
+        (item) => item.id == requested.key,
+      );
+      final availableQuantity = stockService.availableStockForTransaction(
+        stockItem.id,
+        excludingTransactionId: widget.transactionToEdit?.id,
+      );
+      if (!StockService.canSellQuantity(
+        availableStock: availableQuantity,
+        quantity: requested.value,
+        stopWhenOut: stockItem.stopWhenOut,
+      )) {
+        _showSnackBar(
+          isUrdu
+              ? '${stockItem.name} کا دستیاب اسٹاک ${availableQuantity.toStringAsFixed(1)} ہے'
+              : 'Available ${stockItem.name} stock is ${availableQuantity.toStringAsFixed(1)}',
+          true,
+        );
+        return;
       }
     }
 
@@ -1377,11 +1392,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   partyPhoneNumber: account.phone,
                   amount: grandTotal,
                   transactionType: type,
+                  category: transaction.category,
+                  paymentMethod: transaction.paymentMethod,
                   description: transaction.description,
                   items: transaction.items.map((e) => e.toMap()).toList(),
                   receivedAmount: transaction.receivedAmount,
                   pendingAmount: transaction.pendingAmount,
                   transactionId: transaction.id,
+                  transactionDate: transaction.date,
+                  referenceNumber: transaction.referenceNumber,
+                  subtotal: transaction.subtotal,
+                  discountAmount: transaction.discountAmount,
+                  discountPercent: transaction.discountPercent,
+                  discountReason: transaction.discountReason,
                 )
                 .catchError((e) => debugPrint(e.toString()));
           }

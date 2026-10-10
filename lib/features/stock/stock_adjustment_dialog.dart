@@ -36,17 +36,18 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
 
   bool get _shouldShowTypeSelector {
     return widget.showTypeSelector ??
-        (widget.initialType == StockMovementType.adjustment);
+        (widget.initialType == StockMovementType.customerReturn ||
+            widget.initialType == StockMovementType.supplierReturn);
   }
 
   @override
   void initState() {
     super.initState();
     _selectedType = widget.initialType;
-    final initialPrice =
-        (_selectedType == StockMovementType.sale && widget.item.sellingPrice > 0)
-            ? widget.item.sellingPrice
-            : widget.item.purchasePrice;
+    final initialPrice = (_selectedType == StockMovementType.sale &&
+            widget.item.sellingPrice > 0)
+        ? widget.item.sellingPrice
+        : widget.item.purchasePrice;
     _priceController.text =
         initialPrice > 0 ? initialPrice.toStringAsFixed(0) : '';
     _qtyController.addListener(_onQtyChanged);
@@ -386,7 +387,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
   }
 
   // ═════════════════════════════════════════════
-  // 1. Type Selector (2×2 + full)
+  // 1. Type Selector
   // ═════════════════════════════════════════════
   Widget _buildTypeSelector(bool isUrdu, String? fontFamily) {
     return Column(
@@ -394,37 +395,11 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
       children: [
         _buildSectionLabel(
           icon: PhosphorIcons.checkSquare(),
-          text: isUrdu ? 'اینٹری کی قسم' : 'MOVEMENT TYPE',
+          text: isUrdu ? 'واپسی کی قسم' : 'RETURN TYPE',
         ),
         const SizedBox(height: 10),
 
-        // Row 1: Purchase + Sale
-        Row(
-          children: [
-            Expanded(
-              child: _buildTypePill(
-                type: StockMovementType.purchase,
-                icon: PhosphorIcons.arrowDownLeft(),
-                label: isUrdu ? 'خریداری (+)' : 'Purchase (+)',
-                color: AppTheme.incomeColor,
-                fontFamily: fontFamily,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildTypePill(
-                type: StockMovementType.sale,
-                icon: PhosphorIcons.arrowUpRight(),
-                label: isUrdu ? 'فروخت (−)' : 'Sale (−)',
-                color: AppTheme.expenseColor,
-                fontFamily: fontFamily,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-
-        // Row 2: Customer Return + Supplier Return
+        // Customer Return + Supplier Return
         Row(
           children: [
             Expanded(
@@ -447,17 +422,6 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 8),
-
-        // Full: Adjustment
-        _buildTypePill(
-          type: StockMovementType.adjustment,
-          icon: PhosphorIcons.sliders(),
-          label: isUrdu ? 'ایڈجسٹمنٹ' : 'Manual Adjustment',
-          color: const Color(0xFFD97706),
-          fontFamily: fontFamily,
-          full: true,
         ),
       ],
     );
@@ -484,9 +448,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
               ? const EdgeInsets.symmetric(horizontal: 14, vertical: 12)
               : const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
           decoration: BoxDecoration(
-            color: isActive
-                ? color.withValues(alpha: 0.08)
-                : Colors.white,
+            color: isActive ? color.withValues(alpha: 0.08) : Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isActive ? color : AppTheme.backgroundColor,
@@ -494,62 +456,62 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
             ),
             boxShadow: isActive
                 ? [
-              BoxShadow(
-                color: color.withValues(alpha: 0.15),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ]
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.15),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
                 : null,
           ),
           child: full
               ? Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildPillIcon(icon, color, isActive, size: 26),
-              const SizedBox(width: 10),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: isActive ? color : AppTheme.darkColor,
-                  fontFamily: fontFamily,
-                  letterSpacing: -0.1,
-                ),
-              ),
-            ],
-          )
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildPillIcon(icon, color, isActive, size: 26),
+                    const SizedBox(width: 10),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: isActive ? color : AppTheme.darkColor,
+                        fontFamily: fontFamily,
+                        letterSpacing: -0.1,
+                      ),
+                    ),
+                  ],
+                )
               : Column(
-            children: [
-              _buildPillIcon(icon, color, isActive),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: isActive ? color : AppTheme.darkColor,
-                  fontFamily: fontFamily,
-                  letterSpacing: -0.1,
+                  children: [
+                    _buildPillIcon(icon, color, isActive),
+                    const SizedBox(height: 6),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: isActive ? color : AppTheme.darkColor,
+                        fontFamily: fontFamily,
+                        letterSpacing: -0.1,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
         ),
       ),
     );
   }
 
   Widget _buildPillIcon(
-      IconData icon,
-      Color color,
-      bool isActive, {
-        double size = 30,
-      }) {
+    IconData icon,
+    Color color,
+    bool isActive, {
+    double size = 30,
+  }) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       width: size,
@@ -570,10 +532,10 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
   // 2. Quantity Section
   // ═════════════════════════════════════════════
   Widget _buildQuantitySection(
-      bool isUrdu,
-      String? fontFamily,
-      BuildContext context,
-      ) {
+    bool isUrdu,
+    String? fontFamily,
+    BuildContext context,
+  ) {
     final availableStock = _getAvailableStock(context);
     final qty = _currentQty;
 
@@ -616,7 +578,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                       controller: _qtyController,
                       textAlign: TextAlign.center,
                       keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                          const TextInputType.numberWithOptions(decimal: true),
                       style: TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 32,
@@ -709,11 +671,11 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
   }
 
   Widget _buildLivePreview(
-      double qty,
-      double availableStock,
-      bool isUrdu,
-      String? fontFamily,
-      ) {
+    double qty,
+    double availableStock,
+    bool isUrdu,
+    String? fontFamily,
+  ) {
     // Determine preview state
     bool isIncreasePreview = _isIncrease;
     bool isDecreasePreview = _isDecrease;
@@ -938,9 +900,8 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
       ),
       child: Row(
-        crossAxisAlignment: maxLines > 1
-            ? CrossAxisAlignment.start
-            : CrossAxisAlignment.center,
+        crossAxisAlignment:
+            maxLines > 1 ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
           Padding(
             padding: EdgeInsets.only(
@@ -1035,7 +996,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
               borderRadius: BorderRadius.circular(14),
               child: Container(
                 padding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 decoration: BoxDecoration(
                   color: AppTheme.backgroundColor,
                   borderRadius: BorderRadius.circular(14),
@@ -1063,8 +1024,8 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                 onTap: _isSaving ? null : () => _submit(isUrdu),
                 borderRadius: BorderRadius.circular(14),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [submitColor, submitColor2],

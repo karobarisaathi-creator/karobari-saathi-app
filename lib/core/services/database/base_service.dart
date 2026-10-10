@@ -31,12 +31,24 @@ class BaseService extends ChangeNotifier {
 
   // Hive Boxes کو کھولیں
   Future<void> openBoxes() async {
-    await Hive.openBox<Account>('accounts');
-    await Hive.openBox<model.Transaction>('transactions');
-    await Hive.openBox<Category>('categories');
-    await Hive.openBox<Profession>('professions');
-    await Hive.openBox<List>('remote_cached_items');
-    await Hive.openBox('settings');
+    if (!Hive.isBoxOpen('accounts')) {
+      await Hive.openBox<Account>('accounts');
+    }
+    if (!Hive.isBoxOpen('transactions')) {
+      await Hive.openBox<model.Transaction>('transactions');
+    }
+    if (!Hive.isBoxOpen('categories')) {
+      await Hive.openBox<Category>('categories');
+    }
+    if (!Hive.isBoxOpen('professions')) {
+      await Hive.openBox<Profession>('professions');
+    }
+    if (!Hive.isBoxOpen('remote_cached_items')) {
+      await Hive.openBox<List>('remote_cached_items');
+    }
+    if (!Hive.isBoxOpen('settings')) {
+      await Hive.openBox('settings');
+    }
   }
 
   // Hive Boxes بند کریں

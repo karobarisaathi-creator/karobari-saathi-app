@@ -68,8 +68,6 @@ class NotificationCard extends StatelessWidget {
                                     (isUrdu ? 'صارف' : 'User'),
                                 phone: data?['senderPhone'] ?? '',
                                 profileImage: data?['senderPhotoUrl'],
-                                isVerified: data?['isSenderVerified'] == true ||
-                                    data?['isSenderVerified'] == 'true',
                                 customSize: 42,
                                 borderRadius: 6,
                               ),

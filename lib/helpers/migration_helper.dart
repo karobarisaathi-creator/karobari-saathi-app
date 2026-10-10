@@ -118,7 +118,7 @@ class MigrationHelper {
       final List<dynamic> transactionsToDelete = [];
 
       // Clean transactions with invalid account IDs
-      final allAccountKeys = accountsBox.keys.toSet();
+      final allAccountIds = accountsBox.values.map((a) => a.id).toSet();
       // Whitelist internal/system account IDs that aren't in accountsBox
       final systemAccountIds = {
         'default_account',
@@ -127,16 +127,12 @@ class MigrationHelper {
       };
 
       for (var tx in transactionsBox.values) {
-        if (!allAccountKeys.contains(tx.accountId) &&
+        if (tx.accountId.isNotEmpty &&
+            !allAccountIds.contains(tx.accountId) &&
+            accountsBox.get(tx.accountId) == null &&
             !systemAccountIds.contains(tx.accountId)) {
-          transactionsToDelete.add(tx.key); // Use tx.key as it's a HiveObject
-          cleanedTxCount++;
-          print("  🗑️ Queued orphaned transaction for deletion: ID ${tx.id}");
+          print("  ⚠️ Transaction referencing unknown account ID: ${tx.accountId}");
         }
-      }
-
-      if (transactionsToDelete.isNotEmpty) {
-        await transactionsBox.deleteAll(transactionsToDelete);
       }
 
       // Clean professions with invalid data (e.g., null fields that should not be)

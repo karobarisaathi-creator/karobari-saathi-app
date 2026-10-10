@@ -103,15 +103,4 @@ class AccountService extends BaseService {
   Future<int> getPendingDuesCount() async =>
       accountsBox?.values.where((p) => p.balance != 0).length ?? 0;
 
-  Future<void> updateMyVerificationStatus(bool isVerified) async {
-    final user = auth.currentUser;
-    if (user == null || accountsBox == null) return;
-    try {
-      final myAccount =
-          accountsBox!.values.firstWhere((a) => a.phone == user.phoneNumber);
-      await accountsBox!
-          .put(myAccount.id, myAccount.copyWith(isVerified: isVerified));
-      notifyListeners();
-    } catch (_) {}
-  }
 }

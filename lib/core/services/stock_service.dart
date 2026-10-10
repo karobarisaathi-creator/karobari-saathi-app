@@ -92,9 +92,31 @@ class StockService with ChangeNotifier {
     required StockMovement movement,
     bool stopWhenOut = true,
   }) {
-    if (!stopWhenOut && movement.type == StockMovementType.sale) return true;
+    if (!movement.quantity.isFinite) return false;
+    if (movement.type != StockMovementType.adjustment &&
+        movement.quantity < 0) {
+      return false;
+    }
+    if (movement.type == StockMovementType.sale) {
+      return canSellQuantity(
+        availableStock: availableStock,
+        quantity: movement.quantity,
+        stopWhenOut: stopWhenOut,
+      );
+    }
     final stockDelta = movement.stockDelta;
     return stockDelta >= 0 || availableStock + stockDelta >= -0.000001;
+  }
+
+  static bool canSellQuantity({
+    required double availableStock,
+    required double quantity,
+    bool stopWhenOut = true,
+  }) {
+    if (!availableStock.isFinite || !quantity.isFinite || quantity < 0) {
+      return false;
+    }
+    return !stopWhenOut || availableStock - quantity >= -0.000001;
   }
 
   double calculateCurrentStock(String itemId) {
@@ -130,9 +152,7 @@ class StockService with ChangeNotifier {
 
     for (final movement in _movements) {
       final belongsToTransaction =
-          (excludingTransactionId != null &&
-              movement.transactionId == excludingTransactionId) ||
-              movement.transactionId == excludingTransactionId ||
+          movement.transactionId == excludingTransactionId ||
               movement.note == 'Transaction $excludingTransactionId';
       if (movement.stockItemId != itemId || !belongsToTransaction) continue;
       available -= movement.stockDelta;
@@ -186,12 +206,29 @@ class StockService with ChangeNotifier {
 
         final quantity = entry.value.fold<double>(
           0,
-          (sum, item) => sum + item.quantity,
+          (total, item) => total + item.quantity,
         );
-        final amount = entry.value.fold<double>(
+        final subtotal = entry.value.fold<double>(
           0,
-          (sum, item) => sum + item.total,
+          (total, item) =>
+              total + (item.total > 0 ? item.total : item.quantity * item.rate),
         );
+        final transactionSubtotal = transaction.subtotal > 0
+            ? transaction.subtotal
+            : transaction.items.fold<double>(
+                0,
+                (total, item) =>
+                    total +
+                    (item.total > 0 ? item.total : item.quantity * item.rate),
+              );
+        final discountShare = transaction.type == 'income' &&
+                transaction.discountAmount > 0 &&
+                transactionSubtotal > 0
+            ? (transaction.discountAmount * (subtotal / transactionSubtotal))
+                .clamp(0.0, subtotal)
+                .toDouble()
+            : 0.0;
+        final discountedAmount = subtotal - discountShare;
         final stockItemId = entry.key;
         final encodedStockItemId = Uri.encodeComponent(stockItemId);
         final movementId = 'tx_${transaction.id}_$encodedStockItemId';
@@ -203,7 +240,7 @@ class StockService with ChangeNotifier {
               ? StockMovementType.sale
               : StockMovementType.purchase,
           quantity: quantity,
-          unitPrice: quantity > 0 ? amount / quantity : 0,
+          unitPrice: quantity > 0 ? discountedAmount / quantity : 0,
           reason: transaction.type == 'income'
               ? 'Transaction sale'
               : 'Transaction purchase',
@@ -211,7 +248,7 @@ class StockService with ChangeNotifier {
           partyId: transaction.accountId,
           partyName: partyName,
           transactionId: transaction.id,
-          timestamp: transaction.updatedAt,
+          timestamp: transaction.date,
         );
       }
     }
@@ -323,7 +360,8 @@ class StockService with ChangeNotifier {
     final user = _auth.currentUser;
     if (user == null) throw StateError('Sign in to upload a stock image.');
     if (!await image.exists()) {
-      throw FileSystemException('The selected stock image is unavailable.', image.path);
+      throw FileSystemException(
+          'The selected stock image is unavailable.', image.path);
     }
 
     final extension = image.path.split('.').last.toLowerCase();

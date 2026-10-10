@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
@@ -28,7 +27,6 @@ class ProfileInfoWidget extends StatelessWidget {
   final Color? subtitleColor;
   final Color? categoryColor;
   final bool hasUpdate;
-  final bool isVerified;
   final bool isFavorite;
   final Widget? suffix;
   final Widget? bottom;
@@ -61,7 +59,6 @@ class ProfileInfoWidget extends StatelessWidget {
     this.subtitleColor,
     this.categoryColor,
     this.hasUpdate = false,
-    this.isVerified = false,
     this.isFavorite = false,
     this.suffix,
     this.bottom,
@@ -284,14 +281,6 @@ class ProfileInfoWidget extends StatelessWidget {
                 ),
               ),
             ),
-            if (isVerified) ...[
-              const SizedBox(width: 4),
-              Icon(
-                PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
-                size: isLarge ? 20 : 14,
-                color: AppTheme.verifiedGold,
-              ),
-            ],
           ],
         ),
         if (displayCategory.isNotEmpty) ...[
@@ -389,14 +378,6 @@ class ProfileInfoWidget extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            if (isVerified) ...[
-                              const SizedBox(width: 4),
-                              Icon(
-                                PhosphorIcons.sealCheck(PhosphorIconsStyle.fill),
-                                size: isLarge ? 18 : 14,
-                                color: AppTheme.verifiedGold,
-                              ),
-                            ],
                           ],
                         ),
                       ),

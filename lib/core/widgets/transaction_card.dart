@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:account_app/core/models/transaction_model.dart';
-import 'package:account_app/features/accounts/transaction_receipt_screen.dart';
+import 'package:account_app/core/utils/receipt_helper.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 
@@ -88,15 +88,14 @@ class TransactionCard extends StatelessWidget {
           ],
         ),
         onTap: () {
-          // اگر باہر سے کوئی خاص فنکشن دیا گیا ہے تو وہ چلے، ورنہ رسید کھلے
+          // اگر باہر سے کوئی خاص فنکشن دیا گیا ہے تو وہ چلے، ورنہ رسید کا پوپ اپ کھلے
           if (onTap != null) {
             onTap!();
           } else {
-            Navigator.push(
+            ReceiptHelper.showReceiptDialog(
               context,
-              MaterialPageRoute(
-                builder: (context) => TransactionReceiptScreen(transaction: transaction),
-              ),
+              transaction: transaction,
+              isLocalTransaction: true,
             );
           }
         },

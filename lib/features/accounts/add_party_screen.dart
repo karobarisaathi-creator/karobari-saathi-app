@@ -198,7 +198,6 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                                   isLarge: true,
                                   isVerticalCategory: true,
                                   customSize: 90, // تصویر کا سائز بڑھا دیا گیا
-                                  isVerified: (_foundProfile != null && _foundProfile!['isVerified'] == 'true') || (widget.partyToEdit?.isVerified ?? false),
                                 ),
                                 if (_foundProfile != null) ...[
                                   const Divider(height: 24, thickness: 0.5),

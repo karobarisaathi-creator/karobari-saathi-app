@@ -1,0 +1,680 @@
+================================================================================
+KAROBARI SAATHI — COMPLETE AUDIT REPORT
+کاروباری ساتھی — مکمل آڈٹ رپورٹ
+Date: 10 October 2026
+Type: Static code review (lib, tests, firestore.rules)
+Overall health: YELLOW (پیلا) — architecture اچھی ہے، production accounting/sync ابھی محفوظ نہیں
+================================================================================
+
+یہ رپورٹ Flutter پروجیکٹ کے سورس سے تیار کی گئی ہے۔ Runtime پر ہر اسکرین نہیں چلائی گئی۔
+
+
+================================================================================
+1) سمری (OVERALL SUMMARY)
+================================================================================
+
+Metric                              Count
+----------------------------------- ----------
+lib Dart files                      131 (بشمول .g.dart)
+Feature screens / dialogs           ~31
+Test files                          12
+Bugs / issues logged                32
+  - Critical (فوری)                 8
+  - Important (جلد)                 14
+  - Nice to have (بعد میں)          10
+Overall health                      YELLOW
+
+جو چیز ٹھیک ہے:
+- Hive-first save، پھر Firebase fire-and-forget
+- Balance = income − expense
+- Profession netProfit = totalIncome − totalExpense
+- Discount clamp (% اور Rs)
+- Division-by-zero guards
+- Stock stockDelta signs درست
+- Party list ListView / loading / empty refresh
+- NooriNastaleeq + Directionality RTL
+- Quick Bill fully-paid کا balance میں 0 contribution
+- موجودہ unit tests (cycle remainder, receipt discount, pending amount, stock)
+
+جو چیز production روکتی ہے:
+- Quick Bill credit sale کا sign (لینا/دینا الٹ)
+- Cycle میں opening balance غائب
+- Firebase stale account.balance Hive کو overwrite کر سکتا ہے
+- Firestore rules کافی کھلی ہیں
+- navigatorKey ہر rebuild پر نیا بنتا ہے
+
+
+================================================================================
+2) فائل بہ فائل تجزیہ
+================================================================================
+
+Generated .g.dart اور زیادہ تر l10n یہاں تفصیل سے نہیں۔ Accounting / sync / UI منطق نیچے۔
+
+
+--------------------------------------------------------------------------------
+FILE: lib/core/utils/account_balance_utils.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- Cycle epsilon 0.01 rounding کے لیے درست ہے
+- Receipt breakdown: subtotal → discount → received
+- Same-day order: date → createdAt → id
+- Unit tests موجود ہیں
+
+Bugs:
+- Line 30–82: cycle صرف transactions سے چلتا ہے، initialBalance شامل نہیں
+  Opening 500 ہو اور txs برابر ہوں تو UI "حساب برابر" دکھا سکتا ہے جبکہ اصل باقی 500 ہے
+- Line 48: cycle reset کے بعد header پر صرف current cycle کی جمع/بنام آتی ہیں، lifetime نہیں
+  dashboard کے party.balance سے mismatch
+
+FIX:
+  static AccountCycleBalance currentCycle(
+    Iterable<Transaction> transactions, {
+    double openingBalance = 0,
+  }) {
+    // seed running total from opening, then add txs
+    // reset only when totalRunning.abs() < 0.01
+  }
+
+Accounting:
+- جمع/بنام math: OK
+- Balance formula: OK
+- Cycle: FAIL (opening missing)
+
+Edge:
+- خالی list → 0 : OK
+- settled ledger last-cycle restore (lines 54–72): OK مگر opening کے ساتھ غلط
+
+
+--------------------------------------------------------------------------------
+FILE: lib/core/models/transaction_model.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- accountBalanceAmount Quick Bill پر صرف pendingAmount (tests confirm)
+- professionSide INC:/EXP: prefix سمجھتا ہے
+- subtotal ?? amount backward compatible
+
+Bugs:
+- Line 157–162: fromMap میں id, type, category, description null ہوں تو runtime type error
+- Line 152: DateTime.parse throw کر سکتا ہے (Account میں tryParse ہے)
+- Line 190: totalAmount => quantity * rate UI/save میں کم استعمال
+
+FIX:
+  id: map['id']?.toString() ?? '',
+  type: map['type']?.toString() ?? 'income',
+  category: map['category']?.toString() ?? '',
+  description: map['description']?.toString() ?? '',
+  // dates: tryParse like Account
+
+Accounting:
+- Quick Bill pending-only: OK
+- غیر Quick Bill ہمیشہ full amount: OK
+  (جزوی وصولی ledger میں نہیں اترتی — by design)
+
+
+--------------------------------------------------------------------------------
+FILE: lib/core/services/database/account_service.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- Line 87–97: newBalance = opening + income − expense، accountBalanceAmount استعمال
+- Payable opening: opening = -initialBalance
+
+Bugs:
+- Line 80–99: نیا balance صرف Hive؛ Firebase account doc update نہیں
+- Line 36: update() اگر cloud doc موجود نہ ہو تو fail۔ set(..., SetOptions(merge: true)) بہتر
+- Line 50–57: delete پر ہر transaction کا cloud await — آف لائن hang
+- Line 110: firstWhere phone match پر throw → empty catch
+
+FIX:
+- recalculateAccountBalance کے بعد set(account.toMap()) fire-and-forget
+- delete cloud کو catchError کی طرح غیر-blocking رکھیں
+
+Accounting:
+- formula: OK
+- receivable opening مثبت رہتا ہے، UI مثبت = دینا ہے → opening "receivable" الٹ دکھے (Warning)
+
+
+--------------------------------------------------------------------------------
+FILE: lib/core/services/database/transaction_service.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- Local save → balance recalc → profession recalc → notify → background Firestore
+- Account change پر دونوں accounts recalc
+- addTransaction box null پر واضح StateError
+
+Bugs:
+- Line 8–9: نئی AccountService() / ProfessionService() — Provider والے instance کو notifyListeners نہیں ملتا
+  (Hive پھر بھی update ہوتا ہے؛ UI تبھی refresh جب DatabaseService notify کرے)
+- Line 72: update() missing doc پر fail
+- Line 47: transactionsBox?.put اگر box null ہو تو خاموشی
+
+Accounting:
+- Save / Update / Delete path: OK
+
+
+--------------------------------------------------------------------------------
+FILE: lib/core/services/database/profession_service.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- Season پھر master rollup
+- professionSide سے income/expense
+- Budget alert category normalize (EXP:Seed)
+- % change پر /0 guard
+
+Bugs:
+- Line 173–181: season خود Firebase پر update نہیں، صرف master۔ Season totals cloud پر stale رہ سکتے ہیں
+- Line 44–63: profession delete txs کو Hive سے ہٹاتا ہے مگر party account balance recalc نہیں
+
+FIX:
+- delete کے بعد unique accountIds پر recalculateAccountBalance
+
+Accounting:
+- Profit: OK
+- Budget: Warning (party screen سے آنے والی txs پر INC: prefix نہیں)
+
+
+--------------------------------------------------------------------------------
+FILE: lib/core/services/database/sync_service.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- Realtime + connectivity listener
+- fetchFromFirebase کے بعد سب accounts/professions recalc
+- Logout پر boxes clear
+
+Bugs:
+- Line 52–61: cloud account پورے object سے Hive overwrite — stale balance local صحیح رقم مٹا سکتا ہے
+- Line 64–78: ہر tx change پر recalc اچھا ہے، مگر account snapshot بعد میں stale balance واپس لکھ سکتا ہے
+- Line 124–143: ایک batch — Firestore 500 ops limit
+- Line 68: Transaction.fromMap crash پورے listener کو توڑ سکتا ہے
+
+Edge:
+- بغیر internet: Hive کام کرے گا
+- reconnect پر overwrite risk: CRITICAL
+
+
+--------------------------------------------------------------------------------
+FILE: lib/core/services/database_service.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- واحد Provider façade، stock sync add/update/delete پر
+- init() double-init safe
+- Sync listener → notifyListeners
+
+تجویز:
+- Stock sync fail صرف debugPrint — user کو نہیں بتاتا
+
+
+--------------------------------------------------------------------------------
+FILE: lib/core/services/balance_service.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- /0 profit % line 203–206
+- Empty list average line 224
+
+Bugs:
+- Line 46–60: transaction.amount نہ کہ accountBalanceAmount — Quick Bill paid portion ڈبل گنے گا
+- Dashboard اسے استعمال نہیں کرتا (Dashboard party.balance پڑھتا ہے) — dual logic
+
+
+--------------------------------------------------------------------------------
+FILE: lib/core/services/stock_service.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- Line 88–89: Current = initial + purchases + returns − sales − supplier returns + adj
+- canSellQuantity / NaN guard
+- Discount share proportional on sale movements
+- dispose subscriptions cancel
+
+Bugs:
+- Line 15–80: Hive نہیں — آف لائن stock صرف RAM
+- Auth change پر lists خالی — آف لائن دوبارہ login تک stock UI خالی
+
+Accounting:
+- Qty formula: OK
+
+
+--------------------------------------------------------------------------------
+FILE: lib/core/services/season_report_service.dart
+--------------------------------------------------------------------------------
+Bugs:
+- Line 24–28: side == 'income' || tx.type == 'income'
+  profession expense مگر ledger type income ہو تو آمدن میں چلا جاتا ہے
+- Line 61: areaAcres == 0 تو area = 1.0 → "فی ایکڑ" = کل خرچ (گمراہ کن)
+- Line 87–88: redundant ternary
+
+FIX:
+  if (tx.professionSide == 'income') { ... }
+  else if (tx.professionSide == 'expense') { ... }
+  final area = profession.areaAcres; // if 0, costPerAcre = 0 not expense/1
+
+Accounting:
+- فی ایکڑ / فی من: FAIL جب رقبہ 0
+- ورنہ فارمولا درست
+
+
+--------------------------------------------------------------------------------
+FILE: lib/core/models/profession_model.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- netProfit, costPerUnit, profitPerUnit صفر پیداوار پر 0
+- performanceScore income==0 پر skip
+
+Bugs:
+- Line 185–186: id/name null-unsafe
+- Line 172: DateTime.parse throw
+- costPerUnit totalProduction استعمال کرتا ہے، زراعت productionMun
+  complete season صرف mun لکھتا ہے تو فی یونٹ لاگت 0 رہتی ہے
+
+
+--------------------------------------------------------------------------------
+FILE: lib/core/models/account_model.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- fromMap null-safe، tryParse dates، copyWith
+- Hive field ids 8–9 skip (legacy) — جان بوجھ کر لگتا ہے
+
+
+--------------------------------------------------------------------------------
+FILE: lib/features/quick_bill/quick_bill_preview_screen.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- Discount % clamp 0–100، Rs clamp to subtotal، _total clamp
+- Partial received clamp
+- Cash customer صرف fully paid پر
+- Credit پر party required
+- Controllers dispose
+
+Bugs:
+- Line 399 type: 'income'  [CRITICAL]
+  ادھار فروخت pendingAmount کو جمع میں ڈالتی ہے
+  balance = income − expense مثبت → party header "دینا ہے"
+  دکاندار توقع: سامان دیا = "لینا ہے"
+  مثال: بل Rs 1000، وصولی 0 → app: دینا ہے 1000۔ صحیح: لینا ہے 1000
+- Line 75–82: edit پر percent toStringAsFixed(0) — 12.5% → 12 یا 13
+
+FIX A (تجویز — domain):
+  فروخت کو type: 'expense' (بنام / سامان دیا) بنائیں
+  وصولی کو الگ income tx رکھیں
+
+FIX B (UI):
+  اگر sale income ہی رکھنی ہے تو Quick Bill pending پر label الٹ کریں
+  (balance >= 0 → لینا ہے)
+  FIX A بہتر ہے کیونکہ جمع/بنام بٹن "رقم لی/دی" کے ساتھ inconsistent ہے
+
+Accounting:
+- Discount: OK
+- جمع sign: FAIL for credit sale
+
+
+--------------------------------------------------------------------------------
+FILE: lib/features/accounts/add_transaction_screen.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- Amount <= 0 block
+- Stock stopWhenOut check
+- Item listeners + dispose entries
+- Active season auto-target
+
+Bugs:
+- Line 113 AND 178: addListener(_loadData) دو بار؛ dispose ایک بار remove — memory leak / double rebuild
+- Line 304–305: unit == 'maund' لیکن chip value 'Maund' → فی من qty quantity + sub/40 نہیں چلتا
+- Line 1359: category: _professionSyncType ?? type
+  INC:/EXP: اور منتخب category نہیں۔ Budget/reports ٹوٹتے ہیں
+  (Project screen line 736 صحیح کرتا ہے)
+- Line 1357: pendingAmount: grandTotal غیر Quick Bill پر balance میں unused
+- Line 1418: success کے بعد snackbar popped context پر — کبھی miss
+
+FIX:
+  // initState: صرف ایک addListener
+  if (entry.unit == 'من' || entry.unit.toLowerCase() == 'maund') ...
+  category: _selectedProfessionId == null
+    ? type
+    : '${_professionSyncType == 'income' ? 'INC' : 'EXP'}:${_selectedCategory ?? 'دیگر'}',
+
+
+--------------------------------------------------------------------------------
+FILE: lib/features/accounts/party_detail_screen.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- Cycle grouping + "حساب برابر"
+- Search/filter، FAB hide on scroll
+- removeListener dispose line 716
+- Transaction list ListView.builder
+- Partnership txs header سے خارج
+
+Bugs:
+- Line 230–232: header currentCycle — opening ignore، lifetime totals نہیں
+- Line 232: isPayable = currentBalance >= 0 صفر کو دینا ہے دکھاتا ہے
+- Line 936: cycle sort صرف date — utils createdAt بھی استعمال کرتے ہیں
+  same-day order mismatch
+
+FIX:
+- chronological sort _compareOrder جیسا
+- header کو account.balance یا opening-aware cycle دیں
+
+Edge:
+- خالی list handle
+- لمبی Urdu FittedBox کچھ labels پر: OK
+
+
+--------------------------------------------------------------------------------
+FILE: lib/features/dashboard/dashboard_screen.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- Receivable = negative balances، Payable = positive
+- Empty ListView pull-to-refresh
+- Init dbService.init()
+- NooriNastaleeq title
+
+Bugs:
+- Line 109: party.balance (Hive stored) — party screen cycle سے الگ رقم
+- Line 95+54: DatabaseService دو بار listen (Provider + Consumer) — extra rebuilds
+- Refresh صرف Firebase fetch — آف لائن error silent
+
+
+--------------------------------------------------------------------------------
+FILE: lib/features/professions/complete_season_screen.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- controllers dispose
+- live summary
+- agriculture-only fields
+
+Bugs:
+- Line 70–71: خالی area → 1.0 فی ایکڑ = کل خرچ
+- Line 265–270: productionMun save، totalProduction نہیں → costPerUnit 0
+
+FIX:
+- totalProduction: prodVal (یا mun→kg conversion واضح رکھیں)
+- Area 0 ہو تو فی ایکڑ نہ دکھائیں
+
+
+--------------------------------------------------------------------------------
+FILE: lib/features/professions/add_project_transaction_screen.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- INC:/EXP: prefix line 736
+- dispose items
+
+Bugs:
+- Maund/درجن _effectiveEntryQuantity یہاں نہیں — qty ہمیشہ raw
+
+
+--------------------------------------------------------------------------------
+FILE: lib/features/accounts/bulk_party_transaction_screen.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- amount <= 0 skip
+- row dispose
+- جمع/بنام buttons
+
+Bugs:
+- Line 57–60: آخری row پر text → نئی row — setState listener سے extras
+- Line 182: ID میں millisecondsSinceEpoch — ایک ہی ms میں collision ممکن
+- Negative: parse fail/skip : OK
+- بڑی رقم: double OK
+
+
+--------------------------------------------------------------------------------
+FILE: lib/features/accounts/add_party_screen.dart
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- duplicate phone
+- offline toast
+- opening 0
+
+Bugs:
+- Line 441 google.com lookup — restrictive DNS پر false offline
+- initialBalance UI نہیں — opening feature unused
+- Line 474 ہمیشہ receivable
+
+
+--------------------------------------------------------------------------------
+FILE: lib/app.dart
+--------------------------------------------------------------------------------
+Bugs:
+- Line 107–108 CRITICAL: navigatorKey: GlobalKey() ہر Consumer2 rebuild پر نیا
+  notifications/navigation ٹوٹ سکتے ہیں
+- Line 221: print
+- Line 201–204: logged-in profile check internet مانگتی ہے
+- Line 139–141: RTL languageService.textDirection : OK
+
+FIX:
+  final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+  // MaterialApp(navigatorKey: appNavigatorKey)
+
+
+--------------------------------------------------------------------------------
+FILE: firestore.rules
+--------------------------------------------------------------------------------
+اچھی باتیں:
+- owner checks accounts/txs
+- verification create constraints
+- audit_logs immutable delete
+
+Bugs:
+- Line 21–24: /settings/{document} کوئی بھی signed-in write
+- Line 26–28: /userData/{docId} کوئی بھی user کسی بھی doc پر
+- Line 35–36: users/{userId} read if signed in — دوسرے یوزر کا profile/isAdmin
+- Line 14–17: admin email hardcoded
+- Line 58–59: notifications create if isSignedIn — spam ممکن
+- Amount/type field validation نہیں
+
+
+--------------------------------------------------------------------------------
+دیگر فائلیں (مختصر)
+--------------------------------------------------------------------------------
+main.dart                              OK     Firebase/Hive bootstrap
+receipt_widget.dart                    WARN   Discount display OK؛ opening sign receivable مثبت
+stock_list_screen.dart                 OK     tabs dispose؛ loading
+add_edit_stock_item_screen.dart        OK     controllers dispose
+stock_adjustment_dialog.dart           OK     qty listener dispose
+login_screen.dart                      OK     auth flow
+app_lock_screen.dart                   OK
+backup_screen.dart                     WARN   cloud backup؛ rules backups owner-only OK
+notification_service.dart              WARN   cross-user notify؛ rules create any signed-in
+analytics_service.dart                 OK     tests
+stock_analytics_service.dart           OK     COGS؛ /0 uncosted
+bill_numbering.dart                    OK     tests
+formatters.dart                        OK
+security_service.dart                  OK     lock
+party_history_screen.dart              WARN   party.balance stored؛ cycle نہیں
+reports_screen.dart                    OK     professionSide filter درست
+categories_management_screen.dart      OK
+profession_seasons_screen.dart         WARN   focus listeners dialog
+season_comparison_screen.dart          OK     acre/mun display
+quick_bill_item_selection.dart         WARN   ListView not builder
+sms_invitation_screen.dart             WARN   balance.abs()
+helpers/migration_helper.dart          WARN   legacy paths
+core/widgets/*                         mostly OK   party_card network lookup per card (perf)
+l10n/*                                 OK     ur/en
+tests                                  OK     cycle/discount/stock؛ sale-sign اور opening-cycle tests غائب
+
+
+================================================================================
+3) اہم مسائل (PRIORITY ORDER)
+================================================================================
+
+--- CRITICAL (فوری حل) ---
+1. Quick Bill type: 'income' → ادھار فروخت "دینا ہے" دکھاتی ہے
+   File: quick_bill_preview_screen.dart line 399
+
+2. Cycle opening balance ignore
+   File: account_balance_utils.dart line 30
+
+3. Dashboard party.balance ≠ Party header cycle — دو سورس آف ٹروتھ
+
+4. Recalc صرف Hive؛ realtime account snapshot stale balance لکھے
+   Files: account_service.dart:80 + sync_service.dart:52
+
+5. Firestore rules کھلی (settings, userData, users read)
+
+6. navigatorKey ہر rebuild
+   File: app.dart:107
+
+7. Transaction.fromMap / Profession.fromMap null crash
+
+8. Profession delete کے بعد party balance stale
+
+--- IMPORTANT (جلد حل) ---
+1. Double addListener — add_transaction_screen.dart:113,178
+2. 'Maund' vs 'maund' — فی من حساب
+3. Party tx پر INC:/EXP: category missing
+4. area = 1.0 fallback — جھوٹی فی ایکڑ
+5. productionMun ≠ totalProduction
+6. Season report type || professionSide
+7. Firestore batch 500
+8. Stock Firebase-only (آف لائن)
+9. update() vs set() missing docs
+10. BalanceService amount vs pending
+11. Receivable opening sign vs UI
+12. Same-day cycle sort party_detail vs utils
+13. deleteAccount awaited cloud deletes
+14. Discount percent toStringAsFixed(0) on edit
+
+--- NICE TO HAVE (بعد میں) ---
+1. Dashboard double Provider listen
+2. PartyCard per-item network profile
+3. ListView (non-builder) چند screens
+4. Hardcoded admin email
+5. print in app.dart
+6. Bulk ID collision
+7. Health score heuristic
+8. Dead/dual BalanceService
+9. Comments/naming اردو-English مکس (acceptable)
+
+
+================================================================================
+4) ACCOUNTING AUDIT REPORT
+================================================================================
+
+کیا حساب کتاب درست ہے؟
+
+فارمولا کی سطح پر ہاں:
+- جمع = type == 'income' → accountBalanceAmount
+- بنام = type == 'expense' → accountBalanceAmount
+- Balance = opening + جمع − بنام   (account_service.dart:97)
+- Profession: netProfit = totalIncome − totalExpense
+- Discount: % → subtotal * p / 100 clamp؛ Rs clamp to subtotal؛ net = subtotal − discount
+- Quick Bill fully paid: balance contribution 0 (tested)
+- Stock qty signs درست
+- /0 profession getters میں handle
+
+ڈومین/UI کی سطح پر نہیں — تین بڑے سوراخ:
+
+1) فروخت vs رقم لی ایک ہی income
+   دستی کھاتہ: "رقم لی / جمع" = پیسے وصول
+   فوری بل فروخت بھی income
+   ادھار سامان جمع بن جاتا ہے، لیبل "دینا ہے"
+   روایتی کھاتہ: سامان دیا = بنام / لینا ہے
+
+2) حساب برابر ≠ کھاتہ باقی
+   Cycle txs کو صفر پر reset کرتا ہے، opening نہیں جوڑتا
+   Header صرف موجودہ cycle کی جمع/بنام
+   Dashboard کل party.balance
+   ایک پارٹی پر دو مختلف باقی
+
+3) فی ایکڑ / فی من
+   رقبہ 0 → تقسیم 1 سے
+   پیداوار productionMun save، costPerUnit totalProduction پڑھتا ہے → 0
+   کرایہ rentPerAcre * area report میں ہے مگر profit میں الگ expense نہیں
+   (اگر کرایہ tx نہ لکھی ہو تو منافع زیادہ)
+
+Rounding:
+- UI اکثر روپے toStringAsFixed(0) — Rs 10.6 → 11 display، storage double
+- Cycle 0.01
+- بڑی رقم (10 لاکھ+) double OK (~15 digits)
+
+Discount:
+- حساب درست
+- receipt test: opening 400 + 500 − 50 − 100 = 750
+
+
+================================================================================
+5) TEST CASES (آپ خود چلائیں)
+================================================================================
+
+App میں دستی + flutter test
+
+--- A. جمع / بنام ---
+1. نئی پارٹی، جمع 1000 (رقم لی)۔ توقع: باقی دینا ہے 1000
+2. بنام 400 (رقم دی)۔ توقع: دینا ہے 600
+3. بنام 600۔ توقع: حساب برابر / 0
+
+--- B. Balance formula ---
+1. جمع 5000، بنام 2000 → +3000 (دینا)
+2. صرف بنام 2000 → -2000 (لینا)
+3. Dashboard totals = تمام پارٹیوں کے stored balances کا مجموعہ
+   party screen سے mismatch نوٹ کریں (known bug)
+
+--- C. Discount ---
+1. آئٹمز 1000، 10% → net 900
+2. 10% پھر Rs mode 50 → 50 (subtotal سے زیادہ نہ ہو)
+3. 150% ٹائپ → clamp 100%، net 0
+4. جزوی وصولی 300، pending 600 — receipt: after discount پھر minus received
+
+--- D. Quick Bill sign (critical) ---
+1. پارٹی کو بل 1000، وصولی 0
+   موجودہ app: غالباً دینا ہے 1000 (bug)
+   درست: لینا ہے 1000
+2. بل 1000، وصولی 1000 cash۔ توقع: اس بل سے باقی 0 (یہ حصہ already درست)
+3. بل 1000، وصولی 400۔ توقع: لینا ہے 600
+
+--- E. Cycle ---
+1. جمع 1000، بنام 1000 → حساب برابر ٹیپ/collapse
+2. پھر جمع 400، بنام 100 → cycle باقی 300
+   (test/utils/account_balance_utils_test.dart یہی)
+3. اگر opening 500 receivable add کر سکیں: txs برابر کے بعد باقی 500 رہنا چاہیے
+   آج cycle 0 دکھا سکتا ہے
+
+--- F. Stock ---
+1. Item initial 10، فروخت 3 → 7
+2. stopWhenOut 8 بیچنے کی کوشش → block
+3. Purchase 5 → 12
+4. آف لائن: item add/sale — restart کے بعد Firebase-only ہونے سے غائب ہو سکتا ہے
+
+--- G. فی ایکڑ / فی من ---
+1. سیزن مکمل: رقبہ خالی، خرچ 10000 → فی ایکڑ 10000 دکھے
+   (bug؛ 0 ہونا چاہیے یا "رقبہ درج کریں")
+2. رقبہ 5، پیداوار 200 من، آمدن 200000، خرچ 50000
+   → فی ایکڑ منافع 30000؛ فی من لاگت 250
+3. مکمل کے بعد reports میں costPerUnit — اگر 0 ہے تو totalProduction bug confirm
+
+--- H. Edge ---
+1. خالی پارٹی لسٹ — empty state / refresh
+2. رقم 0 — save block
+3. منفی رقم — skip/block
+4. 1000000+ — display overflow (FittedBox/ellipsis) چیک
+5. لمبی اردو تفصیل — overflow
+6. Airplane mode: پارٹی/tx save → آف لائن؛ واپس آنے پر balance الٹ نہ ہو (sync overwrite)
+7. خراب Firebase doc (missing id) — آج crash ممکن
+
+--- I. Automated ---
+  cd C:\Users\z\StudioProjects\account_app\account_app
+  flutter test
+
+خاص طور پر:
+- test/utils/account_balance_utils_test.dart
+- test/models/transaction_balance_amount_test.dart
+
+
+================================================================================
+6) FINAL VERDICT
+================================================================================
+
+Production کے لیے ابھی تیار نہیں۔
+
+ایپ کا ڈھانچہ (Hive-first، Provider DatabaseService، RTL/Urdu، Quick Bill discount،
+stock arithmetic، موجودہ unit tests) مضبوط بنیاد ہے۔
+
+چھوٹے کاروبار کے کھاتہ کے لیے لینا/دینا کا الٹ نشان اور دو مختلف باقی رقمیں
+سب سے خطرناک ہیں — صارف اعتماد کھو دے گا۔
+
+پہلے یہ 4 کام:
+1. Quick Bill فروخت کا type/label ٹھیک کریں (لینا ہے ادھار پر)
+2. Opening + ایک ہی balance source (dashboard = party header)
+3. Recalc کے بعد Firebase set یا cloud سے balance field ignore
+4. Rules تنگ کریں؛ navigatorKey مستحکم کریں؛ fromMap null-safe
+
+================================================================================
+END OF REPORT
+================================================================================

@@ -13,7 +13,7 @@ import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'sms_invitation_screen.dart';
-import 'transaction_receipt_screen.dart';
+import 'package:account_app/core/utils/receipt_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PartyHistoryScreen extends StatefulWidget {
@@ -165,10 +165,8 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
       _avgPaymentDays = (days / allTx.length).toStringAsFixed(1);
     }
 
-    // ═══ اصل: اعتماد اسکور — 5 ستون ═══
+    // ═══ اصل: اعتماد اسکور ═══
     double score = 0;
-
-    if (widget.party.isVerified) score += 1.0;
 
     final daysSinceFirstDeal =
         DateTime.now().difference(_firstDeal ?? DateTime.now()).inDays;
@@ -392,7 +390,6 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
               isLarge: true,
               textColor: Colors.white,
               subtitleColor: Colors.white70,
-              isVerified: widget.party.isVerified,
               customSize: 52,
               suffix: Container(
                 padding:
@@ -477,13 +474,11 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
                   fontFamily,
                   onTap: () {
                     if (_transactions.isNotEmpty) {
-                      Navigator.push(
+                      ReceiptHelper.showReceiptDialog(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => TransactionReceiptScreen(
-                            transaction: _transactions.first,
-                          ),
-                        ),
+                        transaction: _transactions.first,
+                        account: widget.party,
+                        isLocalTransaction: true,
                       );
                     } else {
                       AppToast.info(

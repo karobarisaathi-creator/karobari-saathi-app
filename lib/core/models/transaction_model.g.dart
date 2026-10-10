@@ -39,13 +39,17 @@ class TransactionAdapter extends TypeAdapter<Transaction> {
       partnershipId: fields[19] as String?,
       voiceNote: fields[20] as String?,
       items: (fields[21] as List).cast<TransactionItem>(),
+      subtotal: fields[22] as double?,
+      discountAmount: fields[23] == null ? 0.0 : fields[23] as double,
+      discountPercent: fields[24] as double?,
+      discountReason: fields[25] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Transaction obj) {
     writer
-      ..writeByte(22)
+      ..writeByte(26)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -89,7 +93,15 @@ class TransactionAdapter extends TypeAdapter<Transaction> {
       ..writeByte(20)
       ..write(obj.voiceNote)
       ..writeByte(21)
-      ..write(obj.items);
+      ..write(obj.items)
+      ..writeByte(22)
+      ..write(obj.subtotal)
+      ..writeByte(23)
+      ..write(obj.discountAmount)
+      ..writeByte(24)
+      ..write(obj.discountPercent)
+      ..writeByte(25)
+      ..write(obj.discountReason);
   }
 
   @override

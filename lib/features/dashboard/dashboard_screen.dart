@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -6,21 +5,14 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
-import 'package:account_app/core/services/notification_service.dart';
-import 'package:account_app/core/services/auth_service.dart';
-import 'package:account_app/core/services/alert_service.dart';
 import 'package:account_app/core/models/account_model.dart';
-// Screens
-import 'package:account_app/features/notifications/notifications_screen.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
 import 'package:account_app/features/accounts/add_party_screen.dart';
-import 'package:account_app/features/accounts/party_history_screen.dart';
 import 'package:account_app/features/accounts/sms_invitation_screen.dart';
 import 'main_navigation_screen.dart';
 import 'package:account_app/core/widgets/party_card.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/simple_spinning_ring.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -109,7 +101,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         p.category != 'Partner' &&
                         p.id != QuickBillConstants.cashCustomerAccountId)
                     .toList();
-                final professions = databaseService.getProfessions();
 
                 double totalReceivable = 0;
                 double totalPayable = 0;
@@ -125,31 +116,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 double netBalance = totalPayable - totalReceivable;
 
-                // --- Professions Logic ---
-                final activeProfessions =
-                    professions.where((p) => p.isActive ?? true).toList();
-                double profIncome = 0;
-                double profExpense = 0;
-                for (var p in activeProfessions) {
-                  // صرف وہی ریکارڈز لیں جو 'ماسٹر' نہیں ہیں (یعنی اصل سیزنز ہیں) اور جاری ہیں
-                  if (!(p.isMaster ?? false)) {
-                    profIncome += p.totalIncome;
-                    profExpense += p.totalExpense;
-                  }
-                }
-                double profProfit = profIncome - profExpense;
-
                 return Column(
                   children: [
                     _buildLargeDarkHeader(
                       receivable: totalReceivable,
                       payable: totalPayable,
                       netBalance: netBalance,
-                      profIncome: profIncome,
-                      profExpense: profExpense,
-                      profProfit: profProfit,
-                      showProfessions: activeProfessions
-                          .isNotEmpty, // اگر کوئی پیشہ ہے تو دکھائیں
                       isUrdu: isUrdu,
                       fontFamily: fontFamily,
                     ),
@@ -176,10 +148,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required double receivable,
     required double payable,
     required double netBalance,
-    required double profIncome,
-    required double profExpense,
-    required double profProfit,
-    required bool showProfessions,
     required bool isUrdu,
     required String fontFamily,
   }) {
@@ -187,66 +155,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ? (netBalance >= 0 ? 'باقی دینے' : 'باقی لینے')
         : (netBalance >= 0 ? 'Net Payable' : 'Net Receivable');
 
-    // Profession Net Stats Logic
-    String profNetLabel = isUrdu ? "میزان" : "Net";
-
-    if (profProfit > 0) {
-      profNetLabel = isUrdu ? "بچت" : "Profit";
-    } else if (profProfit < 0) {
-      profNetLabel = isUrdu ? "خسارہ" : "Loss";
-    }
-
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 60,
-        bottom: 20,
-        left: 20,
-        right: 20,
+        bottom: 16,
+        left: 16,
+        right: 16,
       ),
       decoration: const BoxDecoration(
         color: AppTheme.darkColor,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(15)),
       ),
-      child: Column(
+      child: Row(
         children: [
-          // Party Stats
-          Row(
-            children: [
-              _buildHeaderStatItem(
-                  isUrdu ? 'لینے ہیں' : 'To Receive',
-                  receivable,
-                  Colors.white70,
-                  fontFamily,
-                  PhosphorIcons.arrowDownLeft()),
-              _buildStatDivider(),
-              _buildHeaderStatItem(isUrdu ? 'دینے ہیں' : 'To Pay', payable,
-                  Colors.white70, fontFamily, PhosphorIcons.arrowUpRight()),
-              _buildStatDivider(),
-              _buildHeaderStatItem(balanceLabel, netBalance.abs(),
-                  Colors.white70, fontFamily, PhosphorIcons.wallet(),
-                  isBold: true),
-            ],
-          ),
-          if (showProfessions) ...[
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Divider(height: 1, thickness: 0.5, color: Colors.white10),
-            ),
-            // Profession Stats
-            Row(
-              children: [
-                _buildHeaderStatItem(isUrdu ? 'آمدنی' : 'Income', profIncome,
-                    Colors.white70, fontFamily, PhosphorIcons.arrowDownLeft()),
-                _buildStatDivider(),
-                _buildHeaderStatItem(isUrdu ? 'خرچ' : 'Expense', profExpense,
-                    Colors.white70, fontFamily, PhosphorIcons.arrowUpRight()),
-                _buildStatDivider(),
-                _buildHeaderStatItem(profNetLabel, profProfit.abs(),
-                    Colors.white70, fontFamily, PhosphorIcons.trendUp(),
-                    isBold: true),
-              ],
-            ),
-          ],
+          _buildHeaderStatItem(
+              isUrdu ? 'لینے ہیں' : 'To Receive',
+              receivable,
+              Colors.white70,
+              fontFamily,
+              PhosphorIcons.arrowDownLeft()),
+          _buildStatDivider(),
+          _buildHeaderStatItem(isUrdu ? 'دینے ہیں' : 'To Pay', payable,
+              Colors.white70, fontFamily, PhosphorIcons.arrowUpRight()),
+          _buildStatDivider(),
+          _buildHeaderStatItem(balanceLabel, netBalance.abs(),
+              Colors.white70, fontFamily, PhosphorIcons.wallet(),
+              isBold: true),
         ],
       ),
     );

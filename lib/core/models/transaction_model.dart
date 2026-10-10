@@ -73,6 +73,18 @@ class Transaction extends HiveObject {
   @HiveField(21)
   final List<TransactionItem> items;
 
+  @HiveField(22)
+  final double subtotal;
+
+  @HiveField(23, defaultValue: 0.0)
+  final double discountAmount;
+
+  @HiveField(24)
+  final double? discountPercent;
+
+  @HiveField(25)
+  final String? discountReason;
+
   Transaction({
     required this.id,
     required this.accountId,
@@ -96,7 +108,11 @@ class Transaction extends HiveObject {
     this.partnershipId,
     this.voiceNote,
     this.items = const [],
-  });
+    double? subtotal,
+    this.discountAmount = 0.0,
+    this.discountPercent,
+    this.discountReason,
+  }) : subtotal = subtotal ?? amount;
 
   Map<String, dynamic> toMap() {
     return {
@@ -122,6 +138,10 @@ class Transaction extends HiveObject {
       'partnershipId': partnershipId,
       'voiceNote': voiceNote,
       'items': items.map((x) => x.toMap()).toList(),
+      'subtotal': subtotal,
+      'discountAmount': discountAmount,
+      'discountPercent': discountPercent,
+      'discountReason': discountReason,
     };
   }
 
@@ -158,6 +178,12 @@ class Transaction extends HiveObject {
       items: map['items'] != null
           ? List<TransactionItem>.from(map['items']?.map((x) => TransactionItem.fromMap(x)))
           : [],
+      subtotal: map['subtotal']?.toDouble() ??
+          map['amount']?.toDouble() ??
+          0.0,
+      discountAmount: map['discountAmount']?.toDouble() ?? 0.0,
+      discountPercent: map['discountPercent']?.toDouble(),
+      discountReason: map['discountReason'],
     );
   }
 
@@ -166,7 +192,9 @@ class Transaction extends HiveObject {
   bool get isQuickBill {
     final normalizedDescription = description.trim().toLowerCase();
     return normalizedDescription == 'quick bill' ||
-        normalizedDescription == 'فوری بل';
+        normalizedDescription == 'فوری بل' ||
+        normalizedDescription.contains('فوری بل') ||
+        normalizedDescription.contains('quick bill');
   }
 
   double get accountBalanceAmount {

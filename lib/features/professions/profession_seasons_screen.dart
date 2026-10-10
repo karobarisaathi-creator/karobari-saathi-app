@@ -16,7 +16,7 @@ import 'complete_season_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
-import 'package:account_app/features/accounts/transaction_receipt_screen.dart';
+import 'package:account_app/core/utils/receipt_helper.dart';
 import 'package:account_app/features/professions/add_project_transaction_screen.dart';
 
 class ProfessionSeasonsScreen extends StatefulWidget {
@@ -110,6 +110,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
       appBar: AppBar(
         backgroundColor: AppTheme.darkColor,
         elevation: 0,
+        centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -120,7 +121,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
               color: Colors.white,
               fontFamily: fontFamily,
               fontWeight: FontWeight.bold,
-              fontSize: 20),
+              fontSize: 18),
         ),
         actions: [
           IconButton(
@@ -425,34 +426,6 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                                     color: AppTheme.darkColor,
                                     fontFamily: fontFamily),
                               ),
-                              if (completedSeasons.isNotEmpty)
-                                InkWell(
-                                  onTap: () => _openComparison(
-                                      context, completedSeasons),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.themeColor,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      completedSeasons.length == 1
-                                          ? (isUrdu
-                                              ? 'ریکارڈ دیکھیں'
-                                              : 'View Record')
-                                          : (isUrdu
-                                              ? 'موازنہ دیکھیں'
-                                              : 'Compare Records'),
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        fontFamily: fontFamily,
-                                      ),
-                                    ),
-                                  ),
-                                ),
                             ],
                           ),
                         ),
@@ -498,47 +471,150 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
   Widget _buildCompactStatsHeader(BuildContext context, double income,
       double expense, double netProfit, bool isUrdu, String fontFamily) {
     final netLabel = _getProfitLabel(income, netProfit, isUrdu);
-    final netColor = _getProfitColor(income, netProfit);
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 56,
+        bottom: 16,
+        left: 16,
+        right: 16,
+      ),
       decoration: const BoxDecoration(
         color: AppTheme.darkColor,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(15)),
       ),
-      child: Row(
+      child: Column(
         children: [
-          _buildHeaderStatItem(isUrdu ? "آمدنی" : "Income", income,
-              Colors.white, fontFamily, AppTheme.incomeColor),
-          _buildStatDivider(),
-          _buildHeaderStatItem(isUrdu ? "خرچ" : "Expense", expense,
-              Colors.white, fontFamily, AppTheme.expenseColor),
-          _buildStatDivider(),
-          _buildHeaderStatItem(
-              netLabel, netProfit.abs(), Colors.white, fontFamily, netColor,
-              isBold: true),
+          Row(
+            children: [
+              _buildHeaderStatItem(
+                isUrdu ? "آمدنی" : "Income",
+                income,
+                Colors.white70,
+                fontFamily,
+                PhosphorIcons.arrowDownLeft(),
+              ),
+              _buildStatDivider(),
+              _buildHeaderStatItem(
+                isUrdu ? "خرچ" : "Expense",
+                expense,
+                Colors.white70,
+                fontFamily,
+                PhosphorIcons.arrowUpRight(),
+              ),
+              _buildStatDivider(),
+              _buildHeaderStatItem(
+                netLabel,
+                netProfit.abs(),
+                Colors.white70,
+                fontFamily,
+                PhosphorIcons.trendUp(),
+                isBold: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                final dbService = Provider.of<DatabaseService>(context, listen: false);
+                final seasons = dbService.getSeasons(widget.masterProfession.id);
+                if (seasons.isNotEmpty) {
+                  _openComparison(context, seasons);
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SeasonComparisonScreen(
+                        seasonA: widget.masterProfession,
+                      ),
+                    ),
+                  );
+                }
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      PhosphorIcons.chartLine(),
+                      size: 16,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isUrdu
+                          ? 'تفصیلی سیزن رپورٹ اور موازنہ'
+                          : 'Detailed Season Report & Comparison',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        fontFamily: fontFamily,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 12,
+                      color: Colors.white70,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildHeaderStatItem(String label, double amount, Color color,
-      String fontFamily, Color iconColor,
+  Widget _buildHeaderStatItem(String label, double amount, Color iconColor,
+      String fontFamily, IconData icon,
       {bool isBold = false}) {
     return Expanded(
       child: Column(
         children: [
-          Text(label,
-              style: TextStyle(
-                  color: Colors.white70, fontSize: 13, fontFamily: fontFamily)),
+          Text(
+            label,
+            style: TextStyle(
+                color: Colors.white70, fontSize: 11, fontFamily: fontFamily),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text("Rs ${amount.toStringAsFixed(0)}",
-                style: TextStyle(
-                    color: color,
-                    fontSize: isBold ? 17 : 15,
-                    fontWeight: FontWeight.bold)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 12, color: iconColor),
+              const SizedBox(width: 4),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    "Rs ${amount.toStringAsFixed(0)}",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: isBold ? 16 : 14,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: '',
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -546,7 +622,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
   }
 
   Widget _buildStatDivider() =>
-      Container(height: 18, width: 1, color: Colors.white12);
+      Container(height: 20, width: 1, color: Colors.white12);
 
   Widget _buildCompactSeasonItem(BuildContext context, Profession season,
       bool isUrdu, String fontFamily, DatabaseService db) {
@@ -744,11 +820,11 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
       children: [
         ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-          onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (context) =>
-                      TransactionReceiptScreen(transaction: t))),
+          onTap: () => ReceiptHelper.showReceiptDialog(
+            context,
+            transaction: t,
+            isLocalTransaction: true,
+          ),
           onLongPress: () =>
               _showDeleteTransactionDialog(context, t, isUrdu, fontFamily, db),
           title: Text(t.description.isNotEmpty ? t.description : displayName,

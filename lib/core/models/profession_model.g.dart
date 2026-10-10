@@ -37,13 +37,17 @@ class ProfessionAdapter extends TypeAdapter<Profession> {
       customMetrics: (fields[17] as Map?)?.cast<String, dynamic>(),
       isMaster: fields[18] as bool?,
       parentId: fields[19] as String?,
+      cropType: fields[20] == null ? '' : fields[20] as String,
+      areaAcres: fields[21] == null ? 0.0 : fields[21] as double,
+      rentPerAcre: fields[22] == null ? 0.0 : fields[22] as double,
+      productionMun: fields[23] == null ? 0.0 : fields[23] as double,
     );
   }
 
   @override
   void write(BinaryWriter writer, Profession obj) {
     writer
-      ..writeByte(20)
+      ..writeByte(24)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -83,7 +87,15 @@ class ProfessionAdapter extends TypeAdapter<Profession> {
       ..writeByte(18)
       ..write(obj.isMaster)
       ..writeByte(19)
-      ..write(obj.parentId);
+      ..write(obj.parentId)
+      ..writeByte(20)
+      ..write(obj.cropType)
+      ..writeByte(21)
+      ..write(obj.areaAcres)
+      ..writeByte(22)
+      ..write(obj.rentPerAcre)
+      ..writeByte(23)
+      ..write(obj.productionMun);
   }
 
   @override

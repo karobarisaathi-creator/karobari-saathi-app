@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:hive/hive.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/category_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
-import 'package:account_app/core/models/transaction_item_model.dart';
 import 'package:account_app/core/services/stock_service.dart';
 
 import 'database/account_service.dart';
@@ -26,8 +23,26 @@ class DatabaseService extends ChangeNotifier {
   final SettingsService _settingsService = SettingsService();
   final ProfileService _profileService = ProfileService();
 
+  DatabaseService() {
+    _syncService.addListener(_handleSyncUpdate);
+  }
+
+  void _handleSyncUpdate() {
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _syncService.removeListener(_handleSyncUpdate);
+    _syncService.stopRealtimeSync();
+    _syncService.stopConnectivityListener();
+    super.dispose();
+  }
+
   // پراپرٹیز
-  bool get isInitialized => true;
+  bool _isInitialized = false;
+  Future<void>? _initialization;
+  bool get isInitialized => _isInitialized;
   List<Account> get accounts => _accountService.getAccounts();
   List<model.Transaction> get transactions =>
       _transactionService.getAllTransactions();
@@ -67,17 +82,6 @@ class DatabaseService extends ChangeNotifier {
 
   Future<int> getPartiesCount() => _accountService.getPartiesCount();
   Future<int> getPendingDuesCount() => _accountService.getPendingDuesCount();
-  Future<void> updateMyVerificationStatus(bool v) async {
-    await _accountService.updateMyVerificationStatus(v);
-    notifyListeners();
-  }
-
-  Future<bool> isUserVerified(String uid) async {
-    final doc =
-        await FirebaseFirestore.instance.collection('users').doc(uid).get();
-    return doc.exists && doc.data()?['isVerified'] == true;
-  }
-
   // TRANSACTION OPERATIONS
   Future<void> addTransaction(model.Transaction t) async {
     await _transactionService.addTransaction(t);
@@ -196,14 +200,6 @@ class DatabaseService extends ChangeNotifier {
   List<Category> getCategories() => _categoryService.getCategories();
 
   // GLOBAL LOOKUP & STATUS
-  Future<void> markUserAsDeactivated(String uid) async {
-    await _profileService.markUserAsDeactivated(uid);
-  }
-
-  Future<void> markUserAsActivated(String uid) async {
-    await _profileService.markUserAsActivated(uid);
-  }
-
   Future<Map<String, String>?> findPublicProfileByPhone(String p) =>
       _profileService.findPublicProfileByPhone(p);
   Future<Map<String, String>?> findPublicProfileByUid(String uid) =>
@@ -225,6 +221,7 @@ class DatabaseService extends ChangeNotifier {
 
   Future<void> prepareForLogout() async {
     await _syncService.prepareForLogout();
+    _isInitialized = false;
     notifyListeners();
   }
 
@@ -263,11 +260,25 @@ class DatabaseService extends ChangeNotifier {
 
   // INITIALIZATION
   Future<void> init() async {
+    if (_isInitialized) return;
+    final existingInitialization = _initialization;
+    if (existingInitialization != null) return existingInitialization;
+
+    final initialization = _initialize();
+    _initialization = initialization;
+    try {
+      await initialization;
+    } finally {
+      _initialization = null;
+    }
+  }
+
+  Future<void> _initialize() async {
     await _syncService.openBoxes();
     _syncService.setupConnectivityListener();
     if (FirebaseAuth.instance.currentUser != null) {
       _syncService.startRealtimeSync();
-      _triggerSync();
     }
+    _isInitialized = true;
   }
 }

@@ -95,16 +95,16 @@ class Profession {
   final String? parentId;
 
   // 🌾 زرعی فیلڈز (Farming fields)
-  @HiveField(20)
+  @HiveField(20, defaultValue: '')
   final String cropType;
 
-  @HiveField(21)
+  @HiveField(21, defaultValue: 0.0)
   final double areaAcres;
 
-  @HiveField(22)
+  @HiveField(22, defaultValue: 0.0)
   final double rentPerAcre;
 
-  @HiveField(23)
+  @HiveField(23, defaultValue: 0.0)
   final double productionMun;
 
   Profession({

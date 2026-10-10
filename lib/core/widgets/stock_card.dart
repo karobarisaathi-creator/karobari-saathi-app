@@ -11,6 +11,19 @@ import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 
 class StockCard extends StatelessWidget {
+  static const Map<String, String> _categoryNamesUrdu = {
+    'General': 'عمومی',
+    'Grocery': 'کریانہ',
+    'Food': 'خوراک',
+    'Beverages': 'مشروبات',
+    'Clothing': 'کپڑے',
+    'Electronics': 'الیکٹرانکس',
+    'Household': 'گھریلو سامان',
+    'Personal Care': 'ذاتی استعمال',
+    'Medicine': 'ادویات',
+    'Other': 'دیگر',
+  };
+
   final StockItem item;
   final VoidCallback onTap;
   final VoidCallback onQuickAdd;
@@ -33,12 +46,14 @@ class StockCard extends StatelessWidget {
 
     final computedStock = stockService.calculateCurrentStock(item.id);
     final isOutOfStock = item.trackStock && computedStock <= 0;
-    final isLowStock = item.trackStock &&
-        computedStock <= item.minStockAlert &&
-        !isOutOfStock;
+    final isLowStock =
+        item.trackStock && computedStock <= item.minStockAlert && !isOutOfStock;
 
     final displayName =
-    isUrdu && item.nameUrdu.isNotEmpty ? item.nameUrdu : item.name;
+        isUrdu && item.nameUrdu.isNotEmpty ? item.nameUrdu : item.name;
+    final categoryName = isUrdu
+        ? _categoryNamesUrdu[item.categoryName] ?? item.categoryName
+        : item.categoryName;
 
     // ═══════════════════════════════════════════
     // Status Configuration
@@ -79,9 +94,8 @@ class StockCard extends StatelessWidget {
     final maxRef = item.minStockAlert > 0
         ? (item.minStockAlert * 3).clamp(1.0, double.infinity)
         : 30.0;
-    final progress = item.trackStock
-        ? (computedStock / maxRef).clamp(0.0, 1.0)
-        : 1.0;
+    final progress =
+        item.trackStock ? (computedStock / maxRef).clamp(0.0, 1.0) : 1.0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -92,8 +106,8 @@ class StockCard extends StatelessWidget {
           color: isOutOfStock
               ? AppTheme.expenseColor.withValues(alpha: 0.25)
               : (isLowStock
-              ? const Color(0xFFD97706).withValues(alpha: 0.30)
-              : AppTheme.backgroundColor),
+                  ? const Color(0xFFD97706).withValues(alpha: 0.30)
+                  : AppTheme.backgroundColor),
           width: 1.5,
         ),
         boxShadow: [
@@ -167,7 +181,7 @@ class StockCard extends StatelessWidget {
                                 ),
                                 shape: BoxShape.circle,
                                 border:
-                                Border.all(color: Colors.white, width: 2),
+                                    Border.all(color: Colors.white, width: 2),
                                 boxShadow: [
                                   BoxShadow(
                                     color: AppTheme.verifiedGold
@@ -195,12 +209,14 @@ class StockCard extends StatelessWidget {
                         children: [
                           Text(
                             displayName,
+                            textDirection:
+                                isUrdu ? TextDirection.rtl : TextDirection.ltr,
                             style: TextStyle(
-                              fontSize: 15.5,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 19,
+                              fontWeight: FontWeight.w900,
                               color: AppTheme.darkColor,
                               fontFamily: fontFamily,
-                              letterSpacing: -0.2,
+                              letterSpacing: isUrdu ? 0 : -0.2,
                               height: 1.3,
                             ),
                             maxLines: 2,
@@ -219,13 +235,13 @@ class StockCard extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
-                                    item.categoryName,
+                                    categoryName,
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
                                       color: AppTheme.themeColor,
                                       fontFamily: fontFamily,
-                                      letterSpacing: 0.2,
+                                      letterSpacing: isUrdu ? 0 : 0.2,
                                     ),
                                   ),
                                 ),
@@ -292,68 +308,96 @@ class StockCard extends StatelessWidget {
                 // PRICE ROW
                 // ═══════════════════════════════════════
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      'Rs ${item.sellingPrice.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: AppTheme.darkColor,
-                        letterSpacing: -0.5,
-                        height: 1,
+                    Expanded(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'Rs ${item.sellingPrice.toStringAsFixed(0)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                                color: AppTheme.darkColor,
+                                letterSpacing: -0.5,
+                                height: 1,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            '/ ${item.unit}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textSecondary,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 5),
-                    Text(
-                      '/ ${item.unit}',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textSecondary,
-                        fontFamily: fontFamily,
+                    if (item.purchasePrice > 0 && item.sellingPrice > 0) ...[
+                      const SizedBox(width: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Cost: Rs ${item.purchasePrice.toStringAsFixed(0)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  AppTheme.incomeColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              '${item.profitMarginPercent.toStringAsFixed(0)}% profit',
+                              style: const TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.incomeColor,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 6),
 
-                // Cost / MRP / Profit
+                // MRP
                 Wrap(
                   spacing: 10,
                   runSpacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    if (item.purchasePrice > 0)
-                      _buildMiniInfo(
-                        icon: PhosphorIcons.tag(),
-                        label: 'Cost',
-                        value: 'Rs ${item.purchasePrice.toStringAsFixed(0)}',
-                      ),
                     if (item.mrp > 0)
                       _buildMiniInfo(
                         icon: PhosphorIcons.clipboard(),
                         label: 'MRP',
                         value: 'Rs ${item.mrp.toStringAsFixed(0)}',
-                      ),
-                    if (item.purchasePrice > 0 && item.sellingPrice > 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.incomeColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Text(
-                          '${item.profitMarginPercent.toStringAsFixed(0)}% profit',
-                          style: const TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.incomeColor,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
                       ),
                   ],
                 ),
@@ -427,6 +471,19 @@ class StockCard extends StatelessWidget {
                                 letterSpacing: -0.2,
                               ),
                             ),
+                            if (item.purchasePrice > 0) ...[
+                              Text(
+                                ' (Rs ${(computedStock * item.purchasePrice).toStringAsFixed(0)})',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: statusColor.withValues(alpha: 0.9),
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -604,15 +661,15 @@ class StockCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: isRemote
           ? Image.network(
-        path,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => fallback,
-      )
+              path,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => fallback,
+            )
           : Image.file(
-        File(path),
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => fallback,
-      ),
+              File(path),
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => fallback,
+            ),
     );
   }
 }

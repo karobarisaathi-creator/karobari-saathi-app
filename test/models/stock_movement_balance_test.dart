@@ -55,5 +55,53 @@ void main() {
         isTrue,
       );
     });
+
+    test('sales respect the item out-of-stock policy', () {
+      expect(
+        StockService.canSellQuantity(
+          availableStock: 2,
+          quantity: 3,
+        ),
+        isFalse,
+      );
+      expect(
+        StockService.canSellQuantity(
+          availableStock: 2,
+          quantity: 3,
+          stopWhenOut: false,
+        ),
+        isTrue,
+      );
+      expect(
+        StockService.canApplyMovement(
+          availableStock: 2,
+          movement: movement(StockMovementType.sale, 3),
+          stopWhenOut: false,
+        ),
+        isTrue,
+      );
+    });
+
+    test('sales reject invalid quantities and stock values', () {
+      expect(
+        StockService.canSellQuantity(availableStock: 2, quantity: -1),
+        isFalse,
+      );
+      expect(
+        StockService.canSellQuantity(
+          availableStock: double.infinity,
+          quantity: 1,
+        ),
+        isFalse,
+      );
+      expect(
+        StockService.canApplyMovement(
+          availableStock: 2,
+          movement: movement(StockMovementType.sale, double.nan),
+          stopWhenOut: false,
+        ),
+        isFalse,
+      );
+    });
   });
 }

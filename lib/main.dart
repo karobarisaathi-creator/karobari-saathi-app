@@ -35,7 +35,6 @@ import 'package:account_app/core/services/excel_service.dart'; // Added ExcelSer
 import 'package:account_app/core/services/backup_service.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/security_service.dart';
-import 'package:account_app/core/services/verification_service.dart';
 import 'package:account_app/core/widgets/simple_spinning_ring.dart';
 import './helpers/migration_helper.dart'; // ✅ یہ import کریں
 
@@ -198,7 +197,6 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BackupService()),
         ChangeNotifierProvider(create: (_) => StockService()),
         ChangeNotifierProvider(create: (_) => SecurityService()),
-        ChangeNotifierProvider(create: (_) => VerificationService()),
       ],
       child: Consumer2<LanguageService, ThemeService>(
         builder: (context, languageService, themeService, child) {

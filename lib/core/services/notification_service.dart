@@ -9,7 +9,6 @@ import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/widgets/in_app_notification_banner.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
-import 'database_service.dart';
 
 class NotificationService with ChangeNotifier {
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
@@ -653,11 +652,19 @@ class NotificationService with ChangeNotifier {
     required String partyPhoneNumber,
     required double amount,
     required String transactionType,
+    String? category,
+    String? paymentMethod,
     String? description,
     List<Map<String, dynamic>>? items,
     double? receivedAmount,
     double? pendingAmount,
     String? transactionId,
+    DateTime? transactionDate,
+    String? referenceNumber,
+    double? subtotal,
+    double? discountAmount,
+    double? discountPercent,
+    String? discountReason,
   }) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
@@ -683,9 +690,6 @@ class NotificationService with ChangeNotifier {
         final targetUserId = querySnapshot.docs.first.id;
         if (targetUserId == currentUser.uid) return;
 
-        final dbService = DatabaseService();
-        bool isVerified = await dbService.isUserVerified(currentUser.uid);
-
         // Build detailed receipt message body
         final StringBuffer bodyBuffer = StringBuffer();
         bodyBuffer.writeln('🧾 $myName کی طرف سے بل / رسید');
@@ -706,9 +710,11 @@ class NotificationService with ChangeNotifier {
         }
 
         if (receivedAmount != null && pendingAmount != null) {
-          bodyBuffer.writeln('وصول شدہ: Rs. ${receivedAmount.toStringAsFixed(0)}');
+          bodyBuffer
+              .writeln('وصول شدہ: Rs. ${receivedAmount.toStringAsFixed(0)}');
           if (pendingAmount > 0) {
-            bodyBuffer.writeln('بقایا ادھار: Rs. ${pendingAmount.toStringAsFixed(0)}');
+            bodyBuffer.writeln(
+                'بقایا ادھار: Rs. ${pendingAmount.toStringAsFixed(0)}');
           }
         }
 
@@ -723,16 +729,24 @@ class NotificationService with ChangeNotifier {
           data: {
             'amount': amount.toString(),
             'transactionType': transactionType,
+            'category': category,
+            'paymentMethod': paymentMethod,
             'senderName': myName,
             'senderPhone': currentUser.phoneNumber,
             'senderUid': currentUser.uid,
             'senderPhotoUrl': currentUser.photoURL,
-            'isSenderVerified': isVerified,
             'description': description ?? '',
             'items': items ?? [],
             'receivedAmount': receivedAmount?.toString() ?? '0',
             'pendingAmount': pendingAmount?.toString() ?? '0',
             'transactionId': transactionId ?? notifId,
+            'transactionDate':
+                (transactionDate ?? DateTime.now()).toIso8601String(),
+            'referenceNumber': referenceNumber,
+            'subtotal': (subtotal ?? amount).toString(),
+            'discountAmount': (discountAmount ?? 0).toString(),
+            'discountPercent': discountPercent?.toString(),
+            'discountReason': discountReason,
           },
         );
 

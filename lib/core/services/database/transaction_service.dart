@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'base_service.dart';
 import 'account_service.dart';
@@ -10,8 +9,13 @@ class TransactionService extends BaseService {
   final ProfessionService _professionService = ProfessionService();
 
   Future<void> addTransaction(model.Transaction transaction) async {
+    final box = transactionsBox;
+    if (box == null) {
+      throw StateError('Transaction storage is not initialized.');
+    }
+
     // 1. Save locally first
-    await transactionsBox?.put(transaction.id, transaction);
+    await box.put(transaction.id, transaction);
     await _accountService.recalculateAccountBalance(transaction.accountId);
 
     // Recalculate profession finance (this helper now handles master/season hierarchy)

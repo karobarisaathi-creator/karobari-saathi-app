@@ -18,7 +18,6 @@ import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/features/settings/master_profile_screen.dart';
 import 'package:account_app/features/settings/app_lock_screen.dart';
-import 'package:account_app/features/stock/stock_list_screen.dart';
 
 class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
@@ -76,23 +75,6 @@ class _AppDrawerState extends State<AppDrawer> {
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                _buildSectionHeader(isUrdu ? 'کاروباری ٹولز' : 'Business Tools',
-                    fontFamily, isUrdu),
-                _buildDrawerItem(
-                  icon: PhosphorIcons.package(),
-                  title: isUrdu ? 'اسٹاک اور انوینٹری' : 'Stock & Inventory',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const StockListScreen(),
-                      ),
-                    );
-                  },
-                  fontFamily: fontFamily,
-                ),
-                _buildDivider(),
                 _buildSectionHeader(
                     isUrdu ? 'ڈیٹا اور رپورٹ' : 'Data & Reports',
                     fontFamily,
@@ -247,7 +229,6 @@ class _AppDrawerState extends State<AppDrawer> {
           isLarge: true,
           textColor: Colors.white,
           subtitleColor: Colors.white70,
-          isVerified: false,
           customSize: 60,
         ),
       ),
