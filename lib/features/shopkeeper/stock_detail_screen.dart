@@ -1,4 +1,4 @@
-// lib/features/stock/stock_detail_screen.dart
+// lib/features/shopkeeper/stock_detail_screen.dart
 
 import 'dart:io';
 import 'package:flutter/material.dart';

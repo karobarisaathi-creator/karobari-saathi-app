@@ -1,26 +1,33 @@
 // lib/features/navigation/main_navigation_screen.dart
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:account_app/core/theme/app_theme.dart';
+
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
+import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_drawer.dart';
 import 'package:account_app/features/dashboard/dashboard_screen.dart';
+import 'package:account_app/features/notifications/notifications_screen.dart';
 import 'package:account_app/features/professions/professions_screen.dart';
 import 'package:account_app/features/quick_bill/quick_bill_item_selection_screen.dart';
-import 'package:account_app/features/stock/stock_list_screen.dart';
-import 'package:account_app/features/notifications/notifications_screen.dart';
+import 'package:account_app/features/shopkeeper/shopkeeper_dashboard_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
 
   static final GlobalKey<_MainNavigationScreenState> navigationKey =
-  GlobalKey<_MainNavigationScreenState>();
+      GlobalKey<_MainNavigationScreenState>();
 
   static void switchTab(int index) {
     navigationKey.currentState?.onItemTapped(index);
+  }
+
+  static Future<void> refreshRole() async {
+    await navigationKey.currentState?._checkUserRole();
   }
 
   static _MainNavigationScreenState? of(BuildContext context) {
@@ -35,21 +42,58 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedIndex = 0;
+  bool _isShopkeeperRole = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkUserRole();
+  }
+
+  Future<void> _checkUserRole() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        if (doc.exists && mounted) {
+          final role = doc.data()?['role']?.toString();
+          setState(() {
+            final isShopkeeperRole = role == 'shopkeeper';
+            if (_isShopkeeperRole != isShopkeeperRole) {
+              _selectedIndex = 0;
+            }
+            _isShopkeeperRole = isShopkeeperRole;
+          });
+        }
+      } catch (_) {}
+    }
+  }
 
   void openDrawer() {
     _scaffoldKey.currentState?.openDrawer();
   }
 
-  List<Widget> get _screens => [
-    DashboardScreen(),
-    ProfessionsScreen(),
-    const QuickBillItemSelectionScreen(),
-    const StockListScreen(),
-    const NotificationsScreen(),
-  ];
+  List<Widget> get _screens => _isShopkeeperRole
+      ? [
+          DashboardScreen(),
+          ProfessionsScreen(),
+          const QuickBillItemSelectionScreen(),
+          const ShopkeeperDashboardScreen(),
+          const NotificationsScreen(),
+        ]
+      : [
+          DashboardScreen(),
+          ProfessionsScreen(),
+          const NotificationsScreen(),
+        ];
 
   void onItemTapped(int index) {
-    setState(() => _selectedIndex = index);
+    if (index < _screens.length) {
+      setState(() => _selectedIndex = index);
+    }
   }
 
   @override
@@ -57,6 +101,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final isUrdu = Provider.of<LanguageService>(context).isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    if (_selectedIndex >= _screens.length) {
+      _selectedIndex = 0;
+    }
 
     return Scaffold(
       key: _scaffoldKey,
@@ -69,62 +117,102 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         padding: EdgeInsets.only(bottom: bottomPadding),
         decoration: const BoxDecoration(
           color: AppTheme.darkColor,
-          // ⬇️ نیویگیشن بار کے اوپر والے کونے گول
           borderRadius: BorderRadius.vertical(
             top: Radius.circular(15),
           ),
         ),
         child: SizedBox(
           height: 60,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // ═══ Parties (Left) ═══
-              Expanded(
-                flex: 2,
-                child: _buildNavItem(
-                  index: 0,
-                  icon: PhosphorIcons.users(),
-                  activeIcon: PhosphorIcons.users(PhosphorIconsStyle.fill),
-                ),
-              ),
-
-              // ═══ Professions ═══
-              Expanded(
-                flex: 2,
-                child: _buildNavItem(
-                  index: 1,
-                  icon: PhosphorIcons.briefcase(),
-                  activeIcon:
-                  PhosphorIcons.briefcase(PhosphorIconsStyle.fill),
-                ),
-              ),
-
-              // ═══ Quick Bill (CENTER PILL) ═══
-              Expanded(
-                flex: 5,
-                child: _buildQuickBillPill(isUrdu, fontFamily),
-              ),
-
-              // ═══ Stock ═══
-              Expanded(
-                flex: 2,
-                child: _buildNavItem(
-                  index: 3,
-                  icon: PhosphorIcons.package(),
-                  activeIcon: PhosphorIcons.package(PhosphorIconsStyle.fill),
-                ),
-              ),
-
-              // ═══ Notifications ═══
-              Expanded(
-                flex: 2,
-                child: _buildNotificationItem(),
-              ),
-            ],
-          ),
+          child: _isShopkeeperRole
+              ? _buildShopkeeperNavBar(isUrdu, fontFamily)
+              : _buildSimpleNavBar(isUrdu, fontFamily),
         ),
       ),
+    );
+  }
+
+  // ═════════════════════════════════════════════════════════
+  // Simple Profile Nav Bar (3 Items)
+  // ═════════════════════════════════════════════════════════
+  Widget _buildSimpleNavBar(bool isUrdu, String? fontFamily) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // ═══ Parties / Accounts (Tab 0) ═══
+        Expanded(
+          child: _buildNavItem(
+            index: 0,
+            icon: PhosphorIcons.users(),
+            activeIcon: PhosphorIcons.users(PhosphorIconsStyle.fill),
+          ),
+        ),
+
+        // ═══ Professions / Projects (Tab 1) ═══
+        Expanded(
+          child: _buildNavItem(
+            index: 1,
+            icon: PhosphorIcons.briefcase(),
+            activeIcon: PhosphorIcons.briefcase(PhosphorIconsStyle.fill),
+          ),
+        ),
+
+        // ═══ Notifications (Tab 2) ═══
+        Expanded(
+          child: _buildNotificationItem(index: 2),
+        ),
+      ],
+    );
+  }
+
+  // ═════════════════════════════════════════════════════════
+  // Shopkeeper Profile Nav Bar (5 Items)
+  // ═════════════════════════════════════════════════════════
+  Widget _buildShopkeeperNavBar(bool isUrdu, String? fontFamily) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // ═══ Parties / Accounts (Tab 0) ═══
+        Expanded(
+          flex: 2,
+          child: _buildNavItem(
+            index: 0,
+            icon: PhosphorIcons.users(),
+            activeIcon: PhosphorIcons.users(PhosphorIconsStyle.fill),
+          ),
+        ),
+
+        // ═══ Professions / Projects (Tab 1) ═══
+        Expanded(
+          flex: 2,
+          child: _buildNavItem(
+            index: 1,
+            icon: PhosphorIcons.briefcase(),
+            activeIcon: PhosphorIcons.briefcase(PhosphorIconsStyle.fill),
+          ),
+        ),
+
+        // ═══ Quick Bill (Center Pill) (Tab 2) ═══
+        Expanded(
+          flex: 5,
+          child: _buildQuickBillPill(isUrdu, fontFamily),
+        ),
+
+        // ═══ Shopkeeper Dashboard (Tab 3) ═══
+        Expanded(
+          flex: 2,
+          child: _buildNavItem(
+            index: 3,
+            icon: Icons.storefront_rounded,
+            activeIcon: Icons.storefront_rounded,
+          ),
+        ),
+
+        // ═══ Notifications (Tab 4) ═══
+        Expanded(
+          flex: 2,
+          child: _buildNotificationItem(index: 4),
+        ),
+      ],
     );
   }
 
@@ -159,7 +247,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   // ═════════════════════════════════════════════════════════
-  // Quick Bill Center Pill — بڑا بکس
+  // Quick Bill Center Pill
   // ═════════════════════════════════════════════════════════
   Widget _buildQuickBillPill(bool isUrdu, String? fontFamily) {
     return Material(
@@ -183,7 +271,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ),
               ],
             ),
-            // ⬇️ بکس کا سائز بڑھایا
             padding: const EdgeInsets.symmetric(
               horizontal: 20,
               vertical: 12,
@@ -224,13 +311,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   // ═════════════════════════════════════════════════════════
   // Notifications Item (with badge)
   // ═════════════════════════════════════════════════════════
-  Widget _buildNotificationItem() {
-    final isActive = _selectedIndex == 4;
+  Widget _buildNotificationItem({int index = 2}) {
+    final isActive = _selectedIndex == index;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => onItemTapped(4),
+        onTap: () => onItemTapped(index),
         borderRadius: BorderRadius.circular(12),
         child: Container(
           height: 66,

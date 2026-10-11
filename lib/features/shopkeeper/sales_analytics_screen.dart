@@ -1,4 +1,4 @@
-// lib/features/analytics/sales_analytics_screen.dart
+// lib/features/shopkeeper/sales_analytics_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';

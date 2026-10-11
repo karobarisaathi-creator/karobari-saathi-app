@@ -18,6 +18,7 @@ import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/features/settings/master_profile_screen.dart';
 import 'package:account_app/features/settings/app_lock_screen.dart';
+import 'package:account_app/features/shopkeeper/shopkeeper_dashboard_screen.dart';
 
 class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
@@ -95,6 +96,39 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: PhosphorIcons.database(),
                   title: isUrdu ? 'بیک اپ اور بحالی' : 'Backup & Restore',
                   onTap: () => _showBackupDialog(context, isUrdu),
+                  fontFamily: fontFamily,
+                ),
+                _buildDivider(),
+                _buildSectionHeader(
+                    isUrdu ? 'کاروباری اسکرینز' : 'Business Mode',
+                    fontFamily,
+                    isUrdu),
+                _buildDrawerItem(
+                  icon: Icons.storefront_rounded,
+                  title: isUrdu ? 'شاپ کیپر ڈیش بورڈ' : 'Shopkeeper Dashboard',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ShopkeeperDashboardScreen(),
+                      ),
+                    );
+                  },
+                  fontFamily: fontFamily,
+                ),
+                _buildDrawerItem(
+                  icon: PhosphorIcons.userGear(),
+                  title: isUrdu ? 'پروفائل اور رول' : 'Profile & Role',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const MasterProfileScreen(),
+                      ),
+                    );
+                  },
                   fontFamily: fontFamily,
                 ),
                 _buildDivider(),

@@ -1,4 +1,4 @@
-// lib/features/stock/add_edit_stock_item_screen.dart
+// lib/features/shopkeeper/add_edit_stock_item_screen.dart
 
 import 'dart:io';
 import 'package:flutter/material.dart';

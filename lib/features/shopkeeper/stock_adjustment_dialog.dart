@@ -1,4 +1,4 @@
-// lib/features/stock/stock_adjustment_dialog.dart
+// lib/features/shopkeeper/stock_adjustment_dialog.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
