@@ -24,6 +24,8 @@ class ProfileController extends ChangeNotifier {
   bool _isDisposed = false;
   String? remoteProfileImage;
   File? profileImage;
+  String? remoteBannerImage;
+  File? bannerImage;
   ProfileSaveStatus saveStatus = ProfileSaveStatus.idle;
   String? errorMessage;
 
@@ -60,6 +62,7 @@ class ProfileController extends ChangeNotifier {
       shopNameController.text = (data?['shopName'] ?? '').toString();
       selectedRole = AppRoleExtension.fromString(data?['role']?.toString());
       remoteProfileImage = (data?['photoURL'] ?? user.photoURL)?.toString();
+      remoteBannerImage = (data?['shopBannerUrl'] ?? data?['bannerUrl'])?.toString();
       isEditing = nameController.text.trim().isNotEmpty;
     } catch (error) {
       hasLoadError = true;
@@ -99,6 +102,17 @@ class ProfileController extends ChangeNotifier {
         profileImageUrl = await imageRef.getDownloadURL();
       }
 
+      String? bannerImageUrl = remoteBannerImage;
+      if (bannerImage != null) {
+        final compressed = await ImageUtils.compressImage(bannerImage!);
+        final extension = bannerImage!.path.split('.').last.toLowerCase();
+        final imageRef = FirebaseStorage.instance
+            .ref()
+            .child('users/${user.uid}/banner.$extension');
+        await imageRef.putFile(compressed);
+        bannerImageUrl = await imageRef.getDownloadURL();
+      }
+
       await user.updateDisplayName(nameController.text.trim());
       if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
         await user.updatePhotoURL(profileImageUrl);
@@ -110,10 +124,47 @@ class ProfileController extends ChangeNotifier {
         'shopName': shopNameController.text.trim(),
         'role': selectedRole.id,
         'photoURL': profileImageUrl,
+        'shopBannerUrl': bannerImageUrl,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+      if (selectedRole == AppRole.shopkeeper &&
+          shopNameController.text.trim().isNotEmpty) {
+        final publicShopData = {
+          'uid': user.uid,
+          'displayName': nameController.text.trim(),
+          'ownerName': nameController.text.trim(),
+          'shopName': shopNameController.text.trim(),
+          'businessAddress': addressController.text.trim(),
+          'role': selectedRole.id,
+          'photoURL': profileImageUrl,
+          'profileImageUrl': profileImageUrl,
+          'shopBannerUrl': bannerImageUrl,
+          'bannerImageUrl': bannerImageUrl,
+          'isOpen': true,
+          'rating': 0,
+          'reviews': 0,
+          'distance': '',
+          'distanceVal': null,
+          'deliveryTime': '',
+          'timeVal': 0,
+          'minOrder': '',
+          'deliveryFee': '',
+          'tags': [],
+          'itemCount': 0,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+
+        await FirebaseFirestore.instance
+            .collection('public_shops')
+            .doc(user.uid)
+            .set(publicShopData, SetOptions(merge: true));
+      } else {
+        await FirebaseFirestore.instance.collection('public_shops').doc(user.uid).delete();
+      }
+
       remoteProfileImage = profileImageUrl;
+      remoteBannerImage = bannerImageUrl;
       saveStatus = ProfileSaveStatus.success;
       isEditing = true;
       notifyListeners();

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
@@ -182,7 +183,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
+          UrduAwareText(
             isUrdu ? "رپورٹ $currentYear" : "Report $currentYear",
             style: TextStyle(
               fontSize: 18,
@@ -217,7 +218,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            UrduAwareText(
               isUrdu ? "سیزن منتخب کریں" : "Select Season",
               style: TextStyle(
                   fontSize: 18,
@@ -260,7 +261,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                 ? AppTheme.themeColor
                                 : Colors.grey.shade200),
                       ),
-                      child: Text(
+                      child: UrduAwareText(
                         seasonName,
                         textAlign: TextAlign.center,
                         style: TextStyle(
@@ -304,7 +305,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       children: [
         SizedBox(
           width: 60,
-          child: Text(label,
+          child: UrduAwareText(label,
               style: TextStyle(
                   fontSize: 13,
                   color: Colors.grey[600],
@@ -323,7 +324,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
         ),
         const SizedBox(width: 12),
-        Text("Rs ${val.toStringAsFixed(0)}",
+        UrduAwareText("Rs ${val.toStringAsFixed(0)}",
             style: TextStyle(
                 fontSize: 13, fontWeight: FontWeight.w900, color: color)),
       ],
@@ -350,7 +351,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          UrduAwareText(
             label,
             style: TextStyle(
               fontSize: 16,
@@ -381,7 +382,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 40),
-          child: Text(isUrdu ? "کوئی ڈیٹا موجود نہیں" : "No data available",
+          child: UrduAwareText(isUrdu ? "کوئی ڈیٹا موجود نہیں" : "No data available",
               style: TextStyle(color: Colors.grey, fontFamily: fontFamily)),
         ),
       );
@@ -414,14 +415,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
+                UrduAwareText(
                   "Rs ${total.toStringAsFixed(0)}",
                   style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
                       color: AppTheme.darkColor),
                 ),
-                Text(
+                UrduAwareText(
                   isUrdu
                       ? "${catData.length} زمروں میں"
                       : "in ${catData.length} categories",
@@ -458,7 +459,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             // Percentage
             SizedBox(
               width: 30,
-              child: Text(
+              child: UrduAwareText(
                 "${percentage.toStringAsFixed(0)}%",
                 style: TextStyle(
                   fontSize: 11,
@@ -471,7 +472,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             // Category Name
             Expanded(
               flex: 3,
-              child: Text(
+              child: UrduAwareText(
                 entry.key,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -499,7 +500,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ),
             const SizedBox(width: 12),
             // Amount
-            Text(
+            UrduAwareText(
               "Rs ${entry.value.toStringAsFixed(0)}",
               style: TextStyle(
                 fontSize: 13,

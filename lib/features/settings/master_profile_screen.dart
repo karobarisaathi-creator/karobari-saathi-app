@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/config/app_roles.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/language_service.dart';
@@ -8,6 +11,7 @@ import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
+import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/features/dashboard/main_navigation_screen.dart';
 import 'package:account_app/features/profile/controllers/profile_controller.dart';
 import 'package:account_app/features/shopkeeper/shopkeeper_dashboard_screen.dart';
@@ -38,10 +42,29 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    final stockService = Provider.of<StockService>(context, listen: false);
     final success = await _controller.saveProfile();
     if (!mounted) return;
 
     if (success) {
+      String? catalogError;
+      if (_controller.selectedRole == AppRole.shopkeeper) {
+        try {
+          await stockService.syncPublicCatalog();
+        } catch (error) {
+          catalogError = error.toString();
+        }
+      }
+      if (!mounted) return;
+      if (catalogError != null) {
+        AppToast.error(
+          context,
+          isUrdu
+              ? 'پروفائل محفوظ ہوگیا، مگر دکان کے آئٹمز شائع نہیں ہوسکے: $catalogError'
+              : 'Profile saved, but shop items could not be published: $catalogError',
+        );
+        return;
+      }
       AppToast.success(
           context, isUrdu ? 'پروفائل محفوظ ہوگیا' : 'Profile saved');
       await MainNavigationScreen.refreshRole();
@@ -108,10 +131,39 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                             },
                           ),
                         ),
+                        const SizedBox(height: 16),
+
+                        // ═══ SHOP BANNER SELECTOR ═══
+                        if (controller.selectedRole == AppRole.shopkeeper) ...[
+                          ImageSelectorField(
+                            label: isUrdu
+                                ? 'دکان / کاروبار کا بینر (تصویر)'
+                                : 'Shop / Business Banner Image',
+                            isFullWidth: true,
+                            aspectRatio: 16 / 6,
+                            selectedFiles: controller.bannerImage == null
+                                ? []
+                                : [controller.bannerImage!],
+                            remoteUrls: controller.remoteBannerImage == null
+                                ? []
+                                : [controller.remoteBannerImage!],
+                            maxTotal: 1,
+                            onFilesChanged: (files) {
+                              controller.bannerImage =
+                                  files.isEmpty ? null : files.first;
+                              controller.notifyListeners();
+                            },
+                            onRemoteRemoved: (_) {
+                              controller.remoteBannerImage = null;
+                              controller.notifyListeners();
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         const SizedBox(height: 20),
 
                         // ═══ ROLE SELECTION ═══
-                        Text(
+                        UrduAwareText(
                           isUrdu ? 'پروفائل کی قسم منتخب کریں' : 'Select Profile Mode',
                           style: TextStyle(
                             fontSize: 14,
@@ -212,11 +264,24 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                               const Divider(height: 1),
                               _buildField(
                                 controller: controller.addressController,
-                                label: isUrdu
-                                    ? 'دکان / کاروبار کا پتہ (اختیاری)'
-                                    : 'Shop / business address (optional)',
+                                label: controller.selectedRole == AppRole.shopkeeper
+                                    ? (isUrdu
+                                        ? 'دکان / کاروبار کا پتہ *'
+                                        : 'Shop / business address *')
+                                    : (isUrdu
+                                        ? 'پتہ (اختیاری)'
+                                        : 'Address (Optional)'),
                                 icon: PhosphorIcons.mapPin(),
                                 fontFamily: fontFamily,
+                                validator: (value) {
+                                  if (controller.selectedRole == AppRole.shopkeeper &&
+                                      (value == null || value.trim().isEmpty)) {
+                                    return isUrdu
+                                        ? 'دکان کا پتہ درج کرنا لازمی ہے'
+                                        : 'Enter business address';
+                                  }
+                                  return null;
+                                },
                               ),
                             ],
                           ),
@@ -262,7 +327,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
+                                        UrduAwareText(
                                           isUrdu
                                               ? 'شاپ کیپر ڈیش بورڈ کھولیں'
                                               : 'Open Shopkeeper Dashboard',
@@ -273,7 +338,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                                             fontFamily: fontFamily,
                                           ),
                                         ),
-                                        Text(
+                                        UrduAwareText(
                                           isUrdu
                                               ? 'فوری آرڈرز، بکی اور پروڈکٹس کا خلاصہ'
                                               : 'Quick orders, sales & products overview',
@@ -348,7 +413,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
               color: isSelected ? AppTheme.themeColor : Colors.grey[600],
             ),
             const SizedBox(height: 8),
-            Text(
+            UrduAwareText(
               role.label(isUrdu),
               style: TextStyle(
                 fontSize: 13,
@@ -359,7 +424,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 2),
-            Text(
+            UrduAwareText(
               role.subtitle(isUrdu),
               style: TextStyle(
                 fontSize: 9.5,

@@ -1,3 +1,4 @@
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:photo_view/photo_view.dart';
@@ -272,7 +273,7 @@ class _SimpleGalleryDialogState extends State<_SimpleGalleryDialog> {
                   color: Colors.black54,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(
+                child: UrduAwareText(
                   "${_currentIndex + 1} / ${widget.imagePaths.length}",
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                 ),

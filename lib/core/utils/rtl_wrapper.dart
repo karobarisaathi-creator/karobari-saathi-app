@@ -1,6 +1,7 @@
 // rtl_wrapper.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 
 class RtlWrapper extends StatelessWidget {
@@ -61,11 +62,9 @@ class BilingualText extends StatelessWidget {
     final languageService = Provider.of<LanguageService>(context);
     final isUrdu = languageService.isUrdu;
 
-    return Text(
+    return UrduAwareText(
       isUrdu ? urduText : englishText,
-      style:
-          style?.copyWith(fontFamily: isUrdu ? 'NooriNastaleeq' : 'NotoSans') ??
-          TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : 'NotoSans'),
+      style: style,
       textAlign: textAlign,
       maxLines: maxLines,
       overflow: overflow,

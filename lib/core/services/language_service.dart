@@ -36,7 +36,10 @@ class LanguageService with ChangeNotifier {
 
   String getFontFamily(String text) {
     if (_currentLocale.languageCode == 'ur') {
-      final urduRegex = RegExp(r'[\u0600-\u06FF]');
+      final urduRegex = RegExp(
+        r'[\u0600-\u0605\u0608-\u060F\u0610-\u061A\u061C-\u064A'
+        r'\u066E-\u066F\u0670-\u06D3\u06D5-\u06EF\u06FA-\u06FC\u06FF]',
+      );
       return urduRegex.hasMatch(text) ? 'NooriNastaleeq' : ''; // Default system font for English
     }
     return ''; // Default system font

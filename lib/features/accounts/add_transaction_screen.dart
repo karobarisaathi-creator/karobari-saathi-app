@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
@@ -667,7 +668,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                             itemBuilder: (BuildContext context, int index) {
                               final String option = options.elementAt(index);
                               return ListTile(
-                                title: Text(option,
+                                title: UrduAwareText(option,
                                     style: TextStyle(
                                         fontFamily: fontFamily, fontSize: 14)),
                                 onTap: () => onSelected(option),
@@ -750,7 +751,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        UrduAwareText(
           isUrdu ? 'اکائی منتخب کریں' : 'Unit',
           style: TextStyle(
             color: Colors.grey.shade600,
@@ -766,7 +767,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             final selected = unit == currentUnit;
             final label = isUrdu ? (_itemUnitLabels[unit] ?? unit) : unit;
             return ChoiceChip(
-              label: Text(label),
+              label: UrduAwareText(label),
               selected: selected,
               showCheckmark: false,
               visualDensity: VisualDensity.compact,
@@ -801,7 +802,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
+            UrduAwareText(
               isUrdu ? 'پیشہ منتخب کریں' : 'Select Profession',
               style: TextStyle(
                 fontSize: 13,
@@ -816,7 +817,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   _selectedProfessionId = null;
                   _professionSyncType = null;
                 }),
-                child: Text(
+                child: UrduAwareText(
                   isUrdu ? 'تبدیل کریں' : 'Change',
                   style: TextStyle(
                       fontSize: 11,
@@ -872,7 +873,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     if (selectedProf == null) {
       // Fallback if still not found
-      return Text(isUrdu ? 'پیشہ دستیاب نہیں' : 'Profession not found');
+      return UrduAwareText(isUrdu ? 'پیشہ دستیاب نہیں' : 'Profession not found');
     }
 
     return ListView(
@@ -986,7 +987,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             ),
             const SizedBox(height: 6),
             const SizedBox(height: 10),
-            Text(
+            UrduAwareText(
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -1059,7 +1060,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
             ),
             const SizedBox(height: 6),
-            Text(
+            UrduAwareText(
               name,
               textAlign: TextAlign.center,
               maxLines: 2,
@@ -1109,7 +1110,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       {double topPadding = 24}) {
     return Padding(
       padding: EdgeInsets.only(top: topPadding, bottom: 8),
-      child: Text(
+      child: UrduAwareText(
         title,
         style: TextStyle(
           fontSize: 14,

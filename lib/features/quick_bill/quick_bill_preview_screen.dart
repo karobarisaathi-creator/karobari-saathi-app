@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
@@ -230,7 +231,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: Text(
+                        child: UrduAwareText(
                           isUrdu ? 'ڈسکاونٹ' : 'Discount',
                           style: TextStyle(
                             fontFamily: fontFamily,
@@ -299,6 +300,11 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
     }
 
     final stockService = Provider.of<StockService>(context, listen: false);
+    final previouslyLinkedItemIds = widget.transactionToEdit?.items
+            .map((item) => item.stockItemId)
+            .whereType<String>()
+            .toSet() ??
+        <String>{};
 
     final stockQuantities = <String, double>{};
     for (final line in widget.lines) {
@@ -306,7 +312,9 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
       final stockItem = stockService.items
           .where((item) => item.id == line.stockItemId)
           .firstOrNull;
-      if (stockItem == null) {
+      if (stockItem == null ||
+          (stockItem.isArchived &&
+              !previouslyLinkedItemIds.contains(stockItem.id))) {
         AppToast.warning(
           context,
           isUrdu
@@ -350,6 +358,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
     try {
       final databaseService =
           Provider.of<DatabaseService>(context, listen: false);
+      var stockSynced = true;
 
       Account account;
       if (_pendingAmount <= 0 && _isCashCustomer) {
@@ -421,7 +430,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
 
       final followUpFailures = <String>[];
       if (originalTransaction == null) {
-        await databaseService.addTransaction(transaction);
+        stockSynced = await databaseService.addTransaction(transaction);
         try {
           await BillNumbering.saveNextNumber(
             databaseService,
@@ -435,7 +444,42 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
           );
         }
       } else {
-        await databaseService.updateTransaction(transaction);
+        stockSynced = await databaseService.updateTransaction(transaction);
+      }
+
+      if (!stockSynced && mounted) {
+        final retry = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: UrduAwareText(isUrdu ? 'اسٹاک اپڈیٹ نہیں ہوا' : 'Stock was not updated'),
+            content: UrduAwareText(
+              isUrdu
+                  ? 'بل محفوظ ہوگیا ہے، مگر اس کا اسٹاک ریکارڈ اپڈیٹ نہیں ہوا۔ دوبارہ کوشش کریں؟'
+                  : 'The bill was saved, but its stock movement was not updated. Retry now?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: UrduAwareText(isUrdu ? 'بعد میں' : 'Later'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: UrduAwareText(isUrdu ? 'دوبارہ کوشش' : 'Retry'),
+              ),
+            ],
+          ),
+        );
+        if (retry == true) {
+          stockSynced =
+              await databaseService.retryTransactionStockSync(transaction);
+        }
+        if (!stockSynced) {
+          followUpFailures.add(
+            isUrdu
+                ? 'اس بل کا اسٹاک ریکارڈ ابھی بھی اپڈیٹ نہیں ہوا؛ نیٹ ورک بحال ہونے پر اسی بل کو دوبارہ محفوظ کریں۔'
+                : 'Stock for this bill is still not updated. Re-save the bill after the network is restored.',
+          );
+        }
       }
 
       if (!mounted) return;
@@ -561,7 +605,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                 if (_mode != _PayMode.full) ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: Text(
+                    child: UrduAwareText(
                       isUrdu ? 'پارٹی منتخب کریں' : 'Select party',
                       style: TextStyle(
                         fontFamily: fontFamily,
@@ -614,7 +658,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
             color: AppTheme.textSecondary,
           ),
           const SizedBox(width: 6),
-          Text(
+          UrduAwareText(
             isUrdu ? 'بل نمبر' : 'Bill number',
             style: TextStyle(
               fontFamily: fontFamily,
@@ -700,7 +744,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
+                  child: UrduAwareText(
                     isUrdu ? 'آئٹمز' : 'Items',
                     style: TextStyle(
                       fontSize: 13.5,
@@ -718,7 +762,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                     color: AppTheme.themeColor.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Text(
+                  child: UrduAwareText(
                     '${widget.lines.length} ${isUrdu ? "آئٹمز" : "items"}',
                     style: const TextStyle(
                       fontSize: 10,
@@ -777,7 +821,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                UrduAwareText(
                   line.name,
                   style: TextStyle(
                     fontFamily: fontFamily,
@@ -790,7 +834,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 3),
-                Text(
+                UrduAwareText(
                   '${line.quantity.toStringAsFixed(line.quantity == line.quantity.roundToDouble() ? 0 : 1)} ${line.unit ?? ""} × Rs ${line.rate.toStringAsFixed(0)}',
                   style: const TextStyle(
                     fontSize: 11,
@@ -803,7 +847,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
             ),
           ),
           const SizedBox(width: 10),
-          Text(
+          UrduAwareText(
             line.total.toStringAsFixed(0),
             style: const TextStyle(
               fontSize: 13.5,
@@ -828,7 +872,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
       child: Row(
         children: [
           Expanded(
-            child: Text(
+            child: UrduAwareText(
               label,
               style: TextStyle(
                 fontSize: 13,
@@ -838,7 +882,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
               ),
             ),
           ),
-          Text(
+          UrduAwareText(
             value,
             style: const TextStyle(
               fontSize: 14,
@@ -869,7 +913,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
           ),
           const SizedBox(width: 6),
           Expanded(
-            child: Text(
+            child: UrduAwareText(
               displayPercent != null
                   ? (isUrdu
                       ? 'رعایت ($displayPercent%)'
@@ -883,7 +927,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
               ),
             ),
           ),
-          Text(
+          UrduAwareText(
             '− ${_discountAmount.toStringAsFixed(0)}',
             style: const TextStyle(
               fontSize: 14,
@@ -913,7 +957,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
       child: Row(
         children: [
           Expanded(
-            child: Text(
+            child: UrduAwareText(
               isUrdu ? 'کل خالص' : 'TOTAL',
               style: TextStyle(
                 fontSize: 14.5,
@@ -924,7 +968,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
               ),
             ),
           ),
-          Text(
+          UrduAwareText(
             _total.toStringAsFixed(0),
             style: const TextStyle(
               fontSize: 22,
@@ -1032,7 +1076,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                             ]
                           : null,
                     ),
-                    child: Text(
+                    child: UrduAwareText(
                       '${preset.toStringAsFixed(0)}%',
                       style: TextStyle(
                         fontSize: 11.5,
@@ -1061,7 +1105,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                     color: const Color(0xFFD97706),
                   ),
                   const SizedBox(width: 6),
-                  Text(
+                  UrduAwareText(
                     isUrdu ? 'اپنی مرضی' : 'Custom',
                     style: TextStyle(
                       fontSize: 12,
@@ -1167,7 +1211,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                   isActive ? const Color(0xFFD97706) : AppTheme.textSecondary,
             ),
             const SizedBox(width: 6),
-            Text(
+            UrduAwareText(
               label,
               style: TextStyle(
                 fontSize: 12,
@@ -1202,7 +1246,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
           ),
           const SizedBox(width: 6),
           Expanded(
-            child: Text(
+            child: UrduAwareText(
               isUrdu ? 'گاہک نے دیے' : 'Customer paid',
               style: TextStyle(
                 fontFamily: fontFamily,
@@ -1252,7 +1296,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Text(
+                const UrduAwareText(
                   'Rs',
                   style: TextStyle(
                     fontSize: 11,
@@ -1305,7 +1349,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  UrduAwareText(
                     isUrdu ? 'پارٹی منتخب کریں' : 'Select a party',
                     style: TextStyle(
                       fontFamily: fontFamily,
@@ -1315,7 +1359,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
+                  UrduAwareText(
                     isUrdu ? 'ادھار کے لیے' : 'For credit',
                     style: TextStyle(
                       fontFamily: fontFamily,
@@ -1378,7 +1422,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                         color: const Color(0xFFD97706),
                       ),
                       const SizedBox(width: 6),
-                      Text(
+                      UrduAwareText(
                         isUrdu ? 'ڈسکاونٹ' : 'Discount',
                         style: TextStyle(
                           fontSize: 12.5,
@@ -1389,7 +1433,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                       ),
                       if (_discountAmount > 0) ...[
                         const SizedBox(width: 6),
-                        Text(
+                        UrduAwareText(
                           _discountType == _DiscountType.percentage
                               ? '${_discountPercent.toStringAsFixed(0)}%'
                               : 'Rs ${_discountAmount.toStringAsFixed(0)}',
@@ -1471,7 +1515,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                       else
                         const Icon(Icons.check_rounded, size: 18),
                       const SizedBox(width: 8),
-                      Text(
+                      UrduAwareText(
                         _saving
                             ? (isUrdu ? 'محفوظ ہو رہا ہے...' : 'Saving...')
                             : widget.transactionToEdit != null
@@ -1535,7 +1579,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                 color: active ? Colors.white : AppTheme.textSecondary,
               ),
               const SizedBox(height: 4),
-              Text(
+              UrduAwareText(
                 label,
                 textAlign: TextAlign.center,
                 maxLines: 1,

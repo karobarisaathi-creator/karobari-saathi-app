@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
@@ -203,7 +204,7 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
                       Icon(PhosphorIcons.calculator(),
                           size: 18, color: const Color(0xFF1D4ED8)),
                       const SizedBox(width: 8),
-                      Text(
+                      UrduAwareText(
                         isUrdu ? 'خلاصہ' : 'Summary',
                         style: TextStyle(
                           fontSize: 14,
@@ -289,7 +290,7 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
                   await db.updateProfession(updated);
                   if (context.mounted) Navigator.pop(context);
                 },
-                child: Text(
+                child: UrduAwareText(
                   isUrdu
                       ? 'بغیر تفصیل کے مکمل کریں'
                       : 'Complete without details',
@@ -314,7 +315,7 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
+        UrduAwareText(
           label,
           style: TextStyle(
             fontSize: 13,
@@ -322,7 +323,7 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
             fontFamily: fontFamily,
           ),
         ),
-        Text(
+        UrduAwareText(
           value,
           style: TextStyle(
             fontSize: 13.5,
@@ -340,7 +341,7 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
+        UrduAwareText(
           label,
           style: TextStyle(
             fontSize: 13,
@@ -348,7 +349,7 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
             fontFamily: fontFamily,
           ),
         ),
-        Text(
+        UrduAwareText(
           value,
           style: TextStyle(
             fontSize: isBold ? 15 : 13.5,

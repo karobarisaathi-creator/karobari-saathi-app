@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert';
 import 'dart:async';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/widgets/in_app_notification_banner.dart';
@@ -354,8 +355,8 @@ class NotificationService with ChangeNotifier {
               return PartyDetailScreen(party: snapshot.data!);
             } else {
               return Scaffold(
-                appBar: AppBar(title: Text('Details')),
-                body: Center(child: Text('Account details not found.')),
+                appBar: AppBar(title: UrduAwareText('Details')),
+                body: Center(child: UrduAwareText('Account details not found.')),
               );
             }
           }

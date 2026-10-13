@@ -28,6 +28,7 @@ void main() {
         trackStock: false,
         allowReturn: false,
         stopWhenOut: false,
+        isArchived: true,
         imagePath: 'https://example.test/laptop.png',
         createdAt: DateTime(2026, 10, 1),
         updatedAt: DateTime(2026, 10, 2),
@@ -48,6 +49,7 @@ void main() {
       expect(restored.trackStock, item.trackStock);
       expect(restored.allowReturn, item.allowReturn);
       expect(restored.stopWhenOut, item.stopWhenOut);
+      expect(restored.isArchived, isTrue);
       expect(restored.imagePath, item.imagePath);
     });
 
@@ -64,6 +66,7 @@ void main() {
       expect(item.trackStock, isTrue);
       expect(item.allowReturn, isTrue);
       expect(item.stopWhenOut, isTrue);
+      expect(item.isArchived, isFalse);
       expect(item.imagePath, isNull);
     });
 
@@ -81,11 +84,13 @@ void main() {
         featured: true,
         trackStock: false,
         clearImagePath: true,
+        isArchived: true,
       );
 
       expect(updated.sku, 'SKU-2');
       expect(updated.featured, isTrue);
       expect(updated.trackStock, isFalse);
+      expect(updated.isArchived, isTrue);
       expect(updated.imagePath, isNull);
     });
   });

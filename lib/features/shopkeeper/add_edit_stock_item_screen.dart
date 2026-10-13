@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/language_service.dart';
@@ -86,50 +88,49 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
     'Other': 'دیگر',
   };
 
+  TextEditingController _createTextController(String text) =>
+      UrduAwareTextEditingController()..text = text;
+
   @override
   void initState() {
     super.initState();
     final item = widget.initialItem;
 
-    _nameController = TextEditingController(text: item?.name ?? '');
-    _nameUrduController = TextEditingController(text: item?.nameUrdu ?? '');
-    _barcodeController = TextEditingController(text: item?.barcode ?? '');
-    _skuController = TextEditingController(text: item?.sku ?? '');
-    _purchasePriceController = TextEditingController(
-      text: item != null && item.purchasePrice > 0
-          ? item.purchasePrice.toStringAsFixed(0)
+    _nameController = _createTextController(item?.name ?? '');
+    _nameUrduController = _createTextController(item?.nameUrdu ?? '');
+    _barcodeController = _createTextController(item?.barcode ?? '');
+    _skuController = _createTextController(item?.sku ?? '');
+    _purchasePriceController = _createTextController(
+      item != null && item.purchasePrice > 0
+          ? item.purchasePrice.toString()
           : '',
     );
-    _sellingPriceController = TextEditingController(
-      text: item != null && item.sellingPrice > 0
-          ? item.sellingPrice.toStringAsFixed(0)
+    _sellingPriceController = _createTextController(
+      item != null && item.sellingPrice > 0 ? item.sellingPrice.toString() : '',
+    );
+    _wholesalePriceController = _createTextController(
+      item != null && item.wholesalePrice > 0
+          ? item.wholesalePrice.toString()
           : '',
     );
-    _wholesalePriceController = TextEditingController(
-      text: item != null && item.wholesalePrice > 0
-          ? item.wholesalePrice.toStringAsFixed(0)
+    _mrpController = _createTextController(
+      item != null && item.mrp > 0 ? item.mrp.toString() : '',
+    );
+    _initialQtyController = _createTextController(
+      item != null && item.initialQuantity > 0
+          ? item.initialQuantity.toString()
           : '',
     );
-    _mrpController = TextEditingController(
-      text: item != null && item.mrp > 0 ? item.mrp.toStringAsFixed(0) : '',
+    _minAlertController = _createTextController(
+      item?.minStockAlert.toString() ?? '5',
     );
-    _initialQtyController = TextEditingController(
-      text: item != null && item.initialQuantity > 0
-          ? item.initialQuantity.toStringAsFixed(0)
-          : '',
-    );
-    _minAlertController = TextEditingController(
-      text: item?.minStockAlert.toStringAsFixed(0) ?? '5',
-    );
-    _descriptionController =
-        TextEditingController(text: item?.description ?? '');
-    _brandController = TextEditingController(text: item?.brand ?? '');
-    _modelController = TextEditingController(text: item?.model ?? '');
-    _supplierNameController =
-        TextEditingController(text: item?.supplierName ?? '');
-    _batchNoController = TextEditingController(text: item?.batchNo ?? '');
-    _warrantyController = TextEditingController(
-      text: item != null && item.warranty > 0 ? item.warranty.toString() : '',
+    _descriptionController = _createTextController(item?.description ?? '');
+    _brandController = _createTextController(item?.brand ?? '');
+    _modelController = _createTextController(item?.model ?? '');
+    _supplierNameController = _createTextController(item?.supplierName ?? '');
+    _batchNoController = _createTextController(item?.batchNo ?? '');
+    _warrantyController = _createTextController(
+      item != null && item.warranty > 0 ? item.warranty.toString() : '',
     );
     _imagePath = item?.imagePath;
     _featured = item?.featured ?? false;
@@ -201,7 +202,8 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
         sellingPrice: double.tryParse(_sellingPriceController.text) ?? 0.0,
         wholesalePrice: double.tryParse(_wholesalePriceController.text) ?? 0.0,
         mrp: double.tryParse(_mrpController.text) ?? 0.0,
-        initialQuantity: double.tryParse(_initialQtyController.text) ?? 0.0,
+        initialQuantity: widget.initialItem?.initialQuantity ??
+            (double.tryParse(_initialQtyController.text) ?? 0.0),
         minStockAlert: double.tryParse(_minAlertController.text) ?? 5.0,
         unit: _selectedUnit,
         description: _descriptionController.text.trim(),
@@ -214,6 +216,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
         trackStock: _trackStock,
         allowReturn: _allowReturn,
         stopWhenOut: _stopWhenOut,
+        isArchived: widget.initialItem?.isArchived ?? false,
         imagePath: imagePath,
         createdAt: widget.initialItem?.createdAt ?? now,
         updatedAt: now,
@@ -320,6 +323,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                     icon: PhosphorIcons.package(),
                     controller: _nameController,
                     fontFamily: fontFamily,
+                    isUrdu: isUrdu,
                     validator: (val) {
                       if (val == null || val.trim().isEmpty) {
                         return isUrdu
@@ -343,6 +347,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                     controller: _barcodeController,
                     fontFamily: fontFamily,
                     isLtr: true,
+                    isUrdu: isUrdu,
                     trailing: IconButton(
                       icon: Icon(PhosphorIcons.camera(), size: 20),
                       onPressed: () => _openBarcodeScanner(isUrdu),
@@ -417,6 +422,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                     fontFamily: fontFamily,
                     isNumber: true,
                     isLtr: true,
+                    isUrdu: isUrdu,
                     suffix: 'Rs.',
                     validator: (v) => _validateNonNegativeNumber(
                       v,
@@ -431,6 +437,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                     fontFamily: fontFamily,
                     isNumber: true,
                     isLtr: true,
+                    isUrdu: isUrdu,
                     suffix: 'Rs.',
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) {
@@ -453,6 +460,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                     fontFamily: fontFamily,
                     isNumber: true,
                     isLtr: true,
+                    isUrdu: isUrdu,
                     suffix: 'Rs.',
                     validator: (v) => _validateNonNegativeNumber(
                       v,
@@ -483,12 +491,18 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                 fontFamily: fontFamily,
                 children: [
                   _buildRowField(
-                    label: isUrdu ? 'شروعاتی اسٹاک' : 'Opening Stock',
+                    label: isEdit
+                        ? (isUrdu
+                            ? 'ابتدائی اسٹاک (مقرر)'
+                            : 'Opening Stock (fixed)')
+                        : (isUrdu ? 'شروعاتی اسٹاک' : 'Opening Stock'),
                     icon: PhosphorIcons.stack(),
                     controller: _initialQtyController,
                     fontFamily: fontFamily,
                     isNumber: true,
                     isLtr: true,
+                    isUrdu: isUrdu,
+                    readOnly: isEdit,
                     validator: (v) => _validateNonNegativeNumber(
                       v,
                       isUrdu: isUrdu,
@@ -502,6 +516,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                     fontFamily: fontFamily,
                     isNumber: true,
                     isLtr: true,
+                    isUrdu: isUrdu,
                     validator: (v) => _validateNonNegativeNumber(
                       v,
                       isUrdu: isUrdu,
@@ -525,6 +540,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                     icon: PhosphorIcons.notePencil(),
                     controller: _descriptionController,
                     fontFamily: fontFamily,
+                    isUrdu: isUrdu,
                     maxLines: 3,
                   ),
                   _buildRowField(
@@ -560,6 +576,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                     icon: PhosphorIcons.storefront(),
                     controller: _supplierNameController,
                     fontFamily: fontFamily,
+                    isUrdu: isUrdu,
                   ),
                   _buildRowField(
                     label: isUrdu ? 'بیچ / لاٹ نمبر' : 'Batch / Lot No.',
@@ -700,7 +717,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                   child: Icon(icon, size: 14, color: AppTheme.themeColor),
                 ),
                 const SizedBox(width: 8),
-                Text(
+                UrduAwareText(
                   title,
                   style: TextStyle(
                     fontSize: 14.5,
@@ -712,7 +729,8 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
               ],
             ),
           ),
-          const Divider(height: 1, thickness: 1, color: AppTheme.backgroundColor),
+          const Divider(
+              height: 1, thickness: 1, color: AppTheme.backgroundColor),
           ...children,
         ],
       ),
@@ -724,11 +742,12 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
     required IconData icon,
     required TextEditingController controller,
     required String fontFamily,
+    required bool isUrdu,
     bool isNumber = false,
     bool isLtr = false,
     bool optional = false,
-    bool isUrdu = true,
     bool isLast = false,
+    bool readOnly = false,
     String? suffix,
     Widget? trailing,
     String? Function(String?)? validator,
@@ -743,6 +762,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
       optional: optional,
       isUrdu: isUrdu,
       isLast: isLast,
+      readOnly: readOnly,
       suffix: suffix,
       trailing: trailing,
       validator: validator,
@@ -754,6 +774,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
     required IconData icon,
     required TextEditingController controller,
     required String fontFamily,
+    required bool isUrdu,
     int maxLines = 1,
     bool isLast = false,
     String? Function(String?)? validator,
@@ -763,6 +784,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
       icon: icon,
       controller: controller,
       fontFamily: fontFamily,
+      isUrdu: isUrdu,
       maxLines: maxLines,
       isLast: isLast,
       validator: validator,
@@ -790,7 +812,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                 children: [
                   Icon(icon, size: 18, color: AppTheme.themeColor),
                   const SizedBox(width: 10),
-                  Text(
+                  UrduAwareText(
                     label,
                     style: TextStyle(
                       fontSize: 13.5,
@@ -823,7 +845,8 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
           ),
         ),
         if (!isLast)
-          const Divider(height: 1, thickness: 1, color: AppTheme.backgroundColor),
+          const Divider(
+              height: 1, thickness: 1, color: AppTheme.backgroundColor),
       ],
     );
   }
@@ -847,7 +870,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
           ),
         ),
         child: Center(
-          child: Text(
+          child: UrduAwareText(
             label,
             style: TextStyle(
               fontSize: 12,
@@ -886,7 +909,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    UrduAwareText(
                       _imagePath != null
                           ? (isUrdu ? 'تصویر تبدیل کریں' : 'Change Image')
                           : (isUrdu ? 'تصویر اپلوڈ کریں' : 'Upload Image'),
@@ -898,7 +921,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
+                    UrduAwareText(
                       isUrdu ? 'آئٹم کی واضح تصویر' : 'Clear picture of item',
                       style: TextStyle(
                         fontSize: 10.5,
@@ -931,7 +954,8 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                           borderRadius: BorderRadius.circular(10),
                           child: _imagePath!.startsWith('http')
                               ? Image.network(_imagePath!, fit: BoxFit.cover)
-                              : Image.file(File(_imagePath!), fit: BoxFit.cover),
+                              : Image.file(File(_imagePath!),
+                                  fit: BoxFit.cover),
                         )
                       : Icon(PhosphorIcons.camera(),
                           size: 22, color: Colors.grey[400]),
@@ -941,7 +965,8 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
           ),
         ),
         if (!isLast)
-          const Divider(height: 1, thickness: 1, color: AppTheme.backgroundColor),
+          const Divider(
+              height: 1, thickness: 1, color: AppTheme.backgroundColor),
       ],
     );
   }
@@ -981,7 +1006,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    UrduAwareText(
                       title,
                       style: TextStyle(
                         fontSize: 13.5,
@@ -991,7 +1016,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
+                    UrduAwareText(
                       sub,
                       style: TextStyle(
                         fontSize: 10.5,
@@ -1008,7 +1033,8 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                 activeThumbColor: AppTheme.themeColor,
                 thumbIcon: WidgetStateProperty.resolveWith<Icon?>((states) {
                   if (states.contains(WidgetState.selected)) {
-                    return const Icon(Icons.check, size: 14, color: Colors.white);
+                    return const Icon(Icons.check,
+                        size: 14, color: Colors.white);
                   }
                   return const Icon(Icons.close, size: 14, color: Colors.grey);
                 }),
@@ -1017,7 +1043,8 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
           ),
         ),
         if (!isLast)
-          const Divider(height: 1, thickness: 1, color: AppTheme.backgroundColor),
+          const Divider(
+              height: 1, thickness: 1, color: AppTheme.backgroundColor),
       ],
     );
   }
@@ -1025,23 +1052,18 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
   // ═══════════════════════════════════════════
   // بارکوڈ اسکینر
   // ═══════════════════════════════════════════
-  void _openBarcodeScanner(bool isUrdu) {
-    showDialog(
+  Future<void> _openBarcodeScanner(bool isUrdu) async {
+    final barcode = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(isUrdu ? 'بارکوڈ اسکینر' : 'Barcode Scanner'),
-        content: Text(
-          isUrdu
-              ? 'یہاں بارکوڈ اسکینر کھلے گا'
-              : 'Barcode scanner will open here',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(isUrdu ? 'ٹھیک ہے' : 'OK'),
-          ),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (_) => _BarcodeScannerDialog(isUrdu: isUrdu),
+    );
+
+    if (barcode == null || !mounted) return;
+
+    _barcodeController.value = TextEditingValue(
+      text: barcode,
+      selection: TextSelection.collapsed(offset: barcode.length),
     );
   }
 
@@ -1056,22 +1078,23 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
           final confirm = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
-              title: Text(isUrdu ? 'آئٹم حذف کریں؟' : 'Delete item?'),
-              content: Text(
+              title: UrduAwareText(
+                  isUrdu ? 'آئٹم آرکائیو کریں؟' : 'Archive item?'),
+              content: UrduAwareText(
                 isUrdu
-                    ? 'کیا آپ واقعی یہ آئٹم حذف کرنا چاہتے ہیں؟'
-                    : 'Are you sure you want to delete this item?',
+                    ? 'آئٹم نئی فروخت سے ہٹ جائے گی، مگر اس کی پرانی اسٹاک ہسٹری محفوظ رہے گی۔'
+                    : 'This item will be removed from new sales, but its stock history will be kept.',
                 style: TextStyle(fontFamily: fontFamily),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
-                  child: Text(isUrdu ? 'منسوخ' : 'Cancel'),
+                  child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel'),
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(ctx, true),
-                  child: Text(
-                    isUrdu ? 'حذف کریں' : 'Delete',
+                  child: UrduAwareText(
+                    isUrdu ? 'آرکائیو کریں' : 'Archive',
                     style: TextStyle(color: AppTheme.expenseColor),
                   ),
                 ),
@@ -1082,14 +1105,25 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
           if (confirm == true && mounted) {
             final stockService =
                 Provider.of<StockService>(context, listen: false);
-            await stockService.deleteStockItem(widget.initialItem!.id);
-            if (mounted) Navigator.pop(context);
+            try {
+              await stockService.archiveStockItem(widget.initialItem!.id);
+              if (mounted) Navigator.pop(context);
+            } catch (error) {
+              if (mounted) {
+                AppToast.error(
+                  context,
+                  isUrdu
+                      ? 'آئٹم آرکائیو نہیں ہو سکی: $error'
+                      : 'Could not archive item: $error',
+                );
+              }
+            }
           }
         },
-        icon: Icon(PhosphorIcons.trash(),
+        icon: Icon(PhosphorIcons.package(),
             color: AppTheme.expenseColor, size: 18),
-        label: Text(
-          isUrdu ? 'آئٹم حذف کریں' : 'Delete Item',
+        label: UrduAwareText(
+          isUrdu ? 'آئٹم آرکائیو کریں' : 'Archive Item',
           style: TextStyle(
             color: AppTheme.expenseColor,
             fontFamily: fontFamily,
@@ -1105,6 +1139,83 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _BarcodeScannerDialog extends StatefulWidget {
+  final bool isUrdu;
+
+  const _BarcodeScannerDialog({required this.isUrdu});
+
+  @override
+  State<_BarcodeScannerDialog> createState() => _BarcodeScannerDialogState();
+}
+
+class _BarcodeScannerDialogState extends State<_BarcodeScannerDialog> {
+  bool _hasScanned = false;
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_hasScanned) return;
+
+    for (final barcode in capture.barcodes) {
+      final value = barcode.rawValue?.trim();
+      if (value != null && value.isNotEmpty) {
+        _hasScanned = true;
+        Navigator.of(context).pop(value);
+        return;
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isUrdu = widget.isUrdu;
+
+    return AlertDialog(
+      title: UrduAwareText(isUrdu ? 'بارکوڈ اسکینر' : 'Barcode Scanner'),
+      content: SizedBox(
+        width: 480,
+        height: 400,
+        child: Column(
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: MobileScanner(
+                  onDetect: _onDetect,
+                  errorBuilder: (context, error, child) => ColoredBox(
+                    color: Colors.black,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: UrduAwareText(
+                          '${isUrdu ? 'کیمرہ دستیاب نہیں یا اجازت نہیں ملی' : 'Camera unavailable or permission denied'}\n$error',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            UrduAwareText(
+              isUrdu
+                  ? 'بارکوڈ کو کیمرے کے سامنے رکھیں'
+                  : 'Point the camera at a barcode',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel'),
+        ),
+      ],
     );
   }
 }
@@ -1143,21 +1254,23 @@ class _CustomInputField extends StatefulWidget {
   final Widget? trailing;
   final String? Function(String?)? validator;
   final bool isLast;
+  final bool readOnly;
 
   const _CustomInputField({
     required this.label,
     required this.icon,
     required this.controller,
     required this.fontFamily,
+    required this.isUrdu,
     this.isNumber = false,
     this.isLtr = false,
     this.optional = false,
-    this.isUrdu = true,
     this.maxLines = 1,
     this.suffix,
     this.trailing,
     this.validator,
     this.isLast = false,
+    this.readOnly = false,
   });
 
   @override
@@ -1185,15 +1298,17 @@ class _CustomInputFieldState extends State<_CustomInputField> {
 
   @override
   Widget build(BuildContext context) {
-    final fullLabel = widget.optional
-        ? '${widget.label} ${widget.isUrdu ? "(اختیاری)" : "(optional)"}'
-        : widget.label;
+    final controller = widget.controller;
+    if (controller is UrduAwareTextEditingController) {
+      controller.isUrdu = widget.isUrdu;
+    }
 
     final effectiveFontFamily = widget.isNumber ? '' : widget.fontFamily;
     final effectiveIsLtr = widget.isNumber ? true : widget.isLtr;
-    final effectiveTextAlign = widget.isNumber
-        ? TextAlign.left
-        : (widget.isLtr ? TextAlign.left : TextAlign.right);
+    const inputTextAlign = TextAlign.left;
+    final hintText = widget.optional
+        ? (widget.isUrdu ? '(اختیاری)' : '(optional)')
+        : (widget.isUrdu ? 'درج کریں...' : 'Enter...');
 
     return Column(
       children: [
@@ -1222,13 +1337,14 @@ class _CustomInputFieldState extends State<_CustomInputField> {
                 children: [
                   Icon(widget.icon, size: 18, color: AppTheme.themeColor),
                   const SizedBox(width: 10),
-                  Text(
-                    fullLabel,
+                  UrduAwareText(
+                    widget.label,
                     style: TextStyle(
                       fontFamily: widget.fontFamily,
                       fontSize: 13.5,
                       fontWeight: FontWeight.bold,
-                      color: _hasFocus ? AppTheme.themeColor : AppTheme.darkColor,
+                      color:
+                          _hasFocus ? AppTheme.themeColor : AppTheme.darkColor,
                     ),
                   ),
                 ],
@@ -1239,6 +1355,7 @@ class _CustomInputFieldState extends State<_CustomInputField> {
                 child: TextFormField(
                   controller: widget.controller,
                   focusNode: _focusNode,
+                  readOnly: widget.readOnly,
                   keyboardType: widget.isNumber
                       ? const TextInputType.numberWithOptions(decimal: true)
                       : (widget.maxLines > 1
@@ -1247,7 +1364,7 @@ class _CustomInputFieldState extends State<_CustomInputField> {
                   maxLines: widget.maxLines,
                   textDirection:
                       effectiveIsLtr ? TextDirection.ltr : TextDirection.rtl,
-                  textAlign: effectiveTextAlign,
+                  textAlign: inputTextAlign,
                   style: TextStyle(
                     fontFamily: effectiveFontFamily,
                     fontSize: 15,
@@ -1257,11 +1374,22 @@ class _CustomInputFieldState extends State<_CustomInputField> {
                   decoration: InputDecoration(
                     filled: false,
                     fillColor: Colors.transparent,
-                    hintText: widget.isUrdu ? 'درج کریں...' : 'Enter...',
-                    hintStyle: TextStyle(
-                      fontFamily: effectiveFontFamily,
-                      fontSize: 13,
-                      color: Colors.grey[400],
+                    hint: Align(
+                      alignment: Alignment.centerLeft,
+                      child: UrduAwareText(
+                        hintText,
+                        textDirection: effectiveIsLtr
+                            ? TextDirection.ltr
+                            : (widget.isUrdu
+                                ? TextDirection.rtl
+                                : TextDirection.ltr),
+                        textAlign: inputTextAlign,
+                        style: TextStyle(
+                          fontFamily: effectiveFontFamily,
+                          fontSize: 13,
+                          color: Colors.grey[400],
+                        ),
+                      ),
                     ),
                     suffixText: widget.suffix,
                     suffixStyle: TextStyle(
@@ -1286,7 +1414,8 @@ class _CustomInputFieldState extends State<_CustomInputField> {
           ),
         ),
         if (!widget.isLast)
-          const Divider(height: 1, thickness: 1, color: AppTheme.backgroundColor),
+          const Divider(
+              height: 1, thickness: 1, color: AppTheme.backgroundColor),
       ],
     );
   }

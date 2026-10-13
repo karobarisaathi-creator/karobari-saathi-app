@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/stock_movement_model.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/stock_service.dart';
@@ -22,7 +23,7 @@ class LowStockItemsScreen extends StatelessWidget {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
 
     final lowStockItems = stockService.items.where((i) {
-      if (!i.trackStock) return false;
+      if (i.isArchived || !i.trackStock) return false;
       final currentStock = stockService.calculateCurrentStock(i.id);
       return currentStock <= i.minStockAlert;
     }).toList();
@@ -45,7 +46,7 @@ class LowStockItemsScreen extends StatelessWidget {
                       color: Colors.green[400],
                     ),
                     const SizedBox(height: 16),
-                    Text(
+                    UrduAwareText(
                       isUrdu
                           ? 'تمام اسٹاک تسلی بخش ہے!'
                           : 'All stock levels are optimal!',

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
@@ -189,7 +190,7 @@ class _PartyCardState extends State<PartyCard> {
                                     BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 4),
                                   ],
                                 ),
-                                child: Text(
+                                child: UrduAwareText(
                                   unreadCount.toString(),
                                   style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold, fontFamily: ''),
                                 ),
@@ -207,7 +208,7 @@ class _PartyCardState extends State<PartyCard> {
                           Row(
                             children: [
                               Flexible(
-                                child: Text(
+                                child: UrduAwareText(
                                   displayName,
                                   style: TextStyle(
                                     fontSize: 16,
@@ -225,7 +226,7 @@ class _PartyCardState extends State<PartyCard> {
                           Row(
                             children: [
                               Expanded(
-                                child: Text(
+                                child: UrduAwareText(
                                   displayCategory,
                                   style: TextStyle(
                                     fontSize: 13,
@@ -240,7 +241,7 @@ class _PartyCardState extends State<PartyCard> {
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
+                                  UrduAwareText(
                                     balanceText,
                                     style: TextStyle(
                                       fontSize: 11,
@@ -254,7 +255,7 @@ class _PartyCardState extends State<PartyCard> {
                                     Icon(balanceIcon, size: 14, color: balanceColor),
                                   ],
                                   const SizedBox(width: 6),
-                                  Text(
+                                  UrduAwareText(
                                     'Rs ${widget.party.balance.abs().toStringAsFixed(0)}',
                                     style: TextStyle(
                                       fontSize: 16,
@@ -298,7 +299,7 @@ class _PartyCardState extends State<PartyCard> {
                             children: [
                               Icon(PhosphorIcons.phone(), size: 20, color: Colors.green),
                               const SizedBox(width: 8),
-                              Text(
+                              UrduAwareText(
                                 isUrdu ? 'کال کریں' : 'Call Party',
                                 style: TextStyle(
                                   fontSize: 13,
@@ -324,7 +325,7 @@ class _PartyCardState extends State<PartyCard> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text(
+                              UrduAwareText(
                                 isUrdu ? 'یاددہانی بھیجیں' : 'Send Reminder',
                                 style: TextStyle(
                                   fontSize: 13,

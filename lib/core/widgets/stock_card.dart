@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/language_service.dart';
@@ -207,7 +208,7 @@ class StockCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          UrduAwareText(
                             displayName,
                             textDirection:
                                 isUrdu ? TextDirection.rtl : TextDirection.ltr,
@@ -234,7 +235,7 @@ class StockCard extends StatelessWidget {
                                         .withValues(alpha: 0.08),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
-                                  child: Text(
+                                  child: UrduAwareText(
                                     categoryName,
                                     style: TextStyle(
                                       fontSize: 10,
@@ -249,7 +250,7 @@ class StockCard extends StatelessWidget {
                               ],
                               if (item.sku.isNotEmpty)
                                 Flexible(
-                                  child: Text(
+                                  child: UrduAwareText(
                                     '#${item.sku}',
                                     style: const TextStyle(
                                       fontSize: 10,
@@ -286,7 +287,7 @@ class StockCard extends StatelessWidget {
                         children: [
                           Icon(statusIcon, size: 11, color: statusColor),
                           const SizedBox(width: 4),
-                          Text(
+                          UrduAwareText(
                             statusText,
                             style: TextStyle(
                               fontSize: 10.5,
@@ -316,7 +317,7 @@ class StockCard extends StatelessWidget {
                         textBaseline: TextBaseline.alphabetic,
                         children: [
                           Flexible(
-                            child: Text(
+                            child: UrduAwareText(
                               'Rs ${item.sellingPrice.toStringAsFixed(0)}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -330,7 +331,7 @@ class StockCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 5),
-                          Text(
+                          UrduAwareText(
                             '/ ${item.unit}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -349,7 +350,7 @@ class StockCard extends StatelessWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
+                          UrduAwareText(
                             'Cost: Rs ${item.purchasePrice.toStringAsFixed(0)}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -370,7 +371,7 @@ class StockCard extends StatelessWidget {
                                   AppTheme.incomeColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(5),
                             ),
-                            child: Text(
+                            child: UrduAwareText(
                               '${item.profitMarginPercent.toStringAsFixed(0)}% profit',
                               style: const TextStyle(
                                 fontSize: 9.5,
@@ -462,7 +463,7 @@ class StockCard extends StatelessWidget {
                               color: statusColor,
                             ),
                             const SizedBox(width: 5),
-                            Text(
+                            UrduAwareText(
                               '${computedStock.toStringAsFixed(computedStock.truncateToDouble() == computedStock ? 0 : 1)} ${item.unit}',
                               style: TextStyle(
                                 fontSize: 12.5,
@@ -472,7 +473,7 @@ class StockCard extends StatelessWidget {
                               ),
                             ),
                             if (item.purchasePrice > 0) ...[
-                              Text(
+                              UrduAwareText(
                                 ' (Rs ${(computedStock * item.purchasePrice).toStringAsFixed(0)})',
                                 style: TextStyle(
                                   fontSize: 11,
@@ -490,7 +491,7 @@ class StockCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       // Alert info
                       Flexible(
-                        child: Text(
+                        child: UrduAwareText(
                           isUrdu
                               ? 'الرٹ: ${item.minStockAlert.toStringAsFixed(0)}'
                               : 'Alert: ${item.minStockAlert.toStringAsFixed(0)}',
@@ -544,7 +545,7 @@ class StockCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
+                          child: UrduAwareText(
                             isUrdu
                                 ? 'یہ آئٹم اسٹاک ٹریک نہیں کرتا'
                                 : 'Stock is not tracked for this item',
@@ -585,7 +586,7 @@ class StockCard extends StatelessWidget {
           color: AppTheme.textSecondary.withValues(alpha: 0.7),
         ),
         const SizedBox(width: 3),
-        Text(
+        UrduAwareText(
           '$label: ',
           style: TextStyle(
             fontSize: 10,
@@ -593,7 +594,7 @@ class StockCard extends StatelessWidget {
             color: AppTheme.textSecondary.withValues(alpha: 0.85),
           ),
         ),
-        Text(
+        UrduAwareText(
           value,
           style: const TextStyle(
             fontSize: 10,

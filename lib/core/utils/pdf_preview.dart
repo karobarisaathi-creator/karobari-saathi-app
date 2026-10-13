@@ -1,4 +1,5 @@
 // pdf_preview.dart
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:flutter/material.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -13,7 +14,7 @@ class PdfPreviewScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('PDF Preview'),
+        title: UrduAwareText('PDF Preview'),
         actions: [
           IconButton(
             icon: Icon(Icons.share),

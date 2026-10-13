@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/notification_model.dart';
@@ -232,7 +233,7 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
+                    UrduAwareText(
                       isUrdu ? 'بل کی رسید' : 'Transaction Receipt',
                       style: TextStyle(
                         fontSize: 16,

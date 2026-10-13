@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/season_report_model.dart';
 import 'package:account_app/core/services/database_service.dart';
@@ -259,7 +260,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
+                  child: UrduAwareText(
                     title,
                     style: TextStyle(
                       fontSize: 13.5,
@@ -288,7 +289,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(
+      child: UrduAwareText(
         text,
         style: TextStyle(
           fontSize: 10,
@@ -331,7 +332,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                UrduAwareText(
                   displayName,
                   style: TextStyle(
                     fontSize: 15,
@@ -350,7 +351,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                   runSpacing: 3,
                   children: [
                     if (crop.isNotEmpty)
-                      Text(
+                      UrduAwareText(
                         crop,
                         style: TextStyle(
                           fontSize: 11,
@@ -360,7 +361,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                         ),
                       ),
                     if (report.areaAcres > 0)
-                      Text(
+                      UrduAwareText(
                         '${_formatQty(report.areaAcres)} ${isUrdu ? "ایکڑ" : "acres"}',
                         style: TextStyle(
                           fontSize: 11,
@@ -370,7 +371,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                         ),
                       ),
                     if (report.productionMun > 0)
-                      Text(
+                      UrduAwareText(
                         '${_formatQty(report.productionMun)} ${isUrdu ? "من" : "mun"}',
                         style: TextStyle(
                           fontSize: 11,
@@ -402,7 +403,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                   color: healthColor,
                 ),
                 const SizedBox(width: 4),
-                Text(
+                UrduAwareText(
                   _healthLabel(health, isUrdu),
                   style: TextStyle(
                     fontSize: 10.5,
@@ -448,7 +449,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Text(
+            child: UrduAwareText(
               isUrdu ? 'بمقابلہ' : 'VS',
               style: TextStyle(
                 fontSize: 11,
@@ -489,7 +490,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
           ),
           const SizedBox(width: 6),
           Flexible(
-            child: Text(
+            child: UrduAwareText(
               label,
               style: TextStyle(
                 fontSize: 12,
@@ -616,7 +617,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
+                child: UrduAwareText(
                   label,
                   style: TextStyle(
                     fontSize: 10,
@@ -632,7 +633,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             ],
           ),
           const SizedBox(height: 10),
-          Text(
+          UrduAwareText(
             value,
             style: TextStyle(
               fontSize: fullWidth ? 22 : 18,
@@ -708,7 +709,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         children: [
           Expanded(
             flex: 2,
-            child: Text(
+            child: UrduAwareText(
               isUrdu ? 'تفصیل' : 'Metric',
               style: const TextStyle(
                 fontSize: 10,
@@ -720,7 +721,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
           ),
           const Expanded(
             flex: 12,
-            child: Text(
+            child: UrduAwareText(
               'A',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -733,7 +734,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
           ),
           const Expanded(
             flex: 12,
-            child: Text(
+            child: UrduAwareText(
               'B',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -746,7 +747,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
           ),
           Expanded(
             flex: 12,
-            child: Text(
+            child: UrduAwareText(
               isUrdu ? 'فرق' : 'Diff',
               textAlign: TextAlign.center,
               style: const TextStyle(
@@ -792,7 +793,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         children: [
           Expanded(
             flex: 2,
-            child: Text(
+            child: UrduAwareText(
               label,
               style: TextStyle(
                 fontSize: 12,
@@ -806,7 +807,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
           ),
           Expanded(
             flex: 12,
-            child: Text(
+            child: UrduAwareText(
               newText,
               textAlign: TextAlign.center,
               style: const TextStyle(
@@ -821,7 +822,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
           ),
           Expanded(
             flex: 12,
-            child: Text(
+            child: UrduAwareText(
               oldText,
               textAlign: TextAlign.center,
               style: const TextStyle(
@@ -845,7 +846,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                     .withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Text(
+              child: UrduAwareText(
                 diffText,
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -964,7 +965,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
       child: Row(
         children: [
           Expanded(
-            child: Text(
+            child: UrduAwareText(
               label,
               style: TextStyle(
                 fontSize: 12.5,
@@ -974,7 +975,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               ),
             ),
           ),
-          Text(
+          UrduAwareText(
             value,
             style: TextStyle(
               fontSize: 14,
@@ -1131,7 +1132,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
           Row(
             children: [
               Expanded(
-                child: Text(
+                child: UrduAwareText(
                   label,
                   style: TextStyle(
                     fontSize: 12,
@@ -1142,7 +1143,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                   ),
                 ),
               ),
-              Text(
+              UrduAwareText(
                 '${percent.toStringAsFixed(0)}%',
                 style: TextStyle(
                   fontSize: 14,
@@ -1170,7 +1171,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
           Row(
             children: [
               Expanded(
-                child: Text(
+                child: UrduAwareText(
                   isInverse
                       ? '${inverseLabel ?? ""}: $targetText'
                       : '$valueText / $targetText',
@@ -1217,7 +1218,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         if (categories.isEmpty)
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Text(
+            child: UrduAwareText(
               isUrdu ? 'کوئی زمرہ نہیں' : 'No categories',
               style: TextStyle(
                 color: AppTheme.textSecondary,
@@ -1266,7 +1267,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
+                child: UrduAwareText(
                   cat.name,
                   style: TextStyle(
                     fontSize: 12.5,
@@ -1280,7 +1281,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
+              UrduAwareText(
                 'Rs ${_formatFull(cat.amount)}',
                 style: const TextStyle(
                   fontSize: 13,
@@ -1309,7 +1310,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
+              UrduAwareText(
                 '${percent.toStringAsFixed(1)}%',
                 style: const TextStyle(
                   fontSize: 10,
@@ -1317,7 +1318,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                   color: AppTheme.textSecondary,
                 ),
               ),
-              Text(
+              UrduAwareText(
                 isUrdu
                     ? '${cat.entriesCount} اندراج'
                     : '${cat.entriesCount} entries',
@@ -1383,7 +1384,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         if (rows.isEmpty)
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Text(
+            child: UrduAwareText(
               isUrdu ? 'کوئی زمرہ نہیں' : 'No categories',
               style: TextStyle(
                 color: AppTheme.textSecondary,
@@ -1412,7 +1413,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             children: [
               Expanded(
                 flex: 2,
-                child: Text(
+                child: UrduAwareText(
                   isUrdu ? 'کل' : 'TOTAL',
                   style: TextStyle(
                     fontSize: 10.5,
@@ -1425,7 +1426,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               ),
               Expanded(
                 flex: 12,
-                child: Text(
+                child: UrduAwareText(
                   _formatMoney(newTotal),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
@@ -1437,7 +1438,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               ),
               Expanded(
                 flex: 12,
-                child: Text(
+                child: UrduAwareText(
                   _formatMoney(oldTotal),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
@@ -1449,7 +1450,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               ),
               Expanded(
                 flex: 12,
-                child: Text(
+                child: UrduAwareText(
                   '${newTotal - oldTotal >= 0 ? "+" : ""}${_formatMoney(newTotal - oldTotal)}',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -1523,7 +1524,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
+                    child: UrduAwareText(
                       isUrdu
                           ? '$name کی حد سے ${percent.toStringAsFixed(1)}% زیادہ (Rs ${_formatFull(over)})'
                           : '$name exceeded by ${percent.toStringAsFixed(1)}% (Rs ${_formatFull(over)})',

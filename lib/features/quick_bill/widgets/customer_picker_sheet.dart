@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
@@ -124,7 +125,7 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        Text(
+                                        UrduAwareText(
                                           isUrdu ? 'نقد گاہک' : 'Cash customer',
                                           style: const TextStyle(
                                             color: Colors.white,
@@ -132,7 +133,7 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
-                                        Text(
+                                        UrduAwareText(
                                           isUrdu
                                               ? 'کوئی کھاتہ نہیں بنے گا، صرف سیل ریکارڈ ہوگا'
                                               : 'No party account, just a sale record',
@@ -168,7 +169,7 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          Text(
+                          UrduAwareText(
                             isUrdu ? 'حالیہ پارٹیاں' : 'Recent parties',
                             style: const TextStyle(
                               fontSize: 11.5,
@@ -218,7 +219,7 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                                       radius: 18,
                                       backgroundColor:
                                           AppTheme.themeColor.withOpacity(0.12),
-                                      child: Text(
+                                      child: UrduAwareText(
                                         account.name.isNotEmpty
                                             ? account.name[0]
                                             : '?',
@@ -235,7 +236,7 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Text(
+                                          UrduAwareText(
                                             account.name,
                                             style: const TextStyle(
                                               fontSize: 13,
@@ -243,7 +244,7 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                                             ),
                                           ),
                                           const SizedBox(height: 2),
-                                          Text(
+                                          UrduAwareText(
                                             account.phone.isNotEmpty
                                                 ? account.phone
                                                 : (isUrdu
@@ -255,7 +256,7 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                                             ),
                                           ),
                                           const SizedBox(height: 2),
-                                          Text(
+                                          UrduAwareText(
                                             account.balance == 0
                                                 ? (isUrdu
                                                     ? 'بقایا: 0'
@@ -284,7 +285,7 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                     else
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
-                        child: Text(
+                        child: UrduAwareText(
                           isUrdu ? 'کوئی پارٹی نہیں ملی' : 'No parties found',
                           style: const TextStyle(
                             fontSize: 12,

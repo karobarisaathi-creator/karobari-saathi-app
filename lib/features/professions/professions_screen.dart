@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/models/profession_model.dart';
@@ -61,7 +62,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        title: Text(
+        title: UrduAwareText(
           isUrdu ? 'پیشے/منصوبے' : 'Professions & Categories',
           style: TextStyle(
             color: Colors.white,
@@ -128,7 +129,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
                             Icon(PhosphorIcons.briefcase(),
                                 size: 80, color: Colors.grey[400]),
                             const SizedBox(height: 20),
-                            Text(
+                            UrduAwareText(
                               isUrdu ? 'کوئی پیشہ نہیں' : 'No Professions',
                               style: TextStyle(
                                 fontSize: 20,
@@ -138,7 +139,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            Text(
+                            UrduAwareText(
                               isUrdu
                                   ? 'پہلا پیشہ شامل کریں'
                                   : 'Add your first profession',
@@ -242,7 +243,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
     return Expanded(
       child: Column(
         children: [
-          Text(
+          UrduAwareText(
             label,
             style: TextStyle(
                 color: Colors.white70, fontSize: 11, fontFamily: fontFamily),
@@ -258,7 +259,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
               Flexible(
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
-                  child: Text(
+                  child: UrduAwareText(
                     "Rs ${amount.toStringAsFixed(0)}",
                     style: TextStyle(
                       color: Colors.white,
@@ -372,7 +373,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    UrduAwareText(
                       displayName,
                       style: TextStyle(
                         color: AppTheme.darkColor,
@@ -383,7 +384,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
                     ),
                     if (categoryLabel.isNotEmpty &&
                         categoryLabel != displayName)
-                      Text(
+                      UrduAwareText(
                         categoryLabel,
                         style: TextStyle(
                           fontSize: 13,
@@ -400,7 +401,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
                           color: AppTheme.textSecondary,
                         ),
                         const SizedBox(width: 4),
-                        Text(
+                        UrduAwareText(
                           DateFormat('dd MMM yyyy')
                               .format(profession.createdAt),
                           style: const TextStyle(
@@ -445,7 +446,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
               padding: EdgeInsets.symmetric(vertical: 12),
               child: Divider(height: 1, thickness: 0.5),
             ),
-            Text(
+            UrduAwareText(
               cleanDescription,
               style: TextStyle(
                 fontSize: 15, // Increased font size
@@ -483,7 +484,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
               ),
-              child: Text(
+              child: UrduAwareText(
                 isUrdu ? 'کھولیں' : 'Open',
                 style: TextStyle(
                     fontSize: 13,
@@ -532,7 +533,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
       children: [
         Icon(icon, color: color, size: 18),
         const SizedBox(width: 8),
-        Text(text,
+        UrduAwareText(text,
             style: TextStyle(
                 color: AppTheme.darkColor,
                 fontFamily: fontFamily,
@@ -646,7 +647,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
           backgroundColor: Colors.white,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(isUrdu ? 'پیشہ ڈیلیٹ کریں' : 'Delete Profession',
+          title: UrduAwareText(isUrdu ? 'پیشہ ڈیلیٹ کریں' : 'Delete Profession',
               style: TextStyle(
                   fontFamily: fontFamily,
                   color: AppTheme.darkColor,
@@ -654,7 +655,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
+              UrduAwareText(
                   isUrdu
                       ? 'کیا آپ واقعی "${profession.name}" پیشہ ڈیلیٹ کرنا چاہتے ہیں؟ اس سے منسلک تمام سیزنز اور ٹرانزیکشنز بھی حذف ہو جائیں گی۔'
                       : 'Are you sure you want to delete "${profession.name}"? All its seasons and transactions will be deleted.',
@@ -666,7 +667,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
               CheckboxListTile(
                 value: isConfirmed,
                 onChanged: (val) => setState(() => isConfirmed = val ?? false),
-                title: Text(
+                title: UrduAwareText(
                   isUrdu
                       ? 'جی ہاں، میں ڈیلیٹ کرنا چاہتا ہوں'
                       : 'Yes, I want to delete',

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/models/profession_model.dart';
@@ -115,7 +116,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
+        title: UrduAwareText(
           widget.masterProfession.name,
           style: TextStyle(
               color: Colors.white,
@@ -192,7 +193,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                                           horizontal: 12, vertical: 10),
                                       child: Row(
                                         children: [
-                                          Text(
+                                          UrduAwareText(
                                             activeSeason.season.isNotEmpty
                                                 ? activeSeason.season
                                                 : (activeSeason
@@ -221,7 +222,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                                                     color: const Color(
                                                         0xFFBFDBFE)),
                                               ),
-                                              child: Text(
+                                              child: UrduAwareText(
                                                 '${activeSeason.areaAcres.toStringAsFixed(0)} ${isUrdu ? 'ایکڑ' : 'Acres'}',
                                                 style: TextStyle(
                                                   fontSize: 11,
@@ -235,7 +236,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                                             const SizedBox(width: 8),
                                           ],
                                           const Spacer(),
-                                          Text(
+                                          UrduAwareText(
                                             DateFormat('dd/MM/yy')
                                                 .format(activeSeason.createdAt),
                                             style: const TextStyle(
@@ -266,7 +267,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                                                               BoxShape.circle),
                                                 ),
                                                 const SizedBox(width: 6),
-                                                Text(
+                                                UrduAwareText(
                                                   isUrdu
                                                       ? 'جاری ہے'
                                                       : 'Running',
@@ -356,7 +357,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                                 Icon(PhosphorIcons.calendarPlus(),
                                     size: 48, color: AppTheme.themeColor),
                                 const SizedBox(height: 12),
-                                Text(
+                                UrduAwareText(
                                   isUrdu
                                       ? 'کوئی جاری ${_workNoun(isUrdu)} نہیں ہے'
                                       : 'No active ${_workNoun(isUrdu).toLowerCase()} found',
@@ -367,7 +368,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                                       fontFamily: fontFamily),
                                 ),
                                 const SizedBox(height: 8),
-                                Text(
+                                UrduAwareText(
                                   isUrdu
                                       ? 'نیا ${_workNoun(isUrdu)} شروع کریں تاکہ آپ اپنا حساب الگ رکھ سکیں۔'
                                       : 'Start a new ${_workNoun(isUrdu).toLowerCase()} to keep your records organized.',
@@ -388,7 +389,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                                         borderRadius:
                                             BorderRadius.circular(12)),
                                   ),
-                                  child: Text(
+                                  child: UrduAwareText(
                                       isUrdu
                                           ? 'نیا ${_workNoun(isUrdu)} شروع کریں'
                                           : 'Start New ${_workNoun(isUrdu)}',
@@ -416,7 +417,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
+                              UrduAwareText(
                                 isUrdu
                                     ? 'مکمل شدہ ${_workNoun(isUrdu, plural: true)}'
                                     : 'Completed ${_workNoun(isUrdu, plural: true)}',
@@ -554,7 +555,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                       color: Colors.white,
                     ),
                     const SizedBox(width: 8),
-                    Text(
+                    UrduAwareText(
                       isUrdu
                           ? 'تفصیلی سیزن رپورٹ اور موازنہ'
                           : 'Detailed Season Report & Comparison',
@@ -587,7 +588,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
     return Expanded(
       child: Column(
         children: [
-          Text(
+          UrduAwareText(
             label,
             style: TextStyle(
                 color: Colors.white70, fontSize: 11, fontFamily: fontFamily),
@@ -603,7 +604,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
               Flexible(
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
-                  child: Text(
+                  child: UrduAwareText(
                     "Rs ${amount.toStringAsFixed(0)}",
                     style: TextStyle(
                       color: Colors.white,
@@ -677,7 +678,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                   child: Row(
                     children: [
                       // Crop / Season Name with Year
-                      Text(
+                      UrduAwareText(
                         season.season.isNotEmpty
                             ? season.season
                             : (season.cropType.isNotEmpty
@@ -702,7 +703,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                             borderRadius: BorderRadius.circular(6),
                             border: Border.all(color: const Color(0xFFBFDBFE)),
                           ),
-                          child: Text(
+                          child: UrduAwareText(
                             '${season.areaAcres.toStringAsFixed(0)} ${isUrdu ? 'ایکڑ' : 'Acres'}',
                             style: TextStyle(
                               fontSize: 11,
@@ -718,7 +719,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                       const Spacer(),
 
                       // Dates
-                      Text(
+                      UrduAwareText(
                         "$start - $end",
                         style: const TextStyle(
                           fontSize: 11,
@@ -787,7 +788,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 16),
         child: Center(
-            child: Text(isUrdu ? 'کوئی ٹرانزیکشن نہیں' : 'No transactions',
+            child: UrduAwareText(isUrdu ? 'کوئی ٹرانزیکشن نہیں' : 'No transactions',
                 style: const TextStyle(fontSize: 12, color: Colors.grey))),
       );
     }
@@ -827,7 +828,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
           ),
           onLongPress: () =>
               _showDeleteTransactionDialog(context, t, isUrdu, fontFamily, db),
-          title: Text(t.description.isNotEmpty ? t.description : displayName,
+          title: UrduAwareText(t.description.isNotEmpty ? t.description : displayName,
               style: TextStyle(
                   fontFamily: fontFamily,
                   fontWeight: FontWeight.bold,
@@ -835,7 +836,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                   color: AppTheme.darkColor)),
           subtitle: Row(
             children: [
-              Text(DateFormat('dd MMM').format(t.date),
+              UrduAwareText(DateFormat('dd MMM').format(t.date),
                   style: const TextStyle(
                       fontSize: 11, color: AppTheme.textSecondary)),
               if (t.description.isNotEmpty) ...[
@@ -847,7 +848,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                         color: Colors.grey, shape: BoxShape.circle)),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
+                  child: UrduAwareText(
                     displayName,
                     style: TextStyle(
                         color: AppTheme.themeColor,
@@ -873,7 +874,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                           : AppTheme.expenseColor,
                       size: 12),
                   const SizedBox(width: 2),
-                  Text('Rs ${t.amount.toStringAsFixed(0)}',
+                  UrduAwareText('Rs ${t.amount.toStringAsFixed(0)}',
                       style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
@@ -909,11 +910,11 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(
+        title: UrduAwareText(
           isUrdu ? 'ٹرانزیکشن حذف کریں؟' : 'Delete Transaction?',
           style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
         ),
-        content: Text(
+        content: UrduAwareText(
           isUrdu
               ? 'کیا آپ واقعی اس ٹرانزیکشن کو حذف کرنا چاہتے ہیں؟'
               : 'Are you sure you want to delete this transaction?',
@@ -922,7 +923,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(isUrdu ? 'منسوخ' : 'Cancel',
+            child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel',
                 style: const TextStyle(color: AppTheme.textSecondary)),
           ),
           ElevatedButton(
@@ -937,7 +938,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
             style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.expenseColor,
                 foregroundColor: Colors.white),
-            child: Text(isUrdu ? 'حذف کریں' : 'Delete',
+            child: UrduAwareText(isUrdu ? 'حذف کریں' : 'Delete',
                 style: TextStyle(fontFamily: fontFamily)),
           ),
         ],
@@ -1049,7 +1050,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Text(
+            title: UrduAwareText(
               isAgriculture
                   ? (isUrdu ? 'نیا سیزن شروع کریں' : 'Start New Season')
                   : (isUrdu ? 'نیا پروجیکٹ شروع کریں' : 'Start New Project'),
@@ -1064,7 +1065,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (isAgriculture) ...[
-                      Text(
+                      UrduAwareText(
                         isUrdu ? 'فصل کی قسم منتخب کریں' : 'Select Crop Type',
                         style: TextStyle(
                             fontSize: 12,
@@ -1078,7 +1079,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                         children: crops.map((crop) {
                           final cropName = crop['name'] as String;
                           return ChoiceChip(
-                            label: Text(cropName),
+                            label: UrduAwareText(cropName),
                             avatar: Icon(
                               crop['icon'] as IconData,
                               size: 16,
@@ -1198,7 +1199,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text(isUrdu ? 'منسوخ' : 'Cancel'),
+                child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel'),
               ),
               AppButton(
                 text: isAgriculture
@@ -1267,7 +1268,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
-              child: Text(
+              child: UrduAwareText(
                 isBaseRecord
                     ? (isUrdu
                         ? 'بنیادی ریکارڈ کے اختیارات'
@@ -1283,7 +1284,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
               ListTile(
                 leading: Icon(PhosphorIcons.checkCircle(),
                     color: AppTheme.incomeColor),
-                title: Text(
+                title: UrduAwareText(
                   isUrdu
                       ? '${_workNoun(isUrdu)} مکمل کریں'
                       : 'Complete ${_workNoun(isUrdu)}',
@@ -1306,7 +1307,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
               ListTile(
                 leading: Icon(PhosphorIcons.pencilLine(),
                     color: AppTheme.themeColor),
-                title: Text(
+                title: UrduAwareText(
                   isUrdu ? 'تفصیل شامل کریں / ترمیم' : 'Add / Edit Details',
                   style: TextStyle(
                       fontFamily: fontFamily,
@@ -1328,7 +1329,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
               ListTile(
                 leading: Icon(PhosphorIcons.playCircle(),
                     color: AppTheme.themeColor),
-                title: Text(
+                title: UrduAwareText(
                   isUrdu ? 'دوبارہ فعال کریں' : 'Reactivate',
                   style: TextStyle(
                       fontFamily: fontFamily,
@@ -1343,7 +1344,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
             ListTile(
               leading:
                   Icon(PhosphorIcons.trash(), color: AppTheme.expenseColor),
-              title: Text(
+              title: UrduAwareText(
                 isBaseRecord
                     ? (isUrdu ? 'بنیادی ریکارڈ صاف کریں' : 'Clear Base Record')
                     : (isUrdu ? 'حذف کریں' : 'Delete'),
@@ -1373,7 +1374,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(
+          title: UrduAwareText(
             isUrdu ? 'بنیادی ریکارڈ صاف کریں؟' : 'Clear Base Record?',
             style:
                 TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
@@ -1381,7 +1382,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
+              UrduAwareText(
                 isUrdu
                     ? 'کیا آپ واقعی اس پیشے کا بنیادی ریکارڈ (وہ ٹرانزیکشنز جو کسی ${_workNoun(isUrdu)} سے منسلک نہیں) صاف کرنا چاہتے ہیں؟ اس سے صرف پرانا ڈیٹا مٹے گا، نئے ریکارڈز محفوظ رہیں گے۔'
                     : 'Are you sure you want to clear the base record (transactions not linked to any ${_workNoun(isUrdu).toLowerCase()})? This will only delete legacy data; active records will remain safe.',
@@ -1392,7 +1393,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                 value: isConfirmed,
                 onChanged: (val) =>
                     setDialogState(() => isConfirmed = val ?? false),
-                title: Text(
+                title: UrduAwareText(
                   isUrdu
                       ? 'جی ہاں، میں مٹانا چاہتا ہوں'
                       : 'Yes, I want to clear',
@@ -1410,7 +1411,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(isUrdu ? 'منسوخ' : 'Cancel'),
+              child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel'),
             ),
             AppButton(
               text: isUrdu ? 'صاف کریں' : 'Clear',
@@ -1460,7 +1461,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: Text(
+          title: UrduAwareText(
             isUrdu
                 ? '${_workNoun(isUrdu)} حذف کریں؟'
                 : 'Delete ${_workNoun(isUrdu)}?',
@@ -1470,7 +1471,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
+              UrduAwareText(
                 isUrdu
                     ? 'کیا آپ واقعی "${season.season}" کو حذف کرنا چاہتے ہیں؟ اس سے منسلک تمام ٹرانزیکشنز بھی ڈیلیٹ ہو جائیں گی۔'
                     : 'Are you sure you want to delete "${season.season}"? This will also delete all its transactions.',
@@ -1480,7 +1481,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
               CheckboxListTile(
                 value: isConfirmed,
                 onChanged: (val) => setState(() => isConfirmed = val ?? false),
-                title: Text(
+                title: UrduAwareText(
                   isUrdu
                       ? 'جی ہاں، میں ڈیلیٹ کرنا چاہتا ہوں'
                       : 'Yes, I want to delete',
@@ -1550,7 +1551,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
+        UrduAwareText(
           '$label: ',
           style: TextStyle(
             fontSize: 13,
@@ -1562,7 +1563,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
         Flexible(
           child: FittedBox(
             fit: BoxFit.scaleDown,
-            child: Text(
+            child: UrduAwareText(
               amount.abs().toStringAsFixed(0),
               style: TextStyle(
                 fontSize: 13,
@@ -1617,7 +1618,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
         builder: (context, setDialogState) => AlertDialog(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(
+          title: UrduAwareText(
             isUrdu
                 ? 'موازنے کے لیے ۲ سیزن منتخب کریں'
                 : 'Select 2 Seasons to Compare',
@@ -1630,7 +1631,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(isUrdu ? 'پہلا سیزن:' : 'First Season:'),
+              UrduAwareText(isUrdu ? 'پہلا سیزن:' : 'First Season:'),
               const SizedBox(height: 4),
               DropdownButton<Profession>(
                 isExpanded: true,
@@ -1638,14 +1639,14 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                 items: completedSeasons.map((s) {
                   return DropdownMenuItem(
                       value: s,
-                      child: Text(s.season.isNotEmpty ? s.season : s.name));
+                      child: UrduAwareText(s.season.isNotEmpty ? s.season : s.name));
                 }).toList(),
                 onChanged: (val) {
                   if (val != null) setDialogState(() => selectedA = val);
                 },
               ),
               const SizedBox(height: 12),
-              Text(isUrdu ? 'دوسرا سیزن:' : 'Second Season:'),
+              UrduAwareText(isUrdu ? 'دوسرا سیزن:' : 'Second Season:'),
               const SizedBox(height: 4),
               DropdownButton<Profession>(
                 isExpanded: true,
@@ -1653,7 +1654,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                 items: completedSeasons.map((s) {
                   return DropdownMenuItem(
                       value: s,
-                      child: Text(s.season.isNotEmpty ? s.season : s.name));
+                      child: UrduAwareText(s.season.isNotEmpty ? s.season : s.name));
                 }).toList(),
                 onChanged: (val) {
                   if (val != null) setDialogState(() => selectedB = val);
@@ -1664,7 +1665,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(isUrdu ? 'منسوخ' : 'Cancel'),
+              child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel'),
             ),
             AppButton(
               text: isUrdu ? 'موازنہ کریں' : 'Compare',

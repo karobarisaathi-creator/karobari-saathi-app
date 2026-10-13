@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/image_utils.dart';
 import 'package:provider/provider.dart';
@@ -145,7 +146,7 @@ class _ImageSelectorFieldState extends State<ImageSelectorField> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.label != null) ...[
-          Text(
+          UrduAwareText(
             widget.label!,
             style: TextStyle(
               fontSize: 14,
@@ -239,19 +240,108 @@ class _ImageSelectorFieldState extends State<ImageSelectorField> {
     ];
 
     if (allImages.isNotEmpty) {
-      return ImageGalleryViewer(
-        imagePaths: allImages,
-        onRemove: (index) {
-          if (index < widget.remoteUrls.length) {
-            widget.onRemoteRemoved?.call(index);
-          } else {
-            _removeFile(index - widget.remoteUrls.length);
-          }
-        },
-        isReadOnly: false,
-        isVerticalGrid: true,
-        crossAxisCount: 1,
-        padding: EdgeInsets.zero,
+      final imagePath = allImages.first;
+      final isLocal = widget.selectedFiles.isNotEmpty;
+
+      return AspectRatio(
+        aspectRatio: widget.aspectRatio,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ImageGalleryViewer(
+                        imagePaths: allImages,
+                        isReadOnly: true,
+                      ),
+                    ),
+                  );
+                },
+                child: isLocal
+                    ? Image.file(
+                        File(imagePath),
+                        fit: BoxFit.cover,
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: imagePath,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: Colors.grey[200],
+                          child: const Center(
+                              child: CircularProgressIndicator()),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.broken_image,
+                              color: Colors.grey),
+                        ),
+                      ),
+              ),
+              // Remove button on top-right
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: () {
+                    if (widget.remoteUrls.isNotEmpty) {
+                      widget.onRemoteRemoved?.call(0);
+                    } else {
+                      _removeFile(0);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ),
+              // Edit / Change Button on bottom-right
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: _isPicking ? null : _pickImage,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.edit, color: Colors.white, size: 12),
+                        const SizedBox(width: 4),
+                        UrduAwareText(
+                          isUrdu ? 'تبدیل کریں' : 'Change',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontFamily: fontFamily,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
@@ -278,7 +368,7 @@ class _ImageSelectorFieldState extends State<ImageSelectorField> {
                     color: Colors.grey[400],
                   ),
                   const SizedBox(height: 10),
-                  Text(
+                  UrduAwareText(
                     isUrdu ? 'تصویر منتخب کریں' : 'Select Image',
                     style: TextStyle(
                       color: Colors.grey[500],
@@ -326,7 +416,7 @@ class _ImageSelectorFieldState extends State<ImageSelectorField> {
               size: size == double.infinity ? 24 : size * 0.35,
             ),
             const SizedBox(height: 4),
-            Text(
+            UrduAwareText(
               isUrdu ? 'شامل کریں' : 'Add',
               style: TextStyle(
                 fontSize: 10,
@@ -387,7 +477,7 @@ class _ImageSelectorFieldState extends State<ImageSelectorField> {
                           color: Colors.grey[400],
                         ),
                         const SizedBox(height: 4),
-                        Text(
+                        UrduAwareText(
                           isUrdu ? 'تصویر' : 'Photo',
                           style: TextStyle(
                             fontSize: 12,

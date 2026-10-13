@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:account_app/core/services/language_service.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 
 class LanguageAwareText extends StatelessWidget {
   final String text;
@@ -19,15 +18,9 @@ class LanguageAwareText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final languageService = Provider.of<LanguageService>(context);
-    
-    return Text(
+    return UrduAwareText(
       text,
-      style: style?.copyWith(
-        fontFamily: languageService.getFontFamily(text),
-      ) ?? TextStyle(
-        fontFamily: languageService.getFontFamily(text),
-      ),
+      style: style,
       textAlign: textAlign,
       maxLines: maxLines,
       overflow: overflow,

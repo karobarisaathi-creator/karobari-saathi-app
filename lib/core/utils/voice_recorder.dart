@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -62,7 +63,7 @@ class _VoiceRecorderState extends State<VoiceRecorder> {
           children: [
             Icon(Icons.mic, color: AppTheme.themeColor, size: 20), // Reduced from 24
             const SizedBox(height: 1), // Reduced from 2
-            const Text("Tap to Record", style: TextStyle(color: Colors.grey, fontSize: 9)), // Reduced from 10
+            const UrduAwareText("Tap to Record", style: TextStyle(color: Colors.grey, fontSize: 9)), // Reduced from 10
           ],
         ),
       ),
@@ -85,7 +86,7 @@ class _VoiceRecorderState extends State<VoiceRecorder> {
           children: [
             const Icon(Icons.stop_circle, color: AppTheme.expenseColor, size: 16), // Smaller icon
             const SizedBox(width: 4),
-            Text(
+            UrduAwareText(
               _formatDuration(_recordingDuration),
               style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.expenseColor),
             ),

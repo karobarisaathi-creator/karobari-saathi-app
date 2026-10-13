@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/config/professions_config.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
@@ -83,7 +84,7 @@ class _CategoriesManagementScreenState
                       color: AppTheme.themeColor, size: 20),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
+                    child: UrduAwareText(
                       widget.isUrdu
                           ? 'یہ زمرے آپ کے پیشے کے لین دین میں استعمال ہوں گے۔'
                           : 'These categories will be used in your profession transactions.',
@@ -116,7 +117,7 @@ class _CategoriesManagementScreenState
                     ],
                   ),
                   child: ListTile(
-                    title: Text(cat,
+                    title: UrduAwareText(cat,
                         style: TextStyle(
                             fontFamily: fontFamily,
                             fontWeight: fontWeight,
@@ -138,7 +139,7 @@ class _CategoriesManagementScreenState
         onPressed: _showAddCategoryDialog,
         backgroundColor: AppTheme.darkColor,
         icon: const Icon(Icons.add, color: Colors.white),
-        label: Text(widget.isUrdu ? 'نیا زمرہ' : 'Add Category',
+        label: UrduAwareText(widget.isUrdu ? 'نیا زمرہ' : 'Add Category',
             style: TextStyle(fontFamily: fontFamily, color: Colors.white)),
       ),
     );
@@ -151,7 +152,7 @@ class _CategoriesManagementScreenState
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(widget.isUrdu ? 'نیا زمرہ' : 'New Category',
+        title: UrduAwareText(widget.isUrdu ? 'نیا زمرہ' : 'New Category',
             style: TextStyle(fontFamily: fontFamily)),
         content: TextField(
           controller: controller,
@@ -167,7 +168,7 @@ class _CategoriesManagementScreenState
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(widget.isUrdu ? 'منسوخ' : 'Cancel')),
+              child: UrduAwareText(widget.isUrdu ? 'منسوخ' : 'Cancel')),
           ElevatedButton(
             onPressed: () {
               if (controller.text.trim().isNotEmpty) {
@@ -177,7 +178,7 @@ class _CategoriesManagementScreenState
             },
             style:
                 ElevatedButton.styleFrom(backgroundColor: AppTheme.darkColor),
-            child: Text(widget.isUrdu ? 'شامل کریں' : 'Add'),
+            child: UrduAwareText(widget.isUrdu ? 'شامل کریں' : 'Add'),
           ),
         ],
       ),

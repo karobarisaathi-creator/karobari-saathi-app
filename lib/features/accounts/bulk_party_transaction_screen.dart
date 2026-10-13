@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/models/account_model.dart';
@@ -245,7 +246,7 @@ class _BulkPartyTransactionScreenState extends State<BulkPartyTransactionScreen>
         centerTitle: true,
         backgroundColor: AppTheme.darkColor,
         foregroundColor: Colors.white,
-        title: Text(
+        title: UrduAwareText(
           '${isUrdu ? 'بیچ انٹری:' : 'Bulk Entry:'} ${widget.party?.name ?? ''}',
           style: TextStyle(
             fontFamily: fontFamily,
@@ -268,12 +269,12 @@ class _BulkPartyTransactionScreenState extends State<BulkPartyTransactionScreen>
               color: AppTheme.themeColor.withOpacity(0.1),
               child: Row(
                 children: [
-                  SizedBox(width: 250, child: Text(isUrdu ? 'تفصیل و تاریخ' : 'Description & Date',
+                  SizedBox(width: 250, child: UrduAwareText(isUrdu ? 'تفصیل و تاریخ' : 'Description & Date',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, fontFamily: fontFamily, color: Colors.black))),
                   const SizedBox(width: 40), // Arrow space
-                  SizedBox(width: 100, child: Text(isUrdu ? 'رقم' : 'Amount',
+                  SizedBox(width: 100, child: UrduAwareText(isUrdu ? 'رقم' : 'Amount',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, fontFamily: fontFamily, color: Colors.black))),
-                  SizedBox(width: 120, child: Text(isUrdu ? 'قسم' : 'Type',
+                  SizedBox(width: 120, child: UrduAwareText(isUrdu ? 'قسم' : 'Type',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, fontFamily: fontFamily, color: Colors.black))),
                   const SizedBox(width: 40),
                 ],
@@ -452,7 +453,7 @@ class _BulkPartyTransactionScreenState extends State<BulkPartyTransactionScreen>
             color: isSelected ? selectedColor : Colors.grey.shade100,
             borderRadius: BorderRadius.circular(6),
           ),
-          child: Text(
+          child: UrduAwareText(
             label,
             textAlign: TextAlign.center,
             style: TextStyle(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'app_filter_chip.dart'; // Import to use AppCategory and theme consistency
@@ -84,7 +85,7 @@ class CategoryChip extends StatelessWidget {
               ),
               const SizedBox(width: 6),
             ],
-            Text(
+            UrduAwareText(
               displayLabel,
               style: TextStyle(
                 fontSize: 13,

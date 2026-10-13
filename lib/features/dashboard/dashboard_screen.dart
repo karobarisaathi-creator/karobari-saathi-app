@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
@@ -60,7 +61,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        title: Text(
+        title: UrduAwareText(
           isUrdu ? 'کاروباری ساتھی' : 'Karobari Saathi',
           style: TextStyle(
             color: Colors.white,
@@ -168,18 +169,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       child: Row(
         children: [
-          _buildHeaderStatItem(
-              isUrdu ? 'لینے ہیں' : 'To Receive',
-              receivable,
-              Colors.white70,
-              fontFamily,
-              PhosphorIcons.arrowDownLeft()),
+          _buildHeaderStatItem(isUrdu ? 'لینے ہیں' : 'To Receive', receivable,
+              Colors.white70, fontFamily, PhosphorIcons.arrowDownLeft()),
           _buildStatDivider(),
           _buildHeaderStatItem(isUrdu ? 'دینے ہیں' : 'To Pay', payable,
               Colors.white70, fontFamily, PhosphorIcons.arrowUpRight()),
           _buildStatDivider(),
-          _buildHeaderStatItem(balanceLabel, netBalance.abs(),
-              Colors.white70, fontFamily, PhosphorIcons.wallet(),
+          _buildHeaderStatItem(balanceLabel, netBalance.abs(), Colors.white70,
+              fontFamily, PhosphorIcons.wallet(),
               isBold: true),
         ],
       ),
@@ -192,7 +189,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Expanded(
       child: Column(
         children: [
-          Text(
+          UrduAwareText(
             label,
             style: TextStyle(
                 color: Colors.white70, fontSize: 11, fontFamily: fontFamily),
@@ -208,7 +205,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Flexible(
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
-                  child: Text(
+                  child: UrduAwareText(
                     "Rs ${amount.toStringAsFixed(0)}",
                     style: TextStyle(
                       color: Colors.white,
@@ -266,7 +263,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Icon(PhosphorIcons.users(),
                       size: 64, color: Colors.grey[400]),
                   const SizedBox(height: 16),
-                  Text(
+                  UrduAwareText(
                     isUrdu ? 'کوئی پارٹی نہیں ملی' : 'No Parties Found',
                     style: TextStyle(
                         fontSize: 18,
@@ -303,7 +300,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Icon(PhosphorIcons.users(),
                       size: 48, color: Colors.grey[400]),
                   const SizedBox(height: 12),
-                  Text(
+                  UrduAwareText(
                     isUrdu ? 'کوئی پارٹی نہیں ملی' : 'No Parties Found',
                     style: TextStyle(
                         fontSize: 16,
@@ -350,12 +347,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             );
           },
           onMessage: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (context) =>
-                      BalanceAlertScreen(party: updatedParty)),
-            );
+            BalanceAlertDialog.show(context, party: updatedParty);
           },
         );
       },

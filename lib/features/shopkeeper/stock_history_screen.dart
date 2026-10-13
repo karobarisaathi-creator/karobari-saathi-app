@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/models/stock_movement_model.dart';
 import 'package:account_app/core/services/language_service.dart';
@@ -39,7 +40,7 @@ class StockHistoryScreen extends StatelessWidget {
                       color: Colors.grey[400],
                     ),
                     const SizedBox(height: 16),
-                    Text(
+                    UrduAwareText(
                       isUrdu
                           ? 'کوئی اسٹاک ہسٹری موجود نہیں'
                           : 'No history movements yet',
@@ -104,7 +105,7 @@ class StockHistoryScreen extends StatelessWidget {
                         child: _buildMovementAvatar(stockItem, m, isUrdu),
                       ),
                     ),
-                    title: Text(
+                    title: UrduAwareText(
                       m.stockItemName,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
@@ -112,7 +113,7 @@ class StockHistoryScreen extends StatelessWidget {
                         fontFamily: fontFamily,
                       ),
                     ),
-                    subtitle: Text(
+                    subtitle: UrduAwareText(
                       '$typeLabel • ${m.reason.isNotEmpty ? m.reason : (isUrdu ? 'معمول کا لین دین' : 'Regular transaction')}',
                       style: TextStyle(
                         fontSize: 11,
@@ -120,7 +121,7 @@ class StockHistoryScreen extends StatelessWidget {
                         fontFamily: fontFamily,
                       ),
                     ),
-                    trailing: Text(
+                    trailing: UrduAwareText(
                       '${m.quantity} x Rs. ${m.unitPrice.toStringAsFixed(0)}',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
@@ -139,7 +140,7 @@ class StockHistoryScreen extends StatelessWidget {
     final path = stockItem?.imagePath;
     if (path == null || path.isEmpty) {
       return Center(
-        child: Text(
+        child: UrduAwareText(
           m.stockItemName.isNotEmpty ? m.stockItemName[0] : '?',
           style: const TextStyle(
             color: AppTheme.darkColor,
@@ -157,7 +158,7 @@ class StockHistoryScreen extends StatelessWidget {
             path,
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Center(
-              child: Text(
+              child: UrduAwareText(
                 m.stockItemName.isNotEmpty ? m.stockItemName[0] : '?',
                 style: const TextStyle(
                   color: AppTheme.darkColor,
@@ -171,7 +172,7 @@ class StockHistoryScreen extends StatelessWidget {
             File(path),
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Center(
-              child: Text(
+              child: UrduAwareText(
                 m.stockItemName.isNotEmpty ? m.stockItemName[0] : '?',
                 style: const TextStyle(
                   color: AppTheme.darkColor,

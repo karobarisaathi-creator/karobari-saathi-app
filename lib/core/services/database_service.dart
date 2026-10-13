@@ -83,18 +83,20 @@ class DatabaseService extends ChangeNotifier {
   Future<int> getPartiesCount() => _accountService.getPartiesCount();
   Future<int> getPendingDuesCount() => _accountService.getPendingDuesCount();
   // TRANSACTION OPERATIONS
-  Future<void> addTransaction(model.Transaction t) async {
+  Future<bool> addTransaction(model.Transaction t) async {
     await _transactionService.addTransaction(t);
-    await _syncTransactionStock(t);
+    final stockSynced = await _syncTransactionStock(t);
     notifyListeners();
     _triggerSync();
+    return stockSynced;
   }
 
-  Future<void> updateTransaction(model.Transaction t) async {
+  Future<bool> updateTransaction(model.Transaction t) async {
     await _transactionService.updateTransaction(t);
-    await _syncTransactionStock(t);
+    final stockSynced = await _syncTransactionStock(t);
     notifyListeners();
     _triggerSync();
+    return stockSynced;
   }
 
   Future<void> deleteTransaction(String id) async {
@@ -227,7 +229,20 @@ class DatabaseService extends ChangeNotifier {
 
   Future<void> close() => _syncService.closeBoxes();
 
-  Future<void> _syncTransactionStock(
+  Future<bool> _syncTransactionStock(
+    model.Transaction transaction, {
+    bool deleteTransaction = false,
+  }) =>
+      _syncTransactionStockResult(
+        transaction,
+        deleteTransaction: deleteTransaction,
+      );
+
+  Future<bool> retryTransactionStockSync(model.Transaction transaction) {
+    return _syncTransactionStockResult(transaction);
+  }
+
+  Future<bool> _syncTransactionStockResult(
     model.Transaction transaction, {
     bool deleteTransaction = false,
   }) async {
@@ -236,8 +251,10 @@ class DatabaseService extends ChangeNotifier {
         transaction,
         deleteTransaction: deleteTransaction,
       );
+      return true;
     } catch (error) {
       debugPrint('Transaction stock sync failed: $error');
+      return false;
     }
   }
 

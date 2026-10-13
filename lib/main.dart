@@ -13,6 +13,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'firebase_options.dart'; // Import generated options
 
 // Models
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart'; // Added import for TransactionItemAdapter
@@ -435,7 +436,7 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
                 },
               ),
               const SizedBox(height: 40),
-              Text(
+              UrduAwareText(
                 isUrdu ? 'کاروباری ساتھی' : 'Karobari Sathi',
                 style: TextStyle(
                   fontSize: 32,
@@ -446,7 +447,7 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
                 ),
               ),
               const SizedBox(height: 15),
-              Text(
+              UrduAwareText(
                 isUrdu ? 'ڈیٹا لوڈ ہو رہا ہے...' : 'Loading Data...',
                 style: TextStyle(
                   fontSize: 16,

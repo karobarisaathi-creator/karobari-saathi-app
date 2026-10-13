@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 
 class VoiceCommentPlayer extends StatefulWidget {
@@ -156,7 +157,7 @@ class _VoiceCommentPlayerState extends State<VoiceCommentPlayer> {
           children: [
             Icon(Icons.error_outline, size: 14, color: Colors.red),
             SizedBox(width: 6),
-            Text('Error loading audio', style: TextStyle(fontSize: 11, color: Colors.red)),
+            UrduAwareText('Error loading audio', style: TextStyle(fontSize: 11, color: Colors.red)),
           ],
         ),
       );
@@ -224,7 +225,7 @@ class _VoiceCommentPlayerState extends State<VoiceCommentPlayer> {
             ),
             Padding(
               padding: const EdgeInsets.only(left: 4, right: 8),
-              child: Text(
+              child: UrduAwareText(
                 _displayTime,
                 style: const TextStyle(
                   color: Colors.white,

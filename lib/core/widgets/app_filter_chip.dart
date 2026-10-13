@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 
@@ -116,7 +117,7 @@ class AppFilterChip extends StatelessWidget {
                   color: (isSelected && !transparentBackground) ? Colors.white : AppTheme.darkColor,
                 ),
                 const SizedBox(width: 8),
-                Text(
+                UrduAwareText(
                   label,
                   style: TextStyle(
                     color: (isSelected && !transparentBackground) ? Colors.white : AppTheme.darkColor,

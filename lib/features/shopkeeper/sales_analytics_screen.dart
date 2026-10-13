@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/stock_analytics_model.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
@@ -403,7 +404,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                 color: isActive ? AppTheme.themeColor : AppTheme.textSecondary,
               ),
               const SizedBox(width: 8),
-              Text(
+              UrduAwareText(
                 label,
                 style: TextStyle(
                   fontSize: 13,
@@ -442,7 +443,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
           Expanded(
             child: Column(
               children: [
-                Text(
+                UrduAwareText(
                   _isMonthlyView
                       ? (isUrdu ? 'منتخب مہینہ' : 'SELECTED MONTH')
                       : (isUrdu ? 'منتخب سال' : 'SELECTED YEAR'),
@@ -455,7 +456,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text.rich(
+                UrduAwareText.rich(
                   TextSpan(
                     children: [
                       TextSpan(
@@ -629,7 +630,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
+                child: UrduAwareText(
                   label,
                   style: TextStyle(
                     fontSize: 10.5,
@@ -645,7 +646,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Text(
+          UrduAwareText(
             value,
             style: const TextStyle(
               fontSize: 22,
@@ -667,7 +668,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                   color: bgColor,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Text.rich(
+                child: UrduAwareText.rich(
                   TextSpan(
                     children: [
                       if (subtitle.contains('%')) ...[
@@ -725,7 +726,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                           : AppTheme.expenseColor,
                     ),
                     const SizedBox(width: 3),
-                    Text(
+                    UrduAwareText(
                       '${changePercent >= 0 ? "+" : ""}${changePercent.toStringAsFixed(1)}%',
                       style: const TextStyle(
                         fontSize: 10.5,
@@ -788,7 +789,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
+                child: UrduAwareText(
                   isUrdu ? 'ماہانہ خرید و فروخت' : 'Monthly Purchases & Sales',
                   style: TextStyle(
                     fontSize: 13.5,
@@ -871,7 +872,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                           ],
                         ),
                         const SizedBox(height: 6),
-                        Text(
+                        UrduAwareText(
                           isUrdu
                               ? m.monthNameUrdu.toUpperCase()
                               : m.monthName.toUpperCase(),
@@ -915,7 +916,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
           ),
         ),
         const SizedBox(width: 5),
-        Text(
+        UrduAwareText(
           label,
           style: TextStyle(
             fontSize: 10.5,
@@ -1003,7 +1004,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          UrduAwareText(
             label,
             style: TextStyle(
               fontSize: 10,
@@ -1014,7 +1015,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
             ),
           ),
           const SizedBox(height: 6),
-          Text(
+          UrduAwareText(
             value,
             style: const TextStyle(
               fontSize: 17,
@@ -1027,7 +1028,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
-          Text(
+          UrduAwareText(
             sub,
             style: const TextStyle(
               fontSize: 10.5,
@@ -1126,7 +1127,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    UrduAwareText(
                       isUrdu
                           ? stats.monthNameUrdu.toUpperCase()
                           : stats.monthName.toUpperCase(),
@@ -1143,7 +1144,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
+                    UrduAwareText(
                       stats.salesRevenue > 0
                           ? _formatCompact(stats.salesRevenue)
                           : '—',
@@ -1172,7 +1173,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                           ),
                           const SizedBox(width: 2),
                           Flexible(
-                            child: Text(
+                            child: UrduAwareText(
                               '${change >= 0 ? "+" : ""}${change.toStringAsFixed(0)}%',
                               style: const TextStyle(
                                 fontSize: 9,
@@ -1187,7 +1188,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                         ],
                       )
                     else
-                      Text(
+                      UrduAwareText(
                         isPast
                             ? (isUrdu ? 'کوئی نہیں' : 'None')
                             : (isUrdu ? 'باقی' : 'Pending'),
@@ -1224,7 +1225,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Text(
+        child: UrduAwareText(
           isUrdu
               ? 'اس مدت میں اسٹاک کی خرید یا فروخت درج نہیں ہوئی۔'
               : 'No stock purchases or sales were recorded for this period.',
@@ -1269,7 +1270,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
           Row(
             children: [
               Expanded(
-                child: Text(
+                child: UrduAwareText(
                   isUrdu && item.nameUrdu.isNotEmpty
                       ? item.nameUrdu
                       : item.name,
@@ -1284,7 +1285,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
+              UrduAwareText(
                 '${isUrdu ? 'منافع' : 'Profit'}: ${_formatCompact(item.grossProfit)}',
                 style: TextStyle(
                   fontSize: 12,
@@ -1297,7 +1298,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
             ],
           ),
           const SizedBox(height: 5),
-          Text(
+          UrduAwareText(
             isUrdu
                 ? 'خرید ${_formatQuantity(item.purchaseQuantity)} ${item.unit} · فروخت ${_formatQuantity(item.salesQuantity)} ${item.unit} · باقی ${_formatQuantity(item.endingStockQuantity)} ${item.unit}'
                 : 'Bought ${_formatQuantity(item.purchaseQuantity)} ${item.unit} · Sold ${_formatQuantity(item.salesQuantity)} ${item.unit} · In stock ${_formatQuantity(item.endingStockQuantity)} ${item.unit}',
@@ -1312,7 +1313,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
           ),
           if (hasUncostedSales) ...[
             const SizedBox(height: 4),
-            Text(
+            UrduAwareText(
               isUrdu
                   ? 'ان فروخت شدہ یونٹس کی خرید لاگت درج نہیں؛ منافع نامکمل ہو سکتا ہے۔'
                   : 'Purchase cost is missing for some sold units; profit may be incomplete.',
@@ -1341,7 +1342,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Text(
+        child: UrduAwareText(
           isUrdu
               ? 'اس مدت میں پارٹی کے ساتھ کوئی اسٹاک خرید یا فروخت درج نہیں۔'
               : 'No party-linked stock purchases or sales were recorded for this period.',
@@ -1392,7 +1393,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
   ) {
     return Padding(
       padding: const EdgeInsets.only(left: 2, right: 2, top: 4),
-      child: Text(
+      child: UrduAwareText(
         title,
         style: TextStyle(
           fontSize: 12,
@@ -1425,7 +1426,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
           Row(
             children: [
               Expanded(
-                child: Text(
+                child: UrduAwareText(
                   party.partyName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1438,7 +1439,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
+              UrduAwareText(
                 _formatCompact(party.totalValue),
                 style: TextStyle(
                   fontSize: 12,
@@ -1454,7 +1455,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
             Row(
               children: [
                 Expanded(
-                  child: Text(
+                  child: UrduAwareText(
                     '${isUrdu && party.items[index].itemNameUrdu.isNotEmpty ? party.items[index].itemNameUrdu : party.items[index].itemName} · ${isUrdu ? 'خالص' : 'Net'} ${_formatQuantity(party.items[index].quantity)} ${party.items[index].unit}',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -1467,7 +1468,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
+                UrduAwareText(
                   _formatCompact(party.items[index].value),
                   style: TextStyle(
                     fontSize: 10.5,
@@ -1493,7 +1494,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
         color: AppTheme.expenseColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(
+      child: UrduAwareText(
         isUrdu
             ? 'کچھ فروخت شدہ مال کی خرید لاگت موجود نہیں؛ مجموعی منافع نامکمل یا زیادہ دکھ سکتا ہے۔'
             : 'Purchase cost is missing for some sold stock; gross profit may be incomplete or overstated.',
@@ -1659,9 +1660,9 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text.rich(TextSpan(children: nameSpans)),
+                UrduAwareText.rich(TextSpan(children: nameSpans)),
                 const SizedBox(height: 2),
-                Text(
+                UrduAwareText(
                   meta,
                   style: const TextStyle(
                     fontSize: 10.5,
@@ -1676,7 +1677,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
+          UrduAwareText(
             value,
             style: TextStyle(
               fontSize: 14,
@@ -1731,7 +1732,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text.rich(
+            child: UrduAwareText.rich(
               TextSpan(children: textParts),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

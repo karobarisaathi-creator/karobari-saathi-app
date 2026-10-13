@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/pdf_service.dart';
@@ -251,7 +252,7 @@ class _CombinedHeader extends StatelessWidget {
                         onPressed: () => Navigator.pop(context),
                       ),
                       Expanded(
-                        child: Text(
+                        child: UrduAwareText(
                           isUrdu ? 'پارٹی' : 'Party',
                           textAlign: TextAlign.center,
                           style: TextStyle(
@@ -387,7 +388,7 @@ class _CombinedHeader extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(
+          UrduAwareText(
             label,
             style: TextStyle(
               color: Colors.white70,
@@ -406,7 +407,7 @@ class _CombinedHeader extends StatelessWidget {
               Flexible(
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
-                  child: Text(
+                  child: UrduAwareText(
                     "Rs ${amount.toStringAsFixed(0)}",
                     style: TextStyle(
                       color: Colors.white,
@@ -445,7 +446,7 @@ class _CombinedHeader extends StatelessWidget {
             children: [
               Icon(icon, color: Colors.white, size: 14),
               const SizedBox(width: 4),
-              Text(
+              UrduAwareText(
                 label,
                 style: TextStyle(
                   fontFamily: fontFamily,
@@ -599,7 +600,7 @@ class _CombinedHeader extends StatelessWidget {
   }) {
     return ListTile(
       leading: Icon(icon, color: color ?? AppTheme.darkColor, size: 20),
-      title: Text(
+      title: UrduAwareText(
         label,
         style: TextStyle(
           fontFamily: fontFamily,
@@ -621,11 +622,11 @@ class _CombinedHeader extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
+        title: UrduAwareText(
           isUrdu ? 'پارٹی ختم کریں؟' : 'Delete Party?',
           style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
         ),
-        content: Text(
+        content: UrduAwareText(
           isUrdu
               ? 'کیا آپ واقعی اس پارٹی کو ختم کرنا چاہتے ہیں؟ تمام ریکارڈ مٹ جائے گا۔'
               : 'Are you sure you want to delete this party? All records will be lost.',
@@ -634,7 +635,7 @@ class _CombinedHeader extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(
+            child: UrduAwareText(
               isUrdu ? 'منسوخ' : 'Cancel',
               style: TextStyle(
                   color: AppTheme.textSecondary, fontFamily: fontFamily),
@@ -642,7 +643,7 @@ class _CombinedHeader extends StatelessWidget {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(
+            child: UrduAwareText(
               isUrdu ? 'ختم کریں' : 'Delete',
               style: TextStyle(
                   color: AppTheme.expenseColor, fontFamily: fontFamily),
@@ -836,7 +837,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
       onTap: () => setState(() => _selectedFilter = value),
       child: Column(
         children: [
-          Text(
+          UrduAwareText(
             label,
             style: TextStyle(
               color: isSelected ? AppTheme.darkColor : AppTheme.textSecondary,
@@ -869,7 +870,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
         children: [
           Expanded(
             flex: 5,
-            child: Text(
+            child: UrduAwareText(
               widget.isUrdu ? "تفصیل" : "Details",
               style: TextStyle(
                 color: AppTheme.themeColor,
@@ -906,7 +907,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
         Flexible(
           child: FittedBox(
             fit: BoxFit.scaleDown,
-            child: Text(
+            child: UrduAwareText(
               label,
               style: TextStyle(
                 color: AppTheme.themeColor,
@@ -1080,7 +1081,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
+                UrduAwareText(
                   widget.isUrdu
                       ? "حساب برابر (ٹیپ کریں)"
                       : "Balanced (Tap)",
@@ -1092,7 +1093,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                   ),
                 ),
                 const Spacer(),
-                Text(
+                UrduAwareText(
                   "$days ${widget.isUrdu ? 'دن' : 'days'}",
                   style: const TextStyle(
                     fontSize: 11,
@@ -1107,7 +1108,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text("$start → $end",
+                  UrduAwareText("$start → $end",
                       style: const TextStyle(
                           fontSize: 11, color: AppTheme.textSecondary)),
                 ],
@@ -1152,7 +1153,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  UrduAwareText(
                     t.description.isNotEmpty
                         ? t.description
                         : (widget.isUrdu ? 'نقد لین دین' : 'Cash'),
@@ -1170,7 +1171,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        Text(
+                        UrduAwareText(
                           DateFormat('dd MMM').format(t.date),
                           style: const TextStyle(
                             color: AppTheme.textSecondary,
@@ -1180,7 +1181,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                         if (t.referenceNumber != null &&
                             t.referenceNumber!.isNotEmpty) ...[
                           const SizedBox(width: 8),
-                          Text(
+                          UrduAwareText(
                             "${widget.isUrdu ? 'بل' : 'Bill'} ${t.referenceNumber}",
                             style: TextStyle(
                               color: AppTheme.themeColor,
@@ -1193,7 +1194,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                           ),
                         ],
                         const SizedBox(width: 8),
-                        Text(
+                        UrduAwareText(
                           "Rs ${runningBalance.abs().toStringAsFixed(0)}",
                           style: const TextStyle(
                             color: AppTheme.textSecondary,
@@ -1211,7 +1212,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: Text(
+                child: UrduAwareText(
                   !isIncome || t.isQuickBill
                       ? t.amount.toStringAsFixed(0)
                       : "-",
@@ -1228,7 +1229,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: Text(
+                child: UrduAwareText(
                   isIncome
                       ? (t.isQuickBill
                           ? t.receivedAmount.toStringAsFixed(0)
@@ -1256,7 +1257,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
           Icon(PhosphorIcons.receipt(),
               size: 64, color: Colors.grey.shade400),
           const SizedBox(height: 16),
-          Text(
+          UrduAwareText(
             widget.isUrdu ? 'کوئی لین دین نہیں' : 'No transactions',
             style: TextStyle(
               fontFamily: widget.fontFamily,
@@ -1274,14 +1275,14 @@ class _TransactionsTabState extends State<_TransactionsTab> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
+        title: UrduAwareText(
           widget.isUrdu ? 'ڈیلیٹ کریں؟' : 'Delete?',
           style: TextStyle(
             fontFamily: widget.fontFamily,
             fontWeight: FontWeight.bold,
           ),
         ),
-        content: Text(
+        content: UrduAwareText(
           widget.isUrdu
               ? 'کیا آپ واقعی یہ ٹرانزیکشن ڈیلیٹ کرنا چاہتے ہیں؟'
               : 'Are you sure you want to delete this transaction?',
@@ -1290,7 +1291,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(
+            child: UrduAwareText(
               widget.isUrdu ? 'منسوخ' : 'Cancel',
               style: TextStyle(
                 color: AppTheme.textSecondary,
@@ -1314,7 +1315,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.expenseColor,
             ),
-            child: Text(
+            child: UrduAwareText(
               widget.isUrdu ? 'ڈیلیٹ' : 'Delete',
               style: TextStyle(
                 color: Colors.white,
@@ -1504,7 +1505,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
             if (_itemHistory.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 30),
-                child: Text(
+                child: UrduAwareText(
                   widget.isUrdu ? 'کوئی آئٹم نہیں' : 'No items',
                   style: TextStyle(
                     fontFamily: widget.fontFamily,
@@ -1546,7 +1547,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
         ),
         child: Column(
           children: [
-            Text(
+            UrduAwareText(
               value,
               style: const TextStyle(
                 fontSize: 15,
@@ -1555,7 +1556,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
+            UrduAwareText(
               label,
               style: TextStyle(
                 fontFamily: widget.fontFamily,
@@ -1614,7 +1615,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
               : null,
         ),
         alignment: Alignment.center,
-        child: Text(
+        child: UrduAwareText(
           label,
           style: TextStyle(
             fontFamily: widget.fontFamily,
@@ -1635,7 +1636,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
         _subChip('chg', widget.isUrdu ? 'ریٹ بدلا' : 'Rate Changed'),
         const Spacer(),
         Flexible(
-          child: Text(
+          child: UrduAwareText(
             widget.isUrdu ? 'ٹچ کریں، ہسٹری کھلے گی' : 'Tap to see history',
             style: TextStyle(
               fontFamily: widget.fontFamily,
@@ -1663,7 +1664,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
             color: active ? AppTheme.darkColor : Colors.grey.shade300,
           ),
         ),
-        child: Text(
+        child: UrduAwareText(
           label,
           style: TextStyle(
             fontFamily: widget.fontFamily,
@@ -1731,7 +1732,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        UrduAwareText(
                           name,
                           style: TextStyle(
                             fontFamily: widget.fontFamily,
@@ -1742,7 +1743,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        Text(
+                        UrduAwareText(
                           '${history.length} ${widget.isUrdu ? "خریداریاں" : "purchases"}',
                           style: TextStyle(
                             fontFamily: widget.fontFamily,
@@ -1756,7 +1757,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
+                      UrduAwareText(
                         'Rs ${latest.price.toStringAsFixed(0)}',
                         style: const TextStyle(
                           fontSize: 16,
@@ -1764,7 +1765,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
                           color: AppTheme.darkColor,
                         ),
                       ),
-                      Text(
+                      UrduAwareText(
                         widget.isUrdu ? 'آخری ریٹ' : 'Last rate',
                         style: TextStyle(
                           fontFamily: widget.fontFamily,
@@ -1788,7 +1789,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
               ),
               child: Row(
                 children: [
-                  Text(
+                  UrduAwareText(
                     widget.isUrdu ? 'کل' : 'Total',
                     style: TextStyle(
                       fontFamily: widget.fontFamily,
@@ -1797,7 +1798,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Text(
+                  UrduAwareText(
                     'Rs ${totalAmount.toStringAsFixed(0)}',
                     style: const TextStyle(
                       fontSize: 12.5,
@@ -1814,7 +1815,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
                         color: badgeColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Text(
+                      child: UrduAwareText(
                         '${latest.changePercentage!.abs().toStringAsFixed(1)}% ${isDecrease ? "↓" : "↑"}',
                         style: TextStyle(
                           fontSize: 10.5,
@@ -1846,7 +1847,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
         children: [
           Row(
             children: [
-              Text(
+              UrduAwareText(
                 widget.isUrdu ? 'ذاتی جائزہ' : 'Personal Review',
                 style: TextStyle(
                   fontFamily: widget.fontFamily,
@@ -1868,7 +1869,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
                     Icon(Icons.lock,
                         size: 11, color: AppTheme.expenseColor),
                     const SizedBox(width: 4),
-                    Text(
+                    UrduAwareText(
                       widget.isUrdu ? 'صرف آپ' : 'Only you',
                       style: TextStyle(
                         fontFamily: widget.fontFamily,
@@ -1887,7 +1888,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
             children: [
               _stars(_trustScore, 18),
               const SizedBox(width: 8),
-              Text(
+              UrduAwareText(
                 widget.isUrdu ? 'آخری 12 مہینے' : 'Last 12 months',
                 style: TextStyle(
                   fontFamily: widget.fontFamily,
@@ -1914,7 +1915,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
             4,
           ),
           const SizedBox(height: 10),
-          Text(
+          UrduAwareText(
             widget.isUrdu
                 ? 'یہ آپ کے اپنے حساب پر اندازہ ہے۔ پارٹی کو نہیں دکھتا۔'
                 : 'Your private estimate. Not visible to the party.',
@@ -1938,7 +1939,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                UrduAwareText(
                   title,
                   style: TextStyle(
                     fontFamily: widget.fontFamily,
@@ -1947,7 +1948,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                Text(
+                UrduAwareText(
                   sub,
                   style: TextStyle(
                     fontFamily: widget.fontFamily,

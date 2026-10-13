@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 
 class AppToast {
@@ -76,7 +77,7 @@ class AppToast {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
+                        UrduAwareText(
                           title,
                           style: TextStyle(
                             color: Colors.white,
@@ -87,7 +88,7 @@ class AppToast {
                         ),
                         if (localizedSubtitle.isNotEmpty) ...[
                           const SizedBox(height: 4),
-                          Text(
+                          UrduAwareText(
                             localizedSubtitle,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.9),

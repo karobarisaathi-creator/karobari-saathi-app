@@ -26,6 +26,27 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
 
+    match /public_shops/{shopId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isOwner(shopId);
+
+      match /items/{itemId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isOwner(shopId);
+      }
+
+      match /orders/{orderId} {
+        allow create: if isSignedIn()
+          && request.resource.data.customerId == request.auth.uid
+          && request.resource.data.shopId == shopId
+          && request.resource.data.status == 'pending';
+        allow read: if isOwner(shopId)
+          || (isSignedIn() && resource.data.customerId == request.auth.uid);
+        allow update: if isOwner(shopId);
+        allow delete: if false;
+      }
+    }
+
     match /users/{userId} {
       allow read: if isSignedIn();
       allow write: if isOwner(userId);

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/models/stock_movement_model.dart';
 import 'package:account_app/core/services/stock_service.dart';
@@ -316,7 +317,7 @@ class StockDetailScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Expanded(
-                                  child: Text(
+                                  child: UrduAwareText(
                                     displayName,
                                     style: TextStyle(
                                       fontSize: 18,
@@ -350,7 +351,7 @@ class StockDetailScreen extends StatelessWidget {
                                       Icon(status.icon,
                                           size: 12, color: status.color),
                                       const SizedBox(width: 4),
-                                      Text(
+                                      UrduAwareText(
                                         status.text,
                                         style: TextStyle(
                                           fontSize: 11,
@@ -403,7 +404,7 @@ class StockDetailScreen extends StatelessWidget {
                                     color: AppTheme.textSecondary,
                                   ),
                                   const SizedBox(width: 4),
-                                  Text(
+                                  UrduAwareText(
                                     isUrdu
                                         ? 'الرٹ: ${item.minStockAlert.toStringAsFixed(0)}'
                                         : 'Alert: ${item.minStockAlert.toStringAsFixed(0)}',
@@ -449,7 +450,7 @@ class StockDetailScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.baseline,
                               textBaseline: TextBaseline.alphabetic,
                               children: [
-                                Text(
+                                UrduAwareText(
                                   computedStock.toStringAsFixed(
                                     computedStock.truncateToDouble() ==
                                             computedStock
@@ -468,7 +469,7 @@ class StockDetailScreen extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
+                                UrduAwareText(
                                   item.unit,
                                   style: TextStyle(
                                     fontSize: 15,
@@ -503,7 +504,7 @@ class StockDetailScreen extends StatelessWidget {
                                       color: status.color,
                                     ),
                                     const SizedBox(width: 5),
-                                    Text(
+                                    UrduAwareText(
                                       '${isUrdu ? "کل مالیت" : "Total"}: Rs ${(computedStock * (avgCost > 0 ? avgCost : item.purchasePrice)).toStringAsFixed(0)}',
                                       style: TextStyle(
                                         fontSize: 11,
@@ -573,7 +574,7 @@ class StockDetailScreen extends StatelessWidget {
         color: bg,
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(
+      child: UrduAwareText(
         text,
         style: TextStyle(
           fontSize: isMono ? 10 : 10.5,
@@ -720,7 +721,7 @@ class StockDetailScreen extends StatelessWidget {
               Icon(icon, size: 18, color: Colors.white),
               const SizedBox(width: 8),
               Flexible(
-                child: Text(
+                child: UrduAwareText(
                   text,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -836,7 +837,7 @@ class StockDetailScreen extends StatelessWidget {
                     color: AppTheme.textSecondary.withValues(alpha: 0.7)),
                 const SizedBox(width: 5),
                 Expanded(
-                  child: Text(
+                  child: UrduAwareText(
                     label,
                     style: TextStyle(
                       fontSize: 10.5,
@@ -852,7 +853,7 @@ class StockDetailScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            Text(
+            UrduAwareText(
               value,
               style: TextStyle(
                 fontSize: 18,
@@ -871,7 +872,7 @@ class StockDetailScreen extends StatelessWidget {
                   color: AppTheme.incomeColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Text(
+                child: UrduAwareText(
                   '+${profitPercent.toStringAsFixed(0)}% ${fontFamily != null ? 'منافع' : 'profit'}',
                   style: TextStyle(
                     fontSize: 9.5,
@@ -949,7 +950,7 @@ class StockDetailScreen extends StatelessWidget {
                   width: 1,
                 ),
               ),
-              child: Text(
+              child: UrduAwareText(
                 item.description,
                 style: TextStyle(
                   fontSize: 12.5,
@@ -998,7 +999,7 @@ class StockDetailScreen extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
+            child: UrduAwareText(
               label,
               style: TextStyle(
                 fontSize: 12.5,
@@ -1010,7 +1011,7 @@ class StockDetailScreen extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Flexible(
-            child: Text(
+            child: UrduAwareText(
               value,
               style: TextStyle(
                 fontSize: 13.5,
@@ -1049,7 +1050,7 @@ class StockDetailScreen extends StatelessWidget {
               Icon(PhosphorIcons.clockCounterClockwise(),
                   size: 18, color: AppTheme.themeColor),
               const SizedBox(width: 8),
-              Text(
+              UrduAwareText(
                 isUrdu ? 'اسٹاک ہسٹری' : 'Movement History',
                 style: TextStyle(
                   fontSize: 15,
@@ -1067,7 +1068,7 @@ class StockDetailScreen extends StatelessWidget {
                   color: AppTheme.themeColor.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: Text(
+                child: UrduAwareText(
                   isUrdu
                       ? '${movements.length} انٹریز'
                       : '${movements.length} entries',
@@ -1104,7 +1105,7 @@ class StockDetailScreen extends StatelessWidget {
                   color: AppTheme.textSecondary.withValues(alpha: 0.4),
                 ),
                 const SizedBox(height: 12),
-                Text(
+                UrduAwareText(
                   isUrdu
                       ? 'کوئی ہسٹری موجود نہیں'
                       : 'No movements recorded yet',
@@ -1116,7 +1117,7 @@ class StockDetailScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
+                UrduAwareText(
                   isUrdu
                       ? 'اسٹاک کم یا زیادہ کریں تو یہاں دکھے گا'
                       : 'Stock adjustments will appear here',
@@ -1228,7 +1229,7 @@ class StockDetailScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                UrduAwareText(
                   typeLabel,
                   style: TextStyle(
                     fontSize: 13.5,
@@ -1241,7 +1242,7 @@ class StockDetailScreen extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 3),
-                Text(
+                UrduAwareText(
                   movement.note.isNotEmpty ? movement.note : formattedDate,
                   style: TextStyle(
                     fontSize: 11,
@@ -1261,7 +1262,7 @@ class StockDetailScreen extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
+              UrduAwareText(
                 '$sign${qtyAbs.toStringAsFixed(qtyAbs.truncateToDouble() == qtyAbs ? 0 : 1)} ${item.unit}',
                 style: TextStyle(
                   fontSize: 15,
@@ -1274,7 +1275,7 @@ class StockDetailScreen extends StatelessWidget {
               ),
               if (movement.unitPrice > 0) ...[
                 const SizedBox(height: 2),
-                Text(
+                UrduAwareText(
                   'Rs ${movement.unitPrice.toStringAsFixed(0)}',
                   style: const TextStyle(
                     fontSize: 10.5,
@@ -1337,7 +1338,7 @@ class StockDetailScreen extends StatelessWidget {
                     child: Icon(icon, size: 15, color: AppTheme.themeColor),
                   ),
                   const SizedBox(width: 10),
-                  Text(
+                  UrduAwareText(
                     title,
                     style: TextStyle(
                       fontSize: 14,

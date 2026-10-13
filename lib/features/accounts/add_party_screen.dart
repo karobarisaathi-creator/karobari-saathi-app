@@ -7,6 +7,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import 'dart:async';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/auto_sync_service.dart';
@@ -233,7 +234,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                                   BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)
                                 ],
                               ),
-                              child: Text(
+                              child: UrduAwareText(
                                 isUrdu ? 'اکاؤنٹ ملا' : 'Account Found',
                                 style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                               ),
@@ -306,7 +307,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
   Widget _buildSectionLabel(String label, bool isUrdu, String fontFamily) {
     return Align(
       alignment: isUrdu ? Alignment.centerRight : Alignment.centerLeft,
-      child: Text(
+      child: UrduAwareText(
         label,
         style: TextStyle(
           fontSize: 14,
@@ -571,7 +572,7 @@ class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-      title: Text(
+      title: UrduAwareText(
         widget.isUrdu ? 'رابطوں سے منتخب کریں' : 'Select Contact',
         style: TextStyle(
           fontFamily: widget.fontFamily,
@@ -605,7 +606,7 @@ class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
             Expanded(
               child: _filteredContacts.isEmpty
                   ? Center(
-                      child: Text(
+                      child: UrduAwareText(
                         widget.isUrdu ? 'کوئی رابطہ نہیں ملا' : 'No contacts found',
                         style: TextStyle(fontFamily: widget.fontFamily, color: AppTheme.textSecondary, fontWeight: widget.fontWeight),
                       ),
@@ -625,12 +626,12 @@ class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
                           child: ListTile(
                             leading: CircleAvatar(
                               backgroundColor: AppTheme.themeColor.withOpacity(0.1),
-                              child: Text(
+                              child: UrduAwareText(
                                 contact.displayName.isNotEmpty ? contact.displayName[0] : '?',
                                 style: const TextStyle(color: AppTheme.themeColor, fontWeight: FontWeight.bold),
                               ),
                             ),
-                            title: Text(
+                            title: UrduAwareText(
                               contact.displayName,
                               style: TextStyle(
                                 fontFamily: widget.fontFamily,
@@ -638,7 +639,7 @@ class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
                                 fontWeight: widget.isUrdu ? FontWeight.bold : FontWeight.normal,
                               ),
                             ),
-                            subtitle: Text(
+                            subtitle: UrduAwareText(
                               phone,
                               style: const TextStyle(fontFamily: '', fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.bold),
                             ),
@@ -654,7 +655,7 @@ class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text(
+          child: UrduAwareText(
             widget.isUrdu ? 'منسوخ' : 'Cancel',
             style: TextStyle(fontFamily: widget.fontFamily, color: AppTheme.expenseColor, fontWeight: widget.fontWeight),
           ),

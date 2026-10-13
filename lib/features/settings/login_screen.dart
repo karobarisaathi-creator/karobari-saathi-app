@@ -4,6 +4,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
@@ -53,7 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             Icon(PhosphorIcons.shield(), color: _themeColor),
             SizedBox(width: 10),
-            Text(
+            UrduAwareText(
               isUrdu ? 'شرائط و ضوابط' : 'Terms & Conditions',
               style: TextStyle(
                   fontFamily: fontFamily,
@@ -63,7 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
         content: SingleChildScrollView(
-          child: Text.rich(
+          child: UrduAwareText.rich(
             TextSpan(
               style: TextStyle(
                   fontFamily: fontFamily,
@@ -120,7 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text(isUrdu ? 'قبول ہے' : 'Accept',
+            child: UrduAwareText(isUrdu ? 'قبول ہے' : 'Accept',
                 style: TextStyle(
                     fontFamily: fontFamily,
                     color: _themeColor,
@@ -202,7 +203,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         SizedBox(height: 24),
-                        Text(
+                        UrduAwareText(
                           'Karobari Saathi',
                           style: TextStyle(
                             fontSize: 32,
@@ -219,7 +220,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                         ),
-                        Text(
+                        UrduAwareText(
                           'PRO LEDGER',
                           style: TextStyle(
                             fontSize: 16,
@@ -260,7 +261,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            UrduAwareText(
                               isUrdu ? 'خوش آمدید' : 'Welcome',
                               style: TextStyle(
                                 fontSize: 28,
@@ -270,7 +271,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             SizedBox(height: 8),
-                            Text(
+                            UrduAwareText(
                               isUrdu
                                   ? 'اپنے اکاؤنٹ تک رسائی حاصل کریں'
                                   : 'Sign in to access your account',
@@ -411,7 +412,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             SizedBox(height: 24),
 
                             Center(
-                              child: Text.rich(
+                              child: UrduAwareText.rich(
                                 TextSpan(
                                   style: TextStyle(
                                       color: _darkColor.withOpacity(0.5),

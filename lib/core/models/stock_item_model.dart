@@ -26,6 +26,7 @@ class StockItem {
   final bool trackStock;
   final bool allowReturn;
   final bool stopWhenOut;
+  final bool isArchived;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -55,6 +56,7 @@ class StockItem {
     this.trackStock = true,
     this.allowReturn = true,
     this.stopWhenOut = true,
+    this.isArchived = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -93,6 +95,7 @@ class StockItem {
       'trackStock': trackStock,
       'allowReturn': allowReturn,
       'stopWhenOut': stopWhenOut,
+      'isArchived': isArchived,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -147,6 +150,7 @@ class StockItem {
       trackStock: readBool('trackStock', true),
       allowReturn: readBool('allowReturn', true),
       stopWhenOut: readBool('stopWhenOut', true),
+      isArchived: readBool('isArchived', false),
       createdAt: map['createdAt'] != null
           ? DateTime.tryParse(map['createdAt']) ?? DateTime.now()
           : DateTime.now(),
@@ -183,6 +187,7 @@ class StockItem {
     bool? trackStock,
     bool? allowReturn,
     bool? stopWhenOut,
+    bool? isArchived,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -200,8 +205,7 @@ class StockItem {
       minStockAlert: minStockAlert ?? this.minStockAlert,
       unit: unit ?? this.unit,
       description: description ?? this.description,
-      imagePath:
-          clearImagePath ? null : (imagePath ?? this.imagePath),
+      imagePath: clearImagePath ? null : (imagePath ?? this.imagePath),
       sku: sku ?? this.sku,
       mrp: mrp ?? this.mrp,
       brand: brand ?? this.brand,
@@ -213,6 +217,7 @@ class StockItem {
       trackStock: trackStock ?? this.trackStock,
       allowReturn: allowReturn ?? this.allowReturn,
       stopWhenOut: stopWhenOut ?? this.stopWhenOut,
+      isArchived: isArchived ?? this.isArchived,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

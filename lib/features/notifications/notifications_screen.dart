@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/services/database_service.dart';
@@ -144,13 +145,13 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(isUrdu ? 'نیا ورژن دستیاب ہے!' : 'New Version Available!',
+          UrduAwareText(isUrdu ? 'نیا ورژن دستیاب ہے!' : 'New Version Available!',
               style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontFamily: fontFamily)),
           const SizedBox(height: 8),
-          Text(isUrdu ? _updateData!['message_ur'] : _updateData!['message_en'],
+          UrduAwareText(isUrdu ? _updateData!['message_ur'] : _updateData!['message_en'],
               style: TextStyle(
                   color: Colors.white70, fontSize: 12, fontFamily: fontFamily)),
           const SizedBox(height: 12),
@@ -163,12 +164,12 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                     await launchUrl(Uri.parse(url),
                         mode: LaunchMode.externalApplication);
                 },
-                child: Text(isUrdu ? 'اپ ڈیٹ' : 'Update',
+                child: UrduAwareText(isUrdu ? 'اپ ڈیٹ' : 'Update',
                     style: const TextStyle(color: Colors.white)),
               ),
               TextButton(
                   onPressed: _dismissUpdate,
-                  child: Text(isUrdu ? 'بند کریں' : 'Dismiss',
+                  child: UrduAwareText(isUrdu ? 'بند کریں' : 'Dismiss',
                       style: const TextStyle(color: Colors.white70))),
             ],
           )
@@ -207,7 +208,7 @@ class _NotificationListTabState extends State<_NotificationListTab>
 
     if (allNotifications.isEmpty)
       return Center(
-          child: Text(
+          child: UrduAwareText(
               widget.isUrdu ? 'کوئی نوٹیفیکیشن نہیں' : 'No notifications',
               style: TextStyle(
                   color: Colors.grey, fontFamily: widget.fontFamily)));
@@ -262,7 +263,7 @@ class _NotificationListTabState extends State<_NotificationListTab>
                           borderRadius: 6,
                         ),
                       ),
-                      Text(
+                      UrduAwareText(
                         _formatTime(n.timestamp),
                         style:
                             const TextStyle(fontSize: 10, color: Colors.grey),
@@ -325,9 +326,9 @@ class _NotificationListTabState extends State<_NotificationListTab>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(
+        title: UrduAwareText(
             widget.isUrdu ? 'نوٹیفیکیشن حذف کریں؟' : 'Delete Notification?'),
-        content: Text(
+        content: UrduAwareText(
           widget.isUrdu
               ? 'کیا آپ واقعی اس نوٹیفیکیشن کو حذف کرنا چاہتے ہیں؟'
               : 'Are you sure you want to delete this notification?',
@@ -336,7 +337,7 @@ class _NotificationListTabState extends State<_NotificationListTab>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(widget.isUrdu ? 'منسوخ' : 'Cancel'),
+            child: UrduAwareText(widget.isUrdu ? 'منسوخ' : 'Cancel'),
           ),
           TextButton(
             onPressed: () {
@@ -344,7 +345,7 @@ class _NotificationListTabState extends State<_NotificationListTab>
               Provider.of<NotificationService>(context, listen: false)
                   .deleteNotification(n.id);
             },
-            child: Text(
+            child: UrduAwareText(
               widget.isUrdu ? 'حذف کریں' : 'Delete',
               style: const TextStyle(color: Colors.red),
             ),
@@ -528,14 +529,14 @@ class _NotificationListTabState extends State<_NotificationListTab>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(widget.isUrdu ? 'نیا اکاؤنٹ؟' : 'Create Account?'),
-        content: Text(widget.isUrdu
+        title: UrduAwareText(widget.isUrdu ? 'نیا اکاؤنٹ؟' : 'Create Account?'),
+        content: UrduAwareText(widget.isUrdu
             ? '$name کے لیے اکاؤنٹ بنائیں؟'
             : 'Create account for $name?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(widget.isUrdu ? 'کینسل' : 'Cancel')),
+              child: UrduAwareText(widget.isUrdu ? 'کینسل' : 'Cancel')),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
@@ -555,7 +556,7 @@ class _NotificationListTabState extends State<_NotificationListTab>
               await db.addAccount(acc);
               _processAddition(n, acc);
             },
-            child: Text(widget.isUrdu ? 'بنائیں' : 'Create'),
+            child: UrduAwareText(widget.isUrdu ? 'بنائیں' : 'Create'),
           )
         ],
       ),

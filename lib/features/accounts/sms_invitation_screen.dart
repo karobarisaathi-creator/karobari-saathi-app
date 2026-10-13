@@ -2,25 +2,42 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 
-class BalanceAlertScreen extends StatefulWidget {
+class BalanceAlertDialog extends StatefulWidget {
   final Account party;
 
-  const BalanceAlertScreen({Key? key, required this.party}) : super(key: key);
+  const BalanceAlertDialog({super.key, required this.party});
+
+  static Future<void> show(
+    BuildContext context, {
+    required Account party,
+  }) {
+    return showDialog<void>(
+      context: context,
+      builder: (_) => BalanceAlertDialog(party: party),
+    );
+  }
 
   @override
-  _BalanceAlertScreenState createState() => _BalanceAlertScreenState();
+  State<BalanceAlertDialog> createState() => _BalanceAlertDialogState();
 }
 
-class _BalanceAlertScreenState extends State<BalanceAlertScreen> {
-  final TextEditingController _messageController = TextEditingController();
+class _BalanceAlertDialogState extends State<BalanceAlertDialog> {
+  final UrduAwareTextEditingController _messageController =
+      UrduAwareTextEditingController();
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -58,185 +75,223 @@ Please verify. Thanks.""";
   Widget build(BuildContext context) {
     final languageService = Provider.of<LanguageService>(context);
     final isUrdu = languageService.isUrdu;
-    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
+    _messageController.isUrdu = isUrdu;
+    const fontFamily = '';
     final fontWeight = FontWeight.normal;
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.85;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      appBar: CustomAppBar(
-        title: isUrdu ? 'بیلنس کا پیغام' : 'Balance Alert',
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 520, maxHeight: maxHeight),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Bill Paper Container Style (Matches Receipt)
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5)),
-                ],
-              ),
-              child: Column(
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 12, 4),
+              child: Row(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Party Info
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(isUrdu ? 'نام:' : 'Name:',
-                                    style: TextStyle(
-                                        color: Colors.grey,
-                                        fontFamily: fontFamily,
-                                        fontWeight: fontWeight)),
-                                Text(
-                                  widget.party.name,
-                                  style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: fontWeight,
-                                      fontFamily: fontFamily,
-                                      color: AppTheme.darkColor),
-                                ),
-                                if (widget.party.phone.isNotEmpty)
-                                  Text(
-                                    Formatters.formatPhoneNumber(
-                                        widget.party.phone),
-                                    style: const TextStyle(
-                                        color: Colors.blueGrey,
-                                        fontSize: 14,
-                                        fontFamily: '',
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                              ],
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(isUrdu ? 'کل بیلنس' : 'Net Balance',
-                                    style: TextStyle(
-                                        color: Colors.grey,
-                                        fontFamily: fontFamily,
-                                        fontWeight: fontWeight)),
-                                Text(
-                                  'RS ${widget.party.balance.abs().toStringAsFixed(0)}',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    fontFamily: '',
-                                    color: widget.party.balance >= 0
-                                        ? AppTheme.incomeColor
-                                        : AppTheme.expenseColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 15),
-                          child: Divider(thickness: 1, color: Colors.grey),
-                        ),
-
-                        Text(
-                          isUrdu ? 'پیغام لکھیں:' : 'Compose Message:',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey.shade700,
-                            fontFamily: fontFamily,
-                            fontWeight: fontWeight,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Message Input
-                        TextField(
-                          controller: _messageController,
-                          maxLines: 4,
-                          style: TextStyle(
-                            fontFamily: fontFamily,
-                            fontWeight: FontWeight.normal,
-                            fontSize: 16,
-                          ),
-                          decoration: InputDecoration(
-                            fillColor: const Color(0xFFF9F9F9),
-                            filled: true,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12.0),
-                              borderSide: const BorderSide(color: Colors.grey),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12.0),
-                              borderSide:
-                                  BorderSide(color: Colors.grey.shade300),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12.0),
-                              borderSide: const BorderSide(
-                                  color: AppTheme.themeColor, width: 2),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        // Footer Message
-                        Center(
-                          child: Text(
-                            isUrdu ? 'شکریہ!' : 'Thank you!',
-                            style: TextStyle(
-                                fontStyle: FontStyle.italic,
-                                color: Colors.grey,
-                                fontFamily: fontFamily,
-                                fontWeight: fontWeight),
-                          ),
-                        ),
-                      ],
+                  Expanded(
+                    child: UrduAwareText(
+                      isUrdu ? 'بیلنس کا پیغام' : 'Balance Alert',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
+                  ),
+                  IconButton(
+                    tooltip: isUrdu ? 'بند کریں' : 'Close',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
                   ),
                 ],
               ),
             ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    // Bill Paper Container Style (Matches Receipt)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5)),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Party Info
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        UrduAwareText(isUrdu ? 'نام:' : 'Name:',
+                                            style: TextStyle(
+                                                color: Colors.grey,
+                                                fontFamily: fontFamily,
+                                                fontWeight: fontWeight)),
+                                        UrduAwareText(
+                                          widget.party.name,
+                                          style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: fontWeight,
+                                              fontFamily: fontFamily,
+                                              color: AppTheme.darkColor),
+                                        ),
+                                        if (widget.party.phone.isNotEmpty)
+                                          UrduAwareText(
+                                            Formatters.formatPhoneNumber(
+                                                widget.party.phone),
+                                            style: const TextStyle(
+                                                color: Colors.blueGrey,
+                                                fontSize: 14,
+                                                fontFamily: '',
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                      ],
+                                    ),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        UrduAwareText(
+                                            isUrdu ? 'کل بیلنس' : 'Net Balance',
+                                            style: TextStyle(
+                                                color: Colors.grey,
+                                                fontFamily: fontFamily,
+                                                fontWeight: fontWeight)),
+                                        UrduAwareText(
+                                          'RS ${widget.party.balance.abs().toStringAsFixed(0)}',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            fontFamily: '',
+                                            color: widget.party.balance >= 0
+                                                ? AppTheme.incomeColor
+                                                : AppTheme.expenseColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
 
-            const SizedBox(height: 30),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 15),
+                                  child:
+                                      Divider(thickness: 1, color: Colors.grey),
+                                ),
 
-            // Action Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: AppButton(
-                    text: 'SMS',
-                    onPressed: () => _sendSMS(context),
-                    icon: PhosphorIcons.chatTeardropDots(PhosphorIconsStyle.bold),
-                    color: Colors.blueGrey,
-                    size: AppButtonSize.large,
-                    isFullWidth: true,
-                  ),
+                                UrduAwareText(
+                                  isUrdu ? 'پیغام لکھیں:' : 'Compose Message:',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey.shade700,
+                                    fontFamily: fontFamily,
+                                    fontWeight: fontWeight,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+
+                                // Message Input
+                                TextField(
+                                  controller: _messageController,
+                                  maxLines: 4,
+                                  style: TextStyle(
+                                    fontFamily: fontFamily,
+                                    fontWeight: FontWeight.normal,
+                                    fontSize: 16,
+                                  ),
+                                  decoration: InputDecoration(
+                                    fillColor: const Color(0xFFF9F9F9),
+                                    filled: true,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12.0),
+                                      borderSide:
+                                          const BorderSide(color: Colors.grey),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12.0),
+                                      borderSide: BorderSide(
+                                          color: Colors.grey.shade300),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12.0),
+                                      borderSide: const BorderSide(
+                                          color: AppTheme.themeColor, width: 2),
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(height: 20),
+
+                                // Footer Message
+                                Center(
+                                  child: UrduAwareText(
+                                    isUrdu ? 'شکریہ!' : 'Thank you!',
+                                    style: TextStyle(
+                                        fontStyle: FontStyle.italic,
+                                        color: Colors.grey,
+                                        fontFamily: fontFamily,
+                                        fontWeight: fontWeight),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 30),
+
+                    // Action Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: AppButton(
+                            text: 'SMS',
+                            onPressed: () => _sendSMS(context),
+                            icon: PhosphorIcons.chatTeardropDots(
+                                PhosphorIconsStyle.bold),
+                            color: Colors.blueGrey,
+                            size: AppButtonSize.large,
+                            isFullWidth: true,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: AppButton(
+                            text: 'WhatsApp',
+                            onPressed: () => _sendWhatsApp(context),
+                            icon: PhosphorIcons.whatsappLogo(
+                                PhosphorIconsStyle.bold),
+                            color: Colors.green,
+                            size: AppButtonSize.large,
+                            isFullWidth: true,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppButton(
-                    text: 'WhatsApp',
-                    onPressed: () => _sendWhatsApp(context),
-                    icon: PhosphorIcons.whatsappLogo(PhosphorIconsStyle.bold),
-                    color: Colors.green,
-                    size: AppButtonSize.large,
-                    isFullWidth: true,
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ),

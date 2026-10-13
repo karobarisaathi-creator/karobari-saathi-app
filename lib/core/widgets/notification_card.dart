@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
@@ -76,7 +77,7 @@ class NotificationCard extends StatelessWidget {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(
+                          UrduAwareText(
                             _formatTime(notification.timestamp),
                             style: TextStyle(
                               color: AppTheme.darkColor.withValues(alpha: 0.7),
@@ -106,7 +107,7 @@ class NotificationCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (notification.title.isNotEmpty)
-                          Text(
+                          UrduAwareText(
                             _getTranslatedTitle(notification.title),
                             style: TextStyle(
                               fontFamily: fontFamily,
@@ -116,7 +117,7 @@ class NotificationCard extends StatelessWidget {
                             ),
                           ),
                         const SizedBox(height: 2),
-                        Text(
+                        UrduAwareText(
                           isTransaction &&
                                   data?['description'] != null &&
                                   data!['description']
@@ -191,7 +192,7 @@ class NotificationCard extends StatelessWidget {
           Icon(PhosphorIcons.info(PhosphorIconsStyle.bold),
               color: Colors.white, size: 14),
           const SizedBox(width: 8),
-          Text(
+          UrduAwareText(
             isUrdu ? 'اہم پیغام' : 'Important Notice',
             style: TextStyle(
               color: Colors.white,
@@ -218,7 +219,7 @@ class NotificationCard extends StatelessWidget {
               color: AppTheme.themeColor, size: 20),
         ),
         const SizedBox(width: 12),
-        Text(
+        UrduAwareText(
           isUrdu ? 'سسٹم پیغام' : 'System Message',
           style: const TextStyle(
             fontWeight: FontWeight.bold,

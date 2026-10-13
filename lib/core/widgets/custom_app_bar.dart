@@ -1,6 +1,7 @@
 // custom_app_bar.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/theme_service.dart';
 
@@ -44,12 +45,16 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     final isUrdu = languageService.isUrdu;
     final canPop = Navigator.of(context).canPop();
     final shouldShowBackButton = showBackButton && canPop;
+    final titleText = title.toString();
+    final needsRtl = titleText.contains(RegExp(r'[\u0600-\u06FF]'));
 
     return AppBar(
       title: title is Widget
         ? title
-        : Text(
-            title.toString(),
+        : UrduAwareText(
+            titleText,
+            textAlign: TextAlign.center,
+            textDirection: needsRtl ? TextDirection.rtl : TextDirection.ltr,
             style: TextStyle(
               fontFamily: isUrdu ? 'NooriNastaleeq' : null,
               fontSize: isUrdu ? 20 : 18,
@@ -106,7 +111,7 @@ class GradientAppBar extends CustomAppBar {
     final isUrdu = languageService.isUrdu;
 
     return AppBar(
-      title: Text(
+      title: UrduAwareText(
         title,
         style: TextStyle(
           fontFamily: isUrdu ? 'NooriNastaleeq' : null,

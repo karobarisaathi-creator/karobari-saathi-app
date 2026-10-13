@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/models/stock_movement_model.dart';
 import 'package:account_app/core/services/stock_service.dart';
@@ -44,12 +45,16 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
   void initState() {
     super.initState();
     _selectedType = widget.initialType;
+    if (_selectedType == StockMovementType.adjustment) {
+      final stockService = Provider.of<StockService>(context, listen: false);
+      _qtyController.text =
+          stockService.calculateCurrentStock(widget.item.id).toString();
+    }
     final initialPrice = (_selectedType == StockMovementType.sale &&
             widget.item.sellingPrice > 0)
         ? widget.item.sellingPrice
         : widget.item.purchasePrice;
-    _priceController.text =
-        initialPrice > 0 ? initialPrice.toStringAsFixed(0) : '';
+    _priceController.text = initialPrice > 0 ? initialPrice.toString() : '';
     _qtyController.addListener(_onQtyChanged);
   }
 
@@ -90,13 +95,13 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
 
   void _incrementQty() {
     final current = _currentQty;
-    _qtyController.text = (current + 1).toStringAsFixed(0);
+    _qtyController.text = (current + 1).toString();
   }
 
   void _decrementQty() {
     final current = _currentQty;
     if (current > 1) {
-      _qtyController.text = (current - 1).toStringAsFixed(0);
+      _qtyController.text = (current - 1).toString();
     }
   }
 
@@ -111,11 +116,36 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
     if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
 
-    final qty = double.tryParse(_qtyController.text) ?? 0.0;
+    final stockService = Provider.of<StockService>(context, listen: false);
+    final enteredQuantity = double.tryParse(_qtyController.text) ?? 0.0;
+    final available = stockService.calculateCurrentStock(widget.item.id);
+    if (!available.isFinite) {
+      AppToast.error(
+        context,
+        isUrdu
+            ? 'موجودہ اسٹاک کی مقدار درست نہیں ہے۔ پہلے اسٹاک ریکارڈ درست کریں۔'
+            : 'The current stock value is invalid. Correct the stock record first.',
+      );
+      return;
+    }
+    final qty = _selectedType == StockMovementType.adjustment
+        ? StockService.stockAdjustmentDelta(
+            currentStock: available,
+            targetStock: enteredQuantity,
+          )
+        : enteredQuantity;
+    if (_selectedType == StockMovementType.adjustment && qty == 0) {
+      AppToast.warning(
+        context,
+        isUrdu
+            ? 'گنی گئی مقدار موجودہ اسٹاک کے برابر ہے؛ کوئی تبدیلی نہیں کی گئی۔'
+            : 'The counted quantity matches current stock; no adjustment was made.',
+      );
+      return;
+    }
     final price =
         double.tryParse(_priceController.text) ?? widget.item.purchasePrice;
 
-    final stockService = Provider.of<StockService>(context, listen: false);
     String reason = _noteController.text.trim();
     if (reason.isEmpty) {
       switch (_selectedType) {
@@ -149,7 +179,6 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
       timestamp: DateTime.now(),
     );
 
-    final available = stockService.calculateCurrentStock(widget.item.id);
     if (!StockService.canApplyMovement(
       availableStock: available,
       movement: movement,
@@ -328,7 +357,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                UrduAwareText(
                   titleText,
                   style: TextStyle(
                     fontSize: 16,
@@ -341,7 +370,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 3),
-                Text(
+                UrduAwareText(
                   widget.item.name,
                   style: TextStyle(
                     fontSize: 11.5,
@@ -470,7 +499,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                   children: [
                     _buildPillIcon(icon, color, isActive, size: 26),
                     const SizedBox(width: 10),
-                    Text(
+                    UrduAwareText(
                       label,
                       style: TextStyle(
                         fontSize: 12,
@@ -486,7 +515,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                   children: [
                     _buildPillIcon(icon, color, isActive),
                     const SizedBox(height: 6),
-                    Text(
+                    UrduAwareText(
                       label,
                       style: TextStyle(
                         fontSize: 11,
@@ -544,7 +573,9 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
       children: [
         _buildSectionLabel(
           icon: PhosphorIcons.stack(),
-          text: isUrdu ? 'مقدار' : 'QUANTITY',
+          text: _selectedType == StockMovementType.adjustment
+              ? (isUrdu ? 'گنی گئی کل مقدار' : 'COUNTED STOCK')
+              : (isUrdu ? 'مقدار' : 'QUANTITY'),
         ),
         const SizedBox(height: 10),
 
@@ -600,14 +631,18 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                           return isUrdu ? 'مقدار' : 'Required';
                         }
                         final n = double.tryParse(val);
-                        if (n == null || n <= 0) {
+                        if (n == null ||
+                            !n.isFinite ||
+                            (_selectedType == StockMovementType.adjustment
+                                ? n < 0
+                                : n <= 0)) {
                           return isUrdu ? 'درست' : 'Invalid';
                         }
                         return null;
                       },
                     ),
                     const SizedBox(height: 2),
-                    Text(
+                    UrduAwareText(
                       widget.item.unit.toUpperCase(),
                       style: TextStyle(
                         fontSize: 11.5,
@@ -695,6 +730,11 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
       newStock = qty;
     }
 
+    String formatQuantity(double value) =>
+        value == value.truncateToDouble()
+            ? value.toStringAsFixed(0)
+            : value.toString();
+
     // Colors
     Color color;
     Color bg;
@@ -708,32 +748,32 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
       border = const Color(0xFFD97706).withValues(alpha: 0.25);
       icon = PhosphorIcons.warning(PhosphorIconsStyle.fill);
       message = isUrdu
-          ? 'اتنا اسٹاک موجود نہیں! صرف ${availableStock.toStringAsFixed(0)} ${widget.item.unit}'
-          : 'Not enough stock! Only ${availableStock.toStringAsFixed(0)} ${widget.item.unit} available';
+          ? 'اتنا اسٹاک موجود نہیں! صرف ${formatQuantity(availableStock)} ${widget.item.unit}'
+          : 'Not enough stock! Only ${formatQuantity(availableStock)} ${widget.item.unit} available';
     } else if (isIncreasePreview) {
       color = AppTheme.incomeColor;
       bg = AppTheme.incomeColor.withValues(alpha: 0.06);
       border = AppTheme.incomeColor.withValues(alpha: 0.20);
       icon = PhosphorIcons.checkCircle(PhosphorIconsStyle.fill);
       message = isUrdu
-          ? 'اسٹاک بڑھے گا: ${availableStock.toStringAsFixed(0)} → ${newStock.toStringAsFixed(0)} ${widget.item.unit}'
-          : 'Stock will increase: ${availableStock.toStringAsFixed(0)} → ${newStock.toStringAsFixed(0)} ${widget.item.unit}';
+          ? 'اسٹاک بڑھے گا: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}'
+          : 'Stock will increase: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}';
     } else if (isDecreasePreview) {
       color = AppTheme.expenseColor;
       bg = AppTheme.expenseColor.withValues(alpha: 0.06);
       border = AppTheme.expenseColor.withValues(alpha: 0.20);
       icon = PhosphorIcons.arrowDown();
       message = isUrdu
-          ? 'اسٹاک کم ہوگا: ${availableStock.toStringAsFixed(0)} → ${newStock.toStringAsFixed(0)} ${widget.item.unit}'
-          : 'Stock will decrease: ${availableStock.toStringAsFixed(0)} → ${newStock.toStringAsFixed(0)} ${widget.item.unit}';
+          ? 'اسٹاک کم ہوگا: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}'
+          : 'Stock will decrease: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}';
     } else {
       color = AppTheme.themeColor;
       bg = AppTheme.themeColor.withValues(alpha: 0.06);
       border = AppTheme.themeColor.withValues(alpha: 0.20);
       icon = PhosphorIcons.sliders();
       message = isUrdu
-          ? 'اسٹاک ایڈجسٹ ہوگا: ${availableStock.toStringAsFixed(0)} → ${newStock.toStringAsFixed(0)} ${widget.item.unit}'
-          : 'Stock will adjust: ${availableStock.toStringAsFixed(0)} → ${newStock.toStringAsFixed(0)} ${widget.item.unit}';
+          ? 'اسٹاک ایڈجسٹ ہوگا: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}'
+          : 'Stock will adjust: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}';
     }
 
     return AnimatedContainer(
@@ -757,7 +797,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
+            child: UrduAwareText(
               message,
               style: TextStyle(
                 fontSize: 12,
@@ -788,7 +828,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
               fontFamily: fontFamily,
             ),
             const Spacer(),
-            Text(
+            UrduAwareText(
               isUrdu ? 'اختیاری' : 'OPTIONAL',
               style: TextStyle(
                 fontSize: 9.5,
@@ -828,7 +868,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
               fontFamily: fontFamily,
             ),
             const Spacer(),
-            Text(
+            UrduAwareText(
               isUrdu ? 'اختیاری' : 'OPTIONAL',
               style: TextStyle(
                 fontSize: 9.5,
@@ -867,7 +907,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
       children: [
         Icon(icon, size: 12, color: AppTheme.textSecondary),
         const SizedBox(width: 6),
-        Text(
+        UrduAwareText(
           text,
           style: TextStyle(
             fontSize: 10.5,
@@ -950,7 +990,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
           if (suffix != null)
             Padding(
               padding: const EdgeInsets.only(right: 14),
-              child: Text(
+              child: UrduAwareText(
                 suffix,
                 style: const TextStyle(
                   fontSize: 11.5,
@@ -1001,7 +1041,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                   color: AppTheme.backgroundColor,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Text(
+                child: UrduAwareText(
                   isUrdu ? 'کینسل' : 'Cancel',
                   style: TextStyle(
                     fontSize: 13.5,
@@ -1059,7 +1099,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                         ),
                       const SizedBox(width: 8),
                       Flexible(
-                        child: Text(
+                        child: UrduAwareText(
                           _isSaving
                               ? (isUrdu ? 'محفوظ ہو رہا...' : 'Saving...')
                               : (isUrdu ? 'محفوظ کریں' : 'Save Entry'),

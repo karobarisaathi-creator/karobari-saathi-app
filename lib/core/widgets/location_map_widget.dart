@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/services/logging_service.dart';
@@ -205,7 +206,7 @@ class _LocationMapWidgetState extends State<LocationMapWidget> {
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
+                          child: UrduAwareText(
                             widget.address,
                             style: TextStyle(
                               fontSize: 13,
@@ -228,7 +229,7 @@ class _LocationMapWidgetState extends State<LocationMapWidget> {
                               color: AppTheme.themeColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Text(
+                            child: UrduAwareText(
                               _distanceStr,
                               style: TextStyle(
                                 fontSize: 11,
@@ -329,7 +330,7 @@ class _LocationMapWidgetState extends State<LocationMapWidget> {
               color: Colors.grey[400],
             ),
             const SizedBox(height: 8),
-            Text(
+            UrduAwareText(
               widget.isUrdu ? 'نقشہ لوڈ کرنے کے لیے تھپتھپائیں' : 'Tap to load map',
               style: TextStyle(
                 color: Colors.grey[500],

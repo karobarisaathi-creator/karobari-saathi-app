@@ -92,7 +92,12 @@ class StockService with ChangeNotifier {
     required StockMovement movement,
     bool stopWhenOut = true,
   }) {
-    if (!movement.quantity.isFinite) return false;
+    if (!availableStock.isFinite ||
+        !movement.quantity.isFinite ||
+        !movement.unitPrice.isFinite ||
+        movement.unitPrice < 0) {
+      return false;
+    }
     if (movement.type != StockMovementType.adjustment &&
         movement.quantity < 0) {
       return false;
@@ -106,6 +111,16 @@ class StockService with ChangeNotifier {
     }
     final stockDelta = movement.stockDelta;
     return stockDelta >= 0 || availableStock + stockDelta >= -0.000001;
+  }
+
+  static double stockAdjustmentDelta({
+    required double currentStock,
+    required double targetStock,
+  }) {
+    if (!currentStock.isFinite || !targetStock.isFinite || targetStock < 0) {
+      throw ArgumentError('Stock values must be finite and target stock non-negative.');
+    }
+    return targetStock - currentStock;
   }
 
   static bool canSellQuantity({
@@ -165,7 +180,9 @@ class StockService with ChangeNotifier {
     bool deleteTransaction = false,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      throw StateError('Sign in to sync transaction stock movements.');
+    }
 
     final userDoc =
         FirebaseFirestore.instance.collection('users').doc(user.uid);
@@ -262,7 +279,60 @@ class StockService with ChangeNotifier {
     for (final movement in desired.values) {
       batch.set(movementsRef.doc(movement.id), movement.toMap());
     }
-    if (oldById.isNotEmpty || desired.isNotEmpty) await batch.commit();
+    if (oldById.isNotEmpty || desired.isNotEmpty) {
+      await batch.commit();
+      final impactedItemIds = <String>{
+        ...desired.values.map((movement) => movement.stockItemId),
+        ...oldById.values.map(
+          (document) => (document.data() as Map<String, dynamic>)['stockItemId']
+              ?.toString() ?? '',
+        ),
+      }..remove('');
+      for (final itemId in impactedItemIds) {
+        await _refreshPublicAvailability(user.uid, itemId);
+      }
+    }
+  }
+
+  static Future<void> _refreshPublicAvailability(
+    String userId,
+    String itemId,
+  ) async {
+    final firestore = FirebaseFirestore.instance;
+    final userDoc = firestore.collection('users').doc(userId);
+    final stockDoc = await userDoc.collection('stock_items').doc(itemId).get();
+    if (!stockDoc.exists) return;
+    final shopItemRef =
+        firestore.collection('public_shops').doc(userId).collection('items').doc(itemId);
+    final publicItem = await shopItemRef.get();
+    if (!publicItem.exists) return;
+
+    final stockData = stockDoc.data()!;
+    if (stockData['trackStock'] == false) {
+      await shopItemRef.update({
+        'availableQuantity': null,
+        'isAvailable': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return;
+    }
+
+    final movements = await userDoc
+        .collection('stock_movements')
+        .where('stockItemId', isEqualTo: itemId)
+        .get();
+    var available = (stockData['initialQuantity'] as num?)?.toDouble() ?? 0;
+    for (final document in movements.docs) {
+      final movement = StockMovement.fromMap(document.data());
+      if (movement.reason != 'Initial Opening Stock') {
+        available += movement.stockDelta;
+      }
+    }
+    await shopItemRef.update({
+      'availableQuantity': available,
+      'isAvailable': available > 0,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   /// 📊 Calculate Weighted Average Purchase Cost
@@ -323,6 +393,11 @@ class StockService with ChangeNotifier {
     }
 
     await batch.commit();
+    await _syncPublicItem(
+      user.uid,
+      item,
+      availableStock: item.trackStock ? item.initialQuantity : null,
+    );
     notifyListeners();
   }
 
@@ -331,6 +406,8 @@ class StockService with ChangeNotifier {
     final user = _auth.currentUser;
     if (user == null) throw StateError('Sign in to update this stock item.');
 
+    final availableStock =
+        item.trackStock ? calculateCurrentStock(item.id) : null;
     await _firestore
         .collection('users')
         .doc(user.uid)
@@ -338,22 +415,133 @@ class StockService with ChangeNotifier {
         .doc(item.id)
         .set(item.toMap(), SetOptions(merge: true));
 
+    await _syncPublicItem(user.uid, item, availableStock: availableStock);
     notifyListeners();
   }
 
   /// 🗑️ Delete Stock Item
   Future<void> deleteStockItem(String itemId) async {
+    await archiveStockItem(itemId);
+  }
+
+  Future<void> archiveStockItem(String itemId) async {
     final user = _auth.currentUser;
-    if (user == null) throw StateError('Sign in to delete this stock item.');
+    if (user == null) throw StateError('Sign in to archive this stock item.');
+    final item = _items.where((candidate) => candidate.id == itemId).firstOrNull;
+    if (item == null) throw StateError('Stock item $itemId is unavailable.');
 
     await _firestore
         .collection('users')
         .doc(user.uid)
         .collection('stock_items')
         .doc(itemId)
-        .delete();
-
+        .set(
+          item.copyWith(isArchived: true, updatedAt: DateTime.now()).toMap(),
+          SetOptions(merge: true),
+        );
+    await _syncPublicItem(user.uid, item.copyWith(isArchived: true));
     notifyListeners();
+  }
+
+  Future<void> _syncPublicItem(
+    String userId,
+    StockItem item, {
+    double? availableStock,
+  }) async {
+    final shopRef = _firestore.collection('public_shops').doc(userId);
+    final shop = await shopRef.get();
+    if (!shop.exists) return;
+
+    final itemRef = shopRef.collection('items').doc(item.id);
+    final previous = await itemRef.get();
+    if (item.isArchived) {
+      if (previous.exists) {
+        await itemRef.delete();
+        await shopRef.update({'itemCount': FieldValue.increment(-1)});
+      }
+      return;
+    }
+
+    await itemRef.set({
+      'id': item.id,
+      'name': item.name,
+      'nameUrdu': item.nameUrdu,
+      'description': item.description,
+      'rate': item.sellingPrice,
+      'oldRate': item.mrp > item.sellingPrice ? item.mrp : null,
+      'unit': item.unit,
+      'category': item.categoryName,
+      'imageUrl': item.imagePath ?? '',
+      'availableQuantity': availableStock,
+      'trackStock': item.trackStock,
+      'isAvailable': !item.trackStock || (availableStock ?? 0) > 0,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    if (!previous.exists) {
+      await shopRef.update({'itemCount': FieldValue.increment(1)});
+    }
+  }
+
+  Future<void> syncPublicCatalog() async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('Sign in to publish shop items.');
+    final shop = await _firestore.collection('public_shops').doc(user.uid).get();
+    if (!shop.exists) return;
+
+    final batch = _firestore.batch();
+    final publicItems = await shop.reference.collection('items').get();
+    final userDoc = _firestore.collection('users').doc(user.uid);
+    final stockSnapshot = await userDoc.collection('stock_items').get();
+    final movementSnapshot = await userDoc.collection('stock_movements').get();
+    final activeItems = stockSnapshot.docs
+        .map((doc) => StockItem.fromMap(doc.data()))
+        .where((item) => !item.isArchived)
+        .toList();
+    final movements = movementSnapshot.docs
+        .map((doc) => StockMovement.fromMap(doc.data()))
+        .toList();
+    final activeIds = activeItems.map((item) => item.id).toSet();
+    for (final doc in publicItems.docs) {
+      if (!activeIds.contains(doc.id)) batch.delete(doc.reference);
+    }
+
+    for (final item in activeItems) {
+      double? available;
+      if (item.trackStock) {
+        var currentAvailable = item.initialQuantity;
+        for (final movement in movements.where((m) => m.stockItemId == item.id)) {
+          if (movement.reason != 'Initial Opening Stock') {
+            currentAvailable += movement.stockDelta;
+          }
+        }
+        available = currentAvailable;
+      }
+      batch.set(
+        shop.reference.collection('items').doc(item.id),
+        {
+          'id': item.id,
+          'name': item.name,
+          'nameUrdu': item.nameUrdu,
+          'description': item.description,
+          'rate': item.sellingPrice,
+          'oldRate': item.mrp > item.sellingPrice ? item.mrp : null,
+          'unit': item.unit,
+          'category': item.categoryName,
+          'imageUrl': item.imagePath ?? '',
+          'availableQuantity': available,
+          'trackStock': item.trackStock,
+          'isAvailable': !item.trackStock || (available ?? 0) > 0,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    }
+    batch.set(
+      shop.reference,
+      {'itemCount': activeItems.length},
+      SetOptions(merge: true),
+    );
+    await batch.commit();
   }
 
   Future<String> uploadStockImage(File image, String itemId) async {
@@ -391,6 +579,9 @@ class StockService with ChangeNotifier {
         throw StateError('Stock item ${movement.stockItemId} is unavailable.');
       }
       final item = matchingItems.first;
+      if (item.isArchived) {
+        throw StateError('${item.name} is archived.');
+      }
       if (!item.trackStock) {
         throw StateError('${item.name} is configured not to track stock.');
       }
@@ -428,6 +619,10 @@ class StockService with ChangeNotifier {
     await batch.commit();
 
     _movements = [...movements, ..._movements];
+    final changedItemIds = movements.map((movement) => movement.stockItemId).toSet();
+    for (final itemId in changedItemIds) {
+      await _refreshPublicAvailability(user.uid, itemId);
+    }
     notifyListeners();
   }
 
@@ -439,7 +634,7 @@ class StockService with ChangeNotifier {
     int outOfStockCount = 0;
 
     for (var item in _items) {
-      if (!item.trackStock) continue;
+      if (item.isArchived || !item.trackStock) continue;
       final qty = calculateCurrentStock(item.id);
       final avgCost = calculateWeightedAverageCost(item.id);
 
@@ -454,7 +649,7 @@ class StockService with ChangeNotifier {
     }
 
     return {
-      'totalItems': _items.length,
+      'totalItems': _items.where((item) => !item.isArchived).length,
       'totalPurchaseValue': totalPurchaseValue,
       'totalSalesPotentialValue': totalSalesPotentialValue,
       'expectedProfit': totalSalesPotentialValue - totalPurchaseValue,

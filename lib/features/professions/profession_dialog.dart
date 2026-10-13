@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
@@ -93,7 +94,7 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            UrduAwareText(
               widget.isUrdu ? 'تفصیلات درج کریں' : 'Enter Details',
               style: TextStyle(
                 fontSize: 18,
@@ -124,7 +125,7 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
 
             const SizedBox(height: 24),
 
-            Text(
+            UrduAwareText(
               widget.isUrdu
                   ? 'پیشہ کا شعبہ منتخب کریں'
                   : 'Select a Profession Category',
@@ -240,7 +241,7 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
+                  child: UrduAwareText(
                     isUrdu ? group.nameUrdu : group.name,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,

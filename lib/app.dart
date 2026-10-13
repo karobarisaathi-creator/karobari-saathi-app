@@ -12,6 +12,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'l10n/app_localizations.dart';
 
 // Models
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/category_model.dart';
@@ -235,7 +236,7 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
             children: [
               CircularProgressIndicator(),
               SizedBox(height: 20),
-              Text('ایپ لوڈ ہو رہی ہے...'),
+              UrduAwareText('ایپ لوڈ ہو رہی ہے...'),
             ],
           ),
         ),

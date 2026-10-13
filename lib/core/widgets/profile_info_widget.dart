@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
@@ -270,7 +271,7 @@ class ProfileInfoWidget extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Flexible(
-              child: Text(
+              child: UrduAwareText(
                 displayName,
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -285,7 +286,7 @@ class ProfileInfoWidget extends StatelessWidget {
         ),
         if (displayCategory.isNotEmpty) ...[
           SizedBox(height: verticalSpacing),
-          Text(
+          UrduAwareText(
             displayCategory,
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -298,7 +299,7 @@ class ProfileInfoWidget extends StatelessWidget {
         ],
         if (phone.isNotEmpty) ...[
           SizedBox(height: verticalSpacing),
-          Text(
+          UrduAwareText(
             phone,
             style: TextStyle(
               fontSize: 13,
@@ -349,7 +350,7 @@ class ProfileInfoWidget extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (topLabel != null && topLabel!.isNotEmpty)
-                    Text(
+                    UrduAwareText(
                       topLabel!,
                       style: TextStyle(
                         fontSize: 12,
@@ -366,7 +367,7 @@ class ProfileInfoWidget extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Flexible(
-                              child: Text(
+                              child: UrduAwareText(
                                 displayName,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -395,7 +396,7 @@ class ProfileInfoWidget extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Flexible(
-                      child: Text(
+                      child: UrduAwareText(
                         displayCategory,
                         style: TextStyle(
                           fontSize: 14,
@@ -417,7 +418,7 @@ class ProfileInfoWidget extends StatelessWidget {
               ],
               if (phone.isNotEmpty) ...[
                 SizedBox(height: verticalSpacing),
-                Text(
+                UrduAwareText(
                   Formatters.formatPhoneNumber(phone),
                   style: TextStyle(
                     fontSize: 13,
@@ -428,7 +429,7 @@ class ProfileInfoWidget extends StatelessWidget {
               ],
               if (address != null && address!.isNotEmpty) ...[
                 SizedBox(height: verticalSpacing),
-                Text(
+                UrduAwareText(
                   address!,
                   style: TextStyle(
                     fontSize: 13,
@@ -443,7 +444,7 @@ class ProfileInfoWidget extends StatelessWidget {
               ],
               if (showDate && date != null) ...[
                 SizedBox(height: verticalSpacing),
-                Text(
+                UrduAwareText(
                   Formatters.formatDate(date!),
                   style: TextStyle(
                     fontSize: 12,
@@ -464,7 +465,7 @@ class ProfileInfoWidget extends StatelessWidget {
                     color: reputationBgColor ?? AppTheme.themeColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(
+                  child: UrduAwareText(
                     reputationLabel!,
                     style: TextStyle(
                       fontSize: 10,

@@ -122,3 +122,17 @@ This document provides a detailed overview of each screen and its functionality 
     *   **زمرہ سیٹنگز:** اوپر سیٹنگز (Gear) بٹن سے اپنی مرضی کے زمرے بنائیں (مثلاً: بیج، ڈیزل، مزدوری) جو ہر نئے سیزن میں کام آئیں گے۔
 
 ---
+
+## 11. Shopkeeper & Stock (دکاندار اور اسٹاک)
+* **English:**
+    * Record stock-in, stock-out, returns, and stocktakes. For a stocktake, enter the **counted total quantity**; the app records the signed difference.
+    * Opening stock is fixed after item creation. Use a stocktake adjustment to correct inventory without rewriting its opening balance.
+    * Archived items are removed from new bills while their movement history and analytics remain available.
+    * Quick Bill reports a stock-sync failure after saving and offers a retry. A return entry changes stock only; record any customer or supplier balance adjustment separately.
+* **اردو:**
+    * اسٹاک کی آمد، فروخت، واپسی اور گنتی درج کریں۔ اسٹاک گنتے وقت **کل گنی ہوئی مقدار** لکھیں؛ ایپ فرق کو خود ریکارڈ کرے گی۔
+    * آئٹم بنانے کے بعد ابتدائی اسٹاک مقرر رہتا ہے۔ موجودہ مقدار درست کرنے کے لیے اسٹاک گنتی/ایڈجسٹمنٹ استعمال کریں۔
+    * آرکائیو آئٹم نئے بلوں سے ہٹ جاتی ہے، مگر اس کی پرانی ہسٹری اور رپورٹ برقرار رہتی ہے۔
+    * Quick Bill میں اسٹاک سنک ناکام ہو تو ایپ دوبارہ کوشش دیتی ہے۔ واپسی صرف اسٹاک بدلتی ہے؛ گاہک یا سپلائر کے کھاتے کی تبدیلی الگ درج کریں۔
+
+---

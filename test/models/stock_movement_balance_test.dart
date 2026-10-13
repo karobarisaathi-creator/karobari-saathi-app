@@ -103,5 +103,20 @@ void main() {
         isFalse,
       );
     });
+
+    test('stocktake adjustment converts counted stock to a signed delta', () {
+      expect(
+        StockService.stockAdjustmentDelta(currentStock: 10, targetStock: 8),
+        -2,
+      );
+      expect(
+        StockService.stockAdjustmentDelta(currentStock: 10, targetStock: 0),
+        -10,
+      );
+      expect(
+        StockService.stockAdjustmentDelta(currentStock: 8, targetStock: 10),
+        2,
+      );
+    });
   });
 }

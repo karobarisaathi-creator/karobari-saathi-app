@@ -3,6 +3,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 
 class InAppNotificationBanner {
@@ -103,7 +104,7 @@ class InAppNotificationBanner {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
+                              UrduAwareText(
                                 senderName,
                                 style: const TextStyle(
                                   color: Colors.white70,
@@ -111,7 +112,7 @@ class InAppNotificationBanner {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              const Text(
+                              const UrduAwareText(
                                 'Just now',
                                 style: TextStyle(
                                   color: Colors.white54,
@@ -121,7 +122,7 @@ class InAppNotificationBanner {
                             ],
                           ),
                           const SizedBox(height: 2),
-                          Text(
+                          UrduAwareText(
                             title,
                             style: const TextStyle(
                               color: Colors.white,
@@ -132,7 +133,7 @@ class InAppNotificationBanner {
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 2),
-                          Text(
+                          UrduAwareText(
                             message,
                             style: const TextStyle(
                               color: Colors.white60,

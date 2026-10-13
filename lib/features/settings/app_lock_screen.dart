@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Import for SystemChannels
 import 'package:provider/provider.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/security_service.dart';
 
@@ -172,7 +173,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
                                       size: 80, color: Colors.white24),
                             ),
                             const SizedBox(height: 40),
-                            Text(
+                            UrduAwareText(
                               isUrdu ? 'کاروباری ساتھی' : 'Karobari Sathi',
                               style: const TextStyle(
                                 fontSize: 32,
@@ -183,7 +184,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
                               ),
                             ),
                             const SizedBox(height: 20),
-                            Text(
+                            UrduAwareText(
                               _getStatusText(isUrdu),
                               style: TextStyle(
                                 fontSize: 16,
@@ -233,7 +234,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
                             ),
                             const SizedBox(height: 20),
                             if (_isError)
-                              Text(
+                              UrduAwareText(
                                 _getErrorText(isUrdu),
                                 style: TextStyle(
                                   color: Colors.redAccent,
@@ -262,7 +263,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
                                 _newPinCache == null)
                               TextButton(
                                 onPressed: () => Navigator.pop(context),
-                                child: Text(
+                                child: UrduAwareText(
                                   isUrdu ? 'بعد میں' : 'Later',
                                   style: TextStyle(
                                     color: Colors.white70,

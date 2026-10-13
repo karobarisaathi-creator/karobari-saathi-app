@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/models/account_model.dart';
@@ -215,9 +216,9 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(isUrdu ? 'ریٹ ہسٹری صاف کریں؟' : 'Clear rate history?',
+        title: UrduAwareText(isUrdu ? 'ریٹ ہسٹری صاف کریں؟' : 'Clear rate history?',
             style: TextStyle(fontFamily: fontFamily)),
-        content: Text(
+        content: UrduAwareText(
           isUrdu
               ? 'صرف ریٹ ہسٹری صاف ہوگی، کھاتے کی transaction محفوظ رہے گی۔'
               : 'Only rate history will be cleared. The account transaction will remain.',
@@ -226,11 +227,11 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(isUrdu ? 'منسوخ' : 'Cancel'),
+            child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(isUrdu ? 'صاف کریں' : 'Clear',
+            child: UrduAwareText(isUrdu ? 'صاف کریں' : 'Clear',
                 style: TextStyle(color: AppTheme.expenseColor)),
           ),
         ],
@@ -318,7 +319,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
                       if (_itemHistory.isEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 30),
-                          child: Text(
+                          child: UrduAwareText(
                             isUrdu ? 'کوئی آئٹم نہیں ملا' : 'No items found',
                             style: TextStyle(
                               fontFamily: fontFamily,
@@ -366,7 +367,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
                   onPressed: () => Navigator.pop(context),
                 ),
                 Expanded(
-                  child: Text(
+                  child: UrduAwareText(
                     isUrdu ? 'تجزیہ و ریکارڈ' : 'Analysis & History',
                     textAlign: TextAlign.center,
                     style: TextStyle(
@@ -401,7 +402,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
+                    UrduAwareText(
                       widget.party.balance < 0
                           ? (isUrdu ? 'دینے ہیں' : 'Payable')
                           : (isUrdu ? 'لینے ہیں' : 'Receivable'),
@@ -415,7 +416,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Text(
+                    UrduAwareText(
                       'Rs ${widget.party.balance.abs().toStringAsFixed(0)}',
                       style: TextStyle(
                         fontSize: 12.5,
@@ -459,12 +460,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
                   isUrdu ? 'یاد دہانی' : 'Remind',
                   fontFamily,
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => BalanceAlertScreen(party: widget.party),
-                      ),
-                    );
+                    BalanceAlertDialog.show(context, party: widget.party);
                   },
                 ),
                 const SizedBox(width: 10),
@@ -515,7 +511,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
             children: [
               Icon(icon, color: Colors.white, size: 18),
               const SizedBox(height: 4),
-              Text(
+              UrduAwareText(
                 label,
                 style: TextStyle(
                   fontFamily: fontFamily,
@@ -585,7 +581,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
         ),
         child: Column(
           children: [
-            Text(
+            UrduAwareText(
               value,
               style: TextStyle(
                 fontFamily: fontFamily,
@@ -595,7 +591,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
               ),
             ),
             const SizedBox(height: 4),
-            Text(
+            UrduAwareText(
               label,
               style: TextStyle(
                 fontFamily: fontFamily,
@@ -625,7 +621,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
           Icon(PhosphorIcons.listChecks(),
               color: const Color(0xFF2563EB), size: 20),
           const SizedBox(width: 10),
-          Text(
+          UrduAwareText(
             isUrdu
                 ? 'سارے $_totalDeals اندراج دیکھیں'
                 : 'View all $_totalDeals entries',
@@ -674,7 +670,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
                       : [],
                 ),
                 alignment: Alignment.center,
-                child: Text(
+                child: UrduAwareText(
                   isUrdu ? 'آئٹمز اور ریٹ' : 'Items & Rates',
                   style: TextStyle(
                     fontFamily: fontFamily,
@@ -707,7 +703,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
                       : [],
                 ),
                 alignment: Alignment.center,
-                child: Text(
+                child: UrduAwareText(
                   isUrdu ? 'ذاتی جائزہ' : 'Personal Review',
                   style: TextStyle(
                     fontFamily: fontFamily,
@@ -737,7 +733,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
         _buildSubFilterChip(
             'chg', isUrdu ? 'ریٹ بدلا' : 'Rate Changed', fontFamily),
         const Spacer(),
-        Text(
+        UrduAwareText(
           isUrdu ? 'ٹچ کریں، پوری ہسٹری کھلے گی' : 'Tap to open full history',
           style: TextStyle(
             fontFamily: fontFamily,
@@ -763,7 +759,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
             color: isActive ? const Color(0xFF0F2A40) : const Color(0xFFCBD5E1),
           ),
         ),
-        child: Text(
+        child: UrduAwareText(
           label,
           style: TextStyle(
             fontFamily: fontFamily,
@@ -847,7 +843,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        UrduAwareText(
                           itemName,
                           style: TextStyle(
                             fontFamily: fontFamily,
@@ -857,7 +853,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
                           ),
                         ),
                         const SizedBox(height: 2),
-                        Text(
+                        UrduAwareText(
                           isUrdu
                               ? 'کل ${totalPurchases * 10} ڈبے • $totalPurchases خریداریاں'
                               : 'Total ${totalPurchases * 10} boxes • $totalPurchases purchases',
@@ -873,7 +869,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
+                      UrduAwareText(
                         'Rs ${latestPrice.toStringAsFixed(0)}',
                         style: const TextStyle(
                           fontSize: 17,
@@ -882,7 +878,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Text(
+                      UrduAwareText(
                         isUrdu ? 'آخری ریٹ، فی ڈبہ' : 'Last rate, per unit',
                         style: TextStyle(
                           fontFamily: fontFamily,
@@ -909,7 +905,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
               ),
               child: Row(
                 children: [
-                  Text(
+                  UrduAwareText(
                     isUrdu ? 'کل رقم' : 'Total amount',
                     style: TextStyle(
                       fontFamily: fontFamily,
@@ -918,7 +914,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Text(
+                  UrduAwareText(
                     'Rs ${totalAmount.toStringAsFixed(0)}',
                     style: const TextStyle(
                       fontSize: 13,
@@ -935,7 +931,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
                         color: badgeColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
+                      child: UrduAwareText(
                         '${latest.changePercentage!.abs().toStringAsFixed(1)}% ${isDecrease ? "↓" : "↑"}',
                         style: TextStyle(
                           fontSize: 11,
@@ -973,7 +969,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
         children: [
           Row(
             children: [
-              Text(
+              UrduAwareText(
                 isUrdu ? 'ذاتی جائزہ' : 'Personal Review',
                 style: TextStyle(
                   fontFamily: fontFamily,
@@ -994,7 +990,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
                   children: [
                     Icon(Icons.lock, size: 12, color: AppTheme.expenseColor),
                     const SizedBox(width: 4),
-                    Text(
+                    UrduAwareText(
                       isUrdu ? 'صرف آپ' : 'Only you',
                       style: TextStyle(
                         fontFamily: fontFamily,
@@ -1013,7 +1009,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
             children: [
               _buildStarRow(_trustScore, 20),
               const SizedBox(width: 10),
-              Text(
+              UrduAwareText(
                 isUrdu ? 'آخری 12 مہینے' : 'Last 12 months',
                 style: TextStyle(
                   fontFamily: fontFamily,
@@ -1042,7 +1038,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
               4,
               fontFamily),
           const SizedBox(height: 10),
-          Text(
+          UrduAwareText(
             isUrdu
                 ? 'یہ آپ کے اپنے حساب پر ایک اندازہ ہے۔ پارٹی کو نظر نہیں آتا۔'
                 : 'This is your private estimate. Not visible to the party.',
@@ -1067,7 +1063,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                UrduAwareText(
                   title,
                   style: TextStyle(
                     fontFamily: fontFamily,
@@ -1076,7 +1072,7 @@ class _PartyHistoryScreenState extends State<PartyHistoryScreen>
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
+                UrduAwareText(
                   sub,
                   style: TextStyle(
                     fontFamily: fontFamily,
@@ -1189,7 +1185,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
           backgroundColor: const Color(0xFF0F2A40),
           elevation: 0,
           centerTitle: true,
-          title: Text(
+          title: UrduAwareText(
             itemName,
             style: TextStyle(
               fontFamily: fontFamily,
@@ -1262,7 +1258,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      UrduAwareText(
                         isUrdu ? 'ریٹ کا سفر' : 'Rate Journey',
                         style: TextStyle(
                           fontFamily: fontFamily,
@@ -1289,14 +1285,14 @@ class ItemHistoryDetailScreen extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
+                          UrduAwareText(
                             DateFormat('dd/MM/yy').format(history.last.date),
                             style: const TextStyle(
                               fontSize: 11,
                               color: Color(0xFF94A3B8),
                             ),
                           ),
-                          Text(
+                          UrduAwareText(
                             DateFormat('dd/MM/yy').format(history.first.date),
                             style: const TextStyle(
                               fontSize: 11,
@@ -1322,7 +1318,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    UrduAwareText(
                       isUrdu ? 'ہر خریداری' : 'Per Purchase',
                       style: TextStyle(
                         fontFamily: fontFamily,
@@ -1412,7 +1408,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Text(
+            UrduAwareText(
               value,
               style: TextStyle(
                 fontSize: 17,
@@ -1421,7 +1417,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
+            UrduAwareText(
               label,
               style: TextStyle(
                 fontFamily: fontFamily,
@@ -1460,7 +1456,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
         children: [
           const Icon(Icons.chevron_left, color: Color(0xFF94A3B8), size: 18),
           const SizedBox(width: 6),
-          Text(
+          UrduAwareText(
             'Rs ${(h.price * 10).toStringAsFixed(0)}',
             style: const TextStyle(
               fontSize: 15,
@@ -1476,7 +1472,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
                 color: badgeColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
+              child: UrduAwareText(
                 '${change.abs().toStringAsFixed(1)}% ${isDecrease ? "↓" : "↑"}',
                 style: TextStyle(
                   fontSize: 11,
@@ -1492,7 +1488,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
                 color: const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
+              child: UrduAwareText(
                 isFirst
                     ? (isUrdu ? 'پہلی بار' : 'First time')
                     : (isUrdu ? 'ریٹ وہی' : 'Same rate'),
@@ -1508,7 +1504,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
+              UrduAwareText(
                 DateFormat('dd/MM/yy').format(h.date),
                 style: const TextStyle(
                   fontSize: 13,
@@ -1517,7 +1513,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 2),
-              Text(
+              UrduAwareText(
                 '10 ${isUrdu ? 'ڈبہ' : 'Box'} × ${h.price.toStringAsFixed(0)}',
                 style: const TextStyle(
                   fontSize: 11,
@@ -1547,7 +1543,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFCBD5E1)),
         ),
-        child: Text(
+        child: UrduAwareText(
           label,
           style: TextStyle(
             fontFamily: fontFamily,
@@ -1565,7 +1561,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(isUrdu ? 'آئٹم کا نام بدلیں' : 'Rename Item',
+        title: UrduAwareText(isUrdu ? 'آئٹم کا نام بدلیں' : 'Rename Item',
             style: TextStyle(fontFamily: fontFamily)),
         content: TextField(
           controller: controller,
@@ -1577,7 +1573,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: Text(isUrdu ? 'منسوخ' : 'Cancel'),
+            child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel'),
           ),
           AppButton(
             text: isUrdu ? 'محفوظ کریں' : 'Save',
@@ -1598,7 +1594,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
-          title: Text(isUrdu ? 'اکائی بدلیں' : 'Change Unit',
+          title: UrduAwareText(isUrdu ? 'اکائی بدلیں' : 'Change Unit',
               style: TextStyle(fontFamily: fontFamily)),
           content: Wrap(
             spacing: 8,
@@ -1606,7 +1602,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
             children: units.map((u) {
               final isSelected = u == selectedUnit;
               return ChoiceChip(
-                label: Text(u, style: TextStyle(fontFamily: fontFamily)),
+                label: UrduAwareText(u, style: TextStyle(fontFamily: fontFamily)),
                 selected: isSelected,
                 selectedColor: AppTheme.themeColor,
                 labelStyle: TextStyle(
@@ -1618,7 +1614,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: Text(isUrdu ? 'منسوخ' : 'Cancel'),
+              child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel'),
             ),
             AppButton(
               text: isUrdu ? 'محفوظ کریں' : 'Save',
@@ -1637,9 +1633,9 @@ class ItemHistoryDetailScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(isUrdu ? 'دوسرے آئٹم میں ملا دیں' : 'Merge Item',
+        title: UrduAwareText(isUrdu ? 'دوسرے آئٹم میں ملا دیں' : 'Merge Item',
             style: TextStyle(fontFamily: fontFamily)),
-        content: Text(
+        content: UrduAwareText(
           isUrdu
               ? 'کیا آپ واقعی "$itemName" کے تمام اندراجات کو کسی دوسرے آئٹم میں ضم کرنا چاہتے ہیں؟'
               : 'Do you want to merge all entries of "$itemName" into another item?',
@@ -1648,7 +1644,7 @@ class ItemHistoryDetailScreen extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: Text(isUrdu ? 'منسوخ' : 'Cancel'),
+            child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel'),
           ),
           AppButton(
             text: isUrdu ? 'ضم کریں' : 'Merge',

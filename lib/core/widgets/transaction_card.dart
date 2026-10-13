@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/utils/receipt_helper.dart';
 import 'package:account_app/core/services/language_service.dart';
@@ -46,7 +47,7 @@ class TransactionCard extends StatelessWidget {
             size: 20,
           ),
         ),
-        title: Text(
+        title: UrduAwareText(
           transaction.description,
           style: TextStyle(
             fontFamily: fontFamily,
@@ -56,12 +57,12 @@ class TransactionCard extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            UrduAwareText(
               '${transaction.date.day}/${transaction.date.month}/${transaction.date.year}',
               style: const TextStyle(fontFamily: '', fontWeight: FontWeight.bold),
             ),
             if (transaction.professionName != null)
-              Text(
+              UrduAwareText(
                 transaction.professionName!,
                 style: TextStyle(
                   fontSize: 12,
@@ -76,7 +77,7 @@ class TransactionCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
+            UrduAwareText(
               'Rs. ${transaction.amount.toStringAsFixed(0)}',
               style: TextStyle(
                 color: color,

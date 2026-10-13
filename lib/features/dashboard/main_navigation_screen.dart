@@ -6,12 +6,14 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_drawer.dart';
 import 'package:account_app/features/dashboard/dashboard_screen.dart';
 import 'package:account_app/features/notifications/notifications_screen.dart';
+import 'package:account_app/features/order/nearby_shops_screen.dart';
 import 'package:account_app/features/professions/professions_screen.dart';
 import 'package:account_app/features/quick_bill/quick_bill_item_selection_screen.dart';
 import 'package:account_app/features/shopkeeper/shopkeeper_dashboard_screen.dart';
@@ -87,6 +89,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       : [
           DashboardScreen(),
           ProfessionsScreen(),
+          const OrderSelectionScreen(),
           const NotificationsScreen(),
         ];
 
@@ -132,7 +135,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   // ═════════════════════════════════════════════════════════
-  // Simple Profile Nav Bar (3 Items)
+  // Simple Profile Nav Bar (4 Items with Center Pill)
   // ═════════════════════════════════════════════════════════
   Widget _buildSimpleNavBar(bool isUrdu, String? fontFamily) {
     return Row(
@@ -140,6 +143,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       children: [
         // ═══ Parties / Accounts (Tab 0) ═══
         Expanded(
+          flex: 2,
           child: _buildNavItem(
             index: 0,
             icon: PhosphorIcons.users(),
@@ -149,6 +153,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
         // ═══ Professions / Projects (Tab 1) ═══
         Expanded(
+          flex: 2,
           child: _buildNavItem(
             index: 1,
             icon: PhosphorIcons.briefcase(),
@@ -156,9 +161,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           ),
         ),
 
-        // ═══ Notifications (Tab 2) ═══
+        // ═══ Order Selection (Center Pill) (Tab 2) ═══
         Expanded(
-          child: _buildNotificationItem(index: 2),
+          flex: 5,
+          child: _buildOrderPill(isUrdu, fontFamily),
+        ),
+
+        // ═══ Notifications (Tab 3) ═══
+        Expanded(
+          flex: 2,
+          child: _buildNotificationItem(index: 3),
         ),
       ],
     );
@@ -286,8 +298,70 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ),
                 const SizedBox(width: 8),
                 Flexible(
-                  child: Text(
+                  child: UrduAwareText(
                     isUrdu ? 'فوری بل' : 'Bill',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      fontFamily: fontFamily,
+                      letterSpacing: 0.2,
+                      height: 1.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ═════════════════════════════════════════════════════════
+  // Nearby Shops Center Pill (Simple Profile)
+  // ═════════════════════════════════════════════════════════
+  Widget _buildOrderPill(bool isUrdu, String? fontFamily) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => onItemTapped(2),
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          height: 66,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppTheme.themeColor,
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.themeColor.withValues(alpha: 0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 18,
+              vertical: 12,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.storefront_rounded,
+                  size: 18,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: UrduAwareText(
+                    isUrdu ? 'دکاندار' : 'Shops',
                     style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w900,
@@ -354,7 +428,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                             width: 1.5,
                           ),
                         ),
-                        child: Text(
+                        child: UrduAwareText(
                           notifService.unreadCount > 99
                               ? '99+'
                               : '${notifService.unreadCount}',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:account_app/core/services/language_service.dart';
@@ -76,7 +77,7 @@ class AppButton extends StatelessWidget {
             const SizedBox(width: 6), // Slightly reduced from 8
           ],
           Flexible(
-            child: Text(
+            child: UrduAwareText(
               text,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

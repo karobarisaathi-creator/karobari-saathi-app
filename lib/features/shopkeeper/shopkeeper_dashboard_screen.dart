@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/stock_movement_model.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/stock_service.dart';
@@ -11,8 +12,7 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/widgets/stock_card.dart';
-import 'package:account_app/features/accounts/reports_screen.dart';
-import 'package:account_app/features/quick_bill/quick_bill_item_selection_screen.dart';
+import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/features/settings/master_profile_screen.dart';
 import 'package:account_app/features/shopkeeper/low_stock_items_screen.dart';
 import 'package:account_app/features/shopkeeper/stock_history_screen.dart';
@@ -20,27 +20,8 @@ import 'package:account_app/features/shopkeeper/add_edit_stock_item_screen.dart'
 import 'package:account_app/features/shopkeeper/sales_analytics_screen.dart';
 import 'package:account_app/features/shopkeeper/stock_detail_screen.dart';
 import 'package:account_app/features/shopkeeper/stock_adjustment_dialog.dart';
-
-// ═══════════════════════════════════════════
-// COLORS
-// ═══════════════════════════════════════════
-class ShopkeeperColors {
-  static const theme = Color(0xFF1D6ED6);
-  static const themeDark = Color(0xFF1557A8);
-  static const dark = Color(0xFF123248);
-  static const darkHeader = Color(0xFF0F2A40);
-  static const income = Color(0xFF515D11);
-  static const expense = Color(0xFFC83120);
-  static const warning = Color(0xFFD97706);
-  static const warningLight = Color(0xFFFBBF24);
-  static const purple = Color(0xFF8B5CF6);
-  static const purpleLight = Color(0xFFA78BFA);
-  static const textSecondary = Color(0xFF757575);
-  static const bg = Color(0xFFE8EAF0);
-  static const gray100 = Color(0xFFEEF1F5);
-  static const gray200 = Color(0xFFE1E5EC);
-  static const gray400 = Color(0xFFB0B8C1);
-}
+import 'package:account_app/features/shopkeeper/shop_settings_screen.dart';
+import 'package:account_app/features/order/shop_orders_screen.dart';
 
 // ═══════════════════════════════════════════
 // SHOPKEEPER DASHBOARD SCREEN
@@ -57,6 +38,8 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
   String _shopName = '';
   String _userName = '';
   String _address = '';
+  String? _bannerImageUrl;
+  String? _profileImageUrl;
 
   @override
   void initState() {
@@ -69,6 +52,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
     if (user != null) {
       setState(() {
         _userName = user.displayName ?? '';
+        _profileImageUrl = user.photoURL;
       });
       try {
         final doc = await FirebaseFirestore.instance
@@ -82,6 +66,10 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
             _userName =
                 (data?['displayName'] ?? user.displayName ?? '').toString();
             _address = (data?['businessAddress'] ?? '').toString();
+            _bannerImageUrl =
+                (data?['bannerImage'] ?? data?['bannerImageUrl'] ?? data?['bannerUrl'] ?? '').toString();
+            _profileImageUrl =
+                (data?['profileImage'] ?? data?['photoURL'] ?? user.photoURL ?? '').toString();
           });
         }
       } catch (_) {}
@@ -102,15 +90,48 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
         summary['totalSalesPotentialValue'] as double? ?? 0.0;
     final lowStockCount = summary['lowStockCount'] as int? ?? 0;
 
+    final appBarTitle = _shopName.isNotEmpty
+        ? _shopName
+        : (_userName.isNotEmpty
+            ? _userName
+            : (isUrdu ? 'شاپ کیپر ڈیش بورڈ' : 'Shopkeeper Dashboard'));
+
     return Directionality(
       textDirection: languageService.textDirection,
       child: Scaffold(
-        backgroundColor: ShopkeeperColors.bg,
+        backgroundColor: AppTheme.backgroundColor,
         appBar: CustomAppBar(
-          title: isUrdu ? 'شاپ کیپر ڈیش بورڈ' : 'Shopkeeper Dashboard',
-          backgroundColor: ShopkeeperColors.darkHeader,
+          title: appBarTitle,
+          backgroundColor: AppTheme.darkColor,
           elevation: 0,
+          shape: const RoundedRectangleBorder(),
           showBackButton: Navigator.canPop(context),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.receipt_long_rounded, color: Colors.white),
+              tooltip: isUrdu ? 'موصولہ آرڈرز' : 'Incoming Orders',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ShopOrdersScreen(),
+                  ),
+                );
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.tune_rounded, color: Colors.white),
+              tooltip: isUrdu ? 'شاپ سیٹنگز' : 'Shop Settings',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ShopSettingsScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
         body: Column(
           children: [
@@ -187,21 +208,18 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
         : (_userName.isNotEmpty
             ? _userName
             : (isUrdu ? 'کریانہ اسٹور' : 'My Store'));
-    final initial =
-        displayName.isNotEmpty ? displayName[0] : (isUrdu ? 'ش' : 'S');
     final locationText = _address.isNotEmpty
         ? _address
         : (isUrdu ? 'لاہور، پاکستان' : 'Pakistan');
 
     return Container(
       decoration: const BoxDecoration(
-        color: ShopkeeperColors.darkHeader,
+        color: AppTheme.darkColor,
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(15)),
       ),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Column(
         children: [
-          // Profile Strip
           GestureDetector(
             onTap: () {
               Navigator.push(
@@ -212,112 +230,112 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
               ).then((_) => _loadProfileInfo());
             },
             child: Container(
-              padding: const EdgeInsets.all(12),
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-              ),
-              child: Row(
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: ShopkeeperColors.theme,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          initial,
-                          style: TextStyle(
-                            fontFamily: fontFamily,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: -4,
-                        left: -4,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            isUrdu ? 'شاپ کیپر' : 'Shopkeeper',
-                            style: TextStyle(
-                              fontFamily: fontFamily,
-                              fontSize: 8,
-                              fontWeight: FontWeight.bold,
-                              color: ShopkeeperColors.theme,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          displayName,
-                          style: TextStyle(
-                            fontFamily: fontFamily,
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                ],
+              ),
+              child: Stack(
+                children: [
+                  // Banner Image Cover
+                  Positioned.fill(
+                    child: _bannerImageUrl != null &&
+                            _bannerImageUrl!.trim().isNotEmpty
+                        ? Image.network(
+                            _bannerImageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                _buildHeaderBannerFallback(),
+                          )
+                        : _buildHeaderBannerFallback(),
+                  ),
+
+                  // Dark overlay gradient for maximum text readability
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.5),
+                            Colors.black.withValues(alpha: 0.8),
+                          ],
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          locationText,
-                          style: TextStyle(
-                            fontFamily: fontFamily,
-                            fontSize: 11,
-                            fontWeight: fontWeight,
-                            color: Colors.white70,
+                      ),
+                    ),
+                  ),
+
+                  // Profile Card Info using ProfileInfoWidget
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ProfileInfoWidget(
+                            name: displayName,
+                            phone: locationText,
+                            profileImage: _profileImageUrl,
+                            isLarge: true,
+                            customSize: 48,
+                            borderRadius: 14,
+                            textColor: Colors.white,
+                            subtitleColor: Colors.white70,
                           ),
-                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.chevron_left_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  _switchRoleBtn(context, isUrdu, fontFamily),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 14),
-
           Row(
             children: [
               _statMini(
-                  'Rs ${purchaseVal.toStringAsFixed(0)}',
-                  isUrdu ? 'خرید مالیت' : 'Purchase Val',
-                  const Color(0xFFA3E635),
-                  fontFamily,
-                  isUrdu),
+                'Rs ${purchaseVal.toStringAsFixed(0)}',
+                isUrdu ? 'خرید مالیت' : 'Purchase Val',
+                const Color(0xFFA3E635),
+                fontFamily,
+                isUrdu,
+              ),
               const SizedBox(width: 8),
               _statMini(
-                  'Rs ${salesVal.toStringAsFixed(0)}',
-                  isUrdu ? 'فروخت مالیت' : 'Sales Val',
-                  const Color(0xFF93C5FD),
-                  fontFamily,
-                  isUrdu),
+                'Rs ${salesVal.toStringAsFixed(0)}',
+                isUrdu ? 'فروخت مالیت' : 'Sales Val',
+                const Color(0xFF93C5FD),
+                fontFamily,
+                isUrdu,
+              ),
               const SizedBox(width: 8),
-              _statMini('$lowStockCount', isUrdu ? 'کم اسٹاک' : 'Low Stock',
-                  const Color(0xFFFBBF24), fontFamily, isUrdu),
+              _statMini(
+                '$lowStockCount',
+                isUrdu ? 'کم اسٹاک' : 'Low Stock',
+                const Color(0xFFFBBF24),
+                fontFamily,
+                isUrdu,
+              ),
             ],
           ),
         ],
@@ -325,37 +343,15 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
     );
   }
 
-  Widget _switchRoleBtn(BuildContext context, bool isUrdu, String fontFamily) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const MasterProfileScreen(),
-          ),
-        ).then((_) => _loadProfileInfo());
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.refresh_rounded, color: Colors.white, size: 12),
-            const SizedBox(width: 5),
-            Text(
-              isUrdu ? 'بدلیں' : 'Switch',
-              style: TextStyle(
-                fontFamily: fontFamily,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
+  Widget _buildHeaderBannerFallback() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF1E293B),
+            Color(0xFF334155),
           ],
         ),
       ),
@@ -381,7 +377,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
           children: [
             FittedBox(
               fit: BoxFit.scaleDown,
-              child: Text(
+              child: UrduAwareText(
                 value,
                 style: const TextStyle(
                   fontSize: 14,
@@ -405,7 +401,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                 ),
                 const SizedBox(width: 4),
                 Flexible(
-                  child: Text(
+                  child: UrduAwareText(
                     label,
                     style: TextStyle(
                       fontFamily: fontFamily,
@@ -438,15 +434,15 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
       children: [
         Row(
           children: [
-            Icon(icon, size: 16, color: ShopkeeperColors.theme),
+            Icon(icon, size: 16, color: AppTheme.themeColor),
             const SizedBox(width: 8),
-            Text(
+            UrduAwareText(
               title,
               style: TextStyle(
                 fontFamily: fontFamily,
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: ShopkeeperColors.dark,
+                color: AppTheme.darkColor,
               ),
             ),
           ],
@@ -456,18 +452,18 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
             onTap: onActionTap,
             child: Row(
               children: [
-                Text(
+                UrduAwareText(
                   isUrdu ? 'سب دیکھیں' : 'View All',
                   style: TextStyle(
                     fontFamily: fontFamily,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: ShopkeeperColors.theme,
+                    color: AppTheme.themeColor,
                   ),
                 ),
                 const SizedBox(width: 4),
                 const Icon(Icons.chevron_left_rounded,
-                    size: 14, color: ShopkeeperColors.theme),
+                    size: 14, color: AppTheme.themeColor),
               ],
             ),
           ),
@@ -489,31 +485,10 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
               child: _quickActionCard(
                 isUrdu: isUrdu,
                 fontFamily: fontFamily,
-                title: isUrdu ? 'نیا بل' : 'New Sale',
-                sub: isUrdu ? 'فوری بل بنائیں' : 'Create a quick bill',
-                icon: Icons.receipt_long_rounded,
-                color1: ShopkeeperColors.warning,
-                color2: ShopkeeperColors.warningLight,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const QuickBillItemSelectionScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _quickActionCard(
-                isUrdu: isUrdu,
-                fontFamily: fontFamily,
                 title: isUrdu ? 'نیا آئٹم' : 'New Item',
                 sub: isUrdu ? 'نیا پروڈکٹ شامل کریں' : 'Add new stock product',
                 icon: Icons.add_circle_outline_rounded,
-                color1: ShopkeeperColors.purple,
-                color2: ShopkeeperColors.purpleLight,
+                color: AppTheme.purpleColor,
                 onTap: () {
                   Navigator.push(
                     context,
@@ -524,11 +499,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                 },
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
+            const SizedBox(width: 12),
             Expanded(
               child: _quickActionCard(
                 isUrdu: isUrdu,
@@ -538,8 +509,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                     ? 'تمام اسٹاک پراڈکٹس کی لسٹ'
                     : 'All inventory stock items',
                 icon: Icons.inventory_2_rounded,
-                color1: const Color(0xFF0EA5E9),
-                color2: const Color(0xFF38BDF8),
+                color: const Color(0xFF0EA5E9),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -550,7 +520,11 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                 },
               ),
             ),
-            const SizedBox(width: 12),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
             Expanded(
               child: _quickActionCard(
                 isUrdu: isUrdu,
@@ -560,8 +534,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                     ? 'لین دین اور آمدورفت ہسٹری'
                     : 'Stock movements history log',
                 icon: Icons.history_rounded,
-                color1: const Color(0xFF8B5CF6),
-                color2: const Color(0xFFA78BFA),
+                color: AppTheme.purpleColor,
                 onTap: () {
                   Navigator.push(
                     context,
@@ -572,11 +545,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                 },
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
+            const SizedBox(width: 12),
             Expanded(
               child: _quickActionCard(
                 isUrdu: isUrdu,
@@ -586,35 +555,12 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                     ? 'سیلز اور منافع کا تفصیلی تجزیہ'
                     : 'Sales, purchase & profit analytics',
                 icon: Icons.bar_chart_rounded,
-                color1: ShopkeeperColors.income,
-                color2: const Color(0xFF6B7A1F),
+                color: AppTheme.incomeColor,
                 onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => const SalesAnalyticsScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _quickActionCard(
-                isUrdu: isUrdu,
-                fontFamily: fontFamily,
-                title: isUrdu ? 'مالی رپورٹس' : 'Financial Reports',
-                sub: isUrdu
-                    ? 'مکمل کاروباری رپورٹس'
-                    : 'General financial reports',
-                icon: Icons.description_rounded,
-                color1: ShopkeeperColors.expense,
-                color2: const Color(0xFFE04B36),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ReportsScreen(),
                     ),
                   );
                 },
@@ -632,8 +578,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
     required String title,
     required String sub,
     required IconData icon,
-    required Color color1,
-    required Color color2,
+    required Color color,
     String? badge,
     VoidCallback? onTap,
   }) {
@@ -644,10 +589,9 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: color1.withValues(alpha: 0.3), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: ShopkeeperColors.dark.withValues(alpha: 0.04),
+              color: AppTheme.darkColor.withValues(alpha: 0.04),
               blurRadius: 3,
               offset: const Offset(0, 1),
             ),
@@ -663,7 +607,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: color1,
+                    color: color,
                     borderRadius: BorderRadius.circular(999),
                     boxShadow: [
                       BoxShadow(
@@ -673,7 +617,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                       ),
                     ],
                   ),
-                  child: Text(
+                  child: UrduAwareText(
                     badge,
                     style: TextStyle(
                       fontFamily: fontFamily,
@@ -691,11 +635,11 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [color1, color2]),
+                    color: color,
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
-                        color: color1.withValues(alpha: 0.3),
+                        color: color.withValues(alpha: 0.3),
                         blurRadius: 14,
                         offset: const Offset(0, 5),
                       ),
@@ -704,23 +648,23 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                   child: Icon(icon, color: Colors.white, size: 24),
                 ),
                 const SizedBox(height: 12),
-                Text(
+                UrduAwareText(
                   title,
                   style: TextStyle(
                     fontFamily: fontFamily,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: ShopkeeperColors.dark,
+                    color: AppTheme.darkColor,
                     height: 1.3,
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
+                UrduAwareText(
                   sub,
                   style: TextStyle(
                     fontFamily: fontFamily,
                     fontSize: 10.5,
-                    color: ShopkeeperColors.textSecondary,
+                    color: AppTheme.textSecondary,
                     height: 1.4,
                   ),
                   maxLines: 2,
@@ -753,15 +697,10 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              ShopkeeperColors.warning.withValues(alpha: 0.08),
-              ShopkeeperColors.warning.withValues(alpha: 0.02),
-            ],
-          ),
+          color: AppTheme.verifiedGold.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: ShopkeeperColors.warning.withValues(alpha: 0.25),
+            color: AppTheme.verifiedGold.withValues(alpha: 0.25),
             width: 1.5,
           ),
         ),
@@ -771,16 +710,11 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    ShopkeeperColors.warning,
-                    ShopkeeperColors.warningLight,
-                  ],
-                ),
+                color: AppTheme.verifiedGold,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: ShopkeeperColors.warning.withValues(alpha: 0.3),
+                    color: AppTheme.verifiedGold.withValues(alpha: 0.3),
                     blurRadius: 16,
                     offset: const Offset(0, 6),
                   ),
@@ -794,7 +728,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  UrduAwareText(
                     isUrdu ? '⚠️ کم اسٹاک الرٹ' : '⚠️ Low Stock Alert',
                     style: TextStyle(
                       fontFamily: fontFamily,
@@ -804,7 +738,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
+                  UrduAwareText(
                     isUrdu
                         ? '$lowStockCount آئٹمز اسٹاک سے کم ہیں'
                         : '$lowStockCount items below minimum stock',
@@ -840,10 +774,10 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: ShopkeeperColors.gray200, width: 1.5),
+          border: Border.all(color: const Color(0xFFE1E5EC), width: 1.5),
         ),
         child: Center(
-          child: Text(
+          child: UrduAwareText(
             isUrdu
                 ? 'کوئی حالیہ ہسٹری موجود نہیں'
                 : 'No recent stock movements',
@@ -861,10 +795,10 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: ShopkeeperColors.gray200, width: 1.5),
+        border: Border.all(color: const Color(0xFFE1E5EC), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: ShopkeeperColors.dark.withValues(alpha: 0.04),
+            color: AppTheme.darkColor.withValues(alpha: 0.04),
             blurRadius: 3,
             offset: const Offset(0, 1),
           ),
@@ -895,7 +829,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
             isUrdu: isUrdu,
             fontFamily: fontFamily,
             name: m.stockItemName,
-            time: '${m.quantity.toStringAsFixed(0)} آئٹمز',
+            quantity: m.quantity.toStringAsFixed(0),
             tag: typeLabel,
             tagType: amountType == 'income' ? 'bill' : 'order',
             amount: 'Rs. ${m.unitPrice.toStringAsFixed(0)}',
@@ -912,7 +846,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
     required bool isUrdu,
     required String fontFamily,
     required String name,
-    required String time,
+    required String quantity,
     required String tag,
     required String tagType,
     required String amount,
@@ -928,27 +862,27 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
 
     switch (amountType) {
       case 'income':
-        iconBg = ShopkeeperColors.income.withValues(alpha: 0.12);
-        iconFg = ShopkeeperColors.income;
-        amountColor = ShopkeeperColors.income;
+        iconBg = AppTheme.incomeColor.withValues(alpha: 0.12);
+        iconFg = AppTheme.incomeColor;
+        amountColor = AppTheme.incomeColor;
         break;
       case 'expense':
-        iconBg = ShopkeeperColors.expense.withValues(alpha: 0.12);
-        iconFg = ShopkeeperColors.expense;
-        amountColor = ShopkeeperColors.expense;
+        iconBg = AppTheme.expenseColor.withValues(alpha: 0.12);
+        iconFg = AppTheme.expenseColor;
+        amountColor = AppTheme.expenseColor;
         break;
       default:
-        iconBg = ShopkeeperColors.warning.withValues(alpha: 0.12);
-        iconFg = ShopkeeperColors.warning;
-        amountColor = ShopkeeperColors.warning;
+        iconBg = AppTheme.verifiedGold.withValues(alpha: 0.12);
+        iconFg = AppTheme.verifiedGold;
+        amountColor = AppTheme.verifiedGold;
     }
 
     if (tagType == 'bill') {
-      tagBg = ShopkeeperColors.theme.withValues(alpha: 0.12);
-      tagFg = ShopkeeperColors.theme;
+      tagBg = AppTheme.themeColor.withValues(alpha: 0.12);
+      tagFg = AppTheme.themeColor;
     } else if (tagType == 'order') {
-      tagBg = ShopkeeperColors.warning.withValues(alpha: 0.12);
-      tagFg = ShopkeeperColors.warning;
+      tagBg = AppTheme.verifiedGold.withValues(alpha: 0.12);
+      tagFg = AppTheme.verifiedGold;
     }
 
     return Container(
@@ -957,7 +891,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
         border: isLast
             ? null
             : const Border(
-                bottom: BorderSide(color: ShopkeeperColors.gray100),
+                bottom: BorderSide(color: Color(0xFFEEF1F5)),
               ),
       ),
       child: Row(
@@ -976,25 +910,35 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                UrduAwareText(
                   name,
                   style: TextStyle(
                     fontFamily: fontFamily,
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: ShopkeeperColors.dark,
+                    color: AppTheme.darkColor,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    Text(
-                      time,
-                      style: TextStyle(
-                        fontFamily: fontFamily,
+                    UrduAwareText.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: quantity,
+                            style: const TextStyle(fontFamily: null),
+                          ),
+                          TextSpan(
+                            text: ' آئٹمز',
+                            style: TextStyle(fontFamily: fontFamily),
+                          ),
+                        ],
+                      ),
+                      style: const TextStyle(
                         fontSize: 10,
-                        color: ShopkeeperColors.textSecondary,
+                        color: AppTheme.textSecondary,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -1002,7 +946,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                       width: 3,
                       height: 3,
                       decoration: const BoxDecoration(
-                        color: ShopkeeperColors.gray400,
+                        color: Color(0xFFB0B8C1),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -1015,7 +959,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                           color: tagBg,
                           borderRadius: BorderRadius.circular(5),
                         ),
-                        child: Text(
+                        child: UrduAwareText(
                           tag,
                           style: TextStyle(
                             fontFamily: fontFamily,
@@ -1026,12 +970,12 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                         ),
                       )
                     else
-                      Text(
+                      UrduAwareText(
                         tag,
                         style: TextStyle(
                           fontFamily: fontFamily,
                           fontSize: 10,
-                          color: ShopkeeperColors.textSecondary,
+                          color: AppTheme.textSecondary,
                         ),
                       ),
                   ],
@@ -1040,10 +984,10 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
+          UrduAwareText(
             amount,
             style: TextStyle(
-              fontFamily: fontFamily,
+              fontFamily: null,
               fontSize: amountType == 'order' ? 12 : 13.5,
               fontWeight: FontWeight.bold,
               color: amountColor,
@@ -1077,25 +1021,13 @@ class _StockListScreenState extends State<StockListScreen> {
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
 
-    final summary = stockService.getStockSummary();
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
+      appBar: CustomAppBar(
+        title: isUrdu ? 'اسٹاک آئٹمز' : 'Stock Items',
+        backgroundColor: AppTheme.darkColor,
         elevation: 0,
-        centerTitle: true,
-        automaticallyImplyLeading: false,
-        title: Text(
-          isUrdu ? 'اسٹاک آئٹمز' : 'Stock Items',
-          style: TextStyle(
-            color: Colors.white,
-            fontFamily: fontFamily,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
+        showBackButton: Navigator.canPop(context),
         actions: [
           IconButton(
             icon: Icon(
@@ -1112,30 +1044,11 @@ class _StockListScreenState extends State<StockListScreen> {
             },
             tooltip: isUrdu ? 'تلاش' : 'Search',
           ),
-          IconButton(
-            icon: Icon(
-              PhosphorIcons.plusCircle(),
-              color: Colors.white,
-              size: 26,
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AddEditStockItemScreen(),
-                ),
-              );
-            },
-            tooltip: isUrdu ? 'نیا آئٹم' : 'Add Item',
-          ),
           const SizedBox(width: 8),
         ],
       ),
       body: Column(
         children: [
-          // 📊 Top Valuation Summary Header
-          _buildSummaryHeader(summary, isUrdu, fontFamily),
-
           // 🔍 Search Bar (Conditional)
           if (_showSearch)
             Padding(
@@ -1158,119 +1071,14 @@ class _StockListScreenState extends State<StockListScreen> {
     );
   }
 
-  Widget _buildSummaryHeader(
-    Map<String, dynamic> summary,
-    bool isUrdu,
-    String fontFamily,
-  ) {
-    final totalPurchaseValue = summary['totalPurchaseValue'] as double? ?? 0.0;
-    final totalSalesPotentialValue =
-        summary['totalSalesPotentialValue'] as double? ?? 0.0;
-    final lowStockCount = summary['lowStockCount'] as int? ?? 0;
-
-    return Container(
-      padding: EdgeInsets.only(
-        top: MediaQuery.sizeOf(context).height > 0
-            ? MediaQuery.of(context).padding.top + 56
-            : 56,
-        bottom: 16,
-        left: 16,
-        right: 16,
-      ),
-      decoration: const BoxDecoration(
-        color: AppTheme.darkColor,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(15)),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              _buildSummaryItem(
-                isUrdu ? 'خرید مالیت' : 'Purchase Value',
-                'Rs. ${totalPurchaseValue.toStringAsFixed(0)}',
-                PhosphorIcons.arrowDownLeft(),
-                fontFamily,
-              ),
-              _buildDivider(),
-              _buildSummaryItem(
-                isUrdu ? 'فروخت مالیت' : 'Sales Value',
-                'Rs. ${totalSalesPotentialValue.toStringAsFixed(0)}',
-                PhosphorIcons.arrowUpRight(),
-                fontFamily,
-              ),
-              _buildDivider(),
-              _buildSummaryItem(
-                isUrdu ? 'کم اسٹاک الرٹس' : 'Low Stock',
-                '$lowStockCount ${isUrdu ? 'آئٹمز' : 'items'}',
-                PhosphorIcons.bellRinging(),
-                fontFamily,
-                isWarning: lowStockCount > 0,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryItem(
-    String label,
-    String value,
-    IconData icon,
-    String fontFamily, {
-    bool isWarning = false,
-  }) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: isWarning ? const Color(0xFFFBBF24) : Colors.white70,
-              fontSize: 11,
-              fontFamily: fontFamily,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon,
-                  size: 12,
-                  color: isWarning ? const Color(0xFFFBBF24) : Colors.white70),
-              const SizedBox(width: 4),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    value,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDivider() {
-    return Container(height: 20, width: 1, color: Colors.white12);
-  }
-
   Widget _buildItemList(
     StockService stockService,
     bool isUrdu,
     String fontFamily,
   ) {
-    var items = stockService.items;
+    var items = stockService.items
+        .where((item) => !item.isArchived)
+        .toList(growable: true);
 
     if (_searchQuery.isNotEmpty) {
       items = items.where((i) {
@@ -1296,7 +1104,7 @@ class _StockListScreenState extends State<StockListScreen> {
             children: [
               Icon(PhosphorIcons.package(), size: 56, color: Colors.grey[400]),
               const SizedBox(height: 12),
-              Text(
+              UrduAwareText(
                 isUrdu ? 'کوئی آئٹم نہیں ملی' : 'No stock items found',
                 style: TextStyle(
                   fontSize: 15,

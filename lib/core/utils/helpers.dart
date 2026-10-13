@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'dart:math';
 
@@ -78,16 +79,16 @@ class AppHelpers {
     return await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: Text(title),
-            content: Text(message),
+            title: UrduAwareText(title),
+            content: UrduAwareText(message),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: Text(isUrdu ? 'منسوخ' : cancelText),
+                child: UrduAwareText(isUrdu ? 'منسوخ' : cancelText),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: Text(
+                child: UrduAwareText(
                   isUrdu ? 'تصدیق کریں' : confirmText,
                   style: TextStyle(color: Colors.red),
                 ),

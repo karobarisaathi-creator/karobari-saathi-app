@@ -4,6 +4,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/auth_service.dart';
@@ -19,6 +20,7 @@ import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/features/settings/master_profile_screen.dart';
 import 'package:account_app/features/settings/app_lock_screen.dart';
 import 'package:account_app/features/shopkeeper/shopkeeper_dashboard_screen.dart';
+import 'package:account_app/features/order/nearby_shops_screen.dart';
 
 class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
@@ -104,6 +106,20 @@ class _AppDrawerState extends State<AppDrawer> {
                     fontFamily,
                     isUrdu),
                 _buildDrawerItem(
+                  icon: PhosphorIcons.storefront(),
+                  title: isUrdu ? 'قریبی دکاندار' : 'Nearby Shopkeepers',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const OrderSelectionScreen(),
+                      ),
+                    );
+                  },
+                  fontFamily: fontFamily,
+                ),
+                _buildDrawerItem(
                   icon: Icons.storefront_rounded,
                   title: isUrdu ? 'شاپ کیپر ڈیش بورڈ' : 'Shopkeeper Dashboard',
                   onTap: () {
@@ -142,7 +158,7 @@ class _AppDrawerState extends State<AppDrawer> {
                   onTap: () =>
                       languageService.changeLanguage(isUrdu ? 'en' : 'ur'),
                   fontFamily: fontFamily,
-                  trailing: Text(
+                  trailing: UrduAwareText(
                     isUrdu ? 'اردو' : 'English',
                     style: TextStyle(
                       color: AppTheme.themeColor,
@@ -217,7 +233,7 @@ class _AppDrawerState extends State<AppDrawer> {
             padding: const EdgeInsets.all(16.0),
             width: double.infinity,
             color: Colors.grey[100],
-            child: Text(
+            child: UrduAwareText(
               'Karobari Saathi v$_appVersion',
               textAlign: TextAlign.center,
               style: const TextStyle(
@@ -272,7 +288,7 @@ class _AppDrawerState extends State<AppDrawer> {
   Widget _buildSectionHeader(String title, String fontFamily, bool isUrdu) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Text(
+      child: UrduAwareText(
         title,
         style: TextStyle(
           fontSize: 12,
@@ -296,7 +312,7 @@ class _AppDrawerState extends State<AppDrawer> {
   }) {
     return ListTile(
       leading: Icon(icon, color: iconColor ?? Colors.black87, size: 22),
-      title: Text(
+      title: UrduAwareText(
         title,
         style: TextStyle(
           fontFamily: fontFamily,
@@ -376,7 +392,7 @@ class _AppDrawerState extends State<AppDrawer> {
                   ]
                 : [],
           ),
-          child: Text(
+          child: UrduAwareText(
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -416,7 +432,7 @@ class _AppDrawerState extends State<AppDrawer> {
                     Icon(PhosphorIcons.signOut(),
                         color: Colors.blue.shade900, size: 18),
                     const SizedBox(width: 8),
-                    Text(
+                    UrduAwareText(
                       isUrdu ? 'لاگ آؤٹ' : 'Logout',
                       style: TextStyle(
                         color: Colors.blue.shade900,
@@ -450,7 +466,7 @@ class _AppDrawerState extends State<AppDrawer> {
                     Icon(PhosphorIcons.userMinus(),
                         color: Colors.red.shade900, size: 18),
                     const SizedBox(width: 8),
-                    Text(
+                    UrduAwareText(
                       isUrdu ? 'اکاؤنٹ ڈیلیٹ' : 'Delete Account',
                       style: TextStyle(
                         color: Colors.red.shade900,
@@ -556,7 +572,7 @@ class _AppDrawerState extends State<AppDrawer> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(isUrdu ? 'رپورٹ ایکسپورٹ کریں' : 'Export Report',
+        title: UrduAwareText(isUrdu ? 'رپورٹ ایکسپورٹ کریں' : 'Export Report',
             style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -619,7 +635,7 @@ class _AppDrawerState extends State<AppDrawer> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(isUrdu ? 'بیک اپ اور بحالی' : 'Backup & Restore',
+        title: UrduAwareText(isUrdu ? 'بیک اپ اور بحالی' : 'Backup & Restore',
             style: TextStyle(fontFamily: isUrdu ? 'NooriNastaleeq' : '')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -695,13 +711,13 @@ class _AppDrawerState extends State<AppDrawer> {
                       child: Image.asset('assets/images/icons/zalooq.png'),
                     ),
                     const SizedBox(height: 12),
-                    Text(isUrdu ? 'کاروباری ساتھی' : 'Karobari Saathi',
+                    UrduAwareText(isUrdu ? 'کاروباری ساتھی' : 'Karobari Saathi',
                         style: TextStyle(
                             color: Colors.white,
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             fontFamily: fontFamily)),
-                    Text('Version $_appVersion',
+                    UrduAwareText('Version $_appVersion',
                         style: const TextStyle(
                             color: Colors.white70, fontSize: 12)),
                   ],
@@ -760,12 +776,12 @@ class _AppDrawerState extends State<AppDrawer> {
         Icon(icon, color: AppTheme.themeColor, size: 24),
         const SizedBox(width: 12),
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title,
+          UrduAwareText(title,
               style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                   fontFamily: fontFamily)),
-          Text(sub,
+          UrduAwareText(sub,
               style: TextStyle(
                   color: Colors.grey, fontSize: 12, fontFamily: fontFamily)),
         ]),
@@ -779,10 +795,10 @@ class _AppDrawerState extends State<AppDrawer> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(isUrdu ? 'پرائیویسی پالیسی' : 'Privacy Policy',
+        title: UrduAwareText(isUrdu ? 'پرائیویسی پالیسی' : 'Privacy Policy',
             style: TextStyle(fontFamily: fontFamily)),
         content: SingleChildScrollView(
-          child: Text(
+          child: UrduAwareText(
             isUrdu
                 ? 'ہم آپ کی رازداری کا احترام کرتے ہیں۔\n\n1. اکاؤنٹ: لاگ اِن کے لیے فون نمبر اور SMS OTP استعمال ہوتا ہے۔\n2. کاروباری ریکارڈ: آپ کے کھاتے، لین دین، پروفائل اور ایپ کا ڈیٹا آپ کے اکاؤنٹ کے ساتھ کلاؤڈ میں محفوظ ہوتا ہے تاکہ آپ اپنے ریکارڈ بحال کر سکیں۔\n3. مقامی حفاظت: ایپ PIN اور متعلقہ حساس معلومات کو ڈیوائس پر محفوظ طریقے سے رکھنے کی کوشش کرتی ہے۔\n4. شیئرنگ: آپ کا ڈیٹا فروخت نہیں کیا جاتا۔ رابطہ یا چیٹ کی معلومات صرف ایپ کے متعلقہ کاروباری فیچرز میں استعمال ہوتی ہیں۔\n5. بیک اپ: کلاؤڈ سنک سہولت ہے، مگر اہم ریکارڈ کا اپنا بیک اپ بھی رکھیں۔'
                 : 'We respect your privacy.\n\n1. Account: Phone number and SMS OTP are used to sign in.\n2. Business records: Your accounts, transactions, profile, and app data are stored in the cloud with your account so your records can be restored.\n3. Local security: App Lock, PIN, and related sensitive information are stored on the device using secure storage where available.\n4. Sharing: We do not sell your data. Contact and chat details are used only by the related business features.\n5. Backups: Cloud sync is provided for convenience, but keep your own backup of important records.',
@@ -793,7 +809,7 @@ class _AppDrawerState extends State<AppDrawer> {
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(isUrdu ? 'بند کریں' : 'Close'))
+              child: UrduAwareText(isUrdu ? 'بند کریں' : 'Close'))
         ],
       ),
     );
@@ -809,22 +825,22 @@ class _AppDrawerState extends State<AppDrawer> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isUrdu ? 'لاگ آؤٹ' : 'Logout',
+        title: UrduAwareText(isUrdu ? 'لاگ آؤٹ' : 'Logout',
             style: TextStyle(fontFamily: fontFamily)),
-        content: Text(isUrdu
+        content: UrduAwareText(isUrdu
             ? 'کیا آپ واقعی لاگ آؤٹ کرنا چاہتے ہیں؟'
             : 'Are you sure you want to logout?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(isUrdu ? 'نہیں' : 'No')),
+              child: UrduAwareText(isUrdu ? 'نہیں' : 'No')),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
               await Provider.of<AuthService>(context, listen: false)
                   .signOut(context);
             },
-            child: Text(isUrdu ? 'ہاں' : 'Yes',
+            child: UrduAwareText(isUrdu ? 'ہاں' : 'Yes',
                 style: const TextStyle(color: Colors.red)),
           ),
         ],
@@ -837,22 +853,22 @@ class _AppDrawerState extends State<AppDrawer> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isUrdu ? 'اکاؤنٹ ختم کریں' : 'Deactivate',
+        title: UrduAwareText(isUrdu ? 'اکاؤنٹ ختم کریں' : 'Deactivate',
             style: TextStyle(fontFamily: fontFamily, color: Colors.red)),
-        content: Text(isUrdu
+        content: UrduAwareText(isUrdu
             ? 'کیا آپ واقعی اپنا اکاؤنٹ عارضی طور پر ختم کرنا چاہتے ہیں؟'
             : 'Are you sure you want to deactivate your account?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(isUrdu ? 'نہیں' : 'No')),
+              child: UrduAwareText(isUrdu ? 'نہیں' : 'No')),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
               await Provider.of<AuthService>(context, listen: false)
                   .deactivateAccount(context);
             },
-            child: Text(isUrdu ? 'ہاں' : 'Yes',
+            child: UrduAwareText(isUrdu ? 'ہاں' : 'Yes',
                 style: const TextStyle(color: Colors.red)),
           ),
         ],

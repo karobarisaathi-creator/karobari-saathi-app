@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
@@ -384,7 +385,7 @@ class _AddProjectTransactionScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(isUrdu ? 'زمرہ منتخب کریں' : 'Select Category',
+        UrduAwareText(isUrdu ? 'زمرہ منتخب کریں' : 'Select Category',
             style: TextStyle(
                 fontSize: 13,
                 fontWeight: fontWeight,
@@ -413,7 +414,7 @@ class _AddProjectTransactionScreenState
                             : Colors.grey.shade300),
                   ),
                   alignment: Alignment.center,
-                  child: Text(cat,
+                  child: UrduAwareText(cat,
                       style: TextStyle(
                           fontSize: 12,
                           color: isSelected ? Colors.white : AppTheme.darkColor,
@@ -472,7 +473,7 @@ class _AddProjectTransactionScreenState
                             itemBuilder: (BuildContext context, int index) {
                               final String option = options.elementAt(index);
                               return ListTile(
-                                title: Text(option,
+                                title: UrduAwareText(option,
                                     style: TextStyle(
                                         fontFamily: fontFamily, fontSize: 14)),
                                 onTap: () => onSelected(option),
@@ -688,7 +689,7 @@ class _AddProjectTransactionScreenState
       {double topPadding = 24}) {
     return Padding(
         padding: EdgeInsets.only(top: topPadding, bottom: 8),
-        child: Text(title,
+        child: UrduAwareText(title,
             style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,

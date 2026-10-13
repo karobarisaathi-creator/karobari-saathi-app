@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/services/language_service.dart';
@@ -183,7 +184,7 @@ class ReceiptWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Business name + phone
-          Text.rich(
+          UrduAwareText.rich(
             TextSpan(
               children: [
                 TextSpan(
@@ -220,7 +221,7 @@ class ReceiptWidget extends StatelessWidget {
           // Address
           if (businessAddress.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(
+            UrduAwareText(
               businessAddress,
               style: TextStyle(
                 color: Colors.white70,
@@ -242,7 +243,7 @@ class ReceiptWidget extends StatelessWidget {
           // Billed To
           Row(
             children: [
-              Text(
+              UrduAwareText(
                 isUrdu ? 'بنام' : 'BILLED TO',
                 style: TextStyle(
                   color: Colors.white70,
@@ -254,7 +255,7 @@ class ReceiptWidget extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text.rich(
+                child: UrduAwareText.rich(
                   TextSpan(
                     children: [
                       TextSpan(
@@ -341,7 +342,7 @@ class ReceiptWidget extends StatelessWidget {
       crossAxisAlignment:
           alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        Text(
+        UrduAwareText(
           label,
           style: TextStyle(
             color: AppTheme.textSecondary,
@@ -352,7 +353,7 @@ class ReceiptWidget extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 3),
-        Text(
+        UrduAwareText(
           value,
           textDirection: numeric ? ui.TextDirection.ltr : null,
           style: TextStyle(
@@ -390,7 +391,7 @@ class ReceiptWidget extends StatelessWidget {
                 color: Color(0xFF8E5200),
               ),
               const SizedBox(width: 5),
-              Text(
+              UrduAwareText(
                 isUrdu ? 'ادائیگی باقی ہے' : 'PAYMENT DUE',
                 style: TextStyle(
                   color: const Color(0xFF8E5200),
@@ -480,7 +481,7 @@ class ReceiptWidget extends StatelessWidget {
   }
 
   Widget _buildTableHeader(String label, TextAlign align, String? fontFamily) {
-    return Text(
+    return UrduAwareText(
       label,
       textAlign: align,
       style: TextStyle(
@@ -527,7 +528,7 @@ class ReceiptWidget extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                UrduAwareText(
                   description,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -541,7 +542,7 @@ class ReceiptWidget extends StatelessWidget {
                 ),
                 if (unit != null && unit.isNotEmpty) ...[
                   const SizedBox(height: 2),
-                  Text(
+                  UrduAwareText(
                     unit,
                     style: const TextStyle(
                       color: Color(0xFF8A9199),
@@ -556,12 +557,12 @@ class ReceiptWidget extends StatelessWidget {
           // Quantity
           Expanded(
             flex: 2,
-            child: Text(qtyText, textAlign: TextAlign.center, style: numStyle),
+            child: UrduAwareText(qtyText, textAlign: TextAlign.center, style: numStyle),
           ),
           // Rate
           Expanded(
             flex: 2,
-            child: Text(
+            child: UrduAwareText(
               rate.toStringAsFixed(0),
               textAlign: TextAlign.center,
               style: numStyle,
@@ -570,7 +571,7 @@ class ReceiptWidget extends StatelessWidget {
           // Total
           Expanded(
             flex: 3,
-            child: Text(
+            child: UrduAwareText(
               total.toStringAsFixed(0),
               textAlign: TextAlign.end,
               style: numStyle,
@@ -616,14 +617,12 @@ class ReceiptWidget extends StatelessWidget {
               balance: breakdown.openingBalance,
               fontFamily: fontFamily,
             ),
-            _buildDashedDivider(),
             _buildAccountBalanceRow(
               label: isUrdu ? 'مجموعی رقم' : 'GRAND TOTAL',
               balance: breakdown.balanceBeforeDiscount,
               fontFamily: fontFamily,
               emphasized: true,
             ),
-            _buildDashedDivider(),
           ],
           if (breakdown == null && _hasDiscount)
             _buildSimpleRow(
@@ -665,7 +664,7 @@ class ReceiptWidget extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(
+                    child: UrduAwareText(
                       isUrdu ? 'اس بل کی کل رقم' : 'INVOICE TOTAL',
                       style: TextStyle(
                         color: AppTheme.textSecondary,
@@ -676,7 +675,7 @@ class ReceiptWidget extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Text(
+                  UrduAwareText(
                     'Rs ${transaction.amount.toStringAsFixed(0)}',
                     textDirection: ui.TextDirection.ltr,
                     style: const TextStyle(
@@ -724,47 +723,36 @@ class ReceiptWidget extends StatelessWidget {
     bool emphasized = false,
     bool isFinal = false,
   }) {
-    final color = balance < 0
-        ? AppTheme.incomeColor
-        : AppTheme.expenseColor;
+    final color = isFinal
+        ? (balance < 0 ? AppTheme.incomeColor : AppTheme.expenseColor)
+        : (balance < 0 ? AppTheme.themeColor : AppTheme.expenseColor);
+    final sign = balance < 0 ? '−' : '+';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Container(
-        padding: isFinal
-            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10)
-            : EdgeInsets.zero,
-        decoration: isFinal
-            ? BoxDecoration(
-                color: color.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: color.withValues(alpha: 0.30)),
-              )
-            : null,
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontFamily: fontFamily,
-                  fontSize: 12,
-                  fontWeight: emphasized ? FontWeight.w900 : FontWeight.w800,
-                ),
-              ),
-            ),
-            Text(
-              'Rs ${balance.abs().toStringAsFixed(0)}',
-              textDirection: ui.TextDirection.ltr,
+      child: Row(
+        children: [
+          Expanded(
+            child: UrduAwareText(
+              label,
               style: TextStyle(
                 color: color,
-                fontSize: emphasized ? 16 : 14,
-                fontWeight: FontWeight.w900,
-                fontFeatures: const [FontFeature.tabularFigures()],
+                fontFamily: fontFamily,
+                fontSize: 12,
+                fontWeight: emphasized ? FontWeight.w900 : FontWeight.w800,
               ),
             ),
-          ],
-        ),
+          ),
+          UrduAwareText(
+            '$sign Rs ${balance.abs().toStringAsFixed(0)}',
+            textDirection: ui.TextDirection.ltr,
+            style: TextStyle(
+              color: color,
+              fontSize: emphasized ? 16 : 14,
+              fontWeight: FontWeight.w900,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -779,7 +767,7 @@ class ReceiptWidget extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(
+            child: UrduAwareText(
               label,
               style: TextStyle(
                 color: AppTheme.textSecondary,
@@ -789,7 +777,7 @@ class ReceiptWidget extends StatelessWidget {
               ),
             ),
           ),
-          Text(
+          UrduAwareText(
             'Rs $value',
             textDirection: ui.TextDirection.ltr,
             style: const TextStyle(
@@ -824,7 +812,7 @@ class ReceiptWidget extends StatelessWidget {
           ),
           const SizedBox(width: 5),
           Expanded(
-            child: Text(
+            child: UrduAwareText(
               label,
               style: TextStyle(
                 color: AppTheme.verifiedGold,
@@ -834,8 +822,8 @@ class ReceiptWidget extends StatelessWidget {
               ),
             ),
           ),
-          Text(
-            'Rs ${transaction.discountAmount.toStringAsFixed(0)}',
+          UrduAwareText(
+            'Rs ${transaction.discountAmount.toStringAsFixed(0)} −',
             textDirection: ui.TextDirection.ltr,
             style: const TextStyle(
               color: AppTheme.verifiedGold,
@@ -910,7 +898,7 @@ class ReceiptWidget extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(
+            child: UrduAwareText(
               label,
               style: TextStyle(
                 color: color,
@@ -921,7 +909,7 @@ class ReceiptWidget extends StatelessWidget {
               ),
             ),
           ),
-          Text(
+          UrduAwareText(
             'Rs ${amount.toStringAsFixed(0)}',
             textDirection: ui.TextDirection.ltr,
             style: TextStyle(
@@ -944,7 +932,7 @@ class ReceiptWidget extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(0, 14, 0, 15),
       child: Column(
         children: [
-          Text(
+          UrduAwareText(
             isUrdu
                 ? 'آپ کے کاروبار کے لیے کاروباری ساتھی استعمال کرنے کا شکریہ'
                 : 'Thank you for keeping your business records with Karobari Saathi',
@@ -958,7 +946,7 @@ class ReceiptWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Text(
+          UrduAwareText(
             'Karobari Saathi',
             style: TextStyle(
               color: accent,

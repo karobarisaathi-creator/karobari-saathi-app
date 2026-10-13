@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/backup_service.dart';
 import 'package:account_app/core/services/database_service.dart';
@@ -53,7 +54,7 @@ class _BackupScreenState extends State<BackupScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
+        title: UrduAwareText(
           isUrdu ? 'ڈیٹا بیک اپ' : 'Data Backup',
           style: TextStyle(
             fontFamily: isUrdu ? 'NooriNastaleeq' : '',
@@ -98,7 +99,7 @@ class _BackupScreenState extends State<BackupScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            UrduAwareText(
               isUrdu ? 'بیک اپ کی حالت' : 'Backup Status',
               style: TextStyle(
                 fontSize: 18,
@@ -150,7 +151,7 @@ class _BackupScreenState extends State<BackupScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            UrduAwareText(
               isUrdu ? 'ڈیٹا کے اعداد و شمار' : 'Data Statistics',
               style: TextStyle(
                 fontSize: 18,
@@ -194,7 +195,7 @@ class _BackupScreenState extends State<BackupScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            UrduAwareText(
               isUrdu ? 'بیک اپ کے اختیارات' : 'Backup Options',
               style: TextStyle(
                 fontSize: 18,
@@ -255,7 +256,7 @@ class _BackupScreenState extends State<BackupScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            UrduAwareText(
               isUrdu ? 'خودکار بیک اپ' : 'Auto Backup',
               style: TextStyle(
                 fontSize: 18,
@@ -268,7 +269,7 @@ class _BackupScreenState extends State<BackupScreen> {
             Row(
               children: [
                 Expanded(
-                  child: Text(
+                  child: UrduAwareText(
                     isUrdu ? 'خودکار بیک اپ فعال کریں' : 'Enable Auto Backup',
                     style: TextStyle(
                       fontSize: 16,
@@ -286,7 +287,7 @@ class _BackupScreenState extends State<BackupScreen> {
 
             SizedBox(height: 8),
 
-            Text(
+            UrduAwareText(
               isUrdu
                   ? 'خودکار بیک اپ ہر 7 دن بعد کلاؤڈ پر ڈیٹا محفوظ کرے گا'
                   : 'Auto backup will save data to cloud every 7 days',
@@ -316,7 +317,7 @@ class _BackupScreenState extends State<BackupScreen> {
           Icon(icon, color: color, size: 20),
           SizedBox(width: 12),
           Expanded(
-            child: Text(
+            child: UrduAwareText(
               label,
               style: TextStyle(
                 fontFamily: isUrdu ? 'NooriNastaleeq' : '',
@@ -324,7 +325,7 @@ class _BackupScreenState extends State<BackupScreen> {
               ),
             ),
           ),
-          Text(
+          UrduAwareText(
             value,
             style: TextStyle(
               color: Colors.grey[700],
@@ -354,7 +355,7 @@ class _BackupScreenState extends State<BackupScreen> {
           child: Icon(icon, color: color, size: 24),
         ),
         SizedBox(height: 8),
-        Text(
+        UrduAwareText(
           label,
           style: TextStyle(
             fontSize: 12,
@@ -364,7 +365,7 @@ class _BackupScreenState extends State<BackupScreen> {
           ),
         ),
         SizedBox(height: 4),
-        Text(
+        UrduAwareText(
           value,
           style: TextStyle(
             fontSize: 18,
@@ -395,7 +396,7 @@ class _BackupScreenState extends State<BackupScreen> {
               ),
             )
           : Icon(icon, size: 20),
-      label: Text(
+      label: UrduAwareText(
         text,
         style: TextStyle(
           fontFamily: isUrdu ? 'NooriNastaleeq' : '',
@@ -506,14 +507,14 @@ class _BackupScreenState extends State<BackupScreen> {
     return await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: Text(
+            title: UrduAwareText(
               title,
               style: TextStyle(
                 fontFamily: isUrdu ? 'NooriNastaleeq' : '',
                 fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
               ),
             ),
-            content: Text(
+            content: UrduAwareText(
               message,
               style: TextStyle(
                 fontFamily: isUrdu ? 'NooriNastaleeq' : '',
@@ -523,7 +524,7 @@ class _BackupScreenState extends State<BackupScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: Text(
+                child: UrduAwareText(
                   isUrdu ? 'منسوخ' : 'Cancel',
                   style: TextStyle(
                     fontFamily: isUrdu ? 'NooriNastaleeq' : '',
@@ -533,7 +534,7 @@ class _BackupScreenState extends State<BackupScreen> {
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: Text(
+                child: UrduAwareText(
                   isUrdu ? 'جاری رکھیں' : 'Continue',
                   style: TextStyle(
                     color: Colors.red,
