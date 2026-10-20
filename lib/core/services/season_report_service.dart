@@ -41,19 +41,29 @@ class SeasonReportService {
       expenseCountMap['Expense'] = 1;
     }
 
-    final incomeCategories = incomeMap.entries.map((e) => CategoryBreakdown(
-      name: e.key,
-      amount: e.value,
-      isIncome: true,
-      entriesCount: incomeCountMap[e.key] ?? 1,
-    )).toList()..sort((a, b) => b.amount.compareTo(a.amount));
+    final incomeCategories = incomeMap.entries.map((e) {
+      String cleanName = e.key;
+      if (cleanName.startsWith('INC:')) cleanName = cleanName.substring(4);
+      if (cleanName.startsWith('EXP:')) cleanName = cleanName.substring(4);
+      return CategoryBreakdown(
+        name: cleanName,
+        amount: e.value,
+        isIncome: true,
+        entriesCount: incomeCountMap[e.key] ?? 1,
+      );
+    }).toList()..sort((a, b) => b.amount.compareTo(a.amount));
 
-    final expenseCategories = expenseMap.entries.map((e) => CategoryBreakdown(
-      name: e.key,
-      amount: e.value,
-      isIncome: false,
-      entriesCount: expenseCountMap[e.key] ?? 1,
-    )).toList()..sort((a, b) => b.amount.compareTo(a.amount));
+    final expenseCategories = expenseMap.entries.map((e) {
+      String cleanName = e.key;
+      if (cleanName.startsWith('INC:')) cleanName = cleanName.substring(4);
+      if (cleanName.startsWith('EXP:')) cleanName = cleanName.substring(4);
+      return CategoryBreakdown(
+        name: cleanName,
+        amount: e.value,
+        isIncome: false,
+        entriesCount: expenseCountMap[e.key] ?? 1,
+      );
+    }).toList()..sort((a, b) => b.amount.compareTo(a.amount));
 
     final netProfit = totalIncome - totalExpense;
     final profitMargin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0.0;

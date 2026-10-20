@@ -107,11 +107,23 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
       itemCount: (data['itemCount'] as num?)?.toInt() ?? 0,
       showOwnerName: data['showOwnerName'] != false,
       showArea: data['showArea'] != false,
-      showDistance: data['showDistance'] == true,
-      showDeliveryInfo: data['showDeliveryInfo'] == true,
-      showRating: data['showRating'] == true,
+      showDistance: data['showDistance'] != false,
+      showDeliveryInfo: data['showDeliveryInfo'] != false,
+      showRating: data['showRating'] != false,
       showItemsCount: data['showItemsCount'] != false,
       showTags: data['showTags'] == true,
+      latitude: (data['latitude'] is num)
+          ? (data['latitude'] as num).toDouble()
+          : (data['lat'] is num)
+              ? (data['lat'] as num).toDouble()
+              : null,
+      longitude: (data['longitude'] is num)
+          ? (data['longitude'] as num).toDouble()
+          : (data['lng'] is num)
+              ? (data['lng'] as num).toDouble()
+              : (data['lon'] is num)
+                  ? (data['lon'] as num).toDouble()
+                  : null,
       bannerImageUrl: (data['bannerImageUrl'] ?? data['shopBannerUrl'] ?? '').toString(),
       profileImageUrl: (data['profileImageUrl'] ?? data['photoURL'] ?? '').toString(),
     );
@@ -144,7 +156,7 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
       backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
         title: 'قریبی دکاندار',
-        showBackButton: false,
+        showBackButton: Navigator.canPop(context),
         actions: [
           IconButton(
             icon: Icon(
@@ -171,10 +183,10 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
           children: [
             if (_isSearchVisible)
               Padding(
-                padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
                 child: SearchSortBar(
                   controller: _searchCtrl,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   hintText: 'دکان، مالک یا علاقہ تلاش کریں...',
                   onSearchChanged: (v) {
                     setState(() => _shopQuery = v);
@@ -230,7 +242,7 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
           height: 38,
           child: ListView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             children: [
               _buildSortChip(
                 'recent',
@@ -271,7 +283,7 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
                   sub: 'دوسرا نام آزمائیں',
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(14, 4, 14, 24),
+                  padding: const EdgeInsets.fromLTRB(0, 4, 0, 24),
                   itemCount: filtered.length,
                   itemBuilder: (context, i) => ShopCardWidget(
                     shop: filtered[i],

@@ -96,15 +96,21 @@ class _ImageSelectorFieldState extends State<ImageSelectorField> {
         sourcePath: image.path,
         aspectRatio: widget.isProfile
             ? const CropAspectRatio(ratioX: 1, ratioY: 1)
-            : widget.isFullWidth
-                ? CropAspectRatio(ratioX: widget.aspectRatio, ratioY: 1)
-                : const CropAspectRatio(ratioX: 4, ratioY: 3),
+            : null,
         uiSettings: [
           AndroidUiSettings(
             toolbarTitle: isUrdu ? 'تصویر کاٹیں' : 'Crop Image',
             toolbarColor: AppTheme.darkColor,
             toolbarWidgetColor: Colors.white,
-            lockAspectRatio: widget.isProfile || widget.isFullWidth,
+            lockAspectRatio: widget.isProfile,
+            aspectRatioPresets: widget.isProfile
+                ? [CropAspectRatioPreset.square]
+                : [
+                    CropAspectRatioPreset.original,
+                    CropAspectRatioPreset.ratio3x2,
+                    CropAspectRatioPreset.ratio4x3,
+                    CropAspectRatioPreset.ratio16x9,
+                  ],
           ),
         ],
       );

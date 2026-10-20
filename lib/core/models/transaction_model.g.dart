@@ -43,13 +43,14 @@ class TransactionAdapter extends TypeAdapter<Transaction> {
       discountAmount: fields[23] == null ? 0.0 : fields[23] as double,
       discountPercent: fields[24] as double?,
       discountReason: fields[25] as String?,
+      receiptFromCounterparty: fields[26] as bool? ?? false,
     );
   }
 
   @override
   void write(BinaryWriter writer, Transaction obj) {
     writer
-      ..writeByte(26)
+      ..writeByte(27)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -101,7 +102,9 @@ class TransactionAdapter extends TypeAdapter<Transaction> {
       ..writeByte(24)
       ..write(obj.discountPercent)
       ..writeByte(25)
-      ..write(obj.discountReason);
+      ..write(obj.discountReason)
+      ..writeByte(26)
+      ..write(obj.receiptFromCounterparty);
   }
 
   @override

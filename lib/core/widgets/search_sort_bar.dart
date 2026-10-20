@@ -129,7 +129,7 @@ class _SearchSortBarState extends State<SearchSortBar> with SingleTickerProvider
     final inactiveColor = AppTheme.darkColor;
 
     return Padding(
-      padding: widget.padding ?? const EdgeInsets.symmetric(horizontal: 16),
+      padding: widget.padding ?? const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
           // Full Rounded Search Box

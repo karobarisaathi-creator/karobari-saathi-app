@@ -41,7 +41,7 @@ import './helpers/migration_helper.dart'; // ✅ یہ import کریں
 
 // Screens
 import 'package:account_app/features/settings/login_screen.dart';
-import 'package:account_app/features/dashboard/dashboard_screen.dart';
+import 'package:account_app/features/accounts/party_list_screen.dart';
 import 'package:account_app/features/settings/master_profile_screen.dart'; // Updated
 import 'package:account_app/features/accounts/add_party_screen.dart';
 import 'package:account_app/features/accounts/reports_screen.dart';
@@ -50,7 +50,7 @@ import 'package:account_app/features/professions/professions_screen.dart';
 import 'package:account_app/features/accounts/add_transaction_screen.dart';
 import 'package:account_app/features/settings/app_lock_screen.dart'
     as real_lock; // Import the real screen
-import 'package:account_app/features/dashboard/main_navigation_screen.dart';
+import 'package:account_app/features/dashboard/app_shell_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart'; // نئی تھیم فائل شامل کی
 
 // Localization
@@ -249,7 +249,7 @@ class MyApp extends StatelessWidget {
             home: AppWrapper(),
 
             routes: {
-              '/dashboard': (context) => DashboardScreen(),
+              '/dashboard': (context) => const PartyListScreen(),
               '/login': (context) => LoginScreen(),
               '/profileSetup': (context) =>
                   const MasterProfileScreen(), // Updated
@@ -408,7 +408,7 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
         }
 
         // 4. Main Navigation
-        return MainNavigationScreen(key: MainNavigationScreen.navigationKey);
+        return AppShellScreen(key: AppShellScreen.navigationKey);
       },
     );
   }

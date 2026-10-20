@@ -295,7 +295,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
             : (isUrdu ? 'نیا آئٹم شامل کریں' : 'Add Stock Item'),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
         child: Form(
           key: _formKey,
           child: Column(
@@ -332,14 +332,6 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                       }
                       return null;
                     },
-                  ),
-                  _buildRowField(
-                    label: isUrdu ? 'اردو نام' : 'Urdu Name',
-                    icon: PhosphorIcons.textT(),
-                    controller: _nameUrduController,
-                    fontFamily: fontFamily,
-                    optional: true,
-                    isUrdu: isUrdu,
                   ),
                   _buildRowField(
                     label: isUrdu ? 'بارکوڈ' : 'Barcode',

@@ -40,6 +40,7 @@ class ProfileInfoWidget extends StatelessWidget {
   final Color? reputationBgColor;
   final bool isAddressBold;
   final Color? addressColor;
+  final VoidCallback? onAvatarTap;
 
   const ProfileInfoWidget({
     super.key,
@@ -72,6 +73,7 @@ class ProfileInfoWidget extends StatelessWidget {
     this.reputationBgColor,
     this.isAddressBold = false,
     this.addressColor,
+    this.onAvatarTap,
   });
 
   String _getAvatarForName(String name) {
@@ -163,7 +165,7 @@ class ProfileInfoWidget extends StatelessWidget {
   }
 
   Widget _buildImagePart(String displayName, double size, double radius) {
-    return SizedBox(
+    Widget content = SizedBox(
       width: size,
       height: size,
       child: Stack(
@@ -209,6 +211,15 @@ class ProfileInfoWidget extends StatelessWidget {
         ],
       ),
     );
+
+    if (onAvatarTap != null) {
+      return GestureDetector(
+        onTap: onAvatarTap,
+        behavior: HitTestBehavior.opaque,
+        child: content,
+      );
+    }
+    return content;
   }
 
   Widget _buildCoreImage(String? imagePath, String displayName, double size) {
@@ -297,14 +308,42 @@ class ProfileInfoWidget extends StatelessWidget {
             ),
           ),
         ],
-        if (phone.isNotEmpty) ...[
+        if (phone.isNotEmpty || (address != null && address!.isNotEmpty)) ...[
           SizedBox(height: verticalSpacing),
-          UrduAwareText(
-            phone,
-            style: TextStyle(
-              fontSize: 13,
-              color: effectiveSubtitleColor,
-              fontFamily: phoneHasUrdu ? fontFamily : '',
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (phone.isNotEmpty)
+                  UrduAwareText(
+                    phone,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: effectiveSubtitleColor,
+                      fontFamily: phoneHasUrdu ? fontFamily : '',
+                    ),
+                  ),
+                if (phone.isNotEmpty && address != null && address!.isNotEmpty)
+                  UrduAwareText(
+                    '  •  ',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: effectiveSubtitleColor.withValues(alpha: 0.6),
+                    ),
+                  ),
+                if (address != null && address!.isNotEmpty)
+                  UrduAwareText(
+                    address!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: addressColor ?? effectiveSubtitleColor,
+                      fontFamily: fontFamily,
+                      fontWeight: isAddressBold ? FontWeight.w900 : fontWeight,
+                      height: 1.0,
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
@@ -416,30 +455,43 @@ class ProfileInfoWidget extends StatelessWidget {
                   ],
                 ),
               ],
-              if (phone.isNotEmpty) ...[
+              if (phone.isNotEmpty || (address != null && address!.isNotEmpty)) ...[
                 SizedBox(height: verticalSpacing),
-                UrduAwareText(
-                  Formatters.formatPhoneNumber(phone),
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: effectiveSubtitleColor,
-                    fontFamily: phoneHasUrdu ? fontFamily : '',
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (phone.isNotEmpty)
+                        UrduAwareText(
+                          Formatters.formatPhoneNumber(phone),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: effectiveSubtitleColor,
+                            fontFamily: phoneHasUrdu ? fontFamily : '',
+                          ),
+                        ),
+                      if (phone.isNotEmpty && address != null && address!.isNotEmpty)
+                        UrduAwareText(
+                          '  •  ',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: effectiveSubtitleColor.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      if (address != null && address!.isNotEmpty)
+                        UrduAwareText(
+                          address!,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: addressColor ?? effectiveSubtitleColor,
+                            fontFamily: fontFamily,
+                            fontWeight: isAddressBold ? FontWeight.w900 : fontWeight,
+                            height: 1.0,
+                          ),
+                        ),
+                    ],
                   ),
-                ),
-              ],
-              if (address != null && address!.isNotEmpty) ...[
-                SizedBox(height: verticalSpacing),
-                UrduAwareText(
-                  address!,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: addressColor ?? effectiveSubtitleColor,
-                    fontFamily: fontFamily,
-                    fontWeight: isAddressBold ? FontWeight.w900 : fontWeight,
-                    height: 1.0,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
               if (showDate && date != null) ...[

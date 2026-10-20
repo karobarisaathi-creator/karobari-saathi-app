@@ -12,6 +12,8 @@ import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/utils/formatters.dart';
 import 'add_edit_stock_item_screen.dart';
 import 'stock_adjustment_dialog.dart';
 
@@ -47,33 +49,24 @@ class StockDetailScreen extends StatelessWidget {
     final isLowStock =
         item.trackStock && computedStock <= item.minStockAlert && !isOutOfStock;
 
-    final itemMovements = stockService.movements
-        .where((m) => m.stockItemId == item.id)
-        .toList()
+    final movementMap = <String, StockMovement>{};
+    for (final movement
+        in stockService.movements.where((m) => m.stockItemId == item.id)) {
+      final key = movement.id.isNotEmpty
+          ? movement.id
+          : '${movement.stockItemId}|${movement.type.name}|${movement.quantity}|${movement.timestamp.millisecondsSinceEpoch}';
+      movementMap[key] = movement;
+    }
+    final itemMovements = movementMap.values.toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
         title: isUrdu ? 'آئٹم تفصیل' : 'Item Details',
-        actions: [
-          IconButton(
-            icon: Icon(PhosphorIcons.pencilSimple()),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      AddEditStockItemScreen(initialItem: item),
-                ),
-              );
-            },
-            tooltip: isUrdu ? 'ترمیم کریں' : 'Edit Item',
-          ),
-        ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -159,9 +152,9 @@ class StockDetailScreen extends StatelessWidget {
       );
     } else {
       return _StatusData(
-        color: AppTheme.incomeColor,
-        bg: AppTheme.incomeColor.withValues(alpha: 0.10),
-        border: AppTheme.incomeColor.withValues(alpha: 0.25),
+        color: AppTheme.goldColor,
+        bg: AppTheme.goldColor.withValues(alpha: 0.10),
+        border: AppTheme.goldColor.withValues(alpha: 0.25),
         text: isUrdu ? 'اسٹاک موجود' : 'In Stock',
         icon: PhosphorIcons.checkCircle(PhosphorIconsStyle.fill),
       );
@@ -180,17 +173,16 @@ class StockDetailScreen extends StatelessWidget {
     bool isUrdu,
     String? fontFamily,
   ) {
-    final displayName =
-        isUrdu && item.nameUrdu.isNotEmpty ? item.nameUrdu : item.name;
+    final displayName = item.name;
     final categoryName = isUrdu
         ? _categoryNamesUrdu[item.categoryName.trim()] ?? item.categoryName
         : item.categoryName;
     final status = _getStatusData(isUrdu, isOutOfStock, isLowStock);
 
-    // Progress (0..1)
+    // Progress (0..1) - dynamic and working properly
     final maxRef = item.minStockAlert > 0
-        ? (item.minStockAlert * 3).clamp(1.0, double.infinity)
-        : 30.0;
+        ? (item.minStockAlert * 10.0).clamp(100.0, double.infinity)
+        : 100.0;
     final progress =
         item.trackStock ? (computedStock / maxRef).clamp(0.0, 1.0) : 1.0;
 
@@ -243,7 +235,7 @@ class StockDetailScreen extends StatelessWidget {
               children: [
                 // Top: Image + Info
                 Padding(
-                  padding: const EdgeInsets.all(18),
+                  padding: const EdgeInsets.all(14),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -505,7 +497,7 @@ class StockDetailScreen extends StatelessWidget {
                                     ),
                                     const SizedBox(width: 5),
                                     UrduAwareText(
-                                      '${isUrdu ? "کل مالیت" : "Total"}: Rs ${(computedStock * (avgCost > 0 ? avgCost : item.purchasePrice)).toStringAsFixed(0)}',
+                                      '${isUrdu ? "کل مالیت" : "Total"}: Rs ${Formatters.formatAmount((computedStock * (avgCost > 0 ? avgCost : item.purchasePrice)))}',
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w800,
@@ -597,83 +589,108 @@ class StockDetailScreen extends StatelessWidget {
   ) {
     return Column(
       children: [
+        if (item.trackStock) ...[
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  text: isUrdu ? 'سامان خریدا (+)' : 'Stock In (+)',
+                  icon: PhosphorIcons.plusCircle(),
+                  color: AppTheme.incomeColor,
+                  size: AppButtonSize.large,
+                  isFullWidth: true,
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => StockAdjustmentDialog(
+                        item: item,
+                        initialType: StockMovementType.purchase,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: AppButton(
+                  text: isUrdu ? 'سامان بیچا (−)' : 'Stock Out (−)',
+                  icon: PhosphorIcons.minusCircle(),
+                  color: AppTheme.expenseColor,
+                  size: AppButtonSize.large,
+                  isFullWidth: true,
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => StockAdjustmentDialog(
+                        item: item,
+                        initialType: StockMovementType.sale,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  text: isUrdu ? 'ایڈجسٹمنٹ' : 'Adjustment',
+                  icon: PhosphorIcons.sliders(),
+                  color: AppTheme.verifiedGold,
+                  size: AppButtonSize.large,
+                  isFullWidth: true,
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => StockAdjustmentDialog(
+                        item: item,
+                        initialType: StockMovementType.adjustment,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: AppButton(
+                  text: isUrdu ? 'واپسی' : 'Returns',
+                  icon: PhosphorIcons.arrowClockwise(),
+                  color: AppTheme.themeColor,
+                  size: AppButtonSize.large,
+                  isFullWidth: true,
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => StockAdjustmentDialog(
+                        item: item,
+                        initialType: StockMovementType.customerReturn,
+                        showTypeSelector: true,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+        ],
         Row(
           children: [
             Expanded(
-              child: _buildGradientActionButton(
-                text: isUrdu ? 'سامان خریدا (+)' : 'Stock In (+)',
-                icon: PhosphorIcons.plusCircle(),
-                colors: [AppTheme.incomeColor, const Color(0xFF6B7A1F)],
-                shadowColor: AppTheme.incomeColor.withValues(alpha: 0.3),
-                fontFamily: fontFamily,
+              child: AppButton(
+                text: isUrdu ? 'آئٹم میں ترمیم کریں' : 'Edit Item',
+                icon: PhosphorIcons.pencilSimple(),
+                color: const Color(0xFF7C3AED),
+                size: AppButtonSize.large,
+                isFullWidth: true,
                 onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => StockAdjustmentDialog(
-                      item: item,
-                      initialType: StockMovementType.purchase,
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildGradientActionButton(
-                text: isUrdu ? 'سامان بیچا (−)' : 'Stock Out (−)',
-                icon: PhosphorIcons.minusCircle(),
-                colors: [AppTheme.expenseColor, const Color(0xFFE04B36)],
-                shadowColor: AppTheme.expenseColor.withValues(alpha: 0.3),
-                fontFamily: fontFamily,
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => StockAdjustmentDialog(
-                      item: item,
-                      initialType: StockMovementType.sale,
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _buildGradientActionButton(
-                text: isUrdu ? 'ایڈجسٹمنٹ' : 'Adjustment',
-                icon: PhosphorIcons.sliders(),
-                colors: [const Color(0xFFD97706), const Color(0xFFF59E0B)],
-                shadowColor: const Color(0xFFD97706).withValues(alpha: 0.3),
-                fontFamily: fontFamily,
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => StockAdjustmentDialog(
-                      item: item,
-                      initialType: StockMovementType.adjustment,
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildGradientActionButton(
-                text: isUrdu ? 'واپسی' : 'Returns',
-                icon: PhosphorIcons.arrowClockwise(),
-                colors: [const Color(0xFF4A8FE3), const Color(0xFF2563EB)],
-                shadowColor: const Color(0xFF4A8FE3).withValues(alpha: 0.3),
-                fontFamily: fontFamily,
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => StockAdjustmentDialog(
-                      item: item,
-                      initialType: StockMovementType.customerReturn,
-                      showTypeSelector: true,
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          AddEditStockItemScreen(initialItem: item),
                     ),
                   );
                 },
@@ -682,62 +699,6 @@ class StockDetailScreen extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-
-  Widget _buildGradientActionButton({
-    required String text,
-    required IconData icon,
-    required List<Color> colors,
-    required Color shadowColor,
-    required VoidCallback onPressed,
-    String? fontFamily,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: colors,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: shadowColor,
-                blurRadius: 14,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: Colors.white),
-              const SizedBox(width: 8),
-              Flexible(
-                child: UrduAwareText(
-                  text,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: 0.2,
-                    fontFamily: fontFamily,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -767,7 +728,7 @@ class StockDetailScreen extends StatelessWidget {
                   children: [
                     _buildPriceStat(
                       label: isUrdu ? 'اوسط لاگت' : 'AVG COST',
-                      value: 'Rs ${avgCost.toStringAsFixed(0)}',
+                      value: 'Rs ${Formatters.formatAmount(avgCost)}',
                       icon: PhosphorIcons.money(),
                       fontFamily: fontFamily,
                     ),
@@ -775,7 +736,7 @@ class StockDetailScreen extends StatelessWidget {
                         width: 1, height: 60, color: AppTheme.backgroundColor),
                     _buildPriceStat(
                       label: isUrdu ? 'فروخت قیمت' : 'SALE PRICE',
-                      value: 'Rs ${item.sellingPrice.toStringAsFixed(0)}',
+                      value: 'Rs ${Formatters.formatAmount(item.sellingPrice)}',
                       icon: PhosphorIcons.tag(),
                       fontFamily: fontFamily,
                       isHighlight: true,
@@ -791,7 +752,7 @@ class StockDetailScreen extends StatelessWidget {
                     _buildPriceStat(
                       label: isUrdu ? 'تھوک قیمت' : 'WHOLESALE',
                       value: item.wholesalePrice > 0
-                          ? 'Rs ${item.wholesalePrice.toStringAsFixed(0)}'
+                          ? 'Rs ${Formatters.formatAmount(item.wholesalePrice)}'
                           : '—',
                       icon: PhosphorIcons.buildings(),
                       fontFamily: fontFamily,
@@ -801,7 +762,7 @@ class StockDetailScreen extends StatelessWidget {
                     _buildPriceStat(
                       label: isUrdu ? 'ایم آر پی' : 'MRP',
                       value: item.mrp > 0
-                          ? 'Rs ${item.mrp.toStringAsFixed(0)}'
+                          ? 'Rs ${Formatters.formatAmount(item.mrp)}'
                           : '—',
                       icon: PhosphorIcons.clipboard(),
                       fontFamily: fontFamily,
@@ -869,7 +830,7 @@ class StockDetailScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppTheme.incomeColor.withValues(alpha: 0.12),
+                  color: AppTheme.goldColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: UrduAwareText(
@@ -877,7 +838,7 @@ class StockDetailScreen extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.w800,
-                    color: AppTheme.incomeColor,
+                    color: AppTheme.goldColor,
                     fontFamily: fontFamily,
                   ),
                 ),
@@ -941,7 +902,7 @@ class StockDetailScreen extends StatelessWidget {
           if (item.description.isNotEmpty)
             Container(
               margin: const EdgeInsets.fromLTRB(18, 4, 18, 16),
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: AppTheme.backgroundColor.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(12),
@@ -953,8 +914,8 @@ class StockDetailScreen extends StatelessWidget {
               child: UrduAwareText(
                 item.description,
                 style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                   color: AppTheme.darkColor,
                   fontFamily: fontFamily,
                   height: 1.6,
@@ -1002,8 +963,8 @@ class StockDetailScreen extends StatelessWidget {
             child: UrduAwareText(
               label,
               style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
                 color: AppTheme.textSecondary,
                 fontFamily: fontFamily,
               ),
@@ -1014,8 +975,8 @@ class StockDetailScreen extends StatelessWidget {
             child: UrduAwareText(
               value,
               style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
+                fontSize: 15.5,
+                fontWeight: FontWeight.w800,
                 color: AppTheme.darkColor,
                 fontFamily: isMono ? 'monospace' : fontFamily,
                 letterSpacing: isMono ? 0.3 : 0,
@@ -1186,8 +1147,8 @@ class StockDetailScreen extends StatelessWidget {
         isPlus = false;
         break;
       case StockMovementType.adjustment:
-        iconColor = const Color(0xFFD97706);
-        iconBg = const Color(0xFFD97706).withValues(alpha: 0.12);
+        iconColor = AppTheme.verifiedGold;
+        iconBg = AppTheme.verifiedGold.withValues(alpha: 0.10);
         icon = PhosphorIcons.sliders();
         typeLabel = isUrdu ? 'ایڈجسٹمنٹ' : 'Adjustment';
         sign = movement.quantity >= 0 ? '+' : '−';
@@ -1243,7 +1204,13 @@ class StockDetailScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 UrduAwareText(
-                  movement.note.isNotEmpty ? movement.note : formattedDate,
+                  [
+                    if (movement.partyName.isNotEmpty)
+                      isUrdu
+                          ? 'پارٹی: ${movement.partyName}'
+                          : 'Party: ${movement.partyName}',
+                    movement.note.isNotEmpty ? movement.note : formattedDate,
+                  ].join(' • '),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
@@ -1276,7 +1243,7 @@ class StockDetailScreen extends StatelessWidget {
               if (movement.unitPrice > 0) ...[
                 const SizedBox(height: 2),
                 UrduAwareText(
-                  'Rs ${movement.unitPrice.toStringAsFixed(0)}',
+                  'Rs ${Formatters.formatAmount(movement.unitPrice)}',
                   style: const TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,

@@ -10,6 +10,7 @@ import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/utils/formatters.dart';
 
 class StockHistoryScreen extends StatelessWidget {
   const StockHistoryScreen({super.key});
@@ -20,7 +21,17 @@ class StockHistoryScreen extends StatelessWidget {
     final stockService = Provider.of<StockService>(context);
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-    final movements = stockService.movements;
+    final movementMap = <String, StockMovement>{};
+    for (final movement in stockService.movements) {
+      final key = movement.id.isNotEmpty
+          ? movement.id
+          : '${movement.stockItemId}|${movement.type.name}|${movement.quantity}|${movement.timestamp.millisecondsSinceEpoch}';
+      movementMap[key] = movement;
+    }
+    final movements = movementMap.values
+        .where((movement) => movement.type != StockMovementType.purchase)
+        .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
@@ -56,7 +67,7 @@ class StockHistoryScreen extends StatelessWidget {
               ),
             )
           : ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(0, 12, 0, 24),
               itemCount: movements.length,
               itemBuilder: (context, index) {
                 final m = movements[index];
@@ -68,64 +79,188 @@ class StockHistoryScreen extends StatelessWidget {
                 }
 
                 String typeLabel;
+                Color typeColor;
                 switch (m.type) {
-                  case StockMovementType.purchase:
                   case StockMovementType.customerReturn:
-                    typeLabel = m.type == StockMovementType.purchase
-                        ? (isUrdu ? 'خریداری (Stock In)' : 'Purchase')
-                        : (isUrdu ? 'گاہک کی واپسی' : 'Customer Return');
+                    typeLabel = isUrdu ? 'گاہک کی واپسی' : 'Customer Return';
+                    typeColor = AppTheme.incomeColor;
+                    break;
+                  case StockMovementType.supplierReturn:
+                    typeLabel = isUrdu ? 'سپلائر کو واپسی' : 'Supplier Return';
+                    typeColor = AppTheme.expenseColor;
                     break;
                   case StockMovementType.sale:
-                  case StockMovementType.supplierReturn:
-                    typeLabel = m.type == StockMovementType.sale
-                        ? (isUrdu ? 'فروخت (Stock Out)' : 'Sale')
-                        : (isUrdu ? 'سپلاٸر کو واپسی' : 'Supplier Return');
+                    typeLabel = isUrdu ? 'فروخت' : 'Sale';
+                    typeColor = AppTheme.expenseColor;
                     break;
                   case StockMovementType.adjustment:
                     typeLabel = isUrdu ? 'ایڈجسٹمنٹ' : 'Adjustment';
+                    typeColor = AppTheme.verifiedGold;
+                    break;
+                  case StockMovementType.purchase:
+                    typeLabel = isUrdu ? 'خریداری' : 'Purchase';
+                    typeColor = AppTheme.incomeColor;
                     break;
                 }
 
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 6),
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        width: 42,
-                        height: 42,
-                        color: AppTheme.themeColor.withValues(alpha: 0.1),
-                        child: _buildMovementAvatar(stockItem, m, isUrdu),
-                      ),
+                final itemName =
+                    isUrdu && stockItem?.nameUrdu.isNotEmpty == true
+                        ? stockItem!.nameUrdu
+                        : m.stockItemName;
+                final quantityLabel = isUrdu ? 'تعداد' : 'Quantity';
+                final rateLabel = isUrdu ? 'ریٹ' : 'Rate';
+
+                return Directionality(
+                  textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
+                  child: Card(
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    elevation: 0,
+                    color: Theme.of(context).cardTheme.color,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(color: Colors.grey.shade200),
                     ),
-                    title: UrduAwareText(
-                      m.stockItemName,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        fontFamily: fontFamily,
-                      ),
-                    ),
-                    subtitle: UrduAwareText(
-                      '$typeLabel • ${m.reason.isNotEmpty ? m.reason : (isUrdu ? 'معمول کا لین دین' : 'Regular transaction')}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey[700],
-                        fontFamily: fontFamily,
-                      ),
-                    ),
-                    trailing: UrduAwareText(
-                      '${m.quantity} x Rs. ${m.unitPrice.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  width: 48,
+                                  height: 48,
+                                  color: AppTheme.themeColor
+                                      .withValues(alpha: 0.1),
+                                  child: _buildMovementAvatar(
+                                      stockItem, m, isUrdu),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: isUrdu
+                                      ? CrossAxisAlignment.end
+                                      : CrossAxisAlignment.start,
+                                  children: [
+                                    UrduAwareText(
+                                      itemName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        color: AppTheme.darkColor,
+                                        fontFamily: fontFamily,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 4,
+                                      alignment: isUrdu
+                                          ? WrapAlignment.end
+                                          : WrapAlignment.start,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: typeColor.withValues(
+                                              alpha: 0.1,
+                                            ),
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                          ),
+                                          child: UrduAwareText(
+                                            typeLabel,
+                                            style: TextStyle(
+                                              color: typeColor,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              fontFamily: fontFamily,
+                                            ),
+                                          ),
+                                        ),
+                                        if (m.partyName.isNotEmpty)
+                                          UrduAwareText(
+                                            isUrdu
+                                                ? 'پارٹی: ${m.partyName}'
+                                                : 'Party: ${m.partyName}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.grey[700],
+                                              fontFamily: fontFamily,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (m.reason.isNotEmpty || m.note.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            UrduAwareText(
+                              m.note.isNotEmpty ? m.note : m.reason,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[700],
+                                fontFamily: fontFamily,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          Divider(height: 1, color: Colors.grey.shade200),
+                          const SizedBox(height: 10),
+                          Row(
+                            textDirection:
+                                isUrdu ? TextDirection.rtl : TextDirection.ltr,
+                            children: [
+                              _buildMovementMetric(
+                                label: quantityLabel,
+                                value:
+                                    '${_formatQuantity(m.quantity)} ${stockItem?.unit ?? ''}'
+                                        .trim(),
+                                isUrdu: isUrdu,
+                                fontFamily: fontFamily,
+                              ),
+                              const SizedBox(width: 12),
+                              _buildMovementMetric(
+                                label: rateLabel,
+                                value:
+                                    'Rs ${Formatters.formatAmount(m.unitPrice)}',
+                                isUrdu: isUrdu,
+                                fontFamily: fontFamily,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: isUrdu
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: UrduAwareText(
+                              Formatters.formatDateWithTime(m.timestamp),
+                              textDirection: TextDirection.ltr,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -133,6 +268,51 @@ class StockHistoryScreen extends StatelessWidget {
               },
             ),
     );
+  }
+
+  Widget _buildMovementMetric({
+    required String label,
+    required String value,
+    required bool isUrdu,
+    required String fontFamily,
+  }) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment:
+            isUrdu ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          UrduAwareText(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: AppTheme.textSecondary,
+              fontFamily: fontFamily,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: UrduAwareText(
+              value,
+              textDirection: TextDirection.ltr,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: AppTheme.darkColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatQuantity(double quantity) {
+    if (quantity == quantity.truncateToDouble()) {
+      return Formatters.formatAmount(quantity.toInt());
+    }
+
+    return quantity.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '');
   }
 
   Widget _buildMovementAvatar(

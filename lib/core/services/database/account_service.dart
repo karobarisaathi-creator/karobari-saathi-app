@@ -99,6 +99,13 @@ class AccountService extends BaseService {
     }
   }
 
+  Future<void> recalculateAllAccountBalances() async {
+    final accountIds = accountsBox?.keys.toList() ?? [];
+    for (final id in accountIds) {
+      await recalculateAccountBalance(id.toString());
+    }
+  }
+
   Future<int> getPartiesCount() async => accountsBox?.length ?? 0;
   Future<int> getPendingDuesCount() async =>
       accountsBox?.values.where((p) => p.balance != 0).length ?? 0;

@@ -26,10 +26,81 @@ class ReceiptBalanceBreakdown {
   });
 }
 
+class AccountTransactionColumns {
+  final double firstColumn;
+  final double secondColumn;
+
+  const AccountTransactionColumns({
+    required this.firstColumn,
+    required this.secondColumn,
+  });
+}
+
 class AccountBalanceUtils {
+  static AccountTransactionColumns transactionColumns(Transaction transaction) {
+    final isIncome = transaction.type == 'income';
+    final subtotal =
+        transaction.subtotal > 0 ? transaction.subtotal : transaction.amount;
+    final netTotal =
+        (subtotal - transaction.discountAmount).clamp(0, subtotal).toDouble();
+
+    if (transaction.receiptFromCounterparty && !transaction.isQuickBill) {
+      return AccountTransactionColumns(
+        firstColumn: isIncome ? transaction.receivedAmount : netTotal,
+        secondColumn: isIncome ? netTotal : transaction.receivedAmount,
+      );
+    }
+
+    if (transaction.isQuickBill) {
+      // ⭐ کھاتہ اور رسید کو ۱۰۰٪ برابر رکھنا:
+      // بنام (First Column) = نیٹ آئٹمز ٹوٹل (Sale) یا ادا شدہ رقم (Purchase)
+      // جمع (Second Column) = موصول شدہ رقم (Sale) یا نیٹ آئٹمز ٹوٹل (Purchase)
+      return AccountTransactionColumns(
+        firstColumn: isIncome ? netTotal : transaction.receivedAmount,
+        secondColumn: isIncome ? transaction.receivedAmount : netTotal,
+      );
+    }
+
+    return AccountTransactionColumns(
+      firstColumn: isIncome ? 0 : transaction.amount,
+      secondColumn: isIncome ? transaction.amount : 0,
+    );
+  }
+
+  static double ledgerBalance(
+    Iterable<Transaction> transactions, {
+    double initialBalance = 0,
+  }) {
+    return transactions.fold(
+      initialBalance,
+      (balance, transaction) =>
+          balance +
+          (transaction.type == 'income'
+              ? transaction.accountBalanceAmount
+              : -transaction.accountBalanceAmount),
+    );
+  }
+
+  static Map<String, double> runningBalances(
+    Iterable<Transaction> transactions, {
+    double initialBalance = 0,
+  }) {
+    final sortedTransactions = transactions.toList()..sort(_compareOrder);
+    final balances = <String, double>{};
+    var balance = initialBalance;
+
+    for (final transaction in sortedTransactions) {
+      final columns = transactionColumns(transaction);
+      balance += columns.firstColumn - columns.secondColumn;
+      if (balance.abs() < 0.01) balance = 0;
+      balances[transaction.id] = balance;
+    }
+
+    return balances;
+  }
+
   static AccountCycleBalance currentCycle(Iterable<Transaction> transactions) {
-    final sortedTransactions = transactions.toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+    final sortedTransactions = transactions.toList()..sort(_compareOrder);
 
     double currentCycleIn = 0;
     double currentCycleOut = 0;
@@ -37,13 +108,11 @@ class AccountBalanceUtils {
     double totalRunningOut = 0;
 
     for (final transaction in sortedTransactions) {
-      if (transaction.type == 'income') {
-        totalRunningIn += transaction.accountBalanceAmount;
-        currentCycleIn += transaction.accountBalanceAmount;
-      } else {
-        totalRunningOut += transaction.accountBalanceAmount;
-        currentCycleOut += transaction.accountBalanceAmount;
-      }
+      final columns = transactionColumns(transaction);
+      totalRunningOut += columns.firstColumn;
+      currentCycleOut += columns.firstColumn;
+      totalRunningIn += columns.secondColumn;
+      currentCycleIn += columns.secondColumn;
 
       if ((totalRunningIn - totalRunningOut).abs() < 0.01) {
         currentCycleIn = 0;
@@ -57,11 +126,9 @@ class AccountBalanceUtils {
       double lastCycleIn = 0;
       double lastCycleOut = 0;
       for (final transaction in sortedTransactions) {
-        if (transaction.type == 'income') {
-          lastCycleIn += transaction.accountBalanceAmount;
-        } else {
-          lastCycleOut += transaction.accountBalanceAmount;
-        }
+        final columns = transactionColumns(transaction);
+        lastCycleOut += columns.firstColumn;
+        lastCycleIn += columns.secondColumn;
 
         if ((lastCycleIn - lastCycleOut).abs() < 0.01) {
           currentCycleIn = lastCycleIn;
@@ -98,16 +165,16 @@ class AccountBalanceUtils {
 
     var openingBalance = initialBalance;
     for (final transaction in precedingTransactions) {
-      openingBalance += transaction.type == 'income'
-          ? transaction.accountBalanceAmount
-          : -transaction.accountBalanceAmount;
+      final columns = transactionColumns(transaction);
+      openingBalance += columns.firstColumn - columns.secondColumn;
       if (openingBalance.abs() < 0.01) openingBalance = 0;
     }
 
     final direction = receipt.type == 'income' ? 1.0 : -1.0;
     final subtotal = receipt.subtotal > 0 ? receipt.subtotal : receipt.amount;
     final discount = receipt.discountAmount.clamp(0, subtotal).toDouble();
-    final received = receipt.receivedAmount.clamp(0, subtotal - discount).toDouble();
+    final received =
+        receipt.receivedAmount.clamp(0, subtotal - discount).toDouble();
     final beforeDiscount = openingBalance + direction * subtotal;
     final afterDiscount = beforeDiscount - direction * discount;
     final finalBalance = afterDiscount - direction * received;

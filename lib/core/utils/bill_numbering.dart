@@ -15,7 +15,7 @@ class BillNumbering {
         ?.toString()
         .trim();
     if (legacyNumber != null && legacyNumber.isNotEmpty) return legacyNumber;
-    return null;
+    return 'QB-1';
   }
 
   static String increment(String billNumber) {

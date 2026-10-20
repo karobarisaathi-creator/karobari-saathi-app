@@ -7,10 +7,16 @@ import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/backup_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
+import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/theme/app_theme.dart';
+import 'package:account_app/features/settings/master_profile_screen.dart';
 
 class BackupScreen extends StatefulWidget {
+  const BackupScreen({super.key});
+
   @override
-  _BackupScreenState createState() => _BackupScreenState();
+  State<BackupScreen> createState() => _BackupScreenState();
 }
 
 class _BackupScreenState extends State<BackupScreen> {
@@ -21,6 +27,10 @@ class _BackupScreenState extends State<BackupScreen> {
   bool _isLoading = true;
   bool _isBackingUp = false;
   bool _isRestoring = false;
+
+  bool get isUrdu {
+    return Provider.of<LanguageService>(context, listen: false).isUrdu;
+  }
 
   @override
   void initState() {
@@ -47,38 +57,43 @@ class _BackupScreenState extends State<BackupScreen> {
     }
   }
 
+  Future<void> _navigateToProfile() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const MasterProfileScreen(),
+      ),
+    );
+    await _loadBackupInfo();
+  }
+
   @override
   Widget build(BuildContext context) {
     final languageService = Provider.of<LanguageService>(context);
     final isUrdu = languageService.isUrdu;
 
     return Scaffold(
-      appBar: AppBar(
-        title: UrduAwareText(
-          isUrdu ? 'ڈیٹا بیک اپ' : 'Data Backup',
-          style: TextStyle(
-            fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-            fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
+      backgroundColor: AppTheme.backgroundColor,
+      appBar: CustomAppBar(
+        title: isUrdu ? 'ڈیٹا بیک اپ' : 'Data Backup',
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: AppTheme.themeColor))
           : SingleChildScrollView(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 28),
               child: Column(
                 children: [
                   // Backup Status Card
                   _buildBackupStatusCard(isUrdu),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 12),
 
                   // Data Statistics
                   _buildDataStatisticsCard(isUrdu),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 12),
 
                   // Backup Actions
                   _buildBackupActionsCard(isUrdu),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 12),
 
                   // Auto Backup Settings
                   _buildAutoBackupCard(isUrdu),
@@ -91,23 +106,57 @@ class _BackupScreenState extends State<BackupScreen> {
   Widget _buildBackupStatusCard(bool isUrdu) {
     final lastBackup = _backupInfo['lastBackup'];
     final lastRestore = _backupInfo['lastRestore'];
+    final email = _backupInfo['email']?.toString() ?? '';
 
     return Card(
-      elevation: 4,
+      elevation: 2,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            UrduAwareText(
-              isUrdu ? 'بیک اپ کی حالت' : 'Backup Status',
-              style: TextStyle(
-                fontSize: 18,
-                fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                UrduAwareText(
+                  isUrdu ? 'بیک اپ کی حالت' : 'Backup Status',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.darkColor,
+                    fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _navigateToProfile,
+                  icon: const Icon(Icons.edit, size: 16, color: AppTheme.themeColor),
+                  label: UrduAwareText(
+                    isUrdu ? 'ای میل تبدیل کریں' : 'Change Email',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.themeColor,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+                    ),
+                  ),
+                ),
+              ],
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
+
+            _buildStatusItem(
+              isUrdu ? 'بیک اپ ای میل:' : 'Backup Email:',
+              email.isNotEmpty
+                  ? email
+                  : isUrdu
+                  ? 'درج نہیں ہے (پروفائل میں جوڑیں)'
+                  : 'Not set (Link in Profile)',
+              Icons.email,
+              AppTheme.purpleColor,
+              isUrdu,
+            ),
 
             _buildStatusItem(
               isUrdu ? 'آخری بیک اپ:' : 'Last Backup:',
@@ -117,7 +166,8 @@ class _BackupScreenState extends State<BackupScreen> {
                   ? 'کبھی نہیں'
                   : 'Never',
               Icons.backup,
-              Colors.green,
+              AppTheme.incomeColor,
+              isUrdu,
             ),
 
             _buildStatusItem(
@@ -128,14 +178,16 @@ class _BackupScreenState extends State<BackupScreen> {
                   ? 'کبھی نہیں'
                   : 'Never',
               Icons.restore,
-              Colors.blue,
+              AppTheme.themeColor,
+              isUrdu,
             ),
 
             _buildStatusItem(
               isUrdu ? 'بیک اپ سائز:' : 'Backup Size:',
               _formatFileSize(_backupInfo['backupSize'] ?? 0),
               Icons.storage,
-              Colors.orange,
+              AppTheme.verifiedGold,
+              isUrdu,
             ),
           ],
         ),
@@ -145,9 +197,11 @@ class _BackupScreenState extends State<BackupScreen> {
 
   Widget _buildDataStatisticsCard(bool isUrdu) {
     return Card(
-      elevation: 4,
+      elevation: 2,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -155,11 +209,12 @@ class _BackupScreenState extends State<BackupScreen> {
               isUrdu ? 'ڈیٹا کے اعداد و شمار' : 'Data Statistics',
               style: TextStyle(
                 fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.darkColor,
                 fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
 
             Row(
               children: [
@@ -168,7 +223,8 @@ class _BackupScreenState extends State<BackupScreen> {
                     isUrdu ? 'اکاؤنٹس' : 'Accounts',
                     _backupInfo['totalAccounts']?.toString() ?? '0',
                     Icons.people,
-                    Colors.green,
+                    AppTheme.incomeColor,
+                    isUrdu,
                   ),
                 ),
                 Expanded(
@@ -176,7 +232,8 @@ class _BackupScreenState extends State<BackupScreen> {
                     isUrdu ? 'لین دین' : 'Transactions',
                     _backupInfo['totalTransactions']?.toString() ?? '0',
                     Icons.account_balance_wallet,
-                    Colors.blue,
+                    AppTheme.themeColor,
+                    isUrdu,
                   ),
                 ),
               ],
@@ -189,9 +246,11 @@ class _BackupScreenState extends State<BackupScreen> {
 
   Widget _buildBackupActionsCard(bool isUrdu) {
     return Card(
-      elevation: 4,
+      elevation: 2,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -199,48 +258,33 @@ class _BackupScreenState extends State<BackupScreen> {
               isUrdu ? 'بیک اپ کے اختیارات' : 'Backup Options',
               style: TextStyle(
                 fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.darkColor,
                 fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-            _buildActionButton(
-              isUrdu ? 'کلاؤڈ پر بیک اپ کریں' : 'Backup to Cloud',
-              Icons.cloud_upload,
-              Colors.green,
-              _createCloudBackup,
-              _isBackingUp,
+            AppButton(
+              text: isUrdu ? 'کلاؤڈ پر بیک اپ کریں' : 'Backup to Cloud',
+              icon: Icons.cloud_upload,
+              color: AppTheme.incomeColor,
+              size: AppButtonSize.large,
+              isLoading: _isBackingUp,
+              isFullWidth: true,
+              onPressed: _createCloudBackup,
             ),
 
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
 
-            _buildActionButton(
-              isUrdu ? 'کلاؤڈ سے بحالی کریں' : 'Restore from Cloud',
-              Icons.cloud_download,
-              Colors.blue,
-              _restoreFromCloud,
-              _isRestoring,
-            ),
-
-            SizedBox(height: 12),
-
-            _buildActionButton(
-              isUrdu ? 'ڈیٹا ایکسپورٹ کریں' : 'Export Data',
-              Icons.file_download,
-              Colors.orange,
-              _exportData,
-              false,
-            ),
-
-            SizedBox(height: 12),
-
-            _buildActionButton(
-              isUrdu ? 'ڈیٹا امپورٹ کریں' : 'Import Data',
-              Icons.file_upload,
-              Colors.purple,
-              _importData,
-              false,
+            AppButton(
+              text: isUrdu ? 'کلاؤڈ سے بحالی کریں' : 'Restore from Cloud',
+              icon: Icons.cloud_download,
+              color: AppTheme.themeColor,
+              size: AppButtonSize.large,
+              isLoading: _isRestoring,
+              isFullWidth: true,
+              onPressed: _restoreFromCloud,
             ),
           ],
         ),
@@ -250,9 +294,11 @@ class _BackupScreenState extends State<BackupScreen> {
 
   Widget _buildAutoBackupCard(bool isUrdu) {
     return Card(
-      elevation: 4,
+      elevation: 2,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -260,11 +306,12 @@ class _BackupScreenState extends State<BackupScreen> {
               isUrdu ? 'خودکار بیک اپ' : 'Auto Backup',
               style: TextStyle(
                 fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.darkColor,
                 fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
 
             Row(
               children: [
@@ -272,20 +319,28 @@ class _BackupScreenState extends State<BackupScreen> {
                   child: UrduAwareText(
                     isUrdu ? 'خودکار بیک اپ فعال کریں' : 'Enable Auto Backup',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.darkColor,
                       fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                      fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                 ),
-                Switch(
+                Switch.adaptive(
+                  activeThumbColor: AppTheme.themeColor,
                   value: _backupInfo['autoBackupEnabled'] ?? false,
                   onChanged: _toggleAutoBackup,
+                  thumbIcon: WidgetStateProperty.resolveWith<Icon?>((states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return const Icon(Icons.check, size: 14, color: Colors.white);
+                    }
+                    return const Icon(Icons.close, size: 14, color: Colors.grey);
+                  }),
                 ),
               ],
             ),
 
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
 
             UrduAwareText(
               isUrdu
@@ -293,9 +348,8 @@ class _BackupScreenState extends State<BackupScreen> {
                   : 'Auto backup will save data to cloud every 7 days',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey,
+                color: AppTheme.textSecondary,
                 fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
               ),
             ),
           ],
@@ -309,27 +363,35 @@ class _BackupScreenState extends State<BackupScreen> {
     String value,
     IconData icon,
     Color color,
+    bool isUrdu,
   ) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 20),
-          SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: UrduAwareText(
               label,
               style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppTheme.darkColor,
                 fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
               ),
             ),
           ),
           UrduAwareText(
             value,
-            style: TextStyle(
-              color: Colors.grey[700],
-              fontFamily: '',
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -343,71 +405,37 @@ class _BackupScreenState extends State<BackupScreen> {
     String value,
     IconData icon,
     Color color,
+    bool isUrdu,
   ) {
     return Column(
       children: [
         Container(
-          padding: EdgeInsets.all(12),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: color, size: 24),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         UrduAwareText(
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey,
+            color: AppTheme.textSecondary,
             fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-            fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
           ),
         ),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         UrduAwareText(
           value,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 18,
-            fontFamily: '',
             fontWeight: FontWeight.bold,
+            color: AppTheme.darkColor,
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildActionButton(
-    String text,
-    IconData icon,
-    Color color,
-    VoidCallback onPressed,
-    bool isLoading,
-  ) {
-    return ElevatedButton.icon(
-      onPressed: isLoading ? null : onPressed,
-      icon: isLoading
-          ? SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            )
-          : Icon(icon, size: 20),
-      label: UrduAwareText(
-        text,
-        style: TextStyle(
-          fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-          fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
-        ),
-      ),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        minimumSize: Size(double.infinity, 50),
-      ),
     );
   }
 
@@ -415,17 +443,24 @@ class _BackupScreenState extends State<BackupScreen> {
     setState(() => _isBackingUp = true);
 
     try {
-      await _backupService.createBackup();
+      await _backupService.createBackup(isUrdu: isUrdu);
       await _loadBackupInfo();
 
+      final email = _backupInfo['email']?.toString() ?? '';
       _showSnackBar(
         isUrdu
-            ? 'بیک اپ کامیابی سے مکمل ہوگیا'
-            : 'Backup completed successfully',
+            ? 'بیک اپ کامیابی سے مکمل ہو گیا اور ای میل ($email) سے جڑ گیا'
+            : 'Backup completed successfully and linked to $email',
         false,
       );
     } catch (e) {
-      _showSnackBar('${isUrdu ? 'خرابی:' : 'Error:'} $e', true);
+      final err = e.toString().replaceAll('Exception: ', '');
+      final message = isUrdu
+          ? (err.toLowerCase().contains('email') || err.toLowerCase().contains('profile') || err.toLowerCase().contains('ای میل')
+              ? 'براہ کرم پہلے پروفائل میں ای میل درج کریں تاکہ بیک اپ جڑ سکے'
+              : 'بیک اپ بنانے میں خرابی: $err')
+          : err;
+      _showSnackBar(message, true);
     } finally {
       setState(() => _isBackingUp = false);
     }
@@ -452,47 +487,41 @@ class _BackupScreenState extends State<BackupScreen> {
         false,
       );
     } catch (e) {
-      _showSnackBar('${isUrdu ? 'خرابی:' : 'Error:'} $e', true);
+      final err = e.toString().replaceAll('Exception: ', '');
+      _showSnackBar(isUrdu ? 'ڈیٹا بحال کرنے میں خرابی: $err' : 'Restore error: $err', true);
     } finally {
       setState(() => _isRestoring = false);
     }
   }
 
-  Future<void> _exportData() async {
-    try {
-      final jsonData = await _backupService.exportToJson();
-      // Implementation for saving JSON file
-      // This would use file_saver or share_plus
-
-      _showSnackBar(
-        isUrdu ? 'ڈیٹا ایکسپورٹ کیا گیا' : 'Data exported successfully',
-        false,
-      );
-    } catch (e) {
-      _showSnackBar('${isUrdu ? 'خرابی:' : 'Error:'} $e', true);
-    }
-  }
-
-  Future<void> _importData() async {
-    // Implementation for importing from JSON file
-    // This would use file_picker
-  }
-
   Future<void> _toggleAutoBackup(bool enabled) async {
     try {
-      await _backupService.scheduleAutoBackup(enabled);
+      await _backupService.scheduleAutoBackup(enabled, isUrdu: isUrdu);
       await _loadBackupInfo();
 
-      _showSnackBar(
-        enabled
-            ? (isUrdu ? 'خودکار بیک اپ فعال ہوگیا' : 'Auto backup enabled')
-            : (isUrdu
-                  ? 'خودکار بیک اپ غیر فعال ہوگیا'
-                  : 'Auto backup disabled'),
-        false,
-      );
+      final email = _backupInfo['email']?.toString() ?? '';
+      if (enabled) {
+        _showSnackBar(
+          isUrdu
+              ? 'خودکار بیک اپ فعال ہو گیا اور ای میل ($email) سے جڑ گیا'
+              : 'Auto backup enabled and linked to $email',
+          false,
+        );
+      } else {
+        _showSnackBar(
+          isUrdu ? 'خودکار بیک اپ غیر فعال ہوگیا' : 'Auto backup disabled',
+          false,
+        );
+      }
     } catch (e) {
-      _showSnackBar('${isUrdu ? 'خرابی:' : 'Error:'} $e', true);
+      await _loadBackupInfo();
+      final err = e.toString().replaceAll('Exception: ', '');
+      final message = isUrdu
+          ? (err.toLowerCase().contains('email') || err.toLowerCase().contains('profile') || err.toLowerCase().contains('ای میل')
+              ? 'خودکار بیک اپ فعال کرنے کے لیے پہلے پروفائل میں ای میل درج کریں'
+              : 'خودکار بیک اپ میں خرابی: $err')
+          : err;
+      _showSnackBar(message, true);
     }
   }
 
@@ -507,18 +536,21 @@ class _BackupScreenState extends State<BackupScreen> {
     return await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: UrduAwareText(
               title,
               style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppTheme.darkColor,
                 fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
               ),
             ),
             content: UrduAwareText(
               message,
               style: TextStyle(
+                color: AppTheme.textSecondary,
                 fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
               ),
             ),
             actions: [
@@ -527,8 +559,9 @@ class _BackupScreenState extends State<BackupScreen> {
                 child: UrduAwareText(
                   isUrdu ? 'منسوخ' : 'Cancel',
                   style: TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.bold,
                     fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                    fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
               ),
@@ -537,9 +570,9 @@ class _BackupScreenState extends State<BackupScreen> {
                 child: UrduAwareText(
                   isUrdu ? 'جاری رکھیں' : 'Continue',
                   style: TextStyle(
-                    color: Colors.red,
+                    color: AppTheme.expenseColor,
+                    fontWeight: FontWeight.bold,
                     fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                    fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
               ),
@@ -555,9 +588,5 @@ class _BackupScreenState extends State<BackupScreen> {
     } else {
       AppToast.success(context, message);
     }
-  }
-
-  bool get isUrdu {
-    return Provider.of<LanguageService>(context, listen: false).isUrdu;
   }
 }

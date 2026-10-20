@@ -17,7 +17,8 @@ import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/party_card.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'package:account_app/core/utils/bill_numbering.dart';
-import 'package:account_app/core/utils/receipt_helper.dart';
+import 'package:account_app/core/utils/receipt_dialog_helper.dart';
+import 'package:account_app/core/utils/formatters.dart';
 import 'quick_bill_item_selection_screen.dart';
 import 'widgets/customer_picker_sheet.dart';
 
@@ -56,6 +57,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
   bool _saving = false;
   bool _didInitializeEditState = false;
   bool _didInitializeBillNumber = false;
+  bool _isDiscountExpanded = false;
 
   // Discount presets
   static const List<double> _discountPresets = [0, 5, 10, 15, 20, 25, 50];
@@ -67,10 +69,10 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
     _transactionId =
         original?.id ?? DateTime.now().millisecondsSinceEpoch.toString();
     final existingBillNumber = original?.referenceNumber?.trim() ?? '';
-    final billNumber = existingBillNumber.isNotEmpty
-        ? existingBillNumber
-        : 'QB-$_transactionId';
-    _billNumberController = TextEditingController(text: billNumber);
+    final billNum = existingBillNumber.isNotEmpty
+        ? (existingBillNumber.startsWith('QB-') ? existingBillNumber : 'QB-$existingBillNumber')
+        : 'QB-1';
+    _billNumberController = TextEditingController(text: billNum);
 
     // Initialize discount from existing transaction
     if (original != null && original.discountAmount > 0) {
@@ -187,7 +189,8 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
   void _loadNextBillNumber(DatabaseService databaseService) {
     final nextNumber = BillNumbering.loadNextNumber(databaseService);
     if (nextNumber != null) {
-      _billNumberController.text = nextNumber;
+      final billNum = nextNumber.startsWith('QB-') ? nextNumber : 'QB-$nextNumber';
+      _billNumberController.text = billNum;
     }
   }
 
@@ -209,63 +212,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
     }, popupSetState: popupSetState);
   }
 
-  Future<void> _showDiscountDialog(
-    bool isUrdu,
-    String? fontFamily,
-  ) async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => Dialog(
-        insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.85,
-          ),
-          child: StatefulBuilder(
-            builder: (context, setPopupState) => Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 8, 6),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: UrduAwareText(
-                          isUrdu ? 'ڈسکاونٹ' : 'Discount',
-                          style: TextStyle(
-                            fontFamily: fontFamily,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.darkColor,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: isUrdu ? 'بند کریں' : 'Close',
-                        onPressed: () => Navigator.of(dialogContext).pop(),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
-                  ),
-                ),
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                    child: _buildDiscountCard(
-                      isUrdu,
-                      fontFamily,
-                      popupSetState: setPopupState,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  // (removed _showDiscountDialog in favor of inline expansion)
 
   Future<void> _pickCustomer() async {
     final result = await showCustomerPickerSheet(context);
@@ -397,7 +344,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
       final transaction = Transaction(
         id: originalTransaction?.id ?? _transactionId,
         accountId: account.id,
-        amount: _total, // ← Total after discount
+        amount: _pendingAmount, // ← Effective amount (pending balance)
         subtotal: _subtotal, // ← NEW: Before discount
         discountAmount: _discountAmount, // ← NEW
         discountPercent:
@@ -420,11 +367,18 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
         createdAt: originalTransaction?.createdAt ?? now,
         updatedAt: now,
         billImage: originalTransaction?.billImage,
-        referenceNumber: _billNumberController.text.trim(),
+        referenceNumber: () {
+          final raw = _billNumberController.text.trim();
+          return raw.isEmpty
+              ? 'QB-1'
+              : (raw.startsWith('QB-') ? raw : 'QB-$raw');
+        }(),
         professionId: originalTransaction?.professionId,
         professionName: originalTransaction?.professionName,
         partnershipId: originalTransaction?.partnershipId,
         voiceNote: originalTransaction?.voiceNote,
+        receiptFromCounterparty:
+            originalTransaction?.receiptFromCounterparty ?? false,
         items: items,
       );
 
@@ -432,9 +386,12 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
       if (originalTransaction == null) {
         stockSynced = await databaseService.addTransaction(transaction);
         try {
+          final raw = _billNumberController.text.trim();
+          final fullNum =
+              raw.isEmpty ? 'QB-1' : (raw.startsWith('QB-') ? raw : 'QB-$raw');
           await BillNumbering.saveNextNumber(
             databaseService,
-            _billNumberController.text,
+            fullNum,
           );
         } catch (error) {
           followUpFailures.add(
@@ -451,7 +408,8 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
         final retry = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: UrduAwareText(isUrdu ? 'اسٹاک اپڈیٹ نہیں ہوا' : 'Stock was not updated'),
+            title: UrduAwareText(
+                isUrdu ? 'اسٹاک اپڈیٹ نہیں ہوا' : 'Stock was not updated'),
             content: UrduAwareText(
               isUrdu
                   ? 'بل محفوظ ہوگیا ہے، مگر اس کا اسٹاک ریکارڈ اپڈیٹ نہیں ہوا۔ دوبارہ کوشش کریں؟'
@@ -530,7 +488,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
       }
       widget.onBillCompleted?.call();
       Navigator.of(context).pop();
-      ReceiptHelper.showReceiptDialog(
+      ReceiptDialogHelper.showReceiptDialog(
         context,
         transaction: transaction,
         account: _selectedAccount,
@@ -578,57 +536,50 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 14),
               children: [
-                // ═══ BILL NUMBER CARD ═══
+                // 1. BILL NUMBER CARD
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   child: _buildBillNumberCard(isUrdu, fontFamily),
                 ),
                 const SizedBox(height: 12),
 
-                // ═══ MAIN CARD: Items + Totals + Discount ═══
+                // 2. PARTY SELECTION CARD (if _mode != _PayMode.full)
+                if (_mode != _PayMode.full) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        UrduAwareText(
+                          isUrdu ? 'پارٹی منتخب کریں' : 'Select party',
+                          style: TextStyle(
+                            fontFamily: fontFamily,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (_selectedAccount != null && !_isCashCustomer)
+                          PartyCard(
+                            party: _selectedAccount!,
+                            onView: _pickCustomer,
+                            onMessage: () {},
+                            showActions: false,
+                            margin: EdgeInsets.zero,
+                          )
+                        else
+                          _buildPickPartyPlaceholder(isUrdu, fontFamily),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // 3. MAIN ITEMS CARD (Items + Totals + Customer Paid at bottom)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   child: _buildMainBillCard(isUrdu, fontFamily),
                 ),
-                const SizedBox(height: 12),
-
-                // ═══ PARTIAL PAYMENT ═══
-                if (_mode == _PayMode.partial) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: _buildPartialCard(isUrdu, fontFamily),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // ═══ PARTY SELECTION ═══
-                if (_mode != _PayMode.full) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: UrduAwareText(
-                      isUrdu ? 'پارٹی منتخب کریں' : 'Select party',
-                      style: TextStyle(
-                        fontFamily: fontFamily,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (_selectedAccount != null && !_isCashCustomer)
-                    PartyCard(
-                      party: _selectedAccount!,
-                      onView: _pickCustomer,
-                      onMessage: () {},
-                    )
-                  else
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      child: _buildPickPartyPlaceholder(isUrdu, fontFamily),
-                    ),
-                  const SizedBox(height: 12),
-                ],
-
                 const SizedBox(height: 8),
               ],
             ),
@@ -644,7 +595,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
   // ═════════════════════════════════════════════════════════
   Widget _buildBillNumberCard(bool isUrdu, String? fontFamily) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -662,45 +613,16 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
             isUrdu ? 'بل نمبر' : 'Bill number',
             style: TextStyle(
               fontFamily: fontFamily,
-              fontSize: 12,
+              fontSize: 12.5,
               fontWeight: FontWeight.w700,
               color: AppTheme.textSecondary,
             ),
           ),
           const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F7FA),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE1E5EC), width: 1.5),
-            ),
-            child: SizedBox(
-              width: 140,
-              child: TextField(
-                controller: _billNumberController,
-                textDirection: TextDirection.ltr,
-                textAlign: TextAlign.end,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  color: AppTheme.darkColor,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.3,
-                ),
-                decoration: InputDecoration(
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
-                  border: InputBorder.none,
-                  hintText: isUrdu ? 'بل نمبر' : 'Bill number',
-                  hintStyle: TextStyle(
-                    fontFamily: fontFamily,
-                    color: AppTheme.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ),
+          _BillNumberFieldWidget(
+            controller: _billNumberController,
+            isUrdu: isUrdu,
+            fontFamily: fontFamily,
           ),
         ],
       ),
@@ -708,7 +630,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
   }
 
   // ═════════════════════════════════════════════════════════
-  // MAIN BILL CARD — Items + Subtotal + Discount + Total
+  // MAIN BILL CARD — Items + Subtotal + Discount + Total + Customer Paid
   // ═════════════════════════════════════════════════════════
   Widget _buildMainBillCard(bool isUrdu, String? fontFamily) {
     return Container(
@@ -720,62 +642,6 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF5F7FA),
-              border: Border(bottom: BorderSide(color: Color(0xFFEEF1F5))),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: AppTheme.themeColor.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Icon(
-                    PhosphorIcons.shoppingCart(),
-                    size: 15,
-                    color: AppTheme.themeColor,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: UrduAwareText(
-                    isUrdu ? 'آئٹمز' : 'Items',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.darkColor,
-                      fontFamily: fontFamily,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppTheme.themeColor.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: UrduAwareText(
-                    '${widget.lines.length} ${isUrdu ? "آئٹمز" : "items"}',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.themeColor,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
           // Items list
           ...widget.lines.map((line) => _buildItemRow(line, fontFamily)),
 
@@ -791,7 +657,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                 // Subtotal
                 _buildTotalLine(
                   label: isUrdu ? 'کل رقم' : 'Subtotal',
-                  value: _subtotal.toStringAsFixed(0),
+                  value: Formatters.formatAmount(_subtotal),
                   fontFamily: fontFamily,
                 ),
 
@@ -800,6 +666,91 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
 
                 // Grand Total
                 _buildGrandTotalLine(isUrdu, fontFamily),
+
+                // Customer Paid Row (if _mode == _PayMode.partial) — AT THE VERY BOTTOM OF TOTALS
+                if (_mode == _PayMode.partial) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: const BoxDecoration(
+                      border: Border(top: BorderSide(color: Color(0xFFEEF1F5))),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          PhosphorIcons.money(),
+                          size: 14,
+                          color: AppTheme.themeColor,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: UrduAwareText(
+                            isUrdu ? 'گاہک نے دیے' : 'Customer paid',
+                            style: TextStyle(
+                              fontFamily: fontFamily,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.darkColor,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: const Color(0xFFC9D0D8), width: 1),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 80,
+                                child: TextField(
+                                  controller: _partialController,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  textAlign: TextAlign.start,
+                                  textDirection: TextDirection.ltr,
+                                  onChanged: (_) => setState(() {}),
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppTheme.darkColor,
+                                  ),
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    contentPadding:
+                                        EdgeInsets.symmetric(vertical: 4),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    hintText: '0',
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const UrduAwareText(
+                                'Rs',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -834,13 +785,16 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 3),
-                UrduAwareText(
-                  '${line.quantity.toStringAsFixed(line.quantity == line.quantity.roundToDouble() ? 0 : 1)} ${line.unit ?? ""} × Rs ${line.rate.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textSecondary,
-                    letterSpacing: 0.2,
+                Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: Text(
+                    '${line.quantity.toStringAsFixed(line.quantity == line.quantity.roundToDouble() ? 0 : 1)} ${line.unit ?? ""} × Rs ${line.rate.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
+                      letterSpacing: 0.2,
+                    ),
                   ),
                 ),
               ],
@@ -848,7 +802,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
           ),
           const SizedBox(width: 10),
           UrduAwareText(
-            line.total.toStringAsFixed(0),
+            Formatters.formatAmount(line.total),
             style: const TextStyle(
               fontSize: 13.5,
               fontWeight: FontWeight.w900,
@@ -928,7 +882,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
             ),
           ),
           UrduAwareText(
-            '− ${_discountAmount.toStringAsFixed(0)}',
+            '− ${Formatters.formatAmount(_discountAmount)}',
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w900,
@@ -969,7 +923,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
             ),
           ),
           UrduAwareText(
-            _total.toStringAsFixed(0),
+            Formatters.formatAmount(_total),
             style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w900,
@@ -1227,93 +1181,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
   }
 
   // ═════════════════════════════════════════════════════════
-  // Partial Payment Card
-  // ═════════════════════════════════════════════════════════
-  Widget _buildPartialCard(bool isUrdu, String? fontFamily) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE1E5EC), width: 1.5),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            PhosphorIcons.money(),
-            size: 14,
-            color: AppTheme.themeColor,
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: UrduAwareText(
-              isUrdu ? 'گاہک نے دیے' : 'Customer paid',
-              style: TextStyle(
-                fontFamily: fontFamily,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.darkColor,
-              ),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 8,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: const Color(0xFFC9D0D8),
-                width: 1.5,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 70,
-                  child: TextField(
-                    controller: _partialController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    textAlign: TextAlign.right,
-                    textDirection: TextDirection.ltr,
-                    onChanged: (_) => setState(() {}),
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
-                      color: AppTheme.darkColor,
-                    ),
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                      border: InputBorder.none,
-                      hintText: '0',
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const UrduAwareText(
-                  'Rs',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ═════════════════════════════════════════════════════════
-  // Pick Party Placeholder
+  // Bill Number Field Widget (with subtle focus background)
   // ═════════════════════════════════════════════════════════
   Widget _buildPickPartyPlaceholder(bool isUrdu, String? fontFamily) {
     return InkWell(
@@ -1407,9 +1275,27 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Expanded discount card (opens upwards)
+              if (_isDiscountExpanded) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFAF5EC),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(
+                      color: const Color(0xFFD97706).withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: _buildDiscountCard(isUrdu, fontFamily),
+                ),
+              ],
+
               // Discount control
               InkWell(
-                onTap: () => _showDiscountDialog(isUrdu, fontFamily),
+                onTap: () =>
+                    setState(() => _isDiscountExpanded = !_isDiscountExpanded),
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1446,7 +1332,9 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                       ],
                       const SizedBox(width: 6),
                       Icon(
-                        PhosphorIcons.caretDown(),
+                        _isDiscountExpanded
+                            ? PhosphorIcons.caretUp()
+                            : PhosphorIcons.caretDown(),
                         size: 14,
                         color: AppTheme.textSecondary,
                       ),
@@ -1592,6 +1480,94 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BillNumberFieldWidget extends StatefulWidget {
+  final TextEditingController controller;
+  final bool isUrdu;
+  final String? fontFamily;
+
+  const _BillNumberFieldWidget({
+    required this.controller,
+    required this.isUrdu,
+    required this.fontFamily,
+  });
+
+  @override
+  State<_BillNumberFieldWidget> createState() => _BillNumberFieldWidgetState();
+}
+
+class _BillNumberFieldWidgetState extends State<_BillNumberFieldWidget> {
+  final FocusNode _focusNode = FocusNode();
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      if (mounted) setState(() => _isFocused = _focusNode.hasFocus);
+    });
+    widget.controller.addListener(_ensurePrefix);
+  }
+
+  void _ensurePrefix() {
+    final text = widget.controller.text;
+    if (!text.startsWith('QB-')) {
+      final newText = 'QB-$text';
+      widget.controller.value = widget.controller.value.copyWith(
+        text: newText,
+        selection: TextSelection.collapsed(offset: newText.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_ensurePrefix);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: _isFocused ? const Color(0xFFE2E8F0) : const Color(0xFFF5F7FA),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: SizedBox(
+        width: 110,
+        child: TextField(
+          focusNode: _focusNode,
+          controller: widget.controller,
+          textDirection: TextDirection.ltr,
+          textAlign: TextAlign.start,
+          style: const TextStyle(
+            fontFamily: 'monospace',
+            color: AppTheme.darkColor,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.3,
+          ),
+          decoration: InputDecoration(
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(vertical: 4),
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            hintText: 'QB-1',
+            hintStyle: TextStyle(
+              fontFamily: widget.fontFamily,
+              color: AppTheme.textSecondary,
+              fontSize: 12,
+            ),
           ),
         ),
       ),

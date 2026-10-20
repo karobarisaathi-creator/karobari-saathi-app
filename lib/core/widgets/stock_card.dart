@@ -9,6 +9,7 @@ import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/language_service.dart';
+import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 
 class StockCard extends StatelessWidget {
@@ -27,15 +28,11 @@ class StockCard extends StatelessWidget {
 
   final StockItem item;
   final VoidCallback onTap;
-  final VoidCallback onQuickAdd;
-  final VoidCallback onQuickRemove;
 
   const StockCard({
     super.key,
     required this.item,
     required this.onTap,
-    required this.onQuickAdd,
-    required this.onQuickRemove,
   });
 
   @override
@@ -50,8 +47,7 @@ class StockCard extends StatelessWidget {
     final isLowStock =
         item.trackStock && computedStock <= item.minStockAlert && !isOutOfStock;
 
-    final displayName =
-        isUrdu && item.nameUrdu.isNotEmpty ? item.nameUrdu : item.name;
+    final displayName = item.name;
     final categoryName = isUrdu
         ? _categoryNamesUrdu[item.categoryName] ?? item.categoryName
         : item.categoryName;
@@ -66,13 +62,13 @@ class StockCard extends StatelessWidget {
     IconData statusIcon;
 
     if (!item.trackStock) {
-      statusColor = AppTheme.goldColor; // #607D8B
+      statusColor = AppTheme.goldColor;
       statusBg = AppTheme.goldColor.withValues(alpha: 0.10);
       statusBorder = AppTheme.goldColor.withValues(alpha: 0.20);
       statusText = isUrdu ? 'ٹریک نہیں' : 'Not Tracked';
       statusIcon = PhosphorIcons.infinity();
     } else if (isOutOfStock) {
-      statusColor = AppTheme.expenseColor; // #C83120
+      statusColor = AppTheme.expenseColor;
       statusBg = AppTheme.expenseColor.withValues(alpha: 0.10);
       statusBorder = AppTheme.expenseColor.withValues(alpha: 0.25);
       statusText = isUrdu ? 'ختم' : 'Out of Stock';
@@ -84,22 +80,26 @@ class StockCard extends StatelessWidget {
       statusText = isUrdu ? 'کم' : 'Low Stock';
       statusIcon = PhosphorIcons.warning(PhosphorIconsStyle.fill);
     } else {
-      statusColor = AppTheme.incomeColor; // #515D11
-      statusBg = AppTheme.incomeColor.withValues(alpha: 0.10);
-      statusBorder = AppTheme.incomeColor.withValues(alpha: 0.25);
+      statusColor = AppTheme.goldColor;
+      statusBg = AppTheme.goldColor.withValues(alpha: 0.10);
+      statusBorder = AppTheme.goldColor.withValues(alpha: 0.25);
       statusText = isUrdu ? 'موجود' : 'In Stock';
       statusIcon = PhosphorIcons.checkCircle(PhosphorIconsStyle.fill);
     }
 
-    // Stock progress (0.0 to 1.0)
+    // ═══════════════════════════════════════════════════════════
+    // ⭐ Stock progress — درست حساب
+    // ═══════════════════════════════════════════════════════════
     final maxRef = item.minStockAlert > 0
-        ? (item.minStockAlert * 3).clamp(1.0, double.infinity)
-        : 30.0;
-    final progress =
-        item.trackStock ? (computedStock / maxRef).clamp(0.0, 1.0) : 1.0;
+        ? (item.minStockAlert * 10.0).clamp(100.0, double.infinity)
+        : 100.0;
+
+    final progress = item.trackStock
+        ? (computedStock / maxRef).clamp(0.0, 1.0)
+        : 1.0;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: AppTheme.lightColor,
         borderRadius: BorderRadius.circular(20),
@@ -107,8 +107,8 @@ class StockCard extends StatelessWidget {
           color: isOutOfStock
               ? AppTheme.expenseColor.withValues(alpha: 0.25)
               : (isLowStock
-                  ? const Color(0xFFD97706).withValues(alpha: 0.30)
-                  : AppTheme.backgroundColor),
+              ? const Color(0xFFD97706).withValues(alpha: 0.30)
+              : AppTheme.backgroundColor),
           width: 1.5,
         ),
         boxShadow: [
@@ -127,7 +127,7 @@ class StockCard extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onTap,
+          onTap: onTap,  // ← Detail کھلے
           borderRadius: BorderRadius.circular(20),
           splashColor: AppTheme.themeColor.withValues(alpha: 0.05),
           highlightColor: AppTheme.themeColor.withValues(alpha: 0.03),
@@ -137,7 +137,7 @@ class StockCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ═══════════════════════════════════════
-                // TOP ROW: Image + Name + Status
+                // TOP ROW: Image + Name + Status + Alert
                 // ═══════════════════════════════════════
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,7 +182,7 @@ class StockCard extends StatelessWidget {
                                 ),
                                 shape: BoxShape.circle,
                                 border:
-                                    Border.all(color: Colors.white, width: 2),
+                                Border.all(color: Colors.white, width: 2),
                                 boxShadow: [
                                   BoxShadow(
                                     color: AppTheme.verifiedGold
@@ -211,7 +211,7 @@ class StockCard extends StatelessWidget {
                           UrduAwareText(
                             displayName,
                             textDirection:
-                                isUrdu ? TextDirection.rtl : TextDirection.ltr,
+                            isUrdu ? TextDirection.rtl : TextDirection.ltr,
                             style: TextStyle(
                               fontSize: 19,
                               fontWeight: FontWeight.w900,
@@ -318,7 +318,7 @@ class StockCard extends StatelessWidget {
                         children: [
                           Flexible(
                             child: UrduAwareText(
-                              'Rs ${item.sellingPrice.toStringAsFixed(0)}',
+                              'Rs ${Formatters.formatAmount(item.sellingPrice)}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -351,7 +351,7 @@ class StockCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           UrduAwareText(
-                            'Cost: Rs ${item.purchasePrice.toStringAsFixed(0)}',
+                            'Cost: Rs ${Formatters.formatAmount(item.purchasePrice)}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -368,7 +368,7 @@ class StockCard extends StatelessWidget {
                             ),
                             decoration: BoxDecoration(
                               color:
-                                  AppTheme.incomeColor.withValues(alpha: 0.12),
+                              AppTheme.goldColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(5),
                             ),
                             child: UrduAwareText(
@@ -376,7 +376,7 @@ class StockCard extends StatelessWidget {
                               style: const TextStyle(
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.w800,
-                                color: AppTheme.incomeColor,
+                                color: AppTheme.goldColor,
                                 letterSpacing: 0.2,
                               ),
                             ),
@@ -398,7 +398,7 @@ class StockCard extends StatelessWidget {
                       _buildMiniInfo(
                         icon: PhosphorIcons.clipboard(),
                         label: 'MRP',
-                        value: 'Rs ${item.mrp.toStringAsFixed(0)}',
+                        value: 'Rs ${Formatters.formatAmount(item.mrp)}',
                       ),
                   ],
                 ),
@@ -434,7 +434,7 @@ class StockCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
 
-                  // Stock row: quantity + alert + buttons
+                  // Stock row: quantity + alert (موٹا، کونے میں)
                   Row(
                     children: [
                       // Stock quantity
@@ -474,7 +474,7 @@ class StockCard extends StatelessWidget {
                             ),
                             if (item.purchasePrice > 0) ...[
                               UrduAwareText(
-                                ' (Rs ${(computedStock * item.purchasePrice).toStringAsFixed(0)})',
+                                ' (Rs ${Formatters.formatAmount(computedStock * item.purchasePrice)})',
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
@@ -488,37 +488,44 @@ class StockCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      // Alert info
-                      Flexible(
-                        child: UrduAwareText(
-                          isUrdu
-                              ? 'الرٹ: ${item.minStockAlert.toStringAsFixed(0)}'
-                              : 'Alert: ${item.minStockAlert.toStringAsFixed(0)}',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textSecondary,
-                            fontFamily: fontFamily,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
+                      const Spacer(),
 
-                      // Quick buttons
-                      _buildQuickButton(
-                        icon: PhosphorIcons.minus(),
-                        onPressed: onQuickRemove,
-                        color: AppTheme.expenseColor,
-                        tooltip: isUrdu ? 'کم کریں' : 'Reduce',
-                      ),
-                      const SizedBox(width: 6),
-                      _buildQuickButton(
-                        icon: PhosphorIcons.plus(),
-                        onPressed: onQuickAdd,
-                        color: AppTheme.themeColor,
-                        tooltip: isUrdu ? 'بڑھائیں' : 'Add',
+                      // ⭐ Alert — موٹا فونٹ، کونے میں
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: statusColor.withValues(alpha: 0.25),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              PhosphorIcons.bellRinging(
+                                  PhosphorIconsStyle.fill),
+                              size: 13,
+                              color: statusColor,
+                            ),
+                            const SizedBox(width: 5),
+                            UrduAwareText(
+                              isUrdu
+                                  ? 'الرٹ: ${item.minStockAlert.toStringAsFixed(0)}'
+                                  : 'Alert: ${item.minStockAlert.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w900,
+                                color: statusColor,
+                                fontFamily: fontFamily,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -607,41 +614,6 @@ class StockCard extends StatelessWidget {
   }
 
   // ═════════════════════════════════════════════
-  // Quick Action Button
-  // ═════════════════════════════════════════════
-  Widget _buildQuickButton({
-    required IconData icon,
-    required VoidCallback onPressed,
-    required Color color,
-    required String tooltip,
-  }) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            width: 38,
-            height: 38,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: color.withValues(alpha: 0.22),
-                width: 1,
-              ),
-            ),
-            child: Icon(icon, size: 18, color: color),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ═════════════════════════════════════════════
   // Item Image
   // ═════════════════════════════════════════════
   Widget _buildItemImage(StockItem item, Color statusColor) {
@@ -662,15 +634,15 @@ class StockCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: isRemote
           ? Image.network(
-              path,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => fallback,
-            )
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallback,
+      )
           : Image.file(
-              File(path),
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => fallback,
-            ),
+        File(path),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallback,
+      ),
     );
   }
 }

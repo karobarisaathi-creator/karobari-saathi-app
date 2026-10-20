@@ -7,6 +7,7 @@ import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/widgets/party_card.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// گاہک منتخب کرنے کی شیٹ — نقد گاہک یا موجودہ پارٹیوں میں سے کوئی ایک۔
@@ -187,96 +188,17 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                         itemCount: parties.length,
                         itemBuilder: (context, index) {
                           final account = parties[index];
-                          final isSelected = false;
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 8),
-                            child: InkWell(
-                              onTap: () => Navigator.pop(
+                            child: PartyCard(
+                              party: account,
+                              onView: () => Navigator.pop(
                                 context,
                                 CustomerPickResult(account: account),
                               ),
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? AppTheme.themeColor.withOpacity(0.08)
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? AppTheme.themeColor
-                                        : Colors.black12,
-                                    width: isSelected ? 1.2 : 0.5,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 18,
-                                      backgroundColor:
-                                          AppTheme.themeColor.withOpacity(0.12),
-                                      child: UrduAwareText(
-                                        account.name.isNotEmpty
-                                            ? account.name[0]
-                                            : '?',
-                                        style: const TextStyle(
-                                          color: AppTheme.darkColor,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          UrduAwareText(
-                                            account.name,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          UrduAwareText(
-                                            account.phone.isNotEmpty
-                                                ? account.phone
-                                                : (isUrdu
-                                                    ? 'فون نمبر نہیں ہے'
-                                                    : 'No phone number'),
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.black54,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          UrduAwareText(
-                                            account.balance == 0
-                                                ? (isUrdu
-                                                    ? 'بقایا: 0'
-                                                    : 'Balance: 0')
-                                                : '${isUrdu ? "بقایا" : "Balance"}: ${account.balance.abs().toStringAsFixed(0)}',
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.black54,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Icon(
-                                      PhosphorIcons.caretLeft(),
-                                      size: 16,
-                                      color: Colors.black45,
-                                    ),
-                                  ],
-                                ),
+                              onMessage: () => Navigator.pop(
+                                context,
+                                CustomerPickResult(account: account),
                               ),
                             ),
                           );

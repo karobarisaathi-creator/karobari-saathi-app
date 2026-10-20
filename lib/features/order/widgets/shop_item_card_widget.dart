@@ -3,7 +3,9 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/shop_model.dart';
@@ -17,6 +19,7 @@ class ShopItemCardWidget extends StatelessWidget {
   final VoidCallback? onQuantityEdit;
   final bool quickBillMode;
   final bool showStockQuantity;
+  final bool showStepper;
 
   const ShopItemCardWidget({
     super.key,
@@ -28,7 +31,28 @@ class ShopItemCardWidget extends StatelessWidget {
     this.onQuantityEdit,
     this.quickBillMode = false,
     this.showStockQuantity = true,
+    this.showStepper = false,
   });
+
+  static const Map<String, String> _categoryNamesUrdu = {
+    'General': 'عمومی',
+    'Grocery': 'کریانہ',
+    'Food': 'خوراک',
+    'Beverages': 'مشروبات',
+    'Clothing': 'کپڑے',
+    'Electronics': 'الیکٹرانکس',
+    'Household': 'گھریلو سامان',
+    'Personal Care': 'ذاتی استعمال',
+    'Medicine': 'ادویات',
+    'Other': 'دیگر',
+  };
+
+  String _formatCategory(String cat, bool isUrdu) {
+    if (isUrdu) {
+      return _categoryNamesUrdu[cat] ?? cat;
+    }
+    return cat;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,35 +61,48 @@ class ShopItemCardWidget extends StatelessWidget {
     final low = item.isLowStock;
     final stockPercent = (item.stock / 100 * 100).clamp(0, 100).toDouble();
 
+    // ═══════════════════════════════════════════════════════════
+    // ⭐ goldColor (#607D8B) — AppTheme سے
+    // ═══════════════════════════════════════════════════════════
+    final goldColor = AppTheme.goldColor;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: selected ? const Color(0xFFF5F7F8) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: selected ? AppTheme.themeColor : AppTheme.backgroundColor,
-          width: 1.5,
+          color: selected
+              ? goldColor.withValues(alpha: 0.55)
+              : AppTheme.backgroundColor,
+          width: selected ? 2 : 1.2,
         ),
         boxShadow: selected
             ? [
-                BoxShadow(
-                  color: AppTheme.themeColor.withValues(alpha: 0.2),
-                  blurRadius: 18,
-                  offset: const Offset(0, 6),
-                ),
-              ]
-            : null,
+          BoxShadow(
+            color: goldColor.withValues(alpha: 0.20),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ]
+            : [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Opacity(
         opacity: out ? 0.55 : 1.0,
         child: Column(
           children: [
-            // Main row
+            // ═══ Main row ═══
             Padding(
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  // Emoji
+                  // Emoji/Image
                   Stack(
                     clipBehavior: Clip.none,
                     children: [
@@ -74,55 +111,63 @@ class ShopItemCardWidget extends StatelessWidget {
                         height: 56,
                         decoration: BoxDecoration(
                           gradient: selected
-                              ? const LinearGradient(
-                                  colors: [
-                                    AppTheme.themeColor,
-                                    Color(0xFF4A8FE3),
-                                  ],
-                                )
+                              ? LinearGradient(
+                            colors: [
+                              goldColor,
+                              const Color(0xFF78909C),
+                            ],
+                          )
                               : const LinearGradient(
-                                  colors: [
-                                    Color(0xFFEEF4FF),
-                                    Color(0xFFDCE7F7),
-                                  ],
-                                ),
+                            colors: [
+                              Color(0xFFECF0F2),
+                              Color(0xFFD5DFE4),
+                            ],
+                          ),
                           borderRadius: BorderRadius.circular(14),
+                          boxShadow: selected
+                              ? [
+                            BoxShadow(
+                              color: goldColor.withValues(alpha: 0.30),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                              : null,
                         ),
-                        child: _buildItemImage(item, fontSize: 26, borderRadius: 14),
+                        child: _buildItemImage(item,
+                            fontSize: 26, borderRadius: 14),
                       ),
                       if (item.badge != null)
                         Positioned(
-                          top: -5,
-                          right: -5,
+                          top: -6,
+                          right: -6,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 2),
+                                horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: item.badge == 'hot'
-                                    ? [
-                                        AppTheme.expenseColor,
-                                        const Color(0xFFE54733),
-                                      ]
-                                    : item.badge == 'new'
-                                        ? [
-                                            AppTheme.incomeColor,
-                                            const Color(0xFF6B7A1F),
-                                          ]
-                                        : [
-                                            const Color(0xFFF59E0B),
-                                            const Color(0xFFFBBF24),
-                                          ],
-                              ),
-                              borderRadius: BorderRadius.circular(5),
+                              color: AppTheme.verifiedGold,
+                              borderRadius: BorderRadius.circular(6),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.2),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
                             child: UrduAwareText(
                               item.badge == 'hot'
                                   ? '🔥'
                                   : item.badge == 'new'
-                                      ? '✨'
-                                      : '%',
-                              style: const TextStyle(fontSize: 9),
+                                  ? '✨'
+                                  : (item.badge == '%' || item.badge == 'discount'
+                                      ? '%'
+                                      : item.badge!),
+                              style: const TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
@@ -137,10 +182,10 @@ class ShopItemCardWidget extends StatelessWidget {
                       children: [
                         UrduAwareText(
                           item.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w800,
-                            color: AppTheme.darkColor,
+                            color: selected ? goldColor : AppTheme.darkColor,
                             letterSpacing: -0.2,
                           ),
                           maxLines: 1,
@@ -151,10 +196,12 @@ class ShopItemCardWidget extends StatelessWidget {
                           children: [
                             UrduAwareText(
                               'Rs ${item.rate.toStringAsFixed(0)}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14.5,
                                 fontWeight: FontWeight.w900,
-                                color: AppTheme.themeColor,
+                                color: selected
+                                    ? goldColor
+                                    : AppTheme.darkColor,
                                 letterSpacing: -0.3,
                               ),
                             ),
@@ -182,71 +229,86 @@ class ShopItemCardWidget extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 3),
-                        if (!quickBillMode) Row(
-                          children: [
-                            const Icon(
-                              Icons.star,
-                              size: 11,
-                              color: AppTheme.verifiedGold,
-                            ),
-                            const SizedBox(width: 2),
-                            UrduAwareText(
-                              '${item.rating}',
-                              style: const TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.textSecondary,
+                        if (!quickBillMode)
+                          Row(
+                            children: [
+                              Icon(
+                                PhosphorIcons.star(PhosphorIconsStyle.fill),
+                                size: 11,
+                                color: AppTheme.verifiedGold,
                               ),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 2),
+                              UrduAwareText(
+                                '${item.rating}',
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   ),
 
                   // Stepper
-                  _buildStepper(context),
+                  if (showStepper || quickBillMode)
+                    _buildStepper(context, goldColor),
                 ],
               ),
             ),
 
-            // Footer — Tap to see detail
+            // ═══ Footer — شفاف ═══
             if (quickBillMode)
               Container(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF5F7FA),
-                  borderRadius: BorderRadius.vertical(
+                decoration: BoxDecoration(
+                  color: selected
+                      ? goldColor.withValues(alpha: 0.14)
+                      : goldColor.withValues(alpha: 0.06),
+                  border: Border(
+                    top: BorderSide(
+                      color: selected
+                          ? goldColor.withValues(alpha: 0.20)
+                          : goldColor.withValues(alpha: 0.10),
+                      width: 1,
+                    ),
+                  ),
+                  borderRadius: const BorderRadius.vertical(
                     bottom: Radius.circular(14),
                   ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      out ? PhosphorIcons.xCircle() : PhosphorIcons.checkCircle(),
+                      out
+                          ? PhosphorIcons.xCircle()
+                          : PhosphorIcons.checkCircle(),
                       size: 13,
-                      color: out ? AppTheme.expenseColor : AppTheme.incomeColor,
+                      color: selected ? goldColor : AppTheme.incomeColor,
                     ),
                     const SizedBox(width: 5),
                     UrduAwareText(
                       out
                           ? 'اسٹاک ختم'
                           : showStockQuantity
-                              ? 'اسٹاک: ${item.stock}'
-                              : 'بل میں شامل کریں',
+                          ? 'بقیہ اسٹاک: ${((item.stock - item.quantity) < 0 ? 0 : (item.stock - item.quantity)).toStringAsFixed(item.stock % 1 == 0 ? 0 : 1)}'
+                          : 'بل میں شامل کریں',
                       style: TextStyle(
                         fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: out ? AppTheme.expenseColor : AppTheme.incomeColor,
+                        fontWeight:
+                        selected ? FontWeight.w900 : FontWeight.w800,
+                        color: selected ? goldColor : AppTheme.incomeColor,
                       ),
                     ),
                     const Spacer(),
                     UrduAwareText(
                       'Rs ${item.total.toStringAsFixed(0)}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w900,
-                        color: AppTheme.themeColor,
+                        color: selected ? goldColor : AppTheme.goldColor,
                       ),
                     ),
                   ],
@@ -255,103 +317,128 @@ class ShopItemCardWidget extends StatelessWidget {
             else
               InkWell(
                 onTap: () => _openDetail(context),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(14),
+                ),
                 child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF5F7FA),
-                  borderRadius: BorderRadius.vertical(
-                    bottom: Radius.circular(14),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? goldColor.withValues(alpha: 0.14)
+                        : goldColor.withValues(alpha: 0.06),
+                    border: Border(
+                      top: BorderSide(
+                        color: selected
+                            ? goldColor.withValues(alpha: 0.20)
+                            : goldColor.withValues(alpha: 0.10),
+                        width: 1,
+                      ),
+                    ),
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(14),
                     ),
                   ),
-                child: Row(
-                  children: [
-                    Icon(
-                      PhosphorIcons.info(),
-                      size: 13,
-                      color: AppTheme.themeColor,
-                    ),
-                    const SizedBox(width: 5),
-                    const UrduAwareText(
-                      'تفصیل دیکھیں',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.themeColor,
+                  child: Row(
+                    children: [
+                      Icon(
+                        PhosphorIcons.info(),
+                        size: 13,
+                        color: goldColor,
                       ),
-                    ),
-                    const Spacer(),
-                    // Stock bar
-                    Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppTheme.backgroundColor,
-                        borderRadius: BorderRadius.circular(3),
+                      const SizedBox(width: 5),
+                      UrduAwareText(
+                        'تفصیل دیکھیں',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: selected ? goldColor : AppTheme.darkColor,
+                        ),
                       ),
-                      child: FractionallySizedBox(
-                        alignment: Alignment.centerRight,
-                        widthFactor: out ? 0 : stockPercent / 100,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: out
-                                ? AppTheme.expenseColor
-                                : (low
-                                    ? AppTheme.expenseColor
-                                    : AppTheme.incomeColor),
-                            borderRadius: BorderRadius.circular(3),
+                      const Spacer(),
+                      // Stock progress bar
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppTheme.backgroundColor,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: FractionallySizedBox(
+                          alignment: Alignment.centerRight,
+                          widthFactor: out ? 0 : stockPercent / 100,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: out
+                                  ? AppTheme.expenseColor
+                                  : (low
+                                  ? AppTheme.expenseColor
+                                  : AppTheme.incomeColor),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: out
-                            ? AppTheme.expenseColor
-                            : (low
-                                ? const Color(0xFFFEE2E2)
-                                : const Color(0xFFF0FDF4)),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: UrduAwareText(
-                        out ? 'ختم' : (low ? 'کم' : 'دستیاب'),
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w800,
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
                           color: out
-                              ? Colors.white
+                              ? AppTheme.expenseColor
                               : (low
-                                  ? AppTheme.expenseColor
-                                  : AppTheme.incomeColor),
+                              ? const Color(0xFFFEE2E2)
+                              : const Color(0xFFF0FDF4)),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: UrduAwareText(
+                          out ? 'ختم' : (low ? 'کم' : 'دستیاب'),
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                            color: out
+                                ? Colors.white
+                                : (low
+                                ? AppTheme.expenseColor
+                                : AppTheme.incomeColor),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStepper(BuildContext context) {
+  // ═══════════════════════════════════════════════════════════
+  // Stepper — goldColor
+  // ═══════════════════════════════════════════════════════════
+  Widget _buildStepper(BuildContext context, Color goldColor) {
     final qty = item.quantity;
     final selected = qty > 0;
 
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: selected ? const Color(0xFFEEF4FF) : const Color(0xFFF5F7FA),
+        color: selected ? goldColor : const Color(0xFFECF0F2),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: selected ? AppTheme.themeColor : AppTheme.backgroundColor,
+          color: selected ? goldColor : const Color(0xFFD5DFE4),
           width: 1.5,
         ),
+        boxShadow: selected
+            ? [
+          BoxShadow(
+            color: goldColor.withValues(alpha: 0.25),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ]
+            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -370,19 +457,19 @@ class ShopItemCardWidget extends StatelessWidget {
                   shape: BoxShape.circle,
                   boxShadow: qty > 0
                       ? [
-                          BoxShadow(
-                            color: AppTheme.darkColor.withValues(alpha: 0.06),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
                       : null,
                 ),
                 child: Icon(
                   PhosphorIcons.minus(),
                   size: 14,
                   color: qty > 0
-                      ? AppTheme.themeColor
+                      ? goldColor
                       : AppTheme.textSecondary.withValues(alpha: 0.5),
                 ),
               ),
@@ -390,7 +477,7 @@ class ShopItemCardWidget extends StatelessWidget {
           ),
           const SizedBox(width: 3),
 
-          // Value — tap to open detail
+          // Value — tap to edit
           InkWell(
             onTap: onQuantityEdit ?? () => _openDetail(context),
             borderRadius: BorderRadius.circular(50),
@@ -405,7 +492,7 @@ class ShopItemCardWidget extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w900,
-                  color: selected ? AppTheme.themeColor : AppTheme.darkColor,
+                  color: selected ? Colors.white : AppTheme.darkColor,
                   letterSpacing: -0.3,
                 ),
               ),
@@ -432,19 +519,19 @@ class ShopItemCardWidget extends StatelessWidget {
                   boxShadow: (item.isOutOfStock || qty >= item.stock)
                       ? null
                       : [
-                          BoxShadow(
-                            color: AppTheme.darkColor.withValues(alpha: 0.06),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Icon(
                   PhosphorIcons.plus(),
                   size: 14,
                   color: (item.isOutOfStock || qty >= item.stock)
                       ? AppTheme.textSecondary.withValues(alpha: 0.5)
-                      : AppTheme.themeColor,
+                      : goldColor,
                 ),
               ),
             ),
@@ -454,8 +541,13 @@ class ShopItemCardWidget extends StatelessWidget {
     );
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // Detail Sheet — goldColor
+  // ═══════════════════════════════════════════════════════════
   void _openDetail(BuildContext context) {
-    int tempQty = item.quantity.toInt();
+    final goldColor = AppTheme.goldColor;
+    final isUrdu =
+        Provider.of<LanguageService>(context, listen: false).isUrdu;
 
     showModalBottomSheet(
       context: context,
@@ -497,22 +589,23 @@ class ShopItemCardWidget extends StatelessWidget {
                         width: 56,
                         height: 56,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
+                          gradient: LinearGradient(
                             colors: [
-                              AppTheme.themeColor,
-                              Color(0xFF4A8FE3),
+                              goldColor,
+                              const Color(0xFF78909C),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: AppTheme.themeColor.withValues(alpha: 0.4),
+                              color: goldColor.withValues(alpha: 0.35),
                               blurRadius: 18,
                               offset: const Offset(0, 6),
                             ),
                           ],
                         ),
-                        child: _buildItemImage(item, fontSize: 28, borderRadius: 16),
+                        child: _buildItemImage(item,
+                            fontSize: 28, borderRadius: 16),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -530,7 +623,7 @@ class ShopItemCardWidget extends StatelessWidget {
                             ),
                             const SizedBox(height: 3),
                             UrduAwareText(
-                              '${shop.name}  •  ${item.category}',
+                              '${shop.name}  •  ${_formatCategory(item.category, isUrdu)}',
                               style: const TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w600,
@@ -552,8 +645,8 @@ class ShopItemCardWidget extends StatelessWidget {
                               color: Color(0xFFEEF1F5),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
-                              Icons.close_rounded,
+                            child: Icon(
+                              PhosphorIcons.x(),
                               size: 16,
                               color: AppTheme.textSecondary,
                             ),
@@ -578,10 +671,10 @@ class ShopItemCardWidget extends StatelessWidget {
                           children: [
                             UrduAwareText(
                               'Rs ${item.rate.toStringAsFixed(0)}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 26,
                                 fontWeight: FontWeight.w900,
-                                color: AppTheme.themeColor,
+                                color: goldColor,
                                 letterSpacing: -0.8,
                               ),
                             ),
@@ -634,9 +727,9 @@ class ShopItemCardWidget extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: const Color(0xFFF5F7FA),
                               borderRadius: BorderRadius.circular(12),
-                              border: const Border(
+                              border: Border(
                                 right: BorderSide(
-                                  color: AppTheme.themeColor,
+                                  color: goldColor,
                                   width: 3,
                                 ),
                               ),
@@ -659,6 +752,7 @@ class ShopItemCardWidget extends StatelessWidget {
                           _DetailSectionTitle(
                             icon: PhosphorIcons.checkCircle(),
                             title: 'خصوصیات',
+                            color: goldColor,
                           ),
                           const SizedBox(height: 8),
                           Wrap(
@@ -666,34 +760,34 @@ class ShopItemCardWidget extends StatelessWidget {
                             runSpacing: 6,
                             children: item.highlights
                                 .map((h) => Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF0FDF4),
-                                        border: Border.all(
-                                            color: const Color(0xFFBBF7D0)),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(
-                                            Icons.check,
-                                            size: 11,
-                                            color: AppTheme.incomeColor,
-                                          ),
-                                          const SizedBox(width: 5),
-                                          UrduAwareText(
-                                            h,
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
-                                              color: AppTheme.incomeColor,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ))
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF0FDF4),
+                                border: Border.all(
+                                    color: const Color(0xFFBBF7D0)),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    PhosphorIcons.check(),
+                                    size: 11,
+                                    color: AppTheme.incomeColor,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  UrduAwareText(
+                                    h,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.incomeColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ))
                                 .toList(),
                           ),
                           const SizedBox(height: 16),
@@ -703,6 +797,7 @@ class ShopItemCardWidget extends StatelessWidget {
                         _DetailSectionTitle(
                           icon: PhosphorIcons.info(),
                           title: 'اضافی معلومات',
+                          color: goldColor,
                         ),
                         const SizedBox(height: 8),
                         GridView.count(
@@ -721,153 +816,14 @@ class ShopItemCardWidget extends StatelessWidget {
                                   : AppTheme.incomeColor,
                             ),
                             _buildInfoTile('ریٹنگ', '★ ${item.rating}'),
-                            _buildInfoTile('کیٹیگری', item.category),
+                            _buildInfoTile(
+                                'کیٹیگری',
+                                _formatCategory(item.category, isUrdu)),
                             _buildInfoTile('ڈیلیوری', shop.deliveryTime),
                           ],
                         ),
                       ],
                     ),
-                  ),
-                ),
-
-                // Footer
-                Container(
-                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 20),
-                  decoration: const BoxDecoration(
-                    border: Border(
-                      top: BorderSide(color: Color(0xFFEEF1F5)),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      // Modal stepper
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF5F7FA),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: AppTheme.backgroundColor,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: tempQty > 0
-                                    ? () => setSheetState(() => tempQty--)
-                                    : null,
-                                borderRadius: BorderRadius.circular(11),
-                                child: Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: tempQty > 0
-                                        ? Colors.white
-                                        : const Color(0xFFEEF1F5),
-                                    borderRadius: BorderRadius.circular(11),
-                                  ),
-                                  child: Icon(
-                                    PhosphorIcons.minus(),
-                                    size: 16,
-                                    color: tempQty > 0
-                                        ? AppTheme.themeColor
-                                        : AppTheme.textSecondary
-                                            .withValues(alpha: 0.5),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Container(
-                              constraints: const BoxConstraints(minWidth: 42),
-                              alignment: Alignment.center,
-                              child: UrduAwareText(
-                                '$tempQty',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppTheme.darkColor,
-                                ),
-                              ),
-                            ),
-                            Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: (out || tempQty >= item.stock)
-                                    ? null
-                                    : () => setSheetState(() => tempQty++),
-                                borderRadius: BorderRadius.circular(11),
-                                child: Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: (out || tempQty >= item.stock)
-                                        ? const Color(0xFFEEF1F5)
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(11),
-                                  ),
-                                  child: Icon(
-                                    PhosphorIcons.plus(),
-                                    size: 16,
-                                    color: (out || tempQty >= item.stock)
-                                        ? AppTheme.textSecondary
-                                            .withValues(alpha: 0.5)
-                                        : AppTheme.themeColor,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-
-                      // Add button
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: tempQty > 0
-                                ? AppTheme.incomeColor
-                                : AppTheme.themeColor,
-                            padding: const EdgeInsets.symmetric(vertical: 18),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            elevation: 0,
-                          ),
-                          onPressed: () {
-                            onQuantitySet(tempQty.toDouble());
-                            Navigator.pop(ctx);
-                          },
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                tempQty > 0
-                                    ? PhosphorIcons.checkCircle()
-                                    : PhosphorIcons.shoppingCart(),
-                                size: 16,
-                                color: Colors.white,
-                              ),
-                              const SizedBox(width: 8),
-                              UrduAwareText(
-                                tempQty > 0
-                                    ? 'کارٹ میں شامل ($tempQty) - Rs ${(item.rate * tempQty).toStringAsFixed(0)}'
-                                    : 'کارٹ میں شامل کریں',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ],
@@ -912,37 +868,52 @@ class ShopItemCardWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildItemImage(ShopItem item, {double fontSize = 26, double borderRadius = 14}) {
+  Widget _buildItemImage(ShopItem item,
+      {double fontSize = 26, double borderRadius = 14}) {
     final path = item.imageUrl?.trim();
+
+    // ═══════════════════════════════════════════════════════════
+    // ⭐ ہمیشہ پیکج آئیکن — کوئی emoji نہیں
+    // ═══════════════════════════════════════════════════════════
     final fallback = Center(
-      child: UrduAwareText(
-        item.emoji.trim().isEmpty ? '📦' : item.emoji,
-        style: TextStyle(fontSize: fontSize),
+      child: Icon(
+        PhosphorIcons.package(),
+        size: fontSize + 2,
+        color: Colors.white,
       ),
     );
 
-    if (path == null || path.isEmpty) return fallback;
+    // اگر imageUrl خالی ہے → پیکج آئیکن
+    if (path == null ||
+        path.isEmpty ||
+        path == '?' ||
+        path == '؟' ||
+        path.length < 5) {
+      return fallback;
+    }
 
+    // اگر imageUrl ہے → تصویر دکھائیں
     final uri = Uri.tryParse(path);
-    final isRemote = uri != null && (uri.scheme == 'https' || uri.scheme == 'http');
+    final isRemote =
+        uri != null && (uri.scheme == 'https' || uri.scheme == 'http');
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: isRemote
           ? Image.network(
-              path,
-              width: double.infinity,
-              height: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => fallback,
-            )
+        path,
+        width: double.infinity,
+        height: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallback,
+      )
           : Image.file(
-              File(path),
-              width: double.infinity,
-              height: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => fallback,
-            ),
+        File(path),
+        width: double.infinity,
+        height: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallback,
+      ),
     );
   }
 }
@@ -950,14 +921,19 @@ class ShopItemCardWidget extends StatelessWidget {
 class _DetailSectionTitle extends StatelessWidget {
   final IconData icon;
   final String title;
+  final Color color;
 
-  const _DetailSectionTitle({required this.icon, required this.title});
+  const _DetailSectionTitle({
+    required this.icon,
+    required this.title,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 13, color: AppTheme.themeColor),
+        Icon(icon, size: 13, color: color),
         const SizedBox(width: 6),
         UrduAwareText(
           title,

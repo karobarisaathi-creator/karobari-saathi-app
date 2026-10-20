@@ -118,7 +118,8 @@ class StockService with ChangeNotifier {
     required double targetStock,
   }) {
     if (!currentStock.isFinite || !targetStock.isFinite || targetStock < 0) {
-      throw ArgumentError('Stock values must be finite and target stock non-negative.');
+      throw ArgumentError(
+          'Stock values must be finite and target stock non-negative.');
     }
     return targetStock - currentStock;
   }
@@ -284,8 +285,10 @@ class StockService with ChangeNotifier {
       final impactedItemIds = <String>{
         ...desired.values.map((movement) => movement.stockItemId),
         ...oldById.values.map(
-          (document) => (document.data() as Map<String, dynamic>)['stockItemId']
-              ?.toString() ?? '',
+          (document) =>
+              (document.data() as Map<String, dynamic>)['stockItemId']
+                  ?.toString() ??
+              '',
         ),
       }..remove('');
       for (final itemId in impactedItemIds) {
@@ -302,8 +305,11 @@ class StockService with ChangeNotifier {
     final userDoc = firestore.collection('users').doc(userId);
     final stockDoc = await userDoc.collection('stock_items').doc(itemId).get();
     if (!stockDoc.exists) return;
-    final shopItemRef =
-        firestore.collection('public_shops').doc(userId).collection('items').doc(itemId);
+    final shopItemRef = firestore
+        .collection('public_shops')
+        .doc(userId)
+        .collection('items')
+        .doc(itemId);
     final publicItem = await shopItemRef.get();
     if (!publicItem.exists) return;
 
@@ -427,7 +433,8 @@ class StockService with ChangeNotifier {
   Future<void> archiveStockItem(String itemId) async {
     final user = _auth.currentUser;
     if (user == null) throw StateError('Sign in to archive this stock item.');
-    final item = _items.where((candidate) => candidate.id == itemId).firstOrNull;
+    final item =
+        _items.where((candidate) => candidate.id == itemId).firstOrNull;
     if (item == null) throw StateError('Stock item $itemId is unavailable.');
 
     await _firestore
@@ -485,7 +492,8 @@ class StockService with ChangeNotifier {
   Future<void> syncPublicCatalog() async {
     final user = _auth.currentUser;
     if (user == null) throw StateError('Sign in to publish shop items.');
-    final shop = await _firestore.collection('public_shops').doc(user.uid).get();
+    final shop =
+        await _firestore.collection('public_shops').doc(user.uid).get();
     if (!shop.exists) return;
 
     final batch = _firestore.batch();
@@ -509,7 +517,8 @@ class StockService with ChangeNotifier {
       double? available;
       if (item.trackStock) {
         var currentAvailable = item.initialQuantity;
-        for (final movement in movements.where((m) => m.stockItemId == item.id)) {
+        for (final movement
+            in movements.where((m) => m.stockItemId == item.id)) {
           if (movement.reason != 'Initial Opening Stock') {
             currentAvailable += movement.stockDelta;
           }
@@ -566,6 +575,20 @@ class StockService with ChangeNotifier {
   }
 
   /// Save every stock movement from one bill in a single Firestore batch.
+  static List<StockMovement> _deduplicateMovements(
+      List<StockMovement> movements) {
+    final byId = <String, StockMovement>{};
+    for (final movement in movements) {
+      final key = movement.id.isNotEmpty
+          ? movement.id
+          : '${movement.stockItemId}|${movement.type.name}|${movement.quantity}|${movement.timestamp.millisecondsSinceEpoch}';
+      byId[key] = movement;
+    }
+    final unique = byId.values.toList();
+    unique.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return unique;
+  }
+
   Future<void> recordMovements(List<StockMovement> movements) async {
     if (movements.isEmpty) return;
     final user = _auth.currentUser;
@@ -618,8 +641,9 @@ class StockService with ChangeNotifier {
     }
     await batch.commit();
 
-    _movements = [...movements, ..._movements];
-    final changedItemIds = movements.map((movement) => movement.stockItemId).toSet();
+    _movements = _deduplicateMovements([...movements, ..._movements]);
+    final changedItemIds =
+        movements.map((movement) => movement.stockItemId).toSet();
     for (final itemId in changedItemIds) {
       await _refreshPublicAvailability(user.uid, itemId);
     }

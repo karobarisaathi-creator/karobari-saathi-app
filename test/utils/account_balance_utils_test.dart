@@ -12,6 +12,7 @@ Transaction _transaction({
   double discountAmount = 0,
   double receivedAmount = 0,
   double pendingAmount = 0,
+  bool receiptFromCounterparty = false,
   String description = 'Transaction',
 }) {
   return Transaction(
@@ -28,10 +29,123 @@ Transaction _transaction({
     discountAmount: discountAmount,
     receivedAmount: receivedAmount,
     pendingAmount: pendingAmount,
+    receiptFromCounterparty: receiptFromCounterparty,
   );
 }
 
 void main() {
+  group('AccountBalanceUtils.transactionColumns', () {
+    test('shows imported received income in debit, like incoming receipt', () {
+      final transaction = _transaction(
+        id: 'imported-income',
+        type: 'expense',
+        amount: 500,
+        subtotal: 500,
+        receiptFromCounterparty: true,
+        date: DateTime(2026, 1, 1),
+      );
+
+      final columns = AccountBalanceUtils.transactionColumns(transaction);
+
+      expect(columns.firstColumn, 500);
+      expect(columns.secondColumn, 0);
+    });
+
+    test('shows imported paid expense in credit, like incoming receipt', () {
+      final transaction = _transaction(
+        id: 'imported-expense',
+        type: 'income',
+        amount: 500,
+        subtotal: 500,
+        receiptFromCounterparty: true,
+        date: DateTime(2026, 1, 1),
+      );
+
+      final columns = AccountBalanceUtils.transactionColumns(transaction);
+
+      expect(columns.firstColumn, 0);
+      expect(columns.secondColumn, 500);
+    });
+
+    test(
+        'keeps imported Quick Bill items and payment in their incoming columns',
+        () {
+      final transaction = _transaction(
+        id: 'imported-sale',
+        type: 'expense',
+        amount: 600,
+        subtotal: 1000,
+        discountAmount: 100,
+        receivedAmount: 300,
+        receiptFromCounterparty: true,
+        date: DateTime(2026, 1, 1),
+        description: 'Quick Bill',
+      );
+
+      final columns = AccountBalanceUtils.transactionColumns(transaction);
+
+      expect(columns.firstColumn, 300);
+      expect(columns.secondColumn, 900);
+    });
+  });
+
+  group('AccountBalanceUtils.ledgerBalance', () {
+    test('includes the opening balance and only each transaction balance', () {
+      final transactions = [
+        _transaction(
+          id: 'sale',
+          type: 'income',
+          amount: 600,
+          date: DateTime(2026, 1, 1),
+          description: 'Quick Bill',
+          receivedAmount: 400,
+        ),
+        _transaction(
+          id: 'payment',
+          type: 'expense',
+          amount: 100,
+          date: DateTime(2026, 1, 2),
+        ),
+      ];
+
+      expect(
+        AccountBalanceUtils.ledgerBalance(
+          transactions,
+          initialBalance: 250,
+        ),
+        750,
+      );
+    });
+  });
+
+  group('AccountBalanceUtils.runningBalances', () {
+    test('updates each row balance using its debit and credit columns', () {
+      final transactions = [
+        _transaction(
+          id: 'sale',
+          type: 'income',
+          amount: 1000,
+          date: DateTime(2026, 1, 1),
+        ),
+        _transaction(
+          id: 'imported-received',
+          type: 'expense',
+          amount: 300,
+          receiptFromCounterparty: true,
+          date: DateTime(2026, 1, 2),
+        ),
+      ];
+
+      final balances = AccountBalanceUtils.runningBalances(
+        transactions,
+        initialBalance: 200,
+      );
+
+      expect(balances['sale'], -800);
+      expect(balances['imported-received'], -500);
+    });
+  });
+
   group('AccountBalanceUtils.currentCycleBalance', () {
     test('returns the outstanding amount after completed cycles', () {
       final transactions = [
@@ -82,6 +196,33 @@ void main() {
 
       expect(AccountBalanceUtils.currentCycleBalance(transactions), 0);
     });
+
+    test('counts a partially paid Quick Bill by its outstanding amount', () {
+      final quickBill = _transaction(
+        id: 'quick-bill',
+        type: 'income',
+        amount: 600,
+        subtotal: 1000,
+        receivedAmount: 400,
+        pendingAmount: 600,
+        description: 'Quick Bill',
+        date: DateTime(2026, 1, 1),
+      );
+
+      expect(AccountBalanceUtils.currentCycleBalance([quickBill]), -600);
+    });
+
+    test('uses incoming debit columns for imported transactions', () {
+      final importedReceived = _transaction(
+        id: 'imported-received',
+        type: 'expense',
+        amount: 500,
+        receiptFromCounterparty: true,
+        date: DateTime(2026, 1, 1),
+      );
+
+      expect(AccountBalanceUtils.currentCycleBalance([importedReceived]), -500);
+    });
   });
 
   group('AccountBalanceUtils.receiptBreakdown', () {
@@ -124,10 +265,27 @@ void main() {
         receipt: receipt,
       );
 
-      expect(result.openingBalance, 400);
-      expect(result.balanceBeforeDiscount, 900);
-      expect(result.balanceAfterDiscount, 850);
-      expect(result.finalBalance, 750);
+      expect(result.openingBalance, -400);
+      expect(result.balanceBeforeDiscount, 100);
+      expect(result.balanceAfterDiscount, 50);
+      expect(result.finalBalance, -50);
+    });
+
+    test('subtracts an expense receipt from the account balance', () {
+      final receipt = _transaction(
+        id: 'expense-receipt',
+        type: 'expense',
+        amount: 250,
+        date: DateTime(2026, 1, 2),
+      );
+      final result = AccountBalanceUtils.receiptBreakdown(
+        transactions: [receipt],
+        receipt: receipt,
+        initialBalance: 800,
+      );
+
+      expect(result.openingBalance, 800);
+      expect(result.finalBalance, 550);
     });
 
     test('orders same-day transactions by creation time', () {
@@ -160,8 +318,8 @@ void main() {
         receipt: receipt,
       );
 
-      expect(result.openingBalance, -40);
-      expect(result.finalBalance, 60);
+      expect(result.openingBalance, 40);
+      expect(result.finalBalance, 140);
     });
 
     test('includes the account opening balance in the receipt snapshot', () {
@@ -185,8 +343,58 @@ void main() {
         initialBalance: -250,
       );
 
-      expect(result.openingBalance, -200);
-      expect(result.finalBalance, -100);
+      expect(result.openingBalance, -300);
+      expect(result.finalBalance, -200);
+    });
+
+    test('uses a Quick Bill pending amount in a later receipt snapshot', () {
+      final quickBill = _transaction(
+        id: 'quick-bill',
+        type: 'income',
+        amount: 600,
+        subtotal: 1000,
+        receivedAmount: 400,
+        pendingAmount: 600,
+        description: 'Quick Bill',
+        date: DateTime(2026, 1, 1),
+      );
+      final receipt = _transaction(
+        id: 'receipt',
+        type: 'income',
+        amount: 100,
+        date: DateTime(2026, 1, 2),
+      );
+
+      final result = AccountBalanceUtils.receiptBreakdown(
+        transactions: [quickBill, receipt],
+        receipt: receipt,
+      );
+
+      expect(result.openingBalance, 600);
+      expect(result.finalBalance, 700);
+    });
+
+    test('uses imported transaction columns for the opening balance', () {
+      final receipt = _transaction(
+        id: 'receipt',
+        type: 'income',
+        amount: 100,
+        date: DateTime(2026, 1, 2),
+      );
+      final importedReceived = _transaction(
+        id: 'imported-received',
+        type: 'expense',
+        amount: 200,
+        receiptFromCounterparty: true,
+        date: DateTime(2026, 1, 1),
+      );
+
+      final result = AccountBalanceUtils.receiptBreakdown(
+        transactions: [importedReceived, receipt],
+        receipt: receipt,
+      );
+
+      expect(result.openingBalance, 200);
     });
   });
 }

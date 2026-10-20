@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
@@ -11,15 +12,20 @@ import 'package:account_app/core/services/pdf_service.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/utils/account_balance_utils.dart';
-import 'package:account_app/core/utils/receipt_helper.dart';
+import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/core/utils/receipt_dialog_helper.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
+import 'package:account_app/core/widgets/profile_update_dialog.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
+import 'package:account_app/core/widgets/item_rate_history_card_widget.dart';
 import 'package:account_app/features/accounts/add_transaction_screen.dart';
 import 'package:account_app/features/accounts/add_party_screen.dart';
 import 'package:account_app/features/accounts/bulk_party_transaction_screen.dart';
-import 'package:account_app/features/accounts/party_history_screen.dart';
+import 'package:account_app/features/accounts/sms_invitation_screen.dart';
+import 'package:account_app/features/accounts/widgets/party_tools_grid_widget.dart';
+import 'package:account_app/features/dashboard/app_shell_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// ═══════════════════════════════════════════════════════════
@@ -70,11 +76,36 @@ class _PartyCombinedScreenState extends State<PartyCombinedScreen>
   bool _isAscending = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  Map<String, String>? _remoteProfileMap;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _checkForUpdate();
+  }
+
+  Future<void> _checkForUpdate() async {
+    if (widget.party.phone.length < 10) return;
+    final dbService = Provider.of<DatabaseService>(context, listen: false);
+    try {
+      final profile =
+          await dbService.findPublicProfileByPhone(widget.party.phone);
+      if (mounted && profile != null) {
+        setState(() {
+          _remoteProfileMap = profile;
+        });
+      }
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'party detail screen',
+          context: ErrorDescription('while loading the party public profile'),
+        ),
+      );
+    }
   }
 
   @override
@@ -93,10 +124,17 @@ class _PartyCombinedScreenState extends State<PartyCombinedScreen>
 
     return Directionality(
       textDirection: isUrdu ? ui.TextDirection.rtl : ui.TextDirection.ltr,
-      child: Scaffold(
-        backgroundColor: AppTheme.scaffoldBackground,
-        body: Column(
-          children: [
+      child: PopScope(
+        canPop: true,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) {
+            AppShellScreen.switchTab(1);
+          }
+        },
+        child: Scaffold(
+          backgroundColor: AppTheme.scaffoldBackground,
+          body: Column(
+            children: [
             // ═══════════════════════════════════════════
             // SHARED DARK HEADER (Radius 15 کے ساتھ)
             // ═══════════════════════════════════════════
@@ -105,7 +143,10 @@ class _PartyCombinedScreenState extends State<PartyCombinedScreen>
               isReadOnly: widget.isReadOnly,
               isUrdu: isUrdu,
               fontFamily: fontFamily,
-              onRefresh: () => setState(() {}),
+              onRefresh: () {
+                _checkForUpdate();
+                setState(() {});
+              },
               showSearch: _showSearch,
               onToggleSearch: () {
                 setState(() {
@@ -116,6 +157,7 @@ class _PartyCombinedScreenState extends State<PartyCombinedScreen>
                   }
                 });
               },
+              remoteProfileMap: _remoteProfileMap,
             ),
 
             // ═══════════════════════════════════════════
@@ -135,7 +177,7 @@ class _PartyCombinedScreenState extends State<PartyCombinedScreen>
                 ),
                 tabs: [
                   Tab(text: isUrdu ? 'لین دین' : 'Transactions'),
-                  Tab(text: isUrdu ? 'تجزیہ' : 'Analysis'),
+                  Tab(text: isUrdu ? 'ٹولز اور ہسٹری' : 'Tools & History'),
                 ],
               ),
             ),
@@ -152,7 +194,8 @@ class _PartyCombinedScreenState extends State<PartyCombinedScreen>
                       child: SearchSortBar(
                         controller: _searchController,
                         hintText: isUrdu ? 'تلاش کریں...' : 'Search...',
-                        onSearchChanged: (v) => setState(() => _searchQuery = v),
+                        onSearchChanged: (v) =>
+                            setState(() => _searchQuery = v),
                         onSortToggled: () =>
                             setState(() => _isAscending = !_isAscending),
                         isAscending: _isAscending,
@@ -191,8 +234,9 @@ class _PartyCombinedScreenState extends State<PartyCombinedScreen>
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -206,6 +250,7 @@ class _CombinedHeader extends StatelessWidget {
   final VoidCallback onRefresh;
   final bool showSearch;
   final VoidCallback onToggleSearch;
+  final Map<String, String>? remoteProfileMap;
 
   const _CombinedHeader({
     required this.party,
@@ -215,6 +260,7 @@ class _CombinedHeader extends StatelessWidget {
     required this.onRefresh,
     required this.showSearch,
     required this.onToggleSearch,
+    this.remoteProfileMap,
   });
 
   @override
@@ -223,14 +269,46 @@ class _CombinedHeader extends StatelessWidget {
       builder: (context, dbService, _) {
         final allTx = dbService
             .getAllTransactions()
-            .where((t) =>
-                t.accountId == party.id && t.partnershipId == null)
+            .where((t) => t.accountId == party.id && t.partnershipId == null)
             .toList()
           ..sort((a, b) => b.date.compareTo(a.date));
 
-        final cycleBalance = AccountBalanceUtils.currentCycle(allTx);
-        final currentBalance = cycleBalance.balance;
-        final isPayable = currentBalance >= 0;
+        final openingBalance = party.balanceType.toLowerCase() == 'payable'
+            ? -party.initialBalance
+            : party.initialBalance;
+
+        final cycle = AccountBalanceUtils.currentCycle(allTx);
+        double totalIncome = cycle.income; // 🟢 جمع (Credit) Total
+        double totalExpense = cycle.expense; // 🔴 بنام (Debit) Total
+
+        if (allTx.isEmpty) {
+          if (openingBalance > 0) {
+            totalExpense += openingBalance; // پرانا بقایا (لینے ہیں) -> بنام 🔴
+          } else if (openingBalance < 0) {
+            totalIncome += openingBalance.abs(); // پرانا بقایا (دینے ہیں) -> جمع 🟢
+          }
+        }
+
+        double currentBalance = totalExpense - totalIncome;
+        final bool isReceivable = currentBalance > 0;
+        final bool isSettled = currentBalance.abs() < 0.01;
+
+        final remoteName = remoteProfileMap?['name']?.trim() ?? '';
+        final localName = party.name.trim();
+        final remotePhoto = remoteProfileMap?['photoUrl']?.trim() ?? '';
+        final localPhoto = (party.profileImage ?? '').trim();
+        final remoteProf = remoteProfileMap?['profession']?.trim() ?? '';
+        final localProf = (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account').trim();
+        final remoteAddress = remoteProfileMap?['address']?.trim() ?? '';
+        final localAddress = (party.address ?? '').trim();
+
+        final bool hasUpdate = remoteProfileMap != null &&
+            ((remoteName.isNotEmpty && remoteName != localName) ||
+                (remotePhoto.isNotEmpty && remotePhoto != localPhoto) ||
+                (remoteProf.isNotEmpty &&
+                    remoteProf != party.category &&
+                    remoteProf != localProf) ||
+                (remoteAddress.isNotEmpty && remoteAddress != localAddress));
 
         return Container(
           decoration: const BoxDecoration(
@@ -248,17 +326,22 @@ class _CombinedHeader extends StatelessWidget {
                   child: Row(
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
-                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.arrow_back,
+                            color: Colors.white, size: 24),
+                        onPressed: () {
+                          AppShellScreen.switchTab(1);
+                          Navigator.pop(context);
+                        },
                       ),
                       Expanded(
                         child: UrduAwareText(
-                          isUrdu ? 'پارٹی' : 'Party',
+                          isUrdu ? 'پارٹی ڈیٹیل' : 'Party Detail',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontFamily: fontFamily,
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
+                            fontSize: isUrdu ? 20 : 18,
+                            fontWeight:
+                                isUrdu ? FontWeight.bold : FontWeight.normal,
                             color: Colors.white,
                           ),
                         ),
@@ -267,14 +350,15 @@ class _CombinedHeader extends StatelessWidget {
                       // سرچ آئیکن بٹن (تین ڈاٹ کے سامنے)
                       IconButton(
                         icon: Icon(
-                          showSearch ? PhosphorIcons.x() : PhosphorIcons.magnifyingGlass(),
+                          showSearch
+                              ? PhosphorIcons.x()
+                              : PhosphorIcons.magnifyingGlass(),
                           color: Colors.white,
-                          size: 20,
+                          size: 24,
                         ),
                         onPressed: onToggleSearch,
                         tooltip: isUrdu ? 'تلاش' : 'Search',
                       ),
-                      _buildMenuButton(context),
                     ],
                   ),
                 ),
@@ -298,6 +382,17 @@ class _CombinedHeader extends StatelessWidget {
                         categoryColor: Colors.white,
                         customSize: 38,
                         borderRadius: 8,
+                        hasUpdate: hasUpdate,
+                        onAvatarTap: (hasUpdate && remoteProfileMap != null)
+                            ? () {
+                                ProfileUpdateDialog.show(
+                                  context,
+                                  party: party,
+                                  remoteProfile: remoteProfileMap!,
+                                  onUpdated: onRefresh,
+                                );
+                              }
+                            : null,
                       ),
 
                       const SizedBox(height: 8),
@@ -307,29 +402,35 @@ class _CombinedHeader extends StatelessWidget {
                         children: [
                           _buildStatItem(
                             isUrdu ? 'جمع' : 'In',
-                            cycleBalance.income,
+                            totalIncome,
                             AppTheme.incomeColor,
                             PhosphorIcons.arrowDownLeft(),
                           ),
                           _buildStatDivider(),
                           _buildStatItem(
                             isUrdu ? 'بنام' : 'Out',
-                            cycleBalance.expense,
+                            totalExpense,
                             AppTheme.expenseColor,
                             PhosphorIcons.arrowUpRight(),
                           ),
                           _buildStatDivider(),
                           _buildStatItem(
                             isUrdu
-                                ? (isPayable ? 'دینا ہے' : 'لینا ہے')
-                                : (isPayable ? 'Payable' : 'Receivable'),
+                                ? (isSettled
+                                    ? 'حساب صاف'
+                                    : (isReceivable ? 'لینے ہیں' : 'دینے ہیں'))
+                                : (isSettled
+                                    ? 'Settled'
+                                    : (isReceivable
+                                        ? 'Receivable'
+                                        : 'Payable')),
                             currentBalance.abs(),
-                            isPayable
-                                ? AppTheme.expenseColor
-                                : AppTheme.incomeColor,
-                            isPayable
-                                ? PhosphorIcons.arrowUpRight()
-                                : PhosphorIcons.arrowDownLeft(),
+                            isReceivable
+                                ? AppTheme.incomeColor
+                                : AppTheme.expenseColor,
+                            isReceivable
+                                ? PhosphorIcons.arrowDownLeft()
+                                : PhosphorIcons.arrowUpRight(),
                             isBold: true,
                           ),
                         ],
@@ -408,7 +509,7 @@ class _CombinedHeader extends StatelessWidget {
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   child: UrduAwareText(
-                    "Rs ${amount.toStringAsFixed(0)}",
+                    "Rs ${Formatters.formatAmount(amount)}",
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: isBold ? 14.5 : 13,
@@ -463,25 +564,30 @@ class _CombinedHeader extends StatelessWidget {
   }
 
   // ═══ Actions ═══
-  void _onCall(BuildContext context) {
-    if (party.phone.trim().isEmpty) {
+  Future<void> _onCall(BuildContext context) async {
+    final phone = party.phone.trim();
+    if (phone.isEmpty) {
       AppToast.warning(
         context,
         isUrdu ? 'نمبر موجود نہیں' : 'No phone number',
       );
       return;
     }
-    AppToast.info(
-      context,
-      isUrdu ? 'کالنگ ${party.phone}' : 'Calling ${party.phone}',
-    );
+    final uri = Uri.parse('tel:$phone');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      if (context.mounted) {
+        AppToast.error(
+          context,
+          isUrdu ? 'کال نہیں ہو سکی' : 'Could not make call',
+        );
+      }
+    }
   }
 
   void _onRemind(BuildContext context) {
-    AppToast.info(
-      context,
-      isUrdu ? 'یاد دہانی بھیجیں' : 'Send reminder',
-    );
+    BalanceAlertDialog.show(context, party: party);
   }
 
   void _onReceipt(BuildContext context, List<model.Transaction> txs) {
@@ -492,7 +598,7 @@ class _CombinedHeader extends StatelessWidget {
       );
       return;
     }
-    ReceiptHelper.showReceiptDialog(
+    ReceiptDialogHelper.showReceiptDialog(
       context,
       transaction: txs.first,
       account: party,
@@ -500,119 +606,7 @@ class _CombinedHeader extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuButton(BuildContext context) {
-    final isUrdu = this.isUrdu;
-    final fontFamily = this.fontFamily;
 
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert, color: Colors.white, size: 20),
-      onSelected: (value) async {
-        if (value == 'bulk_entry') {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => BulkPartyTransactionScreen(party: party),
-            ),
-          ).then((_) => onRefresh());
-        } else if (value == 'history') {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => PartyHistoryScreen(party: party),
-            ),
-          );
-        } else if (value == 'pdf') {
-          final pdfService = Provider.of<PdfService>(context, listen: false);
-          final db = Provider.of<DatabaseService>(context, listen: false);
-          final txs = db
-              .getAllTransactions()
-              .where((t) => t.accountId == party.id)
-              .toList();
-          await pdfService.generateAccountStatement(
-            account: party,
-            transactions: txs,
-            isUrdu: isUrdu,
-          );
-        } else if (value == 'edit') {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => AddPartyScreen(partyToEdit: party),
-            ),
-          );
-          onRefresh();
-        } else if (value == 'delete') {
-          _confirmDelete(context);
-        }
-      },
-      itemBuilder: (_) => [
-        PopupMenuItem(
-          value: 'bulk_entry',
-          child: _menuItem(
-            PhosphorIcons.listBullets(),
-            isUrdu ? 'پیج انٹری' : 'Bulk Entry',
-            fontFamily,
-          ),
-        ),
-        PopupMenuItem(
-          value: 'history',
-          child: _menuItem(
-            PhosphorIcons.clockCounterClockwise(),
-            isUrdu ? 'مکمل تجزیہ' : 'Full Analysis',
-            fontFamily,
-          ),
-        ),
-        PopupMenuItem(
-          value: 'pdf',
-          child: _menuItem(
-            PhosphorIcons.filePdf(),
-            isUrdu ? 'PDF رپورٹ' : 'PDF Report',
-            fontFamily,
-          ),
-        ),
-        PopupMenuItem(
-          value: 'edit',
-          child: _menuItem(
-            PhosphorIcons.pencilLine(),
-            isUrdu ? 'ایڈٹ' : 'Edit',
-            fontFamily,
-          ),
-        ),
-        const PopupMenuDivider(),
-        PopupMenuItem(
-          value: 'delete',
-          child: _menuItem(
-            PhosphorIcons.trash(),
-            isUrdu ? 'ڈیلیٹ' : 'Delete',
-            fontFamily,
-            color: AppTheme.expenseColor,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _menuItem(
-    IconData icon,
-    String label,
-    String? fontFamily, {
-    Color? color,
-  }) {
-    return ListTile(
-      leading: Icon(icon, color: color ?? AppTheme.darkColor, size: 20),
-      title: UrduAwareText(
-        label,
-        style: TextStyle(
-          fontFamily: fontFamily,
-          fontSize: 13,
-          color: color,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      contentPadding: EdgeInsets.zero,
-      visualDensity: VisualDensity.compact,
-    );
-  }
 
   Future<void> _confirmDelete(BuildContext context) async {
     final isUrdu = this.isUrdu;
@@ -718,6 +712,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     await _dbService.recalculateAccountBalance(widget.party.id);
     _refresh();
   }
@@ -726,14 +721,23 @@ class _TransactionsTabState extends State<_TransactionsTab> {
     if (!mounted) return;
     final txs = _dbService
         .getAllTransactions()
-        .where((t) =>
-            t.accountId == widget.party.id && t.partnershipId == null)
+        .where((t) => t.accountId == widget.party.id && t.partnershipId == null)
         .toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+      ..sort((a, b) => _compareTransactions(b, a));
     setState(() {
       _transactions = txs;
       _isLoading = false;
     });
+  }
+
+  int _compareTransactions(model.Transaction first, model.Transaction second) {
+    final dateOrder = first.date.compareTo(second.date);
+    if (dateOrder != 0) return dateOrder;
+
+    final createdOrder = first.createdAt.compareTo(second.createdAt);
+    if (createdOrder != 0) return createdOrder;
+
+    return first.id.compareTo(second.id);
   }
 
   @override
@@ -748,8 +752,9 @@ class _TransactionsTabState extends State<_TransactionsTab> {
           t.category.toLowerCase().contains(query);
       return matchesFilter && matchesSearch;
     }).toList()
-      ..sort((a, b) =>
-          widget.isAscending ? a.date.compareTo(b.date) : b.date.compareTo(a.date));
+      ..sort((a, b) => widget.isAscending
+          ? _compareTransactions(a, b)
+          : _compareTransactions(b, a));
 
     return Stack(
       children: [
@@ -793,6 +798,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                     ),
                   ),
                 );
+                if (!mounted) return;
                 _load();
               },
               backgroundColor: AppTheme.darkColor,
@@ -869,7 +875,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
       child: Row(
         children: [
           Expanded(
-            flex: 5,
+            flex: 6,
             child: UrduAwareText(
               widget.isUrdu ? "تفصیل" : "Details",
               style: TextStyle(
@@ -882,16 +888,22 @@ class _TransactionsTabState extends State<_TransactionsTab> {
           ),
           Expanded(
             flex: 2,
-            child: _labelWithIcon(
-              widget.isUrdu ? 'دیا / بنام' : 'Credits',
-              PhosphorIcons.arrowUpRight(),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _labelWithIcon(
+                widget.isUrdu ? 'دیا / بنام' : 'Credits',
+                PhosphorIcons.arrowUpRight(),
+              ),
             ),
           ),
           Expanded(
             flex: 2,
-            child: _labelWithIcon(
-              widget.isUrdu ? 'لیا / جمع' : 'Debits',
-              PhosphorIcons.arrowDownLeft(),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _labelWithIcon(
+                widget.isUrdu ? 'لیا / جمع' : 'Debits',
+                PhosphorIcons.arrowDownLeft(),
+              ),
             ),
           ),
         ],
@@ -901,6 +913,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
 
   Widget _labelWithIcon(String label, IconData icon) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 12, color: AppTheme.themeColor),
         const SizedBox(width: 4),
@@ -924,39 +937,54 @@ class _TransactionsTabState extends State<_TransactionsTab> {
 
   // ═══ Transactions List ═══
   Widget _buildTransactionList(List<model.Transaction> txs) {
-    final chronological = [..._transactions]
-      ..sort((a, b) => a.date.compareTo(b.date));
+    final dbService = Provider.of<DatabaseService>(context, listen: false);
+    final allAccountTxs = dbService
+        .getAllTransactions()
+        .where((t) => t.accountId == widget.party.id && t.partnershipId == null)
+        .toList()
+      ..sort(_compareTransactions);
 
-    final txBalances = <String, double>{};
+    double openingBalance = widget.party.initialBalance;
+    if (widget.party.balanceType.toLowerCase() == 'payable') {
+      openingBalance = -openingBalance;
+    }
+
+    final txBalances = AccountBalanceUtils.runningBalances(
+      allAccountTxs,
+      initialBalance: openingBalance,
+    );
+
+    final chronological = allAccountTxs;
+
     final cycles = <Map<String, dynamic>>[];
     var currentCycleTxs = <model.Transaction>[];
-    double runningIn = 0, runningOut = 0;
+    double cycleIn = 0, cycleOut = 0;
+    double cycleBalance = openingBalance;
     DateTime? cycleStart;
 
     for (var tx in chronological) {
       cycleStart ??= tx.date;
       currentCycleTxs.add(tx);
-      if (tx.type == 'income') {
-        runningIn += tx.accountBalanceAmount;
-      } else {
-        runningOut += tx.accountBalanceAmount;
-      }
-      txBalances[tx.id] = runningIn - runningOut;
+      final columns = AccountBalanceUtils.transactionColumns(tx);
+      cycleOut += columns.firstColumn;
+      cycleIn += columns.secondColumn;
+      cycleBalance += columns.firstColumn - columns.secondColumn;
 
-      if ((runningIn - runningOut).abs() < 0.01) {
+      if (cycleBalance.abs() < 0.01) {
         cycles.add({
           'id': tx.id,
           'transactions': List<model.Transaction>.from(currentCycleTxs),
           'isSettled': true,
-          'totalIn': runningIn,
-          'totalOut': runningOut,
+          'totalIn': cycleIn,
+          'totalOut': cycleOut,
           'startDate': cycleStart,
           'endDate': tx.date,
           'days': tx.date.difference(cycleStart).inDays,
         });
         currentCycleTxs.clear();
-        runningIn = 0;
-        runningOut = 0;
+        cycleIn = 0;
+        cycleOut = 0;
+        cycleBalance = 0;
         cycleStart = null;
       }
     }
@@ -965,8 +993,8 @@ class _TransactionsTabState extends State<_TransactionsTab> {
         'id': 'active',
         'transactions': List<model.Transaction>.from(currentCycleTxs),
         'isSettled': false,
-        'totalIn': runningIn,
-        'totalOut': runningOut,
+        'totalIn': cycleIn,
+        'totalOut': cycleOut,
       });
     }
 
@@ -997,7 +1025,8 @@ class _TransactionsTabState extends State<_TransactionsTab> {
         itemCount: display.length,
         itemBuilder: (context, i) {
           final c = display[i];
-          final list = (c['display'] as List).whereType<model.Transaction>().toList();
+          final list =
+              (c['display'] as List).whereType<model.Transaction>().toList();
           final settled = c['isSettled'] as bool;
           final id = c['id'] as String;
           final expanded = _expandedCycleIds.contains(id);
@@ -1014,8 +1043,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
           return Column(
             children: [
               _buildSettlementCard(c, expanded),
-              if (expanded)
-                _buildSubList(list.reversed.toList(), txBalances),
+              if (expanded) _buildSubList(list.reversed.toList(), txBalances),
             ],
           );
         },
@@ -1045,6 +1073,8 @@ class _TransactionsTabState extends State<_TransactionsTab> {
     final end = df.format(data['endDate']);
     final days = data['days'];
     final id = data['id'];
+    final totalIn = (data['totalIn'] as num?)?.toDouble() ?? 0;
+    final totalOut = (data['totalOut'] as num?)?.toDouble() ?? 0;
 
     return InkWell(
       onTap: () {
@@ -1058,59 +1088,119 @@ class _TransactionsTabState extends State<_TransactionsTab> {
       },
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.green.withValues(alpha: expanded ? 0.08 : 0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.green.withValues(alpha: 0.2)),
+          gradient: LinearGradient(
+            colors: [
+              AppTheme.themeColor.withValues(alpha: expanded ? 0.12 : 0.06),
+              AppTheme.themeColor.withValues(alpha: expanded ? 0.06 : 0.03),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppTheme.themeColor.withValues(alpha: expanded ? 0.35 : 0.2),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.themeColor.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.green,
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.themeColor,
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.themeColor.withValues(alpha: 0.3),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Icon(
-                    expanded ? Icons.keyboard_arrow_up : Icons.check,
-                    size: 10,
+                    expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.check_rounded,
+                    size: 12,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 UrduAwareText(
-                  widget.isUrdu
-                      ? "حساب برابر (ٹیپ کریں)"
-                      : "Balanced (Tap)",
+                  widget.isUrdu ? "حساب برابر" : "Balanced",
                   style: TextStyle(
                     fontFamily: widget.fontFamily,
                     fontWeight: FontWeight.w900,
-                    fontSize: 12.5,
-                    color: Colors.green.shade800,
+                    fontSize: 13,
+                    color: AppTheme.darkColor,
                   ),
                 ),
                 const Spacer(),
-                UrduAwareText(
-                  "$days ${widget.isUrdu ? 'دن' : 'days'}",
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.darkColor,
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.themeColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: UrduAwareText(
+                    "$days ${widget.isUrdu ? 'دن' : 'days'}",
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.themeColor,
+                    ),
                   ),
                 ),
               ],
             ),
             if (expanded) ...[
+              const SizedBox(height: 12),
+              Container(
+                  height: 1,
+                  color: AppTheme.themeColor.withValues(alpha: 0.15)),
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   UrduAwareText("$start → $end",
                       style: const TextStyle(
-                          fontSize: 11, color: AppTheme.textSecondary)),
+                          fontSize: 11.5,
+                          color: AppTheme.textSecondary,
+                          fontWeight: FontWeight.w600)),
+                  Row(
+                    children: [
+                      if (totalOut > 0)
+                        UrduAwareText(
+                          '${widget.isUrdu ? "بنام:" : "Out:"} Rs ${Formatters.formatAmount(totalOut)}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.expenseColor,
+                          ),
+                        ),
+                      if (totalOut > 0 && totalIn > 0)
+                        const SizedBox(width: 10),
+                      if (totalIn > 0)
+                        UrduAwareText(
+                          '${widget.isUrdu ? "جمع:" : "In:"} Rs ${Formatters.formatAmount(totalIn)}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.incomeColor,
+                          ),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ],
@@ -1121,17 +1211,15 @@ class _TransactionsTabState extends State<_TransactionsTab> {
   }
 
   Widget _buildTransactionItem(model.Transaction t, double runningBalance) {
-    final isIncome = t.type == 'income';
     final isHighlighted = _highlightId == t.id;
+    final columns = AccountBalanceUtils.transactionColumns(t);
 
     return InkWell(
-      onLongPress: widget.isReadOnly
-          ? null
-          : () => _showDeleteConfirm(t),
+      onLongPress: widget.isReadOnly ? null : () => _showDeleteConfirm(t),
       onTap: widget.isReadOnly
           ? null
           : () async {
-              await ReceiptHelper.showReceiptDialog(
+              await ReceiptDialogHelper.showReceiptDialog(
                 context,
                 transaction: t,
                 account: widget.party,
@@ -1187,15 +1275,27 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                               color: AppTheme.themeColor,
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              fontFamily: widget.isUrdu
-                                  ? widget.fontFamily
-                                  : null,
+                              fontFamily:
+                                  widget.isUrdu ? widget.fontFamily : null,
+                            ),
+                          ),
+                        ],
+                        if (t.professionName != null &&
+                            t.professionName!.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          UrduAwareText(
+                            t.professionName!,
+                            style: TextStyle(
+                              color: AppTheme.purpleColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: widget.fontFamily,
                             ),
                           ),
                         ],
                         const SizedBox(width: 8),
                         UrduAwareText(
-                          "Rs ${runningBalance.abs().toStringAsFixed(0)}",
+                          "Rs ${Formatters.formatAmount(runningBalance.abs())}",
                           style: const TextStyle(
                             color: AppTheme.textSecondary,
                             fontSize: 11,
@@ -1213,8 +1313,8 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: UrduAwareText(
-                  !isIncome || t.isQuickBill
-                      ? t.amount.toStringAsFixed(0)
+                  columns.firstColumn > 0
+                      ? Formatters.formatAmount(columns.firstColumn)
                       : "-",
                   style: const TextStyle(
                     color: AppTheme.expenseColor,
@@ -1230,10 +1330,8 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: UrduAwareText(
-                  isIncome
-                      ? (t.isQuickBill
-                          ? t.receivedAmount.toStringAsFixed(0)
-                          : t.amount.toStringAsFixed(0))
+                  columns.secondColumn > 0
+                      ? Formatters.formatAmount(columns.secondColumn)
                       : "-",
                   style: const TextStyle(
                     color: AppTheme.incomeColor,
@@ -1254,8 +1352,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(PhosphorIcons.receipt(),
-              size: 64, color: Colors.grey.shade400),
+          Icon(PhosphorIcons.receipt(), size: 64, color: Colors.grey.shade400),
           const SizedBox(height: 16),
           UrduAwareText(
             widget.isUrdu ? 'کوئی لین دین نہیں' : 'No transactions',
@@ -1271,9 +1368,11 @@ class _TransactionsTabState extends State<_TransactionsTab> {
   }
 
   void _showDeleteConfirm(model.Transaction t) {
+    final parentContext = context;
+    final dbService = Provider.of<DatabaseService>(context, listen: false);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: UrduAwareText(
           widget.isUrdu ? 'ڈیلیٹ کریں؟' : 'Delete?',
@@ -1290,7 +1389,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: UrduAwareText(
               widget.isUrdu ? 'منسوخ' : 'Cancel',
               style: TextStyle(
@@ -1301,13 +1400,12 @@ class _TransactionsTabState extends State<_TransactionsTab> {
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
-              await Provider.of<DatabaseService>(context, listen: false)
-                  .deleteTransaction(t.id);
+              Navigator.pop(dialogContext);
+              await dbService.deleteTransaction(t.id);
               _load();
-              if (context.mounted) {
+              if (parentContext.mounted) {
                 AppToast.success(
-                  context,
+                  parentContext,
                   widget.isUrdu ? 'ڈیلیٹ ہو گیا' : 'Deleted',
                 );
               }
@@ -1355,7 +1453,6 @@ class _AnalysisTabState extends State<_AnalysisTab> {
   DateTime? _firstDeal;
   double _trustScore = 0;
 
-  String _selectedTab = 'items';
   String _rateFilter = 'all';
 
   @override
@@ -1380,7 +1477,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
 
     final allTx = db
         .getAllTransactions()
-        .where((t) => t.accountId == widget.party.id)
+        .where((t) => t.accountId == widget.party.id && t.partnershipId == null)
         .toList();
 
     _totalIn = 0;
@@ -1391,7 +1488,18 @@ class _AnalysisTabState extends State<_AnalysisTab> {
     final itemCount = <String, int>{};
 
     for (var tx in allTx) {
-      if (tx.type == 'income') {
+      if (tx.isQuickBill) {
+        final subtotal = tx.subtotal > 0 ? tx.subtotal : tx.amount;
+        final billTotal =
+            (subtotal - tx.discountAmount).clamp(0, subtotal).toDouble();
+        if (tx.type == 'income') {
+          _totalIn += billTotal;
+          _totalOut += tx.receivedAmount;
+        } else {
+          _totalOut += billTotal;
+          _totalIn += tx.receivedAmount;
+        }
+      } else if (tx.type == 'income') {
         _totalIn += tx.amount;
       } else {
         _totalOut += tx.amount;
@@ -1407,7 +1515,8 @@ class _AnalysisTabState extends State<_AnalysisTab> {
       }
     }
 
-    final chron = List.from(allTx)..sort((a, b) => a.date.compareTo(b.date));
+    final chron = List<model.Transaction>.from(allTx)
+      ..sort((a, b) => a.date.compareTo(b.date));
     final history = <String, List<ItemPriceHistory>>{};
 
     for (var tx in chron) {
@@ -1415,7 +1524,18 @@ class _AnalysisTabState extends State<_AnalysisTab> {
         final cleared = clearedAt[item.description.trim()];
         if (item.rate > 0 &&
             (cleared == null || tx.createdAt.isAfter(cleared))) {
-          _addToHistory(history, item.description, item.rate, tx.date, tx.type);
+          final qty = item.quantity > 0 ? item.quantity : 1.0;
+          final total = item.total > 0 ? item.total : (item.rate * qty);
+          _addToHistory(
+            history,
+            item.description,
+            item.rate,
+            qty,
+            total,
+            item.unit,
+            tx.date,
+            tx.type,
+          );
         }
       }
     }
@@ -1425,11 +1545,16 @@ class _AnalysisTabState extends State<_AnalysisTab> {
 
     _totalVolume = _totalIn + _totalOut;
     _totalDeals = allTx.length;
+    final openingBalance = widget.party.balanceType.toLowerCase() == 'payable'
+        ? -widget.party.initialBalance
+        : widget.party.initialBalance;
+    final currentBalance = AccountBalanceUtils.ledgerBalance(
+      allTx,
+      initialBalance: openingBalance,
+    );
 
     double score = 0;
-    final days = DateTime.now()
-        .difference(_firstDeal ?? DateTime.now())
-        .inDays;
+    final days = DateTime.now().difference(_firstDeal ?? DateTime.now()).inDays;
     if (days > 180) {
       score += 1.0;
     } else if (days > 30) {
@@ -1446,7 +1571,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
       score += 0.5;
     }
     if (_totalVolume > 0) {
-      final ratio = 1 - (widget.party.balance.abs() / _totalVolume);
+      final ratio = 1 - (currentBalance.abs() / _totalVolume);
       if (ratio > 0.9) {
         score += 1.0;
       } else if (ratio > 0.7) {
@@ -1464,42 +1589,62 @@ class _AnalysisTabState extends State<_AnalysisTab> {
     Map<String, List<ItemPriceHistory>> h,
     String name,
     double price,
+    double quantity,
+    double total,
+    String? unit,
     DateTime date,
     String type,
   ) {
     if (name.isEmpty || name == 'دیگر' || name == 'Other') return;
     final clean = name.trim();
+    final entryTotal = total > 0 ? total : (price * quantity);
     if (!h.containsKey(clean)) {
       h[clean] = [
-        ItemPriceHistory(price: price, date: date, type: type),
+        ItemPriceHistory(
+          price: price,
+          quantity: quantity,
+          total: entryTotal,
+          unit: unit,
+          date: date,
+          type: type,
+        ),
       ];
     } else {
       final last = h[clean]!.last;
-      if (last.price != price) {
-        final pct = ((price - last.price) / last.price) * 100;
-        final days = date.difference(last.date).inDays;
-        h[clean]!.add(ItemPriceHistory(
-          price: price,
-          date: date,
-          type: type,
-          changePercentage: pct,
-          daysInterval: days,
-        ));
-      }
+      final pct = last.price > 0 && last.price != price
+          ? (((price - last.price) / last.price) * 100)
+          : null;
+      final days = date.difference(last.date).inDays;
+      h[clean]!.add(ItemPriceHistory(
+        price: price,
+        quantity: quantity,
+        total: entryTotal,
+        unit: unit,
+        date: date,
+        type: type,
+        changePercentage: pct != 0 ? pct : null,
+        daysInterval: days,
+      ));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 30),
-      child: Column(
-        children: [
-          _build3Stats(),
-          const SizedBox(height: 14),
-          _buildToggleTabs(),
-          const SizedBox(height: 14),
-          if (_selectedTab == 'items') ...[
+    return Container(
+      color: AppTheme.backgroundColor,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 30),
+        child: Column(
+          children: [
+            PartyToolsGridWidget(
+              party: widget.party,
+              isUrdu: widget.isUrdu,
+              fontFamily: widget.fontFamily,
+              onRefresh: _loadData,
+            ),
+            const SizedBox(height: 12),
+            _build3Stats(),
+            const SizedBox(height: 14),
             _buildSubFilter(),
             const SizedBox(height: 10),
             if (_itemHistory.isEmpty)
@@ -1514,12 +1659,31 @@ class _AnalysisTabState extends State<_AnalysisTab> {
                 ),
               )
             else
-              ..._itemHistory.entries.map(
-                (e) => _buildItemCard(e.key, e.value),
-              ),
-          ] else
-            _buildPersonalReview(),
-        ],
+              ..._itemHistory.entries.map((e) {
+                final cardHistory = e.value
+                    .map((h) => ItemPriceHistory(
+                          price: h.price,
+                          quantity: h.quantity,
+                          total: h.total,
+                          date: h.date,
+                          type: h.type,
+                          unit: h.unit,
+                          changePercentage: h.changePercentage,
+                          daysInterval: h.daysInterval,
+                        ))
+                    .toList();
+
+                return ItemRateHistoryCardWidget(
+                  itemName: e.key,
+                  partyName: widget.party.name,
+                  history: cardHistory,
+                  isUrdu: widget.isUrdu,
+                  fontFamily: widget.fontFamily,
+                  onItemUpdated: _loadData,
+                );
+              }),
+          ],
+        ),
       ),
     );
   }
@@ -1527,11 +1691,13 @@ class _AnalysisTabState extends State<_AnalysisTab> {
   Widget _build3Stats() {
     return Row(
       children: [
-        _statCard(_getRelationshipPeriod(), widget.isUrdu ? 'تعلق کو' : 'Relationship'),
+        _statCard(_getRelationshipPeriod(),
+            widget.isUrdu ? 'تعلق کو' : 'Relationship'),
         const SizedBox(width: 10),
         _statCard('$_totalDeals', widget.isUrdu ? 'کل اندراج' : 'Total Deals'),
         const SizedBox(width: 10),
-        _statCard(_formatVolume(_totalVolume), widget.isUrdu ? 'حجم' : 'Volume'),
+        _statCard(
+            _formatVolume(_totalVolume), widget.isUrdu ? 'حجم' : 'Volume'),
       ],
     );
   }
@@ -1565,64 +1731,6 @@ class _AnalysisTabState extends State<_AnalysisTab> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToggleTabs() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppTheme.backgroundColor,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _toggleBtn(
-              'items',
-              widget.isUrdu ? 'آئٹمز اور ریٹ' : 'Items & Rates',
-            ),
-          ),
-          Expanded(
-            child: _toggleBtn(
-              'review',
-              widget.isUrdu ? 'ذاتی جائزہ' : 'Personal Review',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _toggleBtn(String key, String label) {
-    final active = _selectedTab == key;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedTab = key),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: active ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: active
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 4,
-                  ),
-                ]
-              : null,
-        ),
-        alignment: Alignment.center,
-        child: UrduAwareText(
-          label,
-          style: TextStyle(
-            fontFamily: widget.fontFamily,
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: active ? AppTheme.darkColor : AppTheme.textSecondary,
-          ),
         ),
       ),
     );
@@ -1677,316 +1785,6 @@ class _AnalysisTabState extends State<_AnalysisTab> {
     );
   }
 
-  Widget _buildItemCard(String name, List<ItemPriceHistory> history) {
-    final hasChange = history.any((h) => h.changePercentage != null);
-    if (_rateFilter == 'chg' && !hasChange) return const SizedBox.shrink();
-
-    final latest = history.first;
-    final isDecrease = latest.changePercentage != null &&
-        latest.changePercentage! < 0;
-    final totalAmount = history.fold<double>(0, (s, h) => s + h.price * 10);
-    final badgeColor =
-        isDecrease ? AppTheme.incomeColor : AppTheme.expenseColor;
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ItemHistoryDetailScreen(
-              itemName: name,
-              history: history,
-              partyName: widget.party.name,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.backgroundColor),
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.local_drink,
-                      color: Color(0xFF2563EB),
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        UrduAwareText(
-                          name,
-                          style: TextStyle(
-                            fontFamily: widget.fontFamily,
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.darkColor,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        UrduAwareText(
-                          '${history.length} ${widget.isUrdu ? "خریداریاں" : "purchases"}',
-                          style: TextStyle(
-                            fontFamily: widget.fontFamily,
-                            fontSize: 11,
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      UrduAwareText(
-                        'Rs ${latest.price.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: AppTheme.darkColor,
-                        ),
-                      ),
-                      UrduAwareText(
-                        widget.isUrdu ? 'آخری ریٹ' : 'Last rate',
-                        style: TextStyle(
-                          fontFamily: widget.fontFamily,
-                          fontSize: 10.5,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: const BoxDecoration(
-                color: Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(16),
-                  bottomRight: Radius.circular(16),
-                ),
-              ),
-              child: Row(
-                children: [
-                  UrduAwareText(
-                    widget.isUrdu ? 'کل' : 'Total',
-                    style: TextStyle(
-                      fontFamily: widget.fontFamily,
-                      fontSize: 11.5,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  UrduAwareText(
-                    'Rs ${totalAmount.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.darkColor,
-                    ),
-                  ),
-                  if (latest.changePercentage != null) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: badgeColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: UrduAwareText(
-                        '${latest.changePercentage!.abs().toStringAsFixed(1)}% ${isDecrease ? "↓" : "↑"}',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.bold,
-                          color: badgeColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPersonalReview() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.backgroundColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              UrduAwareText(
-                widget.isUrdu ? 'ذاتی جائزہ' : 'Personal Review',
-                style: TextStyle(
-                  fontFamily: widget.fontFamily,
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.darkColor,
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppTheme.expenseColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.lock,
-                        size: 11, color: AppTheme.expenseColor),
-                    const SizedBox(width: 4),
-                    UrduAwareText(
-                      widget.isUrdu ? 'صرف آپ' : 'Only you',
-                      style: TextStyle(
-                        fontFamily: widget.fontFamily,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.expenseColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _stars(_trustScore, 18),
-              const SizedBox(width: 8),
-              UrduAwareText(
-                widget.isUrdu ? 'آخری 12 مہینے' : 'Last 12 months',
-                style: TextStyle(
-                  fontFamily: widget.fontFamily,
-                  fontSize: 11.5,
-                  color: AppTheme.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _reviewRow(
-            widget.isUrdu ? 'ادائیگی کی رفتار' : 'Payment speed',
-            widget.isUrdu ? 'اوسط 12 دن دیر' : 'Avg 12 days late',
-            3,
-          ),
-          _reviewRow(
-            widget.isUrdu ? 'بقایا رقم' : 'Outstanding',
-            widget.isUrdu ? '16% باقی' : '16% remaining',
-            2,
-          ),
-          _reviewRow(
-            widget.isUrdu ? 'باقاعدگی' : 'Regularity',
-            widget.isUrdu ? 'ہر 8.8 دن' : 'Every 8.8 days',
-            4,
-          ),
-          const SizedBox(height: 10),
-          UrduAwareText(
-            widget.isUrdu
-                ? 'یہ آپ کے اپنے حساب پر اندازہ ہے۔ پارٹی کو نہیں دکھتا۔'
-                : 'Your private estimate. Not visible to the party.',
-            style: TextStyle(
-              fontFamily: widget.fontFamily,
-              fontSize: 10.5,
-              color: Colors.grey.shade400,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _reviewRow(String title, String sub, int stars) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                UrduAwareText(
-                  title,
-                  style: TextStyle(
-                    fontFamily: widget.fontFamily,
-                    fontSize: 13.5,
-                    color: AppTheme.darkColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                UrduAwareText(
-                  sub,
-                  style: TextStyle(
-                    fontFamily: widget.fontFamily,
-                    fontSize: 11.5,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _stars(stars.toDouble(), 14),
-        ],
-      ),
-    );
-  }
-
-  Widget _stars(double score, double size) {
-    return Directionality(
-      textDirection: ui.TextDirection.ltr,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: List.generate(5, (i) {
-          return Icon(
-            i < score ? Icons.star_rounded : Icons.star_outline_rounded,
-            color: const Color(0xFF2563EB),
-            size: size,
-          );
-        }),
-      ),
-    );
-  }
-
-  String _formatVolume(double v) {
-    if (v >= 100000) return '${(v / 100000).toStringAsFixed(1)} لاکھ';
-    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)} ہزار';
-    return v.toStringAsFixed(0);
-  }
-
   String _getRelationshipPeriod() {
     if (_firstDeal == null || _transactions.isEmpty) return '-';
     final last = _transactions.first.date;
@@ -1998,5 +1796,11 @@ class _AnalysisTabState extends State<_AnalysisTab> {
     } else {
       return '${(diff.inDays / 365).floor()} ${widget.isUrdu ? "سال" : "years"}';
     }
+  }
+
+  String _formatVolume(double v) {
+    if (v >= 100000) return '${(v / 100000).toStringAsFixed(1)} لاکھ';
+    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)} ہزار';
+    return v.toStringAsFixed(0);
   }
 }

@@ -12,6 +12,7 @@ import 'package:account_app/core/config/professions_config.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/utils/formatters.dart';
 
 class CompleteSeasonScreen extends StatefulWidget {
   final Profession season;
@@ -127,7 +128,7 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
                   const Divider(height: 16),
                   _buildHeaderRow(
                     isUrdu ? 'خرچ اب تک' : 'Expense so far',
-                    'Rs. ${expense.toStringAsFixed(0)}',
+                    'Rs. ${Formatters.formatAmount(expense)}',
                     isBold: true,
                     fontFamily: fontFamily,
                   ),
@@ -151,6 +152,7 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
                         controller: _areaController,
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
+                        inputFormatters: [CurrencyInputFormatter()],
                         style: const TextStyle(color: AppTheme.darkColor),
                         decoration: InputDecoration(
                           labelText: isUrdu ? 'رقبہ (ایکڑ)' : 'Area (Acres)',
@@ -168,6 +170,7 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
                         controller: _prodController,
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
+                        inputFormatters: [CurrencyInputFormatter()],
                         style: const TextStyle(color: AppTheme.darkColor),
                         decoration: InputDecoration(
                           labelText: isUrdu ? 'پیداوار (من)' : 'Yield (Mun)',
@@ -220,7 +223,7 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
                     _isAgriculture
                         ? (isUrdu ? 'فی ایکڑ خرچ' : 'Cost / Acre')
                         : (isUrdu ? 'کل خرچ' : 'Total Expense'),
-                    'Rs. ${(_isAgriculture ? costPerAcre : expense).toStringAsFixed(0)}',
+                    'Rs. ${Formatters.formatAmount(_isAgriculture ? costPerAcre : expense)}',
                     fontFamily,
                   ),
                   const Divider(height: 16, color: Color(0xFFBFDBFE)),
@@ -229,7 +232,7 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
                         ? (isUrdu ? 'فی ایکڑ آمدنی' : 'Income / Acre')
                         : (isUrdu ? 'کل آمدنی' : 'Total Income'),
                     income > 0
-                        ? 'Rs. ${(_isAgriculture ? incomePerAcre : income).toStringAsFixed(0)}'
+                        ? 'Rs. ${Formatters.formatAmount(_isAgriculture ? incomePerAcre : income)}'
                         : (isUrdu ? 'ابھی درج نہیں' : 'Not recorded'),
                     fontFamily,
                   ),
@@ -237,7 +240,7 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
                   _buildSummaryRow(
                     isUrdu ? 'خالص منافع' : 'Net Profit',
                     income > 0
-                        ? 'Rs. ${netProfit.toStringAsFixed(0)}'
+                        ? 'Rs. ${Formatters.formatAmount(netProfit)}'
                         : (isUrdu ? 'آمدنی درج نہیں' : 'No Income'),
                     fontFamily,
                     isBold: true,

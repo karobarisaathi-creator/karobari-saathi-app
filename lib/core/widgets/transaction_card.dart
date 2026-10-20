@@ -3,9 +3,10 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/transaction_model.dart';
-import 'package:account_app/core/utils/receipt_helper.dart';
+import 'package:account_app/core/utils/receipt_dialog_helper.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
+import 'package:account_app/core/utils/formatters.dart';
 
 class TransactionCard extends StatelessWidget {
   final Transaction transaction;
@@ -78,7 +79,7 @@ class TransactionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             UrduAwareText(
-              'Rs. ${transaction.amount.toStringAsFixed(0)}',
+              'Rs. ${Formatters.formatAmount(transaction.amount)}',
               style: TextStyle(
                 color: color,
                 fontWeight: FontWeight.bold,
@@ -93,7 +94,7 @@ class TransactionCard extends StatelessWidget {
           if (onTap != null) {
             onTap!();
           } else {
-            ReceiptHelper.showReceiptDialog(
+            ReceiptDialogHelper.showReceiptDialog(
               context,
               transaction: transaction,
               isLocalTransaction: true,

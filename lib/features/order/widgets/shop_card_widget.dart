@@ -7,6 +7,7 @@ import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
+import 'package:account_app/core/widgets/location_chip_widget.dart';
 import 'package:account_app/core/models/shop_model.dart';
 
 class ShopCardWidget extends StatelessWidget {
@@ -25,7 +26,7 @@ class ShopCardWidget extends StatelessWidget {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
@@ -224,30 +225,23 @@ class ShopCardWidget extends StatelessWidget {
                             maxLines: 1, overflow: TextOverflow.ellipsis)),
                       ]),
                     ],
-                    if ((shop.showArea && shop.area.isNotEmpty) ||
-                        (shop.showDistance && shop.distance.isNotEmpty)) ...[
-                      const SizedBox(height: 3),
-                      Row(children: [
-                        if (shop.showArea && shop.area.isNotEmpty) ...[
-                          Icon(PhosphorIcons.mapPin(PhosphorIconsStyle.fill),
-                              size: 13, color: AppTheme.textSecondary),
-                          const SizedBox(width: 4),
-                          Expanded(child: UrduAwareText(shop.area,
-                              textAlign: TextAlign.right, textDirection: TextDirection.rtl,
-                              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600,
-                                  color: AppTheme.textSecondary, fontFamily: fontFamily),
-                              maxLines: 1, overflow: TextOverflow.ellipsis)),
-                        ],
-                        if (shop.showDistance && shop.distance.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Icon(PhosphorIcons.navigationArrow(PhosphorIconsStyle.fill),
-                              size: 12, color: AppTheme.themeColor),
-                          const SizedBox(width: 3),
-                          UrduAwareText(shop.distance,
-                              style: const TextStyle(fontSize: 10.5,
-                                  fontWeight: FontWeight.w800, color: AppTheme.themeColor)),
-                        ],
-                      ]),
+                    if (shop.area.isNotEmpty || shop.latitude != null) ...[
+                      const SizedBox(height: 6),
+                      LocationChipWidget(
+                        latitude: shop.latitude,
+                        longitude: shop.longitude,
+                        address: shop.area,
+                        isUrdu: isUrdu,
+                        isChip: false,
+                        showAddress: shop.showArea,
+                        showTime: true,
+                        color: AppTheme.themeColor,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.themeColor,
+                        ),
+                      ),
                     ],
                     if (shop.showDeliveryInfo &&
                         (shop.deliveryTime.isNotEmpty || shop.deliveryFee.isNotEmpty ||
@@ -255,14 +249,25 @@ class ShopCardWidget extends StatelessWidget {
                       const SizedBox(height: 10),
                       Wrap(spacing: 6, runSpacing: 6, children: [
                         if (shop.deliveryTime.isNotEmpty)
-                          _buildInfoPill(PhosphorIcons.clock(), shop.deliveryTime,
-                              fontFamily: fontFamily),
+                          _buildInfoPill(
+                            PhosphorIcons.clock(),
+                            isUrdu ? 'ڈیلیوری: ${shop.deliveryTime}' : 'Delivery: ${shop.deliveryTime}',
+                            fontFamily: fontFamily,
+                          ),
                         if (shop.deliveryFee.isNotEmpty)
-                          _buildInfoPill(PhosphorIcons.truck(), shop.deliveryFee,
-                              green: shop.deliveryFee == '???', fontFamily: fontFamily),
+                          _buildInfoPill(
+                            PhosphorIcons.truck(),
+                            isUrdu ? 'فیس: ${shop.deliveryFee}' : 'Fee: ${shop.deliveryFee}',
+                            green: shop.deliveryFee == '???',
+                            fontFamily: fontFamily,
+                          ),
                         if (shop.minOrder.isNotEmpty)
-                          _buildInfoPill(PhosphorIcons.money(), shop.minOrder,
-                              blue: true, fontFamily: fontFamily),
+                          _buildInfoPill(
+                            PhosphorIcons.money(),
+                            isUrdu ? 'کم از کم: ${shop.minOrder}' : 'Min: ${shop.minOrder}',
+                            blue: true,
+                            fontFamily: fontFamily,
+                          ),
                       ]),
                     ],
                     if (shop.showTags && shop.tags.isNotEmpty) ...[

@@ -245,12 +245,12 @@ class NotificationCard extends StatelessWidget {
     final type = data['transactionType'] ?? 'income';
     if (isUrdu) {
       return type == 'income'
-          ? '$formattedAmount آپ کے کھاتے میں بنام کیے ہیں'
-          : '$formattedAmount آپ کے کھاتے میں جمع کیے ہیں';
+          ? '$formattedAmount آپ کے کھاتے میں جمع کیے ہیں'
+          : '$formattedAmount آپ کے کھاتے میں بنام کیے ہیں';
     }
     return type == 'income'
-        ? '$formattedAmount has been billed to your account'
-        : '$formattedAmount has been added to your account';
+        ? '$formattedAmount has been credited to your account'
+        : '$formattedAmount has been debited to your account';
   }
 
   String _formatTime(DateTime timestamp) {

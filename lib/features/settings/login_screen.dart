@@ -11,8 +11,7 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
-import 'package:account_app/features/dashboard/dashboard_screen.dart';
-import 'package:account_app/features/dashboard/main_navigation_screen.dart';
+import 'package:account_app/features/dashboard/app_shell_screen.dart';
 import 'package:account_app/features/settings/master_profile_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -604,7 +603,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _navigateToDashboard() {
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
+      MaterialPageRoute(
+        builder: (context) => AppShellScreen(key: AppShellScreen.navigationKey),
+      ),
       (route) => false,
     );
   }

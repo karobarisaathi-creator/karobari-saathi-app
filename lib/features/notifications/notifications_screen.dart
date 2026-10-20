@@ -11,7 +11,7 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
-import 'package:account_app/core/utils/receipt_helper.dart';
+import 'package:account_app/core/utils/receipt_dialog_helper.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/transaction_card.dart';
 import 'package:account_app/core/widgets/app_button.dart';
@@ -145,13 +145,15 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          UrduAwareText(isUrdu ? 'نیا ورژن دستیاب ہے!' : 'New Version Available!',
+          UrduAwareText(
+              isUrdu ? 'نیا ورژن دستیاب ہے!' : 'New Version Available!',
               style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontFamily: fontFamily)),
           const SizedBox(height: 8),
-          UrduAwareText(isUrdu ? _updateData!['message_ur'] : _updateData!['message_en'],
+          UrduAwareText(
+              isUrdu ? _updateData!['message_ur'] : _updateData!['message_en'],
               style: TextStyle(
                   color: Colors.white70, fontSize: 12, fontFamily: fontFamily)),
           const SizedBox(height: 12),
@@ -216,7 +218,7 @@ class _NotificationListTabState extends State<_NotificationListTab>
     return RefreshIndicator(
       onRefresh: widget.onRefresh,
       child: ListView.builder(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: allNotifications.length,
         itemBuilder: (context, index) {
           final n = allNotifications[index];
@@ -235,7 +237,7 @@ class _NotificationListTabState extends State<_NotificationListTab>
             final isAdded = data['isAdded'] == true;
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 12),
+              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -413,12 +415,11 @@ class _NotificationListTabState extends State<_NotificationListTab>
       final transaction = _transactionFromNotification(n);
 
       final isAdded = data['isAdded'] == true;
-      ReceiptHelper.showReceiptDialog(
+      ReceiptDialogHelper.showReceiptDialog(
         context,
         transaction: transaction,
         notification: n,
-        isLocalTransaction:
-            false, // Notification transaction from external sender
+        isLocalTransaction: false, // Notification from external sender
         showAddButton: !isAdded,
         showDeleteButton: true,
         onAddPressed: () => _addToLedger(n),
@@ -489,7 +490,7 @@ class _NotificationListTabState extends State<_NotificationListTab>
       id: data['transactionId'] ??
           DateTime.now().millisecondsSinceEpoch.toString(),
       accountId: account.id,
-      amount: amount,
+      amount: pendingAmount,
       subtotal: double.tryParse(data['subtotal']?.toString() ?? '') ?? amount,
       discountAmount:
           double.tryParse(data['discountAmount']?.toString() ?? '') ?? 0,
@@ -511,6 +512,7 @@ class _NotificationListTabState extends State<_NotificationListTab>
               ? (receivedAmount > 0 ? 'mixed' : 'credit')
               : 'cash'),
       isPending: pendingAmount > 0,
+      receiptFromCounterparty: true,
     );
 
     await db.addTransaction(tx);

@@ -33,14 +33,35 @@ class ProfileService extends BaseService {
         final data = query.docs.first.data();
         final uid = query.docs.first.id;
         
+        String addr = (data['businessAddress'] ??
+                data['address'] ??
+                data['shopAddress'] ??
+                data['storeAddress'] ??
+                data['location'] ??
+                '')
+            .toString();
+
+        if (addr.isEmpty) {
+          try {
+            final shopDoc = await firestore.collection('public_shops').doc(uid).get();
+            if (shopDoc.exists) {
+              final shopData = shopDoc.data();
+              if (shopData != null) {
+                addr = (shopData['businessAddress'] ?? shopData['address'] ?? shopData['location'] ?? '').toString();
+              }
+            }
+          } catch (_) {}
+        }
+
         return {
           'uid': uid,
-          'name': data['displayName'] ?? data['name'] ?? '',
-          'photoUrl': data['photoURL'] ??
+          'name': (data['displayName'] ?? data['name'] ?? '').toString(),
+          'photoUrl': (data['photoURL'] ??
               data['photoUrl'] ??
               data['profileImage'] ??
-              '',
-          'profession': '',
+              '').toString(),
+          'profession': (data['profession'] ?? data['category'] ?? data['shopName'] ?? '').toString(),
+          'address': addr,
         };
       }
     }
@@ -56,19 +77,41 @@ class ProfileService extends BaseService {
         'name': localAccount.name,
         'photoUrl': localAccount.profileImage ?? '',
         'phone': localAccount.phone,
+        'address': localAccount.address ?? '',
       };
     }
 
     final doc = await firestore.collection('users').doc(uid).get();
     if (doc.exists) {
       final data = doc.data()!;
+      String addr = (data['businessAddress'] ??
+              data['address'] ??
+              data['shopAddress'] ??
+              data['storeAddress'] ??
+              data['location'] ??
+              '')
+          .toString();
+
+      if (addr.isEmpty) {
+        try {
+          final shopDoc = await firestore.collection('public_shops').doc(uid).get();
+          if (shopDoc.exists) {
+            final shopData = shopDoc.data();
+            if (shopData != null) {
+              addr = (shopData['businessAddress'] ?? shopData['address'] ?? shopData['location'] ?? '').toString();
+            }
+          }
+        } catch (_) {}
+      }
+
       return {
         'uid': uid,
-        'name': data['displayName'] ?? data['name'] ?? '',
+        'name': (data['displayName'] ?? data['name'] ?? '').toString(),
         'photoUrl':
-            data['photoURL'] ?? data['photoUrl'] ?? data['profileImage'] ?? '',
-        'phone': data['phoneNumber'] ?? '',
-        'profession': '',
+            (data['photoURL'] ?? data['photoUrl'] ?? data['profileImage'] ?? '').toString(),
+        'phone': (data['phoneNumber'] ?? '').toString(),
+        'profession': (data['profession'] ?? data['category'] ?? data['shopName'] ?? '').toString(),
+        'address': addr,
       };
     }
     return null;

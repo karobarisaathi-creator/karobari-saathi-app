@@ -15,10 +15,39 @@ class BackupService with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  // Create complete backup
-  Future<void> createBackup() async {
+  // Helper to get user profile email
+  Future<String?> _getUserEmail() async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception('User not logged in');
+    if (user == null) return null;
+    try {
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final email = userDoc.data()?['email']?.toString().trim();
+      if (email != null && email.isNotEmpty) {
+        return email;
+      }
+    } catch (_) {}
+    if (user.email != null && user.email!.trim().isNotEmpty) {
+      return user.email!.trim();
+    }
+    return null;
+  }
+
+  // Create complete backup
+  Future<void> createBackup({bool isUrdu = false}) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw Exception(isUrdu ? 'صارف لاگ ان نہیں ہے' : 'User not logged in');
+    }
+
+    // Check if email is added in profile
+    final profileEmail = await _getUserEmail();
+    if (profileEmail == null || profileEmail.isEmpty) {
+      throw Exception(
+        isUrdu
+            ? 'براہ کرم پہلے پروفائل میں ای میل درج کریں تاکہ بیک اپ جڑ سکے'
+            : 'Please add an email in your profile before creating a backup',
+      );
+    }
 
     // Get all data from Hive
     final accountsBox = await Hive.openBox<Account>('accounts');
@@ -33,6 +62,7 @@ class BackupService with ChangeNotifier {
       'categories': categoriesBox.values.map((c) => c.toMap()).toList(),
       'professions': professionsBox.values.map((p) => p.toMap()).toList(),
       'settings': settingsBox.toMap(),
+      'email': profileEmail,
       'backupDate': DateTime.now(),
       'appVersion': '1.0.0',
     };
@@ -190,12 +220,15 @@ class BackupService with ChangeNotifier {
     final accountsBox = await Hive.openBox<Account>('accounts');
     final transactionsBox = await Hive.openBox<model.Transaction>('transactions');
 
+    final profileEmail = await _getUserEmail();
+
     return {
       'lastBackup': lastBackup != null ? DateTime.parse(lastBackup) : null,
       'lastRestore': lastRestore != null ? DateTime.parse(lastRestore) : null,
       'totalAccounts': accountsBox.length,
       'totalTransactions': transactionsBox.length,
       'backupSize': await _calculateBackupSize(),
+      'email': profileEmail,
     };
   }
 
@@ -221,6 +254,10 @@ class BackupService with ChangeNotifier {
 
     if (!autoBackupEnabled) return;
 
+    // Check email before auto backup
+    final profileEmail = await _getUserEmail();
+    if (profileEmail == null || profileEmail.isEmpty) return;
+
     final now = DateTime.now();
     final lastBackupDate = lastBackup != null
         ? DateTime.parse(lastBackup)
@@ -228,12 +265,23 @@ class BackupService with ChangeNotifier {
 
     // Backup if more than 7 days have passed
     if (now.difference(lastBackupDate).inDays > 7) {
-      await createBackup();
+      await createBackup(isUrdu: false);
     }
   }
 
   // Schedule automatic backups
-  Future<void> scheduleAutoBackup(bool enable) async {
+  Future<void> scheduleAutoBackup(bool enable, {bool isUrdu = false}) async {
+    if (enable) {
+      final profileEmail = await _getUserEmail();
+      if (profileEmail == null || profileEmail.isEmpty) {
+        throw Exception(
+          isUrdu
+              ? 'خودکار بیک اپ فعال کرنے کے لیے پہلے پروفائل میں ای میل درج کریں'
+              : 'Please add an email in your profile before enabling auto backup',
+        );
+      }
+    }
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('auto_backup', enable);
 

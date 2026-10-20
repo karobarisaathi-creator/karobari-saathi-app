@@ -288,6 +288,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
       } else {
         await FirebaseFirestore.instance.collection('public_shops').doc(user.uid).delete();
       }
+      if (!mounted) return;
       await Provider.of<StockService>(context, listen: false).syncPublicCatalog();
 
       if (!mounted) return;
@@ -333,14 +334,14 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Live Preview Section
             _buildSectionHeader(
               icon: PhosphorIcons.eye(),
-              title: isUrdu ? 'کارڈ لائیو پریویو (Live Preview)' : 'Live Card Preview',
+              title: isUrdu ? 'کارڈ لائیو پریویو' : 'Live Card Preview',
               fontFamily: fontFamily,
             ),
             const SizedBox(height: 10),
@@ -669,25 +670,29 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
     required String title,
     required String fontFamily,
   }) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: AppTheme.themeColor),
-        const SizedBox(width: 8),
-        UrduAwareText(
-          title,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.darkColor,
-            fontFamily: fontFamily,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppTheme.themeColor),
+          const SizedBox(width: 8),
+          UrduAwareText(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.darkColor,
+              fontFamily: fontFamily,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildCardContainer(List<Widget> children) {
     return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),

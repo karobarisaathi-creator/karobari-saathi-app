@@ -29,7 +29,7 @@ void main() {
         () {
       final transaction = _transaction(
         description: 'Quick bill',
-        amount: 1000,
+        amount: 600,
         receivedAmount: 400,
         pendingAmount: 600,
       );
@@ -40,7 +40,7 @@ void main() {
     test('fully received Quick Bill contributes zero to account balance', () {
       final transaction = _transaction(
         description: 'فوری بل',
-        amount: 1000,
+        amount: 0,
         receivedAmount: 1000,
         pendingAmount: 0,
       );
@@ -69,6 +69,22 @@ void main() {
       );
 
       expect(transaction.accountBalanceAmount, 1000);
+    });
+
+    test('preserves counterparty receipt perspective in serialized data', () {
+      final transaction = _transaction(
+        description: 'Imported transaction',
+        amount: 1000,
+        receivedAmount: 0,
+        pendingAmount: 1000,
+      );
+      final imported = Transaction.fromMap({
+        ...transaction.toMap(),
+        'receiptFromCounterparty': true,
+      });
+      final restored = Transaction.fromMap(imported.toMap());
+
+      expect(restored.receiptFromCounterparty, isTrue);
     });
   });
 }

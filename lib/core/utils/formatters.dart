@@ -1,8 +1,71 @@
 // formatters.dart
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
+
+class CurrencyInputFormatter extends TextInputFormatter {
+  final bool allowDecimals;
+
+  CurrencyInputFormatter({this.allowDecimals = true});
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+
+    String text = newValue.text;
+
+    if (allowDecimals && text.contains('.')) {
+      final parts = text.split('.');
+      if (parts.length > 2) {
+        return oldValue;
+      }
+
+      String integerPart = parts[0].replaceAll(RegExp(r'\D'), '');
+      String decimalPart = parts[1].replaceAll(RegExp(r'\D'), '');
+
+      final number = int.tryParse(integerPart) ?? 0;
+      final formatter = NumberFormat('#,##0', 'en_US');
+      final formattedInteger = integerPart.isEmpty ? '' : formatter.format(number);
+
+      final formattedText = '$formattedInteger.$decimalPart';
+
+      return TextEditingValue(
+        text: formattedText,
+        selection: TextSelection.collapsed(offset: formattedText.length),
+      );
+    }
+
+    String cleanText = text.replaceAll(RegExp(r'\D'), '');
+
+    if (cleanText.isEmpty) {
+      return const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      );
+    }
+
+    final number = int.tryParse(cleanText) ?? 0;
+    final formatter = NumberFormat('#,##0', 'en_US');
+    final formattedText = formatter.format(number);
+
+    return TextEditingValue(
+      text: formattedText,
+      selection: TextSelection.collapsed(offset: formattedText.length),
+    );
+  }
+}
 
 class Formatters {
   // Currency formatting
+  static String formatAmount(num amount) {
+    final formatter = NumberFormat('#,##0', 'en_US');
+    return formatter.format(amount);
+  }
+
   static String formatCurrency(double amount, {String? locale}) {
     final format = NumberFormat.currency(
       locale: locale ?? 'ur_PK',
@@ -57,17 +120,22 @@ class Formatters {
     }
   }
 
-  // Phone number formatting to local format (03xx xxxxxxx)
+  // Phone number formatting to local format without country code (03xx xxxxxxx)
   static String formatPhoneNumber(String phone) {
-    String clean = phone.replaceAll(RegExp(r'\D'), '');
+    if (phone.trim().isEmpty) return '';
+    String clean = phone.replaceAll(RegExp(r'[^\d+]'), '');
 
-    // E.164 conversion for international consistency
-    if (clean.startsWith('92') && clean.length == 12) {
-      return '0${clean.substring(2)}';
+    if (clean.startsWith('+')) {
+      clean = clean.substring(1);
     }
-
+    if (clean.startsWith('00')) {
+      clean = clean.substring(2);
+    }
+    if (clean.startsWith('92') && clean.length >= 11) {
+      clean = '0' + clean.substring(2);
+    }
     if (clean.length == 10 && !clean.startsWith('0')) {
-      return '0$clean';
+      clean = '0' + clean;
     }
 
     return clean.isNotEmpty ? clean : phone;

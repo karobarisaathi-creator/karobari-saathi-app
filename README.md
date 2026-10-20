@@ -1,16 +1,26 @@
-# account_app
+# Karobari Saathi
 
-A new Flutter project.
+Karobari Saathi is a Flutter app for managing business accounts, transactions,
+professions, shop inventory, and orders.
 
-## Getting Started
+## Project documentation
 
-This project is a starting point for a Flutter application.
+- [Project structure](./PROJECT_STRUCTURE.md) describes the source tree and
+  where new code should live.
+- [Project guide](./PROJECT_GUIDE.md) describes the app's screens and features.
 
-A few resources to get you started if this is your first Flutter project:
+## Getting started
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Install the Flutter SDK, then run the following commands from the repository
+root:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```sh
+flutter pub get
+flutter run
+```
+
+To run the automated tests:
+
+```sh
+flutter test
+```

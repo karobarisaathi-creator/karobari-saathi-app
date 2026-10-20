@@ -1,3 +1,4 @@
+import 'package:account_app/features/shopkeeper/stock_history_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,10 @@ import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/stock_movement_model.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/stock_service.dart';
+import 'package:account_app/core/services/database_service.dart';
+import 'package:account_app/core/constants/quick_bill_constants.dart';
+import 'package:intl/intl.dart';
+import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
@@ -15,19 +20,25 @@ import 'package:account_app/core/widgets/stock_card.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/features/settings/master_profile_screen.dart';
 import 'package:account_app/features/shopkeeper/low_stock_items_screen.dart';
-import 'package:account_app/features/shopkeeper/stock_history_screen.dart';
+import 'package:account_app/features/shopkeeper/cash_customer_bills_screen.dart';
 import 'package:account_app/features/shopkeeper/add_edit_stock_item_screen.dart';
 import 'package:account_app/features/shopkeeper/sales_analytics_screen.dart';
 import 'package:account_app/features/shopkeeper/stock_detail_screen.dart';
 import 'package:account_app/features/shopkeeper/stock_adjustment_dialog.dart';
-import 'package:account_app/features/shopkeeper/shop_settings_screen.dart';
-import 'package:account_app/features/order/shop_orders_screen.dart';
+import 'package:account_app/features/order/nearby_shops_screen.dart';
+import 'widgets/shopkeeper_tools_grid.dart';
+
 
 // ═══════════════════════════════════════════
 // SHOPKEEPER DASHBOARD SCREEN
 // ═══════════════════════════════════════════
 class ShopkeeperDashboardScreen extends StatefulWidget {
-  const ShopkeeperDashboardScreen({super.key});
+  final bool isEmbedded;
+
+  const ShopkeeperDashboardScreen({
+    super.key,
+    this.isEmbedded = false,
+  });
 
   @override
   State<ShopkeeperDashboardScreen> createState() =>
@@ -40,6 +51,8 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
   String _address = '';
   String? _bannerImageUrl;
   String? _profileImageUrl;
+  bool _isMenuExpanded = false;
+  int _nearbyShopsCount = 0;
 
   @override
   void initState() {
@@ -72,6 +85,22 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                 (data?['profileImage'] ?? data?['photoURL'] ?? user.photoURL ?? '').toString();
           });
         }
+
+        final shopsSnapshot = await FirebaseFirestore.instance
+            .collection('public_shops')
+            .get();
+        final currentUid = user.uid;
+        final nearbyCount = shopsSnapshot.docs
+            .where((doc) =>
+                doc.data()['role'] == 'shopkeeper' &&
+                doc.id != currentUid &&
+                (doc.data()['shopName'] ?? doc.data()['displayName'] ?? '').toString().trim().isNotEmpty)
+            .length;
+        if (mounted) {
+          setState(() {
+            _nearbyShopsCount = nearbyCount;
+          });
+        }
       } catch (_) {}
     }
   }
@@ -88,13 +117,12 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
     final totalPurchaseValue = summary['totalPurchaseValue'] as double? ?? 0.0;
     final totalSalesValue =
         summary['totalSalesPotentialValue'] as double? ?? 0.0;
+    final totalItems = summary['totalItems'] as int? ?? 0;
     final lowStockCount = summary['lowStockCount'] as int? ?? 0;
 
     final appBarTitle = _shopName.isNotEmpty
         ? _shopName
-        : (_userName.isNotEmpty
-            ? _userName
-            : (isUrdu ? 'شاپ کیپر ڈیش بورڈ' : 'Shopkeeper Dashboard'));
+        : (isUrdu ? 'شاپ کیپر ڈیش بورڈ' : 'Shopkeeper Dashboard');
 
     return Directionality(
       textDirection: languageService.textDirection,
@@ -105,30 +133,16 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
           backgroundColor: AppTheme.darkColor,
           elevation: 0,
           shape: const RoundedRectangleBorder(),
-          showBackButton: Navigator.canPop(context),
+          showBackButton: !widget.isEmbedded && Navigator.canPop(context),
           actions: [
             IconButton(
-              icon: const Icon(Icons.receipt_long_rounded, color: Colors.white),
-              tooltip: isUrdu ? 'موصولہ آرڈرز' : 'Incoming Orders',
+              icon: Icon(
+                _isMenuExpanded ? Icons.close_rounded : PhosphorIcons.slidersHorizontal(),
+                color: Colors.white,
+              ),
+              tooltip: isUrdu ? 'کاروباری ٹولز' : 'Business Tools',
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ShopOrdersScreen(),
-                  ),
-                );
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.tune_rounded, color: Colors.white),
-              tooltip: isUrdu ? 'شاپ سیٹنگز' : 'Shop Settings',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ShopSettingsScreen(),
-                  ),
-                );
+                setState(() => _isMenuExpanded = !_isMenuExpanded);
               },
             ),
           ],
@@ -146,24 +160,18 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(14, 16, 14, 30),
+                padding: const EdgeInsets.fromLTRB(12, 16, 12, 30),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildSectionHead(
-                      isUrdu: isUrdu,
-                      fontFamily: fontFamily,
-                      title: isUrdu ? 'فوری کام' : 'Quick Actions',
-                      icon: Icons.bolt_rounded,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildQuickActions(context, isUrdu, fontFamily),
-                    const SizedBox(height: 20),
-                    _buildAlertCard(
+
+                    _buildQuickActions(
                       context,
                       isUrdu,
                       fontFamily,
+                      totalItems,
                       lowStockCount + (summary['outOfStockCount'] as int? ?? 0),
+                      _nearbyShopsCount,
                     ),
                     const SizedBox(height: 20),
                     _buildSectionHead(
@@ -176,7 +184,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const StockHistoryScreen(),
+                            builder: (_) => StockHistoryScreen(),
                           ),
                         );
                       },
@@ -203,11 +211,9 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
     double salesVal,
     int lowStockCount,
   ) {
-    final displayName = _shopName.isNotEmpty
-        ? _shopName
-        : (_userName.isNotEmpty
-            ? _userName
-            : (isUrdu ? 'کریانہ اسٹور' : 'My Store'));
+    final profileName = _userName.isNotEmpty
+        ? _userName
+        : (isUrdu ? 'صارف' : 'User');
     final locationText = _address.isNotEmpty
         ? _address
         : (isUrdu ? 'لاہور، پاکستان' : 'Pakistan');
@@ -217,31 +223,23 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
         color: AppTheme.darkColor,
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(15)),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
       child: Column(
         children: [
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const MasterProfileScreen(),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
                 ),
-              ).then((_) => _loadProfileInfo());
-            },
-            child: Container(
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14.5),
               child: Stack(
                 children: [
                   // Banner Image Cover
@@ -276,45 +274,48 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                   // Profile Card Info using ProfileInfoWidget
                   Padding(
                     padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: ProfileInfoWidget(
-                            name: displayName,
-                            phone: locationText,
-                            profileImage: _profileImageUrl,
-                            isLarge: true,
-                            customSize: 48,
-                            borderRadius: 14,
-                            textColor: Colors.white,
-                            subtitleColor: Colors.white70,
+                    child: ProfileInfoWidget(
+                      name: profileName,
+                      phone: '',
+                      address: locationText,
+                      profileImage: _profileImageUrl,
+                      isLarge: true,
+                      customSize: 48,
+                      borderRadius: 14,
+                      textColor: Colors.white,
+                      subtitleColor: Colors.white70,
+                      onAvatarTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const MasterProfileScreen(),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.3),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.chevron_left_rounded,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ),
-                      ],
+                        ).then((_) => _loadProfileInfo());
+                      },
                     ),
                   ),
                 ],
               ),
             ),
           ),
+
+          // Expandable Menu Grid (between profile card and stat boxes)
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 300),
+            crossFadeState: _isMenuExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            firstChild: const SizedBox.shrink(),
+            secondChild: ShopkeeperToolsGrid(
+              isUrdu: isUrdu,
+              fontFamily: fontFamily,
+            ),
+          ),
           const SizedBox(height: 14),
           Row(
             children: [
               _statMini(
-                'Rs ${purchaseVal.toStringAsFixed(0)}',
+                'Rs ${Formatters.formatAmount(purchaseVal)}',
                 isUrdu ? 'خرید مالیت' : 'Purchase Val',
                 const Color(0xFFA3E635),
                 fontFamily,
@@ -322,7 +323,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
               ),
               const SizedBox(width: 8),
               _statMini(
-                'Rs ${salesVal.toStringAsFixed(0)}',
+                'Rs ${Formatters.formatAmount(salesVal)}',
                 isUrdu ? 'فروخت مالیت' : 'Sales Val',
                 const Color(0xFF93C5FD),
                 fontFamily,
@@ -476,6 +477,9 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
     BuildContext context,
     bool isUrdu,
     String fontFamily,
+    int totalItems,
+    int lowStockCount,
+    int nearbyShopsCount,
   ) {
     return Column(
       children: [
@@ -488,7 +492,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                 title: isUrdu ? 'نیا آئٹم' : 'New Item',
                 sub: isUrdu ? 'نیا پروڈکٹ شامل کریں' : 'Add new stock product',
                 icon: Icons.add_circle_outline_rounded,
-                color: AppTheme.purpleColor,
+                color: AppTheme.themeColor,
                 onTap: () {
                   Navigator.push(
                     context,
@@ -509,7 +513,8 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                     ? 'تمام اسٹاک پراڈکٹس کی لسٹ'
                     : 'All inventory stock items',
                 icon: Icons.inventory_2_rounded,
-                color: const Color(0xFF0EA5E9),
+                color: AppTheme.themeColor,
+                badge: totalItems > 0 ? '$totalItems' : null,
                 onTap: () {
                   Navigator.push(
                     context,
@@ -529,17 +534,16 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
               child: _quickActionCard(
                 isUrdu: isUrdu,
                 fontFamily: fontFamily,
-                title: isUrdu ? 'اسٹاک ہسٹری' : 'Stock History',
-                sub: isUrdu
-                    ? 'لین دین اور آمدورفت ہسٹری'
-                    : 'Stock movements history log',
-                icon: Icons.history_rounded,
-                color: AppTheme.purpleColor,
+                title: isUrdu ? 'قریبی دکاندار' : 'Nearby Shops',
+                sub: isUrdu ? 'دوسرے دکانداروں سے رابطہ' : 'Connect with nearby shops',
+                icon: PhosphorIcons.storefront(),
+                color: AppTheme.themeColor,
+                badge: nearbyShopsCount > 0 ? '$nearbyShopsCount' : null,
                 onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const StockHistoryScreen(),
+                      builder: (_) => const OrderSelectionScreen(),
                     ),
                   );
                 },
@@ -550,23 +554,83 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
               child: _quickActionCard(
                 isUrdu: isUrdu,
                 fontFamily: fontFamily,
-                title: isUrdu ? 'خرید و فروخت رپورٹ' : 'Sales Analytics',
-                sub: isUrdu
-                    ? 'سیلز اور منافع کا تفصیلی تجزیہ'
-                    : 'Sales, purchase & profit analytics',
-                icon: Icons.bar_chart_rounded,
-                color: AppTheme.incomeColor,
+                title: isUrdu ? 'کم اسٹاک الرٹ' : 'Low Stock Alert',
+                sub: isUrdu ? 'کم اسٹاک والی پروڈکٹس' : 'Items running low',
+                icon: Icons.warning_amber_rounded,
+                color: AppTheme.themeColor,
+                badge: lowStockCount > 0 ? '$lowStockCount' : null,
                 onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const SalesAnalyticsScreen(),
+                      builder: (_) => const LowStockItemsScreen(),
                     ),
                   );
                 },
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 12),
+        Builder(
+          builder: (context) {
+            final databaseService = Provider.of<DatabaseService>(context);
+            final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+            final todayCashBillsCount = databaseService
+                .getAllTransactions()
+                .where((t) => 
+                    (t.accountId == QuickBillConstants.cashCustomerAccountId || t.isQuickBill) &&
+                    t.pendingAmount <= 0 &&
+                    DateFormat('yyyy-MM-dd').format(t.date) == todayKey)
+                .length;
+
+            return Row(
+              children: [
+                Expanded(
+                  child: _quickActionCard(
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                    title: isUrdu ? 'نقد بل' : 'Cash Bills',
+                    sub: isUrdu
+                        ? 'نقد گاہکوں کے تمام بلوں کا ریکارڈ'
+                        : 'Record of all cash customer bills',
+                    icon: Icons.receipt_long_rounded,
+                    color: AppTheme.verifiedGold,
+                    badge: '$todayCashBillsCount',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const CashCustomerBillsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _quickActionCard(
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                    title: isUrdu ? 'خرید و فروخت رپورٹ' : 'Sales Analytics',
+                    sub: isUrdu
+                        ? 'سیلز اور منافع کا تفصیلی تجزیہ'
+                        : 'Sales, purchase & profit analytics',
+                    icon: Icons.bar_chart_rounded,
+                    color: AppTheme.themeColor,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SalesAnalyticsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -585,10 +649,10 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
               color: AppTheme.darkColor.withValues(alpha: 0.04),
@@ -597,80 +661,66 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
             ),
           ],
         ),
-        child: Stack(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (badge != null)
-              Positioned(
-                top: 0,
-                left: 0,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(999),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: UrduAwareText(
-                    badge,
-                    style: TextStyle(
-                      fontFamily: fontFamily,
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            Column(
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     color: color,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(10),
                     boxShadow: [
                       BoxShadow(
                         color: color.withValues(alpha: 0.3),
-                        blurRadius: 14,
-                        offset: const Offset(0, 5),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
-                  child: Icon(icon, color: Colors.white, size: 24),
+                  child: Icon(icon, color: Colors.white, size: 20),
                 ),
-                const SizedBox(height: 12),
-                UrduAwareText(
-                  title,
-                  style: TextStyle(
-                    fontFamily: fontFamily,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.darkColor,
-                    height: 1.3,
+                if (badge != null)
+                  Transform.translate(
+                    offset: const Offset(0, -4),
+                    child: UrduAwareText(
+                      badge,
+                      style: TextStyle(
+                        fontFamily: fontFamily,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.themeColor,
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                UrduAwareText(
-                  sub,
-                  style: TextStyle(
-                    fontFamily: fontFamily,
-                    fontSize: 10.5,
-                    color: AppTheme.textSecondary,
-                    height: 1.4,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
               ],
+            ),
+            const SizedBox(height: 8),
+            UrduAwareText(
+              title,
+              style: TextStyle(
+                fontFamily: fontFamily,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.darkColor,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 2),
+            UrduAwareText(
+              sub,
+              style: TextStyle(
+                fontFamily: fontFamily,
+                fontSize: 10,
+                color: AppTheme.textSecondary,
+                height: 1.3,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -832,7 +882,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
             quantity: m.quantity.toStringAsFixed(0),
             tag: typeLabel,
             tagType: amountType == 'income' ? 'bill' : 'order',
-            amount: 'Rs. ${m.unitPrice.toStringAsFixed(0)}',
+            amount: 'Rs. ${Formatters.formatAmount(m.unitPrice)}',
             amountType: amountType,
             icon: icon,
             isLast: isLast,
@@ -1120,7 +1170,7 @@ class _StockListScreenState extends State<StockListScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(0, 12, 0, 24),
       itemCount: items.length,
       itemBuilder: (context, index) {
         final item = items[index];
@@ -1131,24 +1181,6 @@ class _StockListScreenState extends State<StockListScreen> {
               context,
               MaterialPageRoute(
                 builder: (context) => StockDetailScreen(item: item),
-              ),
-            );
-          },
-          onQuickAdd: () {
-            showDialog(
-              context: context,
-              builder: (context) => StockAdjustmentDialog(
-                item: item,
-                initialType: StockMovementType.purchase,
-              ),
-            );
-          },
-          onQuickRemove: () {
-            showDialog(
-              context: context,
-              builder: (context) => StockAdjustmentDialog(
-                item: item,
-                initialType: StockMovementType.sale,
               ),
             );
           },

@@ -34,11 +34,35 @@ class AutoSyncService with ChangeNotifier {
     return box.values.toList();
   }
 
-  Future<void> syncAllDataToCloud() async {
+  Future<String> _getUserIdentifier() async {
     final user = _auth.currentUser;
-    if (user?.phoneNumber == null) {
+    if (user == null) {
       throw Exception('User is not logged in');
     }
+
+    try {
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        final profileEmail = userDoc.data()?['email']?.toString().trim();
+        if (profileEmail != null && profileEmail.isNotEmpty) {
+          return profileEmail;
+        }
+      }
+    } catch (_) {}
+
+    if (user.email != null && user.email!.trim().isNotEmpty) {
+      return user.email!.trim();
+    }
+
+    if (user.phoneNumber != null && user.phoneNumber!.trim().isNotEmpty) {
+      return user.phoneNumber!.trim();
+    }
+
+    throw Exception('User email or phone number not available');
+  }
+
+  Future<void> syncAllDataToCloud() async {
+    final identifier = await _getUserIdentifier();
 
     try {
       // Hive سے اصلی ڈیٹا حاصل کریں
@@ -50,16 +74,18 @@ class AutoSyncService with ChangeNotifier {
       print('اکاؤنٹس: ${accounts.length}');
       print('لین دین: ${transactions.length}');
 
-      await _firestore.collection('userData').doc(user!.phoneNumber).set({
+      await _firestore.collection('userData').doc(identifier).set({
         'accounts': accounts.map((a) => a.toMap()).toList(),
         'transactions': transactions.map((t) => t.toMap()).toList(),
         'categories': categories.map((c) => c.toMap()).toList(),
         'professions': professions.map((p) => p.toMap()).toList(),
-        'lastSync': DateTime.now().toIso8601String(), // String format بہتر ہے
-        'phoneNumber': user.phoneNumber,
+        'lastSync': DateTime.now().toIso8601String(),
+        'identifier': identifier,
+        'email': identifier.contains('@') ? identifier : null,
+        'phoneNumber': _auth.currentUser?.phoneNumber,
       }, SetOptions(merge: true));
 
-      print('تمام ڈیٹا کلاؤڈ پر کامیابی سے سینک ہوگیا');
+      print('تمام ڈیٹا کلاؤڈ پر کامیابی سے سینک ہوگیا ($identifier)');
       notifyListeners();
     } catch (e) {
       print('سینک میں خرابی: $e');
@@ -67,10 +93,11 @@ class AutoSyncService with ChangeNotifier {
     }
   }
 
-  Future<void> restoreAllDataFromPhone(String phoneNumber) async {
+  Future<void> restoreAllDataFromPhone(String? key) async {
     try {
+      final targetKey = key ?? await _getUserIdentifier();
       final snapshot =
-          await _firestore.collection('userData').doc(phoneNumber).get();
+          await _firestore.collection('userData').doc(targetKey).get();
 
       if (snapshot.exists) {
         final data = snapshot.data()!;
@@ -129,7 +156,7 @@ class AutoSyncService with ChangeNotifier {
         print('تمام ڈیٹا کامیابی سے واپس آگیا اور لوکل محفوظ ہوگیا');
         notifyListeners();
       } else {
-        print('اس فون نمبر کا کوئی ڈیٹا کلاؤڈ پر نہیں ملا');
+        print('اس شناخت (ایمیل/فون) کا کوئی ڈیٹا کلاؤڈ پر نہیں ملا');
       }
     } catch (e) {
       print('ڈیٹا واپس لینے میں خرابی: $e');
@@ -138,47 +165,40 @@ class AutoSyncService with ChangeNotifier {
   }
 
   Future<void> syncNewAccount(Account account) async {
-    final user = _auth.currentUser;
-    if (user?.phoneNumber != null) {
-      try {
-        await _firestore.collection('userData').doc(user!.phoneNumber).update({
-          'accounts': FieldValue.arrayUnion([account.toMap()]),
-          'lastSync': DateTime.now().toIso8601String(),
-        });
-      } catch (e) {
-        // اگر document موجود نہ ہو تو syncAllDataToCloud کال کریں یا نیا بنائیں
-        print('نئے اکاؤنٹ سینک میں خرابی (شاید پہلی بار ہے): $e');
-        await syncAllDataToCloud();
-      }
+    try {
+      final key = await _getUserIdentifier();
+      await _firestore.collection('userData').doc(key).update({
+        'accounts': FieldValue.arrayUnion([account.toMap()]),
+        'lastSync': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      print('نئے اکاؤنٹ سینک میں خرابی (شاید پہلی بار ہے): $e');
+      await syncAllDataToCloud();
     }
   }
 
   Future<void> syncNewTransaction(model.Transaction transaction) async {
-    final user = _auth.currentUser;
-    if (user?.phoneNumber != null) {
-      try {
-        await _firestore.collection('userData').doc(user!.phoneNumber).update({
-          'transactions': FieldValue.arrayUnion([transaction.toMap()]),
-          'lastSync': DateTime.now().toIso8601String(),
-        });
-      } catch (e) {
-        print('نئے ٹرانزیکشن سینک میں خرابی: $e');
-        await syncAllDataToCloud();
-      }
+    try {
+      final key = await _getUserIdentifier();
+      await _firestore.collection('userData').doc(key).update({
+        'transactions': FieldValue.arrayUnion([transaction.toMap()]),
+        'lastSync': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      print('نئے ٹرانزیکشن سینک میں خرابی: $e');
+      await syncAllDataToCloud();
     }
   }
 
   Future<void> syncNewProfession(Profession profession) async {
-    final user = _auth.currentUser;
-    if (user?.phoneNumber != null) {
-      try {
-        await _firestore.collection('userData').doc(user!.phoneNumber).update({
-          'professions': FieldValue.arrayUnion([profession.toMap()]),
-          'lastSync': DateTime.now().toIso8601String(),
-        });
-      } catch (e) {
-        await syncAllDataToCloud();
-      }
+    try {
+      final key = await _getUserIdentifier();
+      await _firestore.collection('userData').doc(key).update({
+        'professions': FieldValue.arrayUnion([profession.toMap()]),
+        'lastSync': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      await syncAllDataToCloud();
     }
   }
 

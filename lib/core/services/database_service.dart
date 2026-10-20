@@ -80,6 +80,11 @@ class DatabaseService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> recalculateAllAccountBalances() async {
+    await _accountService.recalculateAllAccountBalances();
+    notifyListeners();
+  }
+
   Future<int> getPartiesCount() => _accountService.getPartiesCount();
   Future<int> getPendingDuesCount() => _accountService.getPendingDuesCount();
   // TRANSACTION OPERATIONS
@@ -292,6 +297,7 @@ class DatabaseService extends ChangeNotifier {
 
   Future<void> _initialize() async {
     await _syncService.openBoxes();
+    await _accountService.recalculateAllAccountBalances();
     _syncService.setupConnectivityListener();
     if (FirebaseAuth.instance.currentUser != null) {
       _syncService.startRealtimeSync();

@@ -11,18 +11,24 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/core/utils/account_balance_utils.dart';
 import 'profile_info_widget.dart';
+import 'profile_update_dialog.dart';
 
 class PartyCard extends StatefulWidget {
   final Account party;
   final VoidCallback onView;
   final VoidCallback onMessage;
+  final bool showActions;
+  final EdgeInsetsGeometry? margin;
 
   const PartyCard({
     super.key,
     required this.party,
     required this.onView,
     required this.onMessage,
+    this.showActions = true,
+    this.margin,
   });
 
   @override
@@ -81,46 +87,57 @@ class _PartyCardState extends State<PartyCard> {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
     final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
 
-    final bool isPayable = widget.party.balance > 0;
-    final bool isSettled = widget.party.balance == 0;
+    final dbService = Provider.of<DatabaseService>(context);
+    final transactions = dbService
+        .getAllTransactions()
+        .where((t) => t.accountId == widget.party.id && t.partnershipId == null)
+        .toList();
+    final cycleBalance = AccountBalanceUtils.currentCycle(transactions);
+    final double displayBalance = cycleBalance.balance;
+
+    final bool isReceivable = displayBalance <= 0;
+    final bool isSettled = displayBalance.abs() < 0.01;
 
     final Color balanceColor = isSettled 
         ? AppTheme.textSecondary 
-        : (isPayable ? AppTheme.expenseColor : AppTheme.incomeColor);
+        : (isReceivable ? AppTheme.incomeColor : AppTheme.expenseColor);
 
     final String balanceText = isSettled
         ? (isUrdu ? 'حساب صاف ہے' : 'Settled')
-        : (isPayable 
-            ? (isUrdu ? 'دینے ہیں' : 'To Pay') 
-            : (isUrdu ? 'لینے ہیں' : 'To Receive'));
+        : (isReceivable 
+            ? (isUrdu ? 'لینے ہیں' : 'To Receive') 
+            : (isUrdu ? 'دینے ہیں' : 'To Pay'));
 
     final IconData balanceIcon = isSettled 
         ? PhosphorIcons.checkCircle() 
-        : (isPayable ? PhosphorIcons.arrowUpRight() : PhosphorIcons.arrowDownLeft());
+        : (isReceivable ? PhosphorIcons.arrowDownLeft() : PhosphorIcons.arrowUpRight());
 
-    final String displayCategory = _remoteProfession != null && _remoteProfession!.isNotEmpty
-        ? _remoteProfession!
+    final String displayCategory = widget.party.category.trim().isNotEmpty
+        ? widget.party.category.trim()
         : (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account');
 
     final String displayName = widget.party.name.trim().isEmpty
         ? (isUrdu ? 'نامعلوم' : 'Unknown')
         : widget.party.name;
 
-    // Standardized Update Comparison Logic (Name, Photo, or Profession)
+    // Standardized Update Comparison Logic (Name, Photo, Profession, or Address)
     final remoteName = _remoteProfileMap?['name']?.trim() ?? '';
     final localName = widget.party.name.trim();
     final remotePhoto = _remoteProfileMap?['photoUrl']?.trim() ?? '';
-    final localPhoto = widget.party.profileImage?.trim() ?? '';
+    final localPhoto = (widget.party.profileImage ?? '').trim();
     final remoteProf = _remoteProfileMap?['profession']?.trim() ?? '';
-    final localProf = (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account').trim(); // Default local comparison
+    final localProf = (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account').trim();
+    final remoteAddress = _remoteProfileMap?['address']?.trim() ?? '';
+    final localAddress = (widget.party.address ?? '').trim();
 
     final bool hasUpdate = _remoteProfileMap != null && 
         ((remoteName.isNotEmpty && remoteName != localName) || 
          (remotePhoto.isNotEmpty && remotePhoto != localPhoto) ||
-         (remoteProf.isNotEmpty && remoteProf != widget.party.category && remoteProf != localProf));
+         (remoteProf.isNotEmpty && remoteProf != widget.party.category && remoteProf != localProf) ||
+         (remoteAddress.isNotEmpty && remoteAddress != localAddress));
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      margin: widget.margin ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -155,6 +172,16 @@ class _PartyCardState extends State<PartyCard> {
                           customSize: 42,
                           borderRadius: 6,
                           hasUpdate: hasUpdate,
+                          onAvatarTap: (hasUpdate && _remoteProfileMap != null)
+                              ? () {
+                                  ProfileUpdateDialog.show(
+                                    context,
+                                    party: widget.party,
+                                    remoteProfile: _remoteProfileMap!,
+                                    onUpdated: _checkForUpdate,
+                                  );
+                                }
+                              : null,
                         ),
                         Consumer<NotificationService>(
                           builder: (context, notificationService, _) {
@@ -256,7 +283,7 @@ class _PartyCardState extends State<PartyCard> {
                                   ],
                                   const SizedBox(width: 6),
                                   UrduAwareText(
-                                    'Rs ${widget.party.balance.abs().toStringAsFixed(0)}',
+                                    'Rs ${Formatters.formatAmount(displayBalance.abs())}',
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w900,
@@ -275,75 +302,77 @@ class _PartyCardState extends State<PartyCard> {
                 ),
               ),
 
-              Divider(height: 1, thickness: 1, color: AppTheme.darkColor.withValues(alpha: 0.08)),
+              if (widget.showActions) ...[
+                Divider(height: 1, thickness: 1, color: AppTheme.darkColor.withValues(alpha: 0.08)),
 
-              // Bottom Section: Actions
-              Container(
-                decoration: const BoxDecoration(
-                  color: Colors.transparent, // پور کارڈ پر رنگ دکھانے کے لیے اسے ٹرانسپیرنٹ کر دیا
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(12),
-                    bottomRight: Radius.circular(12),
+                // Bottom Section: Actions
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.transparent, // پور کارڈ پر رنگ دکھانے کے لیے اسے ٹرانسپیرنٹ کر دیا
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(12),
+                      bottomRight: Radius.circular(12),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Call Action
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => _makePhoneCall(widget.party.phone),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(PhosphorIcons.phone(), size: 20, color: Colors.green),
+                                const SizedBox(width: 8),
+                                UrduAwareText(
+                                  isUrdu ? 'کال کریں' : 'Call Party',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: fontWeight,
+                                    color: AppTheme.darkColor,
+                                    fontFamily: fontFamily,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      Container(height: 24, width: 1, color: Colors.grey.withValues(alpha: 0.3)),
+
+                      // Reminder Action
+                      Expanded(
+                        child: InkWell(
+                          onTap: widget.onMessage,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                UrduAwareText(
+                                  isUrdu ? 'یاددہانی بھیجیں' : 'Send Reminder',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: fontWeight,
+                                    color: AppTheme.themeColor,
+                                    fontFamily: fontFamily,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(PhosphorIcons.bell(), size: 20, color: AppTheme.themeColor),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  children: [
-                    // Call Action
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => _makePhoneCall(widget.party.phone),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(PhosphorIcons.phone(), size: 20, color: Colors.green),
-                              const SizedBox(width: 8),
-                              UrduAwareText(
-                                isUrdu ? 'کال کریں' : 'Call Party',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: fontWeight,
-                                  color: AppTheme.darkColor,
-                                  fontFamily: fontFamily,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    
-                    Container(height: 24, width: 1, color: Colors.grey.withValues(alpha: 0.3)),
-
-                    // Reminder Action
-                    Expanded(
-                      child: InkWell(
-                        onTap: widget.onMessage,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              UrduAwareText(
-                                isUrdu ? 'یاددہانی بھیجیں' : 'Send Reminder',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: fontWeight,
-                                  color: AppTheme.themeColor,
-                                  fontFamily: fontFamily,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Icon(PhosphorIcons.bell(), size: 20, color: AppTheme.themeColor),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              ],
             ],
           ),
         ),

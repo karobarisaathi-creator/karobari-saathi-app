@@ -9,19 +9,22 @@ import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
 import 'package:account_app/features/accounts/add_party_screen.dart';
-import 'package:account_app/features/accounts/sms_invitation_screen.dart';
-import 'main_navigation_screen.dart';
 import 'package:account_app/core/widgets/party_card.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/theme/app_theme.dart';
+import 'package:account_app/core/utils/account_balance_utils.dart';
+import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/simple_spinning_ring.dart';
+import 'package:account_app/features/accounts/sms_invitation_screen.dart';
 
-class DashboardScreen extends StatefulWidget {
+class PartyListScreen extends StatefulWidget {
+  const PartyListScreen({super.key});
+
   @override
-  _DashboardScreenState createState() => _DashboardScreenState();
+  State<PartyListScreen> createState() => _PartyListScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _PartyListScreenState extends State<PartyListScreen> {
   bool _isLoading = false;
   bool _isAscending = true;
   String _searchQuery = "";
@@ -52,10 +55,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final languageService = Provider.of<LanguageService>(context);
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-    final dbService = Provider.of<DatabaseService>(context);
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
+      resizeToAvoidBottomInset: false,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -69,10 +72,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             fontWeight: FontWeight.bold,
             fontSize: 18,
           ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.menu, color: Colors.white),
-          onPressed: () => MainNavigationScreen.of(context)?.openDrawer(),
         ),
         actions: [
           IconButton(
@@ -92,7 +91,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: _isLoading
           ? const Center(
               child:
-                  SimpleSpinningRing(size: 60, duration: Duration(seconds: 2)))
+                  SimpleSpinningRing(size: 60, duration: Duration(seconds: 2)),
+            )
           : Consumer<DatabaseService>(
               builder: (context, databaseService, child) {
                 final allAccounts = databaseService.getAccounts();
@@ -107,7 +107,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 double totalPayable = 0;
 
                 for (var party in parties) {
-                  final liveBalance = party.balance;
+                  final transactions = databaseService
+                      .getAllTransactions()
+                      .where((t) =>
+                          t.accountId == party.id && t.partnershipId == null)
+                      .toList();
+                  final cycleBalance =
+                      AccountBalanceUtils.currentCycle(transactions);
+                  final liveBalance = cycleBalance.balance;
+
                   if (liveBalance > 0) {
                     totalPayable += liveBalance;
                   } else if (liveBalance < 0) {
@@ -152,9 +160,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required bool isUrdu,
     required String fontFamily,
   }) {
-    final balanceLabel = isUrdu
-        ? (netBalance >= 0 ? 'باقی دینے' : 'باقی لینے')
-        : (netBalance >= 0 ? 'Net Payable' : 'Net Receivable');
+    final balanceLabel = netBalance == 0
+        ? (isUrdu ? 'حساب برابر' : 'Balanced')
+        : (netBalance > 0
+            ? (isUrdu ? 'دینے ہیں' : 'To Pay')
+            : (isUrdu ? 'لینے ہیں' : 'To Receive'));
+
+    final balanceIcon = netBalance == 0
+        ? PhosphorIcons.wallet()
+        : (netBalance > 0
+            ? PhosphorIcons.arrowUpRight()
+            : PhosphorIcons.arrowDownLeft());
 
     return Container(
       padding: EdgeInsets.only(
@@ -169,62 +185,86 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       child: Row(
         children: [
-          _buildHeaderStatItem(isUrdu ? 'لینے ہیں' : 'To Receive', receivable,
-              Colors.white70, fontFamily, PhosphorIcons.arrowDownLeft()),
-          _buildStatDivider(),
-          _buildHeaderStatItem(isUrdu ? 'دینے ہیں' : 'To Pay', payable,
-              Colors.white70, fontFamily, PhosphorIcons.arrowUpRight()),
-          _buildStatDivider(),
-          _buildHeaderStatItem(balanceLabel, netBalance.abs(), Colors.white70,
-              fontFamily, PhosphorIcons.wallet(),
-              isBold: true),
+          _buildHeaderStatItem(
+            isUrdu ? 'کل بنام' : 'Total Banam',
+            receivable,
+            Colors.white70,
+            PhosphorIcons.arrowDownLeft(),
+            fontFamily,
+          ),
+          const SizedBox(width: 8),
+          _buildHeaderStatItem(
+            isUrdu ? 'کل جمع' : 'Total Jama',
+            payable,
+            Colors.white70,
+            PhosphorIcons.arrowUpRight(),
+            fontFamily,
+          ),
+          const SizedBox(width: 8),
+          _buildHeaderStatItem(
+            balanceLabel,
+            netBalance.abs(),
+            Colors.white70,
+            balanceIcon,
+            fontFamily,
+            isBold: true,
+          ),
         ],
       ),
     );
   }
 
   Widget _buildHeaderStatItem(String label, double amount, Color iconColor,
-      String fontFamily, IconData icon,
+      IconData icon, String fontFamily,
       {bool isBold = false}) {
     return Expanded(
-      child: Column(
-        children: [
-          UrduAwareText(
-            label,
-            style: TextStyle(
-                color: Colors.white70, fontSize: 11, fontFamily: fontFamily),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 12, color: iconColor),
-              const SizedBox(width: 4),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: UrduAwareText(
-                    "Rs ${amount.toStringAsFixed(0)}",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: isBold ? 16 : 14,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: '',
-                    ),
-                  ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Column(
+          children: [
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: UrduAwareText(
+                "Rs ${Formatters.formatAmount(amount)}",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isBold ? 15 : 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.4,
+                  fontFamily: '',
                 ),
               ),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(height: 3),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 12, color: iconColor),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: UrduAwareText(
+                    label,
+                    style: TextStyle(
+                      fontFamily: fontFamily,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white.withOpacity(0.75),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
-  }
-
-  Widget _buildStatDivider() {
-    return Container(height: 20, width: 1, color: Colors.white12);
   }
 
   Widget _buildPartyList(List<Account> parties, DatabaseService databaseService,
@@ -238,7 +278,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ? a.name.toLowerCase().compareTo(b.name.toLowerCase())
         : b.name.toLowerCase().compareTo(a.name.toLowerCase()));
 
-    // Define scrolling headers
     final List<Widget> headers = [];
     headers.add(
       Padding(
@@ -252,44 +291,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
 
-    if (filteredParties.isEmpty && headers.isEmpty) {
-      return ListView(
-        children: [
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 40),
-              child: Column(
-                children: [
-                  Icon(PhosphorIcons.users(),
-                      size: 64, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  UrduAwareText(
-                    isUrdu ? 'کوئی پارٹی نہیں ملی' : 'No Parties Found',
-                    style: TextStyle(
-                        fontSize: 18,
-                        color: AppTheme.darkColor,
-                        fontFamily: fontFamily),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
     return ListView.builder(
       padding: EdgeInsets.zero,
       itemCount: headers.length +
           filteredParties.length +
           (filteredParties.isEmpty ? 1 : 0),
       itemBuilder: (context, index) {
-        // Render headers first
         if (index < headers.length) {
           return headers[index];
         }
 
-        // Render empty state if no parties after headers
         final partyIndex = index - headers.length;
         if (filteredParties.isEmpty && partyIndex == 0) {
           return Center(
@@ -313,8 +324,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         }
 
-        if (partyIndex >= filteredParties.length)
+        if (partyIndex >= filteredParties.length) {
           return const SizedBox.shrink();
+        }
 
         final party = filteredParties[partyIndex];
 
@@ -336,8 +348,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final updatedParty = party.copyWith(balance: liveBalance);
 
         return PartyCard(
-          key: ValueKey(
-              party.id), // یونیک کی شامل کر دی گئی تاکہ اسٹیٹ مکس نہ ہو
+          key: ValueKey(party.id),
           party: updatedParty,
           onView: () {
             Navigator.push(

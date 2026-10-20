@@ -11,6 +11,7 @@ import 'package:account_app/features/professions/profession_seasons_screen.dart'
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
+import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/config/professions_config.dart';
 
 class ProfessionsScreen extends StatefulWidget {
@@ -57,20 +58,8 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        title: UrduAwareText(
-          isUrdu ? 'پیشے/منصوبے' : 'Professions & Categories',
-          style: TextStyle(
-            color: Colors.white,
-            fontFamily: fontFamily,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
+      appBar: CustomAppBar(
+        title: isUrdu ? 'پیشے/منصوبے' : 'Professions & Categories',
         actions: [
           IconButton(
             onPressed: () => _showAddProfessionDialog(context, isUrdu),
@@ -97,189 +86,61 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
             }
           }
 
-          double profIncome = 0;
-          double profExpense = 0;
-          for (var p in allProfessions) {
-            if (!(p.isMaster ?? false)) {
-              profIncome += p.totalIncome;
-              profExpense += p.totalExpense;
-            }
-          }
-          double profProfit = profIncome - profExpense;
-
-          return Column(
-            children: [
-              // ═══ یکساں ڈارک ہیڈر (100% ڈیش بورڈ جیسا) ═══
-              _buildLargeDarkHeader(
-                profIncome: profIncome,
-                profExpense: profExpense,
-                profProfit: profProfit,
-                showStats: allProfessions.isNotEmpty,
-                isUrdu: isUrdu,
-                fontFamily: fontFamily,
-              ),
-
-              // ═══ CONTENT ═══
-              Expanded(
-                child: professions.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(PhosphorIcons.briefcase(),
-                                size: 80, color: Colors.grey[400]),
-                            const SizedBox(height: 20),
-                            UrduAwareText(
-                              isUrdu ? 'کوئی پیشہ نہیں' : 'No Professions',
-                              style: TextStyle(
-                                fontSize: 20,
-                                color: AppTheme.darkColor,
-                                fontFamily: fontFamily,
-                                fontWeight: fontWeight,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            UrduAwareText(
-                              isUrdu
-                                  ? 'پہلا پیشہ شامل کریں'
-                                  : 'Add your first profession',
-                              style: TextStyle(
-                                color: AppTheme.darkColor.withValues(alpha: 0.7),
-                                fontFamily: fontFamily,
-                                fontWeight: fontWeight,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () async =>
-                            await databaseService.fetchFromFirebase(),
-                        color: AppTheme.themeColor,
-                        backgroundColor: Colors.white,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(12),
-                          itemCount: professions.length,
-                          itemBuilder: (context, index) {
-                            return _buildProfessionListItem(
-                              professions[index],
-                              isUrdu,
-                              fontFamily,
-                              fontWeight,
-                            );
-                          },
+          return professions.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(PhosphorIcons.briefcase(),
+                          size: 80, color: Colors.grey[400]),
+                      const SizedBox(height: 20),
+                      UrduAwareText(
+                        isUrdu ? 'کوئی پیشہ نہیں' : 'No Professions',
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: AppTheme.darkColor,
+                          fontFamily: fontFamily,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-              ),
-            ],
-          );
+                      const SizedBox(height: 12),
+                      UrduAwareText(
+                        isUrdu
+                            ? 'پہلا پیشہ شامل کریں'
+                            : 'Add your first profession',
+                        style: TextStyle(
+                          color: AppTheme.darkColor.withValues(alpha: 0.7),
+                          fontFamily: fontFamily,
+                          fontWeight: fontWeight,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: () async =>
+                      await databaseService.fetchFromFirebase(),
+                  color: AppTheme.themeColor,
+                  backgroundColor: Colors.white,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: professions.length,
+                    itemBuilder: (context, index) {
+                      return _buildProfessionListItem(
+                        professions[index],
+                        isUrdu,
+                        fontFamily,
+                        fontWeight,
+                      );
+                    },
+                  ),
+                );
         },
       ),
     );
   }
 
-  Widget _buildLargeDarkHeader({
-    required double profIncome,
-    required double profExpense,
-    required double profProfit,
-    required bool showStats,
-    required bool isUrdu,
-    required String fontFamily,
-  }) {
-    String profNetLabel = isUrdu ? "میزان" : "Net";
-    if (profProfit > 0) {
-      profNetLabel = isUrdu ? "بچت" : "Profit";
-    } else if (profProfit < 0) {
-      profNetLabel = isUrdu ? "خسارہ" : "Loss";
-    }
 
-    return Container(
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 60,
-        bottom: 16,
-        left: 16,
-        right: 16,
-      ),
-      decoration: const BoxDecoration(
-        color: AppTheme.darkColor,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(15)),
-      ),
-      child: showStats
-          ? Row(
-              children: [
-                _buildHeaderStatItem(
-                  isUrdu ? 'آمدنی' : 'Income',
-                  profIncome,
-                  Colors.white70,
-                  fontFamily,
-                  PhosphorIcons.arrowDownLeft(),
-                ),
-                _buildStatDivider(),
-                _buildHeaderStatItem(
-                  isUrdu ? 'خرچ' : 'Expense',
-                  profExpense,
-                  Colors.white70,
-                  fontFamily,
-                  PhosphorIcons.arrowUpRight(),
-                ),
-                _buildStatDivider(),
-                _buildHeaderStatItem(
-                  profNetLabel,
-                  profProfit.abs(),
-                  Colors.white70,
-                  fontFamily,
-                  PhosphorIcons.trendUp(),
-                  isBold: true,
-                ),
-              ],
-            )
-          : const SizedBox(height: 8),
-    );
-  }
-
-  Widget _buildHeaderStatItem(String label, double amount, Color iconColor,
-      String fontFamily, IconData icon,
-      {bool isBold = false}) {
-    return Expanded(
-      child: Column(
-        children: [
-          UrduAwareText(
-            label,
-            style: TextStyle(
-                color: Colors.white70, fontSize: 11, fontFamily: fontFamily),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 12, color: iconColor),
-              const SizedBox(width: 4),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: UrduAwareText(
-                    "Rs ${amount.toStringAsFixed(0)}",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: isBold ? 16 : 14,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: '',
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatDivider() {
-    return Container(height: 20, width: 1, color: Colors.white12);
-  }
 
   Widget _buildProfessionListItem(Profession profession, bool isUrdu,
       String fontFamily, FontWeight fontWeight) {

@@ -62,7 +62,7 @@ class LowStockItemsScreen extends StatelessWidget {
               ),
             )
           : ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(0, 12, 0, 24),
               itemCount: lowStockItems.length,
               itemBuilder: (context, index) {
                 final item = lowStockItems[index];
@@ -73,24 +73,6 @@ class LowStockItemsScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) => StockDetailScreen(item: item),
-                      ),
-                    );
-                  },
-                  onQuickAdd: () {
-                    showDialog(
-                      context: context,
-                      builder: (_) => StockAdjustmentDialog(
-                        item: item,
-                        initialType: StockMovementType.purchase,
-                      ),
-                    );
-                  },
-                  onQuickRemove: () {
-                    showDialog(
-                      context: context,
-                      builder: (_) => StockAdjustmentDialog(
-                        item: item,
-                        initialType: StockMovementType.sale,
                       ),
                     );
                   },

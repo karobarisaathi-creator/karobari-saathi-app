@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -21,6 +22,7 @@ import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'package:account_app/core/utils/bill_numbering.dart';
+import 'package:account_app/core/utils/formatters.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   final Account? account;
@@ -69,23 +71,6 @@ class _ItemEntry {
 }
 
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
-  static const Map<String, String> _itemUnitLabels = {
-    'Pieces': 'عدد',
-    'Kg': 'کلو',
-    'Gram': 'گرام',
-    'Liter': 'لیٹر',
-    'Meter': 'میٹر',
-    'Sqft': 'مربع فٹ',
-    'Dozen': 'درجن',
-    'Box': 'ڈبہ',
-    'Bag': 'بوری',
-    'Maund': 'من',
-    'Bottle': 'بوتل',
-    'Packet': 'پیکٹ',
-    'Tola': 'تولہ',
-    'Other': 'دیگر',
-  };
-
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _referenceNumberController =
       TextEditingController();
@@ -115,7 +100,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     if (widget.transactionToEdit != null) {
       final t = widget.transactionToEdit!;
-      _amountController.text = t.amount.toStringAsFixed(0);
+      _amountController.text = Formatters.formatAmount(t.amount);
       _selectedDate = t.date;
       _selectedAccountId = t.accountId;
       _selectedProfessionId = t.professionId;
@@ -128,6 +113,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 : 'expense';
         _selectedCategory =
             t.category.contains(':') ? t.category.split(':')[1] : t.category;
+        _loadCategoriesFromProfession(t.professionId!);
       }
 
       _referenceNumberController.text = t.referenceNumber ?? '';
@@ -140,8 +126,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           final entry = _ItemEntry();
           entry.descriptionController.text = item.description;
           entry.quantityController.text = item.quantity.toString();
-          entry.rateController.text = item.rate.toStringAsFixed(0);
-          entry.totalController.text = item.total.toStringAsFixed(0);
+          entry.rateController.text = Formatters.formatAmount(item.rate);
+          entry.totalController.text = Formatters.formatAmount(item.total);
           entry.unit = item.unit ?? 'Pieces';
           entry.stockItemId = item.stockItemId;
           entry.rateWasManuallyEdited = item.stockItemId != null;
@@ -152,8 +138,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         final entry = _ItemEntry();
         entry.descriptionController.text = t.description;
         entry.quantityController.text = t.quantity.toString();
-        entry.rateController.text = t.amount.toStringAsFixed(0);
-        entry.totalController.text = t.amount.toStringAsFixed(0);
+        entry.rateController.text = Formatters.formatAmount(t.amount);
+        entry.totalController.text = Formatters.formatAmount(t.amount);
         _itemEntries.add(entry);
         _setupEntryListeners(entry);
       }
@@ -165,10 +151,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           entry.descriptionController.text = widget.initialDescription!;
         }
         if (widget.initialAmount != null) {
-          entry.rateController.text = widget.initialAmount!.toStringAsFixed(0);
+          entry.rateController.text =
+              Formatters.formatAmount(widget.initialAmount!);
           entry.quantityController.text = '1';
-          entry.totalController.text = widget.initialAmount!.toStringAsFixed(0);
-          _amountController.text = widget.initialAmount!.toStringAsFixed(0);
+          entry.totalController.text =
+              Formatters.formatAmount(widget.initialAmount!);
+          _amountController.text =
+              Formatters.formatAmount(widget.initialAmount!);
         }
       }
     }
@@ -186,6 +175,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     if (widget.forcedProfession != null) {
       _selectedProfessionId = widget.forcedProfession!.id;
       _isProfessionCentric = true;
+      _loadCategoriesFromProfession(_selectedProfessionId!);
     }
   }
 
@@ -194,12 +184,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     super.didChangeDependencies();
     if (_didLoadNextBillNumber || widget.transactionToEdit != null) return;
     _didLoadNextBillNumber = true;
-    final nextNumber = BillNumbering.loadNextNumber(
-      Provider.of<DatabaseService>(context, listen: false),
-    );
-    if (nextNumber != null) {
-      _referenceNumberController.text = nextNumber;
-    }
+    // Bill number left empty by default as requested
   }
 
   void _setupDateListener() {
@@ -263,11 +248,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   void _setupEntryListeners(_ItemEntry entry) {
     void calculate() {
       final finalQuantity = _effectiveEntryQuantity(entry);
-      double rate = double.tryParse(entry.rateController.text) ?? 0;
+      double rate =
+          double.tryParse(entry.rateController.text.replaceAll(',', '')) ?? 0;
 
       final total = finalQuantity * rate;
-      if (entry.totalController.text != total.toStringAsFixed(0)) {
-        entry.totalController.text = total.toStringAsFixed(0);
+      final formattedTotal = Formatters.formatAmount(total);
+      if (entry.totalController.text != formattedTotal) {
+        entry.totalController.text = formattedTotal;
       }
       _calculateGrandTotal();
     }
@@ -316,18 +303,20 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     entry.stockSuggestedRate = rate;
     entry.rateWasManuallyEdited = false;
     entry.applyingSuggestedRate = true;
-    entry.rateController.text = rate.toStringAsFixed(0);
+    entry.rateController.text = Formatters.formatAmount(rate);
     entry.applyingSuggestedRate = false;
   }
 
   void _calculateGrandTotal() {
     double grandTotal = 0;
     for (var entry in _itemEntries) {
-      grandTotal += double.tryParse(entry.totalController.text) ?? 0;
+      grandTotal +=
+          double.tryParse(entry.totalController.text.replaceAll(',', '')) ?? 0;
     }
-    if (_amountController.text != grandTotal.toStringAsFixed(0)) {
+    final formattedGrandTotal = Formatters.formatAmount(grandTotal);
+    if (_amountController.text != formattedGrandTotal) {
       setState(() {
-        _amountController.text = grandTotal.toStringAsFixed(0);
+        _amountController.text = formattedGrandTotal;
       });
     }
   }
@@ -341,7 +330,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           account.id == _selectedAccountId;
     }).toList();
     final masterProfessions = databaseService.getMasterProfessions();
-    _professions = masterProfessions.where((p) => p.isActive ?? true).toList();
+    _professions = masterProfessions.where((p) {
+      if (!(p.isActive ?? true)) return false;
+      final seasons = databaseService.getSeasons(p.id);
+      if (seasons.isEmpty) return true;
+      return seasons.any((s) => s.isActive ?? true);
+    }).toList();
 
     // Collect unique item names from past transactions
     Set<String> names = {};
@@ -467,7 +461,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       _buildTextField(
                         controller: _amountController,
                         label: isUrdu ? 'کل رقم' : 'Grand Total',
-                        isNumber: true,
+                        isCurrency: true,
                         icon: PhosphorIcons.wallet(),
                         fontFamily: fontFamily,
                         fontWeight: FontWeight.bold,
@@ -501,7 +495,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       Expanded(
                         child: AppButton(
                           text: isUrdu ? 'رقم لی / جمع' : 'Received',
-                          icon: PhosphorIcons.arrowUpRight(
+                          icon: PhosphorIcons.arrowDownLeft(
                               PhosphorIconsStyle.bold),
                           color: AppTheme.incomeColor,
                           variant: AppButtonVariant.primary,
@@ -513,7 +507,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       Expanded(
                         child: AppButton(
                           text: isUrdu ? 'رقم دی / بنام' : 'Paid',
-                          icon: PhosphorIcons.arrowDownLeft(
+                          icon: PhosphorIcons.arrowUpRight(
                               PhosphorIconsStyle.bold),
                           color: AppTheme.expenseColor,
                           variant: AppButtonVariant.primary,
@@ -586,7 +580,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                               selection.trim().toLowerCase()) {
                             setState(() {
                               entry.rateController.text =
-                                  it.rate.toStringAsFixed(0);
+                                  Formatters.formatAmount(it.rate);
                               entry.unit = it.unit ?? 'Pieces';
                             });
                             found = true;
@@ -597,7 +591,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                           selection.trim().toLowerCase()) {
                         setState(() {
                           entry.rateController.text =
-                              tx.rate.toStringAsFixed(0);
+                              Formatters.formatAmount(tx.rate);
                         });
                         found = true;
                       }
@@ -686,7 +680,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 flex: 2,
                 child: _buildSmallTextField(
                   controller: entry.quantityController,
-                  label: entry.unit ?? (isUrdu ? 'تعداد' : 'Qty'),
+                  label: isUrdu ? 'تعداد' : 'Qty',
                   fontFamily: fontFamily,
                   fontWeight: FontWeight.bold,
                   isNumber: true,
@@ -694,8 +688,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          _buildUnitSelector(entry, isUrdu, fontFamily),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -714,7 +706,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       label: isUrdu ? 'ریٹ' : 'Rate',
                       fontFamily: fontFamily,
                       fontWeight: FontWeight.bold,
-                      isNumber: true)),
+                      isCurrency: true)),
               const SizedBox(width: 8),
               Expanded(
                   flex: 3,
@@ -723,7 +715,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       label: isUrdu ? 'کل' : 'Total',
                       fontFamily: fontFamily,
                       fontWeight: FontWeight.bold,
-                      isNumber: true,
+                      isCurrency: true,
                       readOnly: true)),
               if (_itemEntries.length > 1)
                 IconButton(
@@ -738,191 +730,458 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-  Widget _buildUnitSelector(
-    _ItemEntry entry,
-    bool isUrdu,
-    String fontFamily,
-  ) {
-    final currentUnit = entry.unit ?? 'Pieces';
-    final choices = entry.stockItemId == null
-        ? _itemUnitLabels.keys.toList()
-        : [currentUnit];
+  List<String> _availableCategories = [];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        UrduAwareText(
-          isUrdu ? 'اکائی منتخب کریں' : 'Unit',
-          style: TextStyle(
-            color: Colors.grey.shade600,
-            fontSize: 11,
-            fontFamily: fontFamily,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: choices.map((unit) {
-            final selected = unit == currentUnit;
-            final label = isUrdu ? (_itemUnitLabels[unit] ?? unit) : unit;
-            return ChoiceChip(
-              label: UrduAwareText(label),
-              selected: selected,
-              showCheckmark: false,
-              visualDensity: VisualDensity.compact,
-              labelStyle: TextStyle(
-                color: selected ? AppTheme.darkColor : Colors.black87,
-                fontFamily: fontFamily,
-                fontSize: 12,
-                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-              ),
-              backgroundColor: Colors.white,
-              selectedColor: AppTheme.themeColor.withValues(alpha: 0.12),
-              side: BorderSide(
-                color: selected ? AppTheme.themeColor : Colors.black12,
-              ),
-              onSelected: (_) {
-                if (entry.stockItemId != null || selected) return;
-                setState(() => entry.unit = unit);
-                entry.subQuantityController.clear();
-              },
-            );
-          }).toList(),
-        ),
-      ],
-    );
+  void _loadCategoriesFromProfession(String professionId) {
+    final db = Provider.of<DatabaseService>(context, listen: false);
+    final masterProfession = db.getProfession(professionId);
+
+    if (masterProfession == null) {
+      setState(() => _availableCategories = []);
+      return;
+    }
+
+    List<String> categories = [];
+    if (masterProfession.categories.isNotEmpty) {
+      categories = masterProfession.categories
+          .map((c) {
+            if (c.startsWith('INC:')) return c.substring(4);
+            if (c.startsWith('EXP:')) return c.substring(4);
+            return c;
+          })
+          .toSet()
+          .toList();
+    }
+
+    if (categories.isEmpty) {
+      categories = ['تنخواہ', 'فری لانس', 'کاروبار', 'کرایہ', 'بجلی', 'پانی', 'دیگر'];
+    }
+
+    setState(() => _availableCategories = categories);
+  }
+
+  void _resetProfession() {
+    setState(() {
+      _selectedProfessionId = null;
+      _professionSyncType = null;
+      _selectedCategory = null;
+      _availableCategories = [];
+    });
   }
 
   Widget _buildProfessionSelectionArea(
       bool isUrdu, String fontFamily, FontWeight fontWeight) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            UrduAwareText(
-              isUrdu ? 'پیشہ منتخب کریں' : 'Select Profession',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: fontWeight,
-                fontFamily: fontFamily,
-                color: Colors.grey.shade600,
-              ),
-            ),
-            if (_selectedProfessionId != null)
-              GestureDetector(
-                onTap: () => setState(() {
-                  _selectedProfessionId = null;
-                  _professionSyncType = null;
-                }),
-                child: UrduAwareText(
-                  isUrdu ? 'تبدیل کریں' : 'Change',
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: AppTheme.themeColor,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: fontFamily),
-                ),
-              ),
-          ],
+    return _buildProfessionSelector(isUrdu, fontFamily, fontWeight);
+  }
+
+  Widget _buildProfessionSelector(
+      bool isUrdu, String fontFamily, FontWeight fontWeight) {
+    final bool isSelected = _selectedProfessionId != null;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.themeColor.withValues(alpha: 0.15),
+          width: 1.5,
         ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 88,
-          child: _selectedProfessionId == null
-              ? ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _professions.length + 1,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    if (index == 0) {
-                      return _buildProfessionCard(
-                        null,
-                        isUrdu ? 'کسی پیشے میں نہیں' : 'None',
-                        PhosphorIcons.prohibit(),
-                        _selectedProfessionId == null,
-                        isUrdu,
-                        fontFamily,
-                        fontWeight,
-                      );
-                    }
-                    final p = _professions[index - 1];
-                    IconData displayIcon = _getProfessionIcon(p);
-                    return _buildProfessionCard(p.id, p.name, displayIcon,
-                        false, isUrdu, fontFamily, fontWeight);
-                  },
-                )
-              : _buildSelectedProfessionView(isUrdu, fontFamily, fontWeight),
-        ),
-      ],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            child: !isSelected
+                ? SizedBox(
+                    height: 50,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _professions.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 10),
+                      itemBuilder: (context, i) {
+                        final prof = _professions[i];
+                        return _buildProfessionChip(
+                          prof: prof,
+                          fontFamily: fontFamily,
+                        );
+                      },
+                    ),
+                  )
+                : Row(
+                    children: [
+                      GestureDetector(
+                        onTap: _resetProfession,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.themeColor,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color:
+                                    AppTheme.themeColor.withValues(alpha: 0.3),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 30,
+                                height: 30,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                alignment: Alignment.center,
+                                child: Icon(
+                                  _getProfessionIcon(
+                                    _professions.firstWhere(
+                                      (p) => p.id == _selectedProfessionId,
+                                      orElse: () => _professions.first,
+                                    ),
+                                  ),
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              UrduAwareText(
+                                _professions
+                                    .firstWhere(
+                                      (p) => p.id == _selectedProfessionId,
+                                      orElse: () => _professions.first,
+                                    )
+                                    .name,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w800,
+                                  fontFamily: fontFamily,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.edit,
+                                    color: Colors.white, size: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildTypeMiniButton(
+                          type: 'income',
+                          icon: PhosphorIcons.arrowDownLeft(),
+                          label: isUrdu ? 'آمدن' : 'In',
+                          fontFamily: fontFamily,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: _buildTypeMiniButton(
+                          type: 'expense',
+                          icon: PhosphorIcons.arrowUpRight(),
+                          label: isUrdu ? 'خرچ' : 'Out',
+                          fontFamily: fontFamily,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            child: (_selectedProfessionId != null &&
+                    _professionSyncType != null)
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 12),
+                      Container(
+                        height: 1,
+                        color: AppTheme.themeColor.withValues(alpha: 0.12),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Container(
+                            width: 20,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              color: _selectedCategory != null
+                                  ? AppTheme.incomeColor
+                                  : AppTheme.themeColor,
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: _selectedCategory != null
+                                ? const Icon(Icons.check,
+                                    color: Colors.white, size: 13)
+                                : Text(
+                                    '2',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(width: 6),
+                          UrduAwareText(
+                            _professionSyncType == 'income'
+                                ? (isUrdu
+                                    ? 'آمدن کا زمرہ منتخب کریں'
+                                    : 'Select income category')
+                                : (isUrdu
+                                    ? 'خرچ کا زمرہ منتخب کریں'
+                                    : 'Select expense category'),
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textSecondary,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      _availableCategories.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: UrduAwareText(
+                                isUrdu
+                                    ? 'اس پیشے میں کوئی زمرہ نہیں'
+                                    : 'No categories for this profession',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: AppTheme.textSecondary,
+                                  fontStyle: FontStyle.italic,
+                                  fontFamily: fontFamily,
+                                ),
+                              ),
+                            )
+                          : SizedBox(
+                              height: 70,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: _availableCategories.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 8),
+                                itemBuilder: (context, i) {
+                                  final catName = _availableCategories[i];
+                                  return _buildCategoryChip(
+                                    id: catName,
+                                    name: catName,
+                                    icon: _getCategoryIcon(catName),
+                                    fontFamily: fontFamily,
+                                  );
+                                },
+                              ),
+                            ),
+                    ],
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildSelectedProfessionView(
-      bool isUrdu, String fontFamily, FontWeight fontWeight) {
-    // Find the profession - it might be a Master ID or a Season ID
-    final db = Provider.of<DatabaseService>(context, listen: false);
-    Profession? selectedProf =
-        _professions.where((p) => p.id == _selectedProfessionId).firstOrNull;
+  Widget _buildProfessionChip({
+    required Profession prof,
+    required String fontFamily,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedProfessionId = prof.id;
+          _professionSyncType = null;
+          _selectedCategory = null;
+          _availableCategories = [];
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F7F9),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppTheme.themeColor.withValues(alpha: 0.15),
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                _getProfessionIcon(prof),
+                color: AppTheme.themeColor,
+                size: 17,
+              ),
+            ),
+            const SizedBox(width: 8),
+            UrduAwareText(
+              prof.name,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.darkColor,
+                fontFamily: fontFamily,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-    // If not in the filtered list (e.g. it's a season), look it up globally
-    selectedProf ??= db.getProfession(_selectedProfessionId!);
+  Widget _buildTypeMiniButton({
+    required String type,
+    required IconData icon,
+    required String label,
+    required String fontFamily,
+  }) {
+    final bool isSelected = _professionSyncType == type;
+    final Color color =
+        type == 'income' ? AppTheme.incomeColor : AppTheme.expenseColor;
 
-    if (selectedProf == null) {
-      // Fallback if still not found
-      return UrduAwareText(isUrdu ? 'پیشہ دستیاب نہیں' : 'Profession not found');
-    }
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _professionSyncType = type;
+          _selectedCategory = null;
+          _loadCategoriesFromProfession(_selectedProfessionId!);
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? color : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? color : color.withValues(alpha: 0.3),
+            width: 1.5,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: isSelected ? Colors.white : color, size: 15),
+            const SizedBox(width: 4),
+            Flexible(
+              child: UrduAwareText(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected ? Colors.white : color,
+                  fontFamily: fontFamily,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-    return ListView(
-      scrollDirection: Axis.horizontal,
-      children: [
-        // Always show "None" option
-        _buildProfessionCard(
-          null,
-          isUrdu ? 'کسی پیشے میں نہیں' : 'None',
-          PhosphorIcons.prohibit(),
-          false,
-          isUrdu,
-          fontFamily,
-          fontWeight,
+  Widget _buildCategoryChip({
+    required String id,
+    required String name,
+    required IconData icon,
+    required String fontFamily,
+  }) {
+    final bool isSelected = _selectedCategory == id;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() => _selectedCategory = id);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 82,
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.themeColor.withValues(alpha: 0.08)
+              : const Color(0xFFF5F7F9),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppTheme.themeColor : Colors.transparent,
+            width: 1.5,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppTheme.themeColor.withValues(alpha: 0.15),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : [],
         ),
-        const SizedBox(width: 12),
-        // Selected Profession
-        _buildProfessionCard(
-          _selectedProfessionId,
-          selectedProf.name,
-          _getProfessionIcon(selectedProf),
-          true,
-          isUrdu,
-          fontFamily,
-          fontWeight,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon,
+                color: isSelected ? AppTheme.themeColor : AppTheme.darkColor,
+                size: 18),
+            const SizedBox(height: 4),
+            UrduAwareText(
+              name,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? AppTheme.themeColor : AppTheme.darkColor,
+                fontFamily: fontFamily,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Center(
-            child:
-                Container(width: 1.5, height: 40, color: Colors.grey.shade200)),
-        const SizedBox(width: 12),
-        _buildSyncTypeCard(
-          label: isUrdu ? 'آمدن' : 'Income',
-          type: 'income',
-          icon: PhosphorIcons.trendUp(),
-          color: AppTheme.incomeColor,
-          isSelected: _professionSyncType == 'income',
-          fontFamily: fontFamily,
-        ),
-        const SizedBox(width: 12),
-        _buildSyncTypeCard(
-          label: isUrdu ? 'خرچ' : 'Expense',
-          type: 'expense',
-          icon: PhosphorIcons.trendDown(),
-          color: AppTheme.expenseColor,
-          isSelected: _professionSyncType == 'expense',
-          fontFamily: fontFamily,
-        ),
-      ],
+      ),
     );
   }
 
@@ -940,143 +1199,53 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     return displayIcon;
   }
 
-  Widget _buildSyncTypeCard({
-    required String label,
-    required String type,
-    required IconData icon,
-    required Color color,
-    required bool isSelected,
-    required String fontFamily,
-  }) {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _professionSyncType = type;
-          _selectedCategory = null; // Reset category
-        });
-      },
-      child: SizedBox(
-        width: 75,
-        child: Column(
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isSelected ? color : color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isSelected ? color : color.withValues(alpha: 0.3),
-                  width: 2,
-                ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: color.withValues(alpha: 0.2),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        )
-                      ]
-                    : [],
-              ),
-              child: Icon(
-                icon,
-                color: isSelected ? Colors.white : color,
-                size: 24,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const SizedBox(height: 10),
-            UrduAwareText(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                fontFamily: fontFamily,
-                color: isSelected ? color : AppTheme.darkColor,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProfessionCard(
-    String? id,
-    String name,
-    IconData icon,
-    bool isSelected,
-    bool isUrdu,
-    String fontFamily,
-    FontWeight fontWeight,
-  ) {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          if (_selectedProfessionId == id && id != null) {
-            // Deselect if already selected
-            _selectedProfessionId = null;
-            _professionSyncType = null;
-          } else {
-            _selectedProfessionId = id;
-            if (id == null) {
-              _professionSyncType = null;
-            }
-          }
-        });
-      },
-      child: SizedBox(
-        width: 75,
-        child: Column(
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppTheme.themeColor
-                    : AppTheme.backgroundColor.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isSelected ? AppTheme.themeColor : Colors.transparent,
-                  width: 2,
-                ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: AppTheme.themeColor.withValues(alpha: 0.2),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        )
-                      ]
-                    : [],
-              ),
-              child: Icon(
-                icon,
-                color: isSelected ? Colors.white : AppTheme.themeColor,
-                size: 24,
-              ),
-            ),
-            const SizedBox(height: 6),
-            UrduAwareText(
-              name,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                fontFamily: fontFamily,
-                color: isSelected ? AppTheme.themeColor : AppTheme.darkColor,
-                height: 1.1,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  IconData _getCategoryIcon(String categoryName) {
+    final name = categoryName.toLowerCase();
+    if (name.contains('نقد') || name.contains('cash'))
+      return PhosphorIcons.money();
+    if (name.contains('ادھار') || name.contains('udhar'))
+      return PhosphorIcons.notebook();
+    if (name.contains('واپسی') || name.contains('return'))
+      return PhosphorIcons.arrowUUpLeft();
+    if (name.contains('خریداری') || name.contains('buy'))
+      return PhosphorIcons.shoppingBag();
+    if (name.contains('کرایہ') || name.contains('rent'))
+      return PhosphorIcons.house();
+    if (name.contains('بجلی') || name.contains('bill'))
+      return PhosphorIcons.lightbulb();
+    if (name.contains('پانی') || name.contains('water'))
+      return PhosphorIcons.drop();
+    if (name.contains('ٹرانسپورٹ') || name.contains('transport'))
+      return PhosphorIcons.truck();
+    if (name.contains('تنخواہ') || name.contains('salary'))
+      return PhosphorIcons.user();
+    if (name.contains('اسٹاک') || name.contains('stock'))
+      return PhosphorIcons.package();
+    if (name.contains('فصل') || name.contains('crop'))
+      return PhosphorIcons.plant();
+    if (name.contains('بیج') || name.contains('seed'))
+      return PhosphorIcons.leaf();
+    if (name.contains('کھاد') || name.contains('fertilizer'))
+      return PhosphorIcons.flask();
+    if (name.contains('مزدوری') || name.contains('labour'))
+      return PhosphorIcons.hardHat();
+    if (name.contains('دودھ') || name.contains('milk'))
+      return PhosphorIcons.drop();
+    if (name.contains('چارہ') || name.contains('feed'))
+      return PhosphorIcons.plant();
+    if (name.contains('دوا') || name.contains('med'))
+      return PhosphorIcons.pill();
+    if (name.contains('کپڑا') || name.contains('cloth'))
+      return PhosphorIcons.scissors();
+    if (name.contains('سلائی') || name.contains('stitch'))
+      return PhosphorIcons.scissors();
+    if (name.contains('فروخت') || name.contains('sale'))
+      return PhosphorIcons.shoppingCart();
+    if (name.contains('سروس') || name.contains('service'))
+      return PhosphorIcons.wrench();
+    if (name.contains('دیگر') || name.contains('other'))
+      return PhosphorIcons.dotsThree();
+    return PhosphorIcons.tag();
   }
 
   Widget _buildSectionCard(
@@ -1128,16 +1297,24 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       required String fontFamily,
       required FontWeight fontWeight,
       bool isNumber = false,
+      bool isCurrency = false,
       bool readOnly = false,
       String? suffixText}) {
     final isUrdu = isUrduHelper(context);
     return TextFormField(
       controller: controller,
-      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      keyboardType: (isNumber || isCurrency)
+          ? const TextInputType.numberWithOptions(decimal: true)
+          : TextInputType.text,
+      inputFormatters: isCurrency
+          ? [CurrencyInputFormatter()]
+          : (isNumber
+              ? [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))]
+              : null),
       style: TextStyle(
           color: readOnly ? Colors.grey : AppTheme.darkColor,
-          fontFamily: isNumber ? '' : fontFamily,
-          fontSize: isNumber ? 16 : 14,
+          fontFamily: (isNumber || isCurrency) ? '' : fontFamily,
+          fontSize: (isNumber || isCurrency) ? 16 : 14,
           fontWeight: fontWeight),
       readOnly: readOnly,
       cursorColor: AppTheme.themeColor,
@@ -1177,16 +1354,24 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       {required TextEditingController controller,
       required String label,
       bool isNumber = false,
+      bool isCurrency = false,
       IconData? icon,
       required String fontFamily,
       required FontWeight fontWeight}) {
     final isUrdu = isUrduHelper(context);
     return TextFormField(
       controller: controller,
-      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      keyboardType: (isNumber || isCurrency)
+          ? const TextInputType.numberWithOptions(decimal: true)
+          : TextInputType.text,
+      inputFormatters: isCurrency
+          ? [CurrencyInputFormatter()]
+          : (isNumber
+              ? [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))]
+              : null),
       style: TextStyle(
           color: AppTheme.darkColor,
-          fontFamily: isNumber ? '' : fontFamily,
+          fontFamily: (isNumber || isCurrency) ? '' : fontFamily,
           fontSize: 16,
           fontWeight: fontWeight),
       cursorColor: AppTheme.themeColor,
@@ -1251,7 +1436,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
       final defaultRate =
           type == 'income' ? stockItem.sellingPrice : stockItem.purchasePrice;
-      final currentRate = double.tryParse(entry.rateController.text) ?? 0;
+      final currentRate =
+          double.tryParse(entry.rateController.text.replaceAll(',', '')) ?? 0;
       if (defaultRate > 0 &&
           (!entry.rateWasManuallyEdited ||
               currentRate == entry.stockSuggestedRate)) {
@@ -1290,7 +1476,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       }
     }
 
-    double grandTotal = double.tryParse(_amountController.text) ?? 0;
+    double grandTotal =
+        double.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
     if (grandTotal <= 0) {
       _showSnackBar(isUrdu ? 'رقم درج کریں' : 'Please enter amount', true);
       return;
@@ -1307,12 +1494,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       String mainDescription = "";
       for (var entry in _itemEntries) {
         final desc = entry.descriptionController.text;
-        final total = double.tryParse(entry.totalController.text) ?? 0;
+        final total =
+            double.tryParse(entry.totalController.text.replaceAll(',', '')) ??
+                0;
         if (total > 0 || desc.isNotEmpty) {
           items.add(TransactionItem(
             description: desc,
             quantity: _effectiveEntryQuantity(entry),
-            rate: double.tryParse(entry.rateController.text) ?? total,
+            rate: double.tryParse(
+                    entry.rateController.text.replaceAll(',', '')) ??
+                total,
             total: total,
             unit: entry.unit,
             stockItemId: entry.stockItemId,
@@ -1357,7 +1548,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         amount: grandTotal,
         pendingAmount: grandTotal,
         type: type,
-        category: _professionSyncType ?? type,
+        category: (_selectedProfessionId != null && _professionSyncType != null)
+            ? '${_professionSyncType == 'income' ? 'INC' : 'EXP'}:${_selectedCategory ?? 'دیگر'}'
+            : (_selectedCategory ?? type),
         description: mainDescription.isEmpty ? 'دیگر' : mainDescription,
         date: _selectedDate,
         quantity: 1,
@@ -1371,6 +1564,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         items: items,
         professionId: targetProfessionId,
         professionName: profName,
+        receiptFromCounterparty:
+            widget.transactionToEdit?.receiptFromCounterparty ?? false,
       );
 
       if (widget.transactionToEdit != null) {

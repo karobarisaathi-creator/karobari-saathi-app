@@ -595,12 +595,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
           ),
         ],
       ),
-      foregroundDecoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border(
-          left: BorderSide(color: borderColor, width: 4),
-        ),
-      ),
+
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1205,7 +1200,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
     required bool isUrdu,
     String? fontFamily,
   }) {
-    final colors = _categoryColors();
+    final colors = isIncome ? _incomeCategoryColors() : _expenseCategoryColors();
 
     return _sectionCard(
       title: title,
@@ -1544,6 +1539,28 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         );
       }).toList(),
     );
+  }
+
+  List<Color> _incomeCategoryColors() {
+    return const [
+      AppTheme.incomeColor,
+      Color(0xFF10B981), // Emerald
+      Color(0xFF059669), // Green
+      Color(0xFF34D399), // Light Green
+      Color(0xFF047857), // Dark Green
+      Color(0xFF6EE7B7),
+    ];
+  }
+
+  List<Color> _expenseCategoryColors() {
+    return const [
+      AppTheme.expenseColor,
+      Color(0xFFEF4444), // Red
+      Color(0xFFD97706), // Amber
+      Color(0xFFDC2626), // Dark Red
+      Color(0xFFF59E0B), // Orange
+      Color(0xFFB91C1C),
+    ];
   }
 
   // ═════════════════════════════════════════════════════════

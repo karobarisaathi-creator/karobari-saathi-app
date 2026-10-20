@@ -6,15 +6,21 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:account_app/core/config/app_roles.dart';
 import 'package:account_app/core/utils/image_utils.dart';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
 
 enum ProfileSaveStatus { idle, loading, success, error }
 
 class ProfileController extends ChangeNotifier {
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController phoneController = TextEditingController();
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController addressController = TextEditingController();
-  final TextEditingController shopNameController = TextEditingController();
+  final UrduAwareTextEditingController nameController =
+      UrduAwareTextEditingController();
+  final UrduAwareTextEditingController phoneController =
+      UrduAwareTextEditingController();
+  final UrduAwareTextEditingController emailController =
+      UrduAwareTextEditingController();
+  final UrduAwareTextEditingController addressController =
+      UrduAwareTextEditingController();
+  final UrduAwareTextEditingController shopNameController =
+      UrduAwareTextEditingController();
 
   AppRole selectedRole = AppRole.simple;
 
@@ -29,12 +35,9 @@ class ProfileController extends ChangeNotifier {
   ProfileSaveStatus saveStatus = ProfileSaveStatus.idle;
   String? errorMessage;
 
-  void setRole(AppRole role) {
-    if (selectedRole != role) {
-      selectedRole = role;
-      notifyListeners();
-    }
-  }
+  bool get isShopkeeper =>
+      shopNameController.text.trim().isNotEmpty &&
+      addressController.text.trim().isNotEmpty;
 
   Future<void> loadExistingProfile() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -60,7 +63,7 @@ class ProfileController extends ChangeNotifier {
       emailController.text = (data?['email'] ?? user.email ?? '').toString();
       addressController.text = (data?['businessAddress'] ?? '').toString();
       shopNameController.text = (data?['shopName'] ?? '').toString();
-      selectedRole = AppRoleExtension.fromString(data?['role']?.toString());
+      selectedRole = isShopkeeper ? AppRole.shopkeeper : AppRole.simple;
       remoteProfileImage = (data?['photoURL'] ?? user.photoURL)?.toString();
       remoteBannerImage = (data?['shopBannerUrl'] ?? data?['bannerUrl'])?.toString();
       isEditing = nameController.text.trim().isNotEmpty;
@@ -113,6 +116,11 @@ class ProfileController extends ChangeNotifier {
         bannerImageUrl = await imageRef.getDownloadURL();
       }
 
+      final hasShopName = shopNameController.text.trim().isNotEmpty;
+      final hasShopAddress = addressController.text.trim().isNotEmpty;
+      final effectiveShopkeeper = hasShopName && hasShopAddress;
+      selectedRole = effectiveShopkeeper ? AppRole.shopkeeper : AppRole.simple;
+
       await user.updateDisplayName(nameController.text.trim());
       if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
         await user.updatePhotoURL(profileImageUrl);
@@ -128,8 +136,7 @@ class ProfileController extends ChangeNotifier {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      if (selectedRole == AppRole.shopkeeper &&
-          shopNameController.text.trim().isNotEmpty) {
+      if (effectiveShopkeeper) {
         final publicShopData = {
           'uid': user.uid,
           'displayName': nameController.text.trim(),

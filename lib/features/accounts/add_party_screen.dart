@@ -37,6 +37,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
 
   late String _selectedCategory;
   File? _profileImage;
@@ -53,19 +54,25 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
   void initState() {
     super.initState();
     _nameController.addListener(_updatePreview);
+    _addressController.addListener(_updatePreview);
     _phoneController.addListener(_onPhoneChanged);
     
     if (widget.partyToEdit != null) {
       _nameController.text = widget.partyToEdit!.name;
       _phoneController.text = widget.partyToEdit!.phone;
+      _addressController.text = widget.partyToEdit!.address ?? '';
       
       _selectedCategory = widget.partyToEdit!.category;
 
       if (widget.partyToEdit!.profileImage != null) {
-        if (widget.partyToEdit!.profileImage!.startsWith('http')) {
-          _remoteImageUrl = widget.partyToEdit!.profileImage;
-        } else {
-          _profileImage = File(widget.partyToEdit!.profileImage!);
+        final imgPath = widget.partyToEdit!.profileImage!.trim();
+        if (imgPath.startsWith('http')) {
+          _remoteImageUrl = imgPath;
+        } else if (!imgPath.startsWith('assets/')) {
+          final file = File(imgPath);
+          if (file.existsSync()) {
+            _profileImage = file;
+          }
         }
       }
     } else {
@@ -113,6 +120,9 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
     if (_foundProfile == null) return;
     setState(() {
       _nameController.text = _foundProfile!['name'] ?? _nameController.text;
+      if (_foundProfile!['address']?.isNotEmpty == true) {
+        _addressController.text = _foundProfile!['address']!;
+      }
       _remoteImageUrl = _foundProfile!['photoUrl'];
       _profileImage = null; // Clear local image if using remote
       _foundProfile = null; // Hide the lookup card
@@ -130,7 +140,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
     final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
 
     return Scaffold(
-      backgroundColor: AppTheme.lightColor,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
         title: widget.partyToEdit != null ? l10n.editParty : l10n.addParty,
       ),
@@ -187,15 +197,17 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                                       ? (_foundProfile!['name'] ?? l10n.partyName)
                                       : (_nameController.text.isEmpty ? l10n.partyName : _nameController.text),
                                   phone: _phoneController.text.isEmpty ? '03000000000' : _phoneController.text,
-                                  profileImage: _remoteImageUrl ?? (_foundProfile != null && _profileImage == null ? _foundProfile!['photoUrl'] : null) ?? _profileImage?.path,
+                                  profileImage: _remoteImageUrl ?? (_foundProfile != null && _profileImage == null ? _foundProfile!['photoUrl'] : null) ?? _profileImage?.path ?? widget.partyToEdit?.profileImage,
                                   category: _foundProfile != null 
                                       ? (_foundProfile!['profession']?.isNotEmpty == true 
                                           ? _foundProfile!['profession'] 
                                           : (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account'))
                                       : (isUrdu ? 'نیا کھاتہ' : 'New Account'),
                                   address: _foundProfile != null 
-                                      ? (isUrdu ? 'پہلے سے موجود اکاؤنٹ' : 'Existing Account') 
-                                      : null,
+                                      ? (_foundProfile!['address']?.isNotEmpty == true 
+                                          ? _foundProfile!['address'] 
+                                          : (isUrdu ? 'پہلے سے موجود اکاؤنٹ' : 'Existing Account')) 
+                                      : (_addressController.text.isNotEmpty ? _addressController.text : null),
                                   isLarge: true,
                                   isVerticalCategory: true,
                                   customSize: 90, // تصویر کا سائز بڑھا دیا گیا
@@ -284,6 +296,16 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                       fontFamily: fontFamily,
                       fontWeight: fontWeight,
                       validator: (value) => value == null || value.isEmpty ? l10n.invalidName : null,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Address Field
+                    _buildTextField(
+                      controller: _addressController,
+                      label: l10n.address,
+                      icon: PhosphorIcons.mapPin(),
+                      fontFamily: fontFamily,
+                      fontWeight: fontWeight,
                     ),
                     const SizedBox(height: 40),
               
@@ -446,14 +468,14 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
         isConnected = false;
       }
 
-      String? finalImagePath = _remoteImageUrl ?? _profileImage?.path;
+      String? finalImagePath = _remoteImageUrl ?? _profileImage?.path ?? widget.partyToEdit?.profileImage;
 
       if (widget.partyToEdit != null) {
         // Edit Mode
         final updatedParty = widget.partyToEdit!.copyWith(
           name: _nameController.text,
           phone: _phoneController.text,
-          address: null,
+          address: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
           category: _selectedCategory,
           profileImage: finalImagePath,
           updatedAt: DateTime.now(),
@@ -468,7 +490,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           name: _nameController.text,
           phone: _phoneController.text,
-          address: null,
+          address: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
           category: _selectedCategory,
           initialBalance: 0.0,
           balanceType: 'receivable',
@@ -514,6 +536,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
     _searchTimer?.cancel();
     _nameController.dispose();
     _phoneController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 }

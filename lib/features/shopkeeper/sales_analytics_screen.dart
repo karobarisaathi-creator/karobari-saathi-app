@@ -11,6 +11,7 @@ import 'package:account_app/core/services/stock_analytics_service.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
 
 class SalesAnalyticsScreen extends StatefulWidget {
@@ -38,7 +39,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
     if (absoluteAmount >= 1000) {
       return 'Rs $sign${(absoluteAmount / 1000).toStringAsFixed(0)}K';
     }
-    return 'Rs $sign${absoluteAmount.toStringAsFixed(0)}';
+    return 'Rs $sign${Formatters.formatAmount(absoluteAmount)}';
   }
 
   String _getMonthName(int month) {
@@ -201,7 +202,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
       body: stockService.isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1271,9 +1272,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
             children: [
               Expanded(
                 child: UrduAwareText(
-                  isUrdu && item.nameUrdu.isNotEmpty
-                      ? item.nameUrdu
-                      : item.name,
+                  item.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

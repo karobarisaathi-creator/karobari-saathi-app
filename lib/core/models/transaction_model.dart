@@ -85,6 +85,9 @@ class Transaction extends HiveObject {
   @HiveField(25)
   final String? discountReason;
 
+  @HiveField(26, defaultValue: false)
+  final bool receiptFromCounterparty;
+
   Transaction({
     required this.id,
     required this.accountId,
@@ -112,6 +115,7 @@ class Transaction extends HiveObject {
     this.discountAmount = 0.0,
     this.discountPercent,
     this.discountReason,
+    this.receiptFromCounterparty = false,
   }) : subtotal = subtotal ?? amount;
 
   Map<String, dynamic> toMap() {
@@ -142,6 +146,7 @@ class Transaction extends HiveObject {
       'discountAmount': discountAmount,
       'discountPercent': discountPercent,
       'discountReason': discountReason,
+      'receiptFromCounterparty': receiptFromCounterparty,
     };
   }
 
@@ -176,14 +181,14 @@ class Transaction extends HiveObject {
       partnershipId: map['partnershipId'],
       voiceNote: map['voiceNote'],
       items: map['items'] != null
-          ? List<TransactionItem>.from(map['items']?.map((x) => TransactionItem.fromMap(x)))
+          ? List<TransactionItem>.from(
+              map['items']?.map((x) => TransactionItem.fromMap(x)))
           : [],
-      subtotal: map['subtotal']?.toDouble() ??
-          map['amount']?.toDouble() ??
-          0.0,
+      subtotal: map['subtotal']?.toDouble() ?? map['amount']?.toDouble() ?? 0.0,
       discountAmount: map['discountAmount']?.toDouble() ?? 0.0,
       discountPercent: map['discountPercent']?.toDouble(),
       discountReason: map['discountReason'],
+      receiptFromCounterparty: map['receiptFromCounterparty'] == true,
     );
   }
 
@@ -197,13 +202,8 @@ class Transaction extends HiveObject {
         normalizedDescription.contains('quick bill');
   }
 
-  double get accountBalanceAmount {
-    if (!isQuickBill ||
-        (receivedAmount == 0 && pendingAmount == 0 && amount != 0)) {
-      return amount;
-    }
-    return pendingAmount;
-  }
+  // ✅ FINAL: amount ہمیشہ effective ہے (AddTransaction اور QuickBill دونوں میں)
+  double get accountBalanceAmount => amount;
 
   String get formattedDate => DateFormat('dd/MM/yyyy').format(date);
   String get formattedTime => DateFormat('hh:mm a').format(date);

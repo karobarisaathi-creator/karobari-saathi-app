@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -14,6 +15,8 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
+import 'package:account_app/core/utils/formatters.dart';
 
 class AddProjectTransactionScreen extends StatefulWidget {
   final Profession profession;
@@ -301,6 +304,7 @@ class _AddProjectTransactionScreenState
                         controller: _amountController,
                         label: isUrdu ? 'کل رقم' : 'Grand Total',
                         isNumber: true,
+                        isCurrency: true,
                         icon: PhosphorIcons.wallet(),
                         fontFamily: fontFamily,
                         fontWeight: FontWeight.bold,
@@ -366,7 +370,22 @@ class _AddProjectTransactionScreenState
     final masterId = widget.profession.parentId ?? widget.profession.id;
     final masterProf = db.getProfession(masterId);
 
-    List<String> cats = (masterProf?.categories ?? widget.profession.categories)
+    final rawCategories = masterProf?.categories ?? widget.profession.categories;
+    
+    List<String> filteredRaw = rawCategories.where((c) {
+      if (_selectedType == 'income') {
+        return c.startsWith('INC:');
+      } else if (_selectedType == 'expense') {
+        return c.startsWith('EXP:');
+      }
+      return true;
+    }).toList();
+
+    if (filteredRaw.isEmpty) {
+      filteredRaw = rawCategories;
+    }
+
+    List<String> cats = filteredRaw
         .map((c) {
           if (c.contains(':')) return c.split(':')[1];
           return c;
@@ -528,7 +547,8 @@ class _AddProjectTransactionScreenState
                       label: isUrdu ? 'ریٹ' : 'Rate',
                       fontFamily: fontFamily,
                       fontWeight: FontWeight.bold,
-                      isNumber: true)),
+                      isNumber: true,
+                      isCurrency: true)),
               const SizedBox(width: 8),
               Expanded(
                   flex: 3,
@@ -581,14 +601,22 @@ class _AddProjectTransactionScreenState
       required String fontFamily,
       required FontWeight fontWeight,
       bool isNumber = false,
+      bool isCurrency = false,
       bool readOnly = false}) {
     return TextFormField(
       controller: controller,
-      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      keyboardType: (isNumber || isCurrency)
+          ? const TextInputType.numberWithOptions(decimal: true)
+          : TextInputType.text,
+      inputFormatters: isCurrency
+          ? [CurrencyInputFormatter()]
+          : (isNumber
+              ? [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))]
+              : null),
       readOnly: readOnly,
       style: TextStyle(
           color: readOnly ? Colors.grey : AppTheme.darkColor,
-          fontFamily: isNumber ? '' : fontFamily,
+          fontFamily: (isNumber || isCurrency) ? '' : fontFamily,
           fontSize: 16,
           fontWeight: fontWeight),
       decoration: InputDecoration(
@@ -618,15 +646,23 @@ class _AddProjectTransactionScreenState
       {required TextEditingController controller,
       required String label,
       bool isNumber = false,
+      bool isCurrency = false,
       IconData? icon,
       required String fontFamily,
       required FontWeight fontWeight}) {
     return TextFormField(
       controller: controller,
-      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      keyboardType: (isNumber || isCurrency)
+          ? const TextInputType.numberWithOptions(decimal: true)
+          : TextInputType.text,
+      inputFormatters: isCurrency
+          ? [CurrencyInputFormatter()]
+          : (isNumber
+              ? [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))]
+              : null),
       style: TextStyle(
           color: AppTheme.darkColor,
-          fontFamily: isNumber ? '' : fontFamily,
+          fontFamily: (isNumber || isCurrency) ? '' : fontFamily,
           fontSize: 16,
           fontWeight: fontWeight),
       decoration: InputDecoration(
@@ -698,6 +734,17 @@ class _AddProjectTransactionScreenState
   }
 
   Future<void> _saveTransaction(String type) async {
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    if (widget.profession.isActive == false) {
+      AppToast.error(
+        context,
+        isUrdu
+            ? 'یہ سیزن بند/مکمل ہو چکا ہے، اس میں ٹرانزیکشن نہیں کی جا سکتی'
+            : 'This season is closed/inactive, cannot add transactions',
+      );
+      return;
+    }
+
     double grandTotal = double.tryParse(_amountController.text) ?? 0;
     if (grandTotal <= 0) return;
 
