@@ -71,7 +71,7 @@ class ItemRateHistoryCardWidget extends StatelessWidget {
       margin: margin ?? const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
         boxShadow: [
           BoxShadow(
@@ -83,10 +83,10 @@ class ItemRateHistoryCardWidget extends StatelessWidget {
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: InkWell(
           onTap: () => _openItemHistorySheet(context),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           child: Column(
             children: [
               Padding(
@@ -301,7 +301,7 @@ class ItemRateHistoryCardWidget extends StatelessWidget {
 
             // Top Dark Summary Header Card
             Container(
-              margin: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+              margin: const EdgeInsets.fromLTRB(0, 4, 0, 4),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: AppTheme.darkColor,

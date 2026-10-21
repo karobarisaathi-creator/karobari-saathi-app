@@ -295,7 +295,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
             : (isUrdu ? 'نیا آئٹم شامل کریں' : 'Add Stock Item'),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+        padding: const EdgeInsets.fromLTRB(8, 12, 8, 24),
         child: Form(
           key: _formKey,
           child: Column(
@@ -678,9 +678,10 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
     required List<Widget> children,
   }) {
     return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(

@@ -97,16 +97,17 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
                 : 'Complete ${_workNoun(isUrdu)}'),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
         child: Column(
           children: [
             // 🏷️ Season Info Top Card
             Container(
               width: double.infinity,
+              margin: const EdgeInsets.symmetric(vertical: 4),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: Colors.black12, width: 0.5),
               ),
               child: Column(

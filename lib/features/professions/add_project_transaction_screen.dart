@@ -246,7 +246,7 @@ class _AddProjectTransactionScreenState
           ? const Center(
               child: CircularProgressIndicator(color: AppTheme.themeColor))
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
               child: Column(
                 children: [
                   // 1. Basic Info
@@ -257,7 +257,7 @@ class _AddProjectTransactionScreenState
                           fontFamily,
                           isUrdu,
                           topPadding: 0),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Row(
                         children: [
                           Expanded(
@@ -276,11 +276,11 @@ class _AddProjectTransactionScreenState
                                   isUrdu, fontFamily, fontWeight)),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 6),
                       _buildCategorySelector(isUrdu, fontFamily, fontWeight),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 4),
 
                   // 2. Items & Total
                   _buildSectionCard(
@@ -295,11 +295,11 @@ class _AddProjectTransactionScreenState
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: _itemEntries.length,
                         separatorBuilder: (context, index) =>
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                         itemBuilder: (context, index) => _buildItemRow(
                             index, isUrdu, fontFamily, fontWeight),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 8),
                       _buildTextField(
                         controller: _amountController,
                         label: isUrdu ? 'کل رقم' : 'Grand Total',
@@ -311,7 +311,7 @@ class _AddProjectTransactionScreenState
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 4),
 
                   // 3. Attachments
                   _buildSectionCard(
@@ -330,7 +330,7 @@ class _AddProjectTransactionScreenState
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
 
                   Row(
                     children: [
@@ -704,11 +704,12 @@ class _AddProjectTransactionScreenState
   Widget _buildSectionCard(
       {required List<Widget> children, EdgeInsets? padding}) {
     return Container(
+      margin: const EdgeInsets.symmetric(vertical: 2),
       padding:
-          padding ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: AppTheme.themeColor.withValues(alpha: 0.2)),
           boxShadow: [
             BoxShadow(
@@ -724,7 +725,7 @@ class _AddProjectTransactionScreenState
   Widget _buildSectionHeader(String title, String fontFamily, bool isUrdu,
       {double topPadding = 24}) {
     return Padding(
-        padding: EdgeInsets.only(top: topPadding, bottom: 8),
+        padding: EdgeInsets.only(top: topPadding, bottom: 4),
         child: UrduAwareText(title,
             style: TextStyle(
                 fontSize: 14,

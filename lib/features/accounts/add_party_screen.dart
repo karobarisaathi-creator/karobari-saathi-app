@@ -145,7 +145,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
         title: widget.partyToEdit != null ? l10n.editParty : l10n.addParty,
       ),
       body: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -635,16 +635,17 @@ class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
                       ),
                     )
                   : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
                       shrinkWrap: true,
                       itemCount: _filteredContacts.length,
                       itemBuilder: (context, index) {
                         Contact contact = _filteredContacts[index];
                         String phone = contact.phones.isNotEmpty ? contact.phones.first.number : (widget.isUrdu ? 'نمبر موجود نہیں' : 'No number');
                         return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
+                          margin: const EdgeInsets.symmetric(vertical: 4),
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.grey.withOpacity(0.1)),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(20),
                           ),
                           child: ListTile(
                             leading: CircleAvatar(

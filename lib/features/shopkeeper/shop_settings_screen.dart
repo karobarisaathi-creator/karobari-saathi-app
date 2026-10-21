@@ -334,7 +334,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -692,10 +692,10 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
 
   Widget _buildCardContainer(List<Widget> children) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
         boxShadow: [
           BoxShadow(

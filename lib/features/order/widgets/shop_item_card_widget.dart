@@ -67,10 +67,10 @@ class ShopItemCardWidget extends StatelessWidget {
     final goldColor = AppTheme.goldColor;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: selected ? const Color(0xFFF5F7F8) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: selected
               ? goldColor.withValues(alpha: 0.55)

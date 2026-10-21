@@ -285,7 +285,7 @@ class _BulkPartyTransactionScreenState extends State<BulkPartyTransactionScreen>
           // Rows List
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               itemCount: _rows.length,
               itemBuilder: (context, index) {
                 final row = _rows[index];
@@ -293,9 +293,12 @@ class _BulkPartyTransactionScreenState extends State<BulkPartyTransactionScreen>
                   scrollDirection: Axis.horizontal,
                   child: Container(
                     width: 600,
-                    margin: const EdgeInsets.only(bottom: 12),
+                    margin: const EdgeInsets.symmetric(vertical: 4),
                     padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                    decoration: const BoxDecoration(color: Colors.white),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.end, // Aligns everything with the last line of description
                       children: [

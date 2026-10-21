@@ -20,11 +20,10 @@ import 'package:account_app/core/widgets/stock_card.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/features/settings/master_profile_screen.dart';
 import 'package:account_app/features/shopkeeper/low_stock_items_screen.dart';
-import 'package:account_app/features/shopkeeper/cash_customer_bills_screen.dart';
+import 'package:account_app/features/shopkeeper/customer_bills_screen.dart';
 import 'package:account_app/features/shopkeeper/add_edit_stock_item_screen.dart';
 import 'package:account_app/features/shopkeeper/sales_analytics_screen.dart';
 import 'package:account_app/features/shopkeeper/stock_detail_screen.dart';
-import 'package:account_app/features/shopkeeper/stock_adjustment_dialog.dart';
 import 'package:account_app/features/order/nearby_shops_screen.dart';
 import 'widgets/shopkeeper_tools_grid.dart';
 
@@ -160,7 +159,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(12, 16, 12, 30),
+                padding: const EdgeInsets.fromLTRB(8, 16, 8, 30),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -576,11 +575,11 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
           builder: (context) {
             final databaseService = Provider.of<DatabaseService>(context);
             final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
-            final todayCashBillsCount = databaseService
+            final todayQuickBillsCount = databaseService
                 .getAllTransactions()
                 .where((t) => 
-                    (t.accountId == QuickBillConstants.cashCustomerAccountId || t.isQuickBill) &&
-                    t.pendingAmount <= 0 &&
+                    t.isQuickBill &&
+                    t.type == 'income' &&
                     DateFormat('yyyy-MM-dd').format(t.date) == todayKey)
                 .length;
 
@@ -590,18 +589,18 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                   child: _quickActionCard(
                     isUrdu: isUrdu,
                     fontFamily: fontFamily,
-                    title: isUrdu ? 'نقد بل' : 'Cash Bills',
+                    title: isUrdu ? 'سیل ریکارڈ' : 'Sales Record',
                     sub: isUrdu
-                        ? 'نقد گاہکوں کے تمام بلوں کا ریکارڈ'
-                        : 'Record of all cash customer bills',
+                        ? 'فوری بل سے کی گئی نقد اور ادھار سیل'
+                        : 'Quick bill cash & credit sales',
                     icon: Icons.receipt_long_rounded,
                     color: AppTheme.verifiedGold,
-                    badge: '$todayCashBillsCount',
+                    badge: '$todayQuickBillsCount',
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const CashCustomerBillsScreen(),
+                          builder: (_) => const CustomerBillsScreen(),
                         ),
                       );
                     },
@@ -652,7 +651,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
               color: AppTheme.darkColor.withValues(alpha: 0.04),
@@ -745,10 +744,11 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
         );
       },
       child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppTheme.verifiedGold.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: AppTheme.verifiedGold.withValues(alpha: 0.25),
             width: 1.5,
@@ -820,10 +820,11 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
 
     if (movements.isEmpty) {
       return Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: const Color(0xFFE1E5EC), width: 1.5),
         ),
         child: Center(
@@ -842,9 +843,10 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
     }
 
     return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFE1E5EC), width: 1.5),
         boxShadow: [
           BoxShadow(
@@ -1170,7 +1172,7 @@ class _StockListScreenState extends State<StockListScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(0, 12, 0, 24),
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 24),
       itemCount: items.length,
       itemBuilder: (context, index) {
         final item = items[index];

@@ -90,7 +90,7 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
             : (widget.isUrdu ? 'پیشہ ترمیم کریں' : 'Edit Profession'),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

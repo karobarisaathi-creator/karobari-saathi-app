@@ -80,20 +80,20 @@ class _BackupScreenState extends State<BackupScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.themeColor))
           : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 28),
+              padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
               child: Column(
                 children: [
                   // Backup Status Card
                   _buildBackupStatusCard(isUrdu),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 6),
 
                   // Data Statistics
                   _buildDataStatisticsCard(isUrdu),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 6),
 
                   // Backup Actions
                   _buildBackupActionsCard(isUrdu),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 6),
 
                   // Auto Backup Settings
                   _buildAutoBackupCard(isUrdu),
@@ -109,9 +109,9 @@ class _BackupScreenState extends State<BackupScreen> {
     final email = _backupInfo['email']?.toString() ?? '';
 
     return Card(
-      elevation: 2,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -197,9 +197,9 @@ class _BackupScreenState extends State<BackupScreen> {
 
   Widget _buildDataStatisticsCard(bool isUrdu) {
     return Card(
-      elevation: 2,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -246,9 +246,9 @@ class _BackupScreenState extends State<BackupScreen> {
 
   Widget _buildBackupActionsCard(bool isUrdu) {
     return Card(
-      elevation: 2,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -294,9 +294,9 @@ class _BackupScreenState extends State<BackupScreen> {
 
   Widget _buildAutoBackupCard(bool isUrdu) {
     return Card(
-      elevation: 2,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

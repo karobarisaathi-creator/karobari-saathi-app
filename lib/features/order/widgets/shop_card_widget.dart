@@ -26,10 +26,10 @@ class ShopCardWidget extends StatelessWidget {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
         boxShadow: [
           BoxShadow(
@@ -41,10 +41,10 @@ class ShopCardWidget extends StatelessWidget {
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           child: Column(
             children: [
               // Cover

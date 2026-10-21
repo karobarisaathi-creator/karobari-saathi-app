@@ -277,7 +277,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                             sub: 'دوسری کیٹیگری آزمائیں',
                           )
                         : ListView.builder(
-                            padding: const EdgeInsets.fromLTRB(0, 4, 0, 100),
+                            padding: const EdgeInsets.fromLTRB(8, 4, 8, 100),
                             itemCount: filtered.length,
                             itemBuilder: (context, i) {
                               final item = filtered[i];
@@ -389,12 +389,13 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
         shop.bannerImageUrl!.trim().isNotEmpty;
 
     return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
       ),
       foregroundDecoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.25),
           width: 1.2,

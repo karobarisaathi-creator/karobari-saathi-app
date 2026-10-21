@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/stock_analytics_model.dart';
+import 'package:account_app/core/models/stock_item_model.dart';
+import 'package:account_app/core/models/stock_movement_model.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/stock_analytics_service.dart';
@@ -21,10 +23,31 @@ class SalesAnalyticsScreen extends StatefulWidget {
   State<SalesAnalyticsScreen> createState() => _SalesAnalyticsScreenState();
 }
 
-class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
+class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   bool _isMonthlyView = true;
   int _selectedYear = DateTime.now().year;
   int _selectedMonth = DateTime.now().month;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        setState(() {
+          _isMonthlyView = _tabController.index == 0;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   // ═════════════════════════════════════════════════════════════
   // Helpers
@@ -44,36 +67,24 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
 
   String _getMonthName(int month) {
     const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return months[(month - 1).clamp(0, 11)];
+  }
+
+  String _getFullMonthName(int month) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
     ];
     return months[(month - 1).clamp(0, 11)];
   }
 
   String _getUrduMonthName(int month) {
     const months = [
-      'جنوری',
-      'فروری',
-      'مارچ',
-      'اپریل',
-      'مئی',
-      'جون',
-      'جولائی',
-      'اگست',
-      'ستمبر',
-      'اکتوبر',
-      'نومبر',
-      'دسمبر',
+      'جنوری', 'فروری', 'مارچ', 'اپریل', 'مئی', 'جون',
+      'جولائی', 'اگست', 'ستمبر', 'اکتوبر', 'نومبر', 'دسمبر',
     ];
     return months[(month - 1).clamp(0, 11)];
   }
@@ -99,7 +110,6 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
   }
 
   void _nextPeriod() {
-    final now = DateTime.now();
     if (!_canGoNext) return;
     setState(() {
       if (_isMonthlyView) {
@@ -111,7 +121,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
         }
       } else {
         _selectedYear++;
-        _selectedMonth = now.month;
+        _selectedMonth = DateTime.now().month;
       }
     });
   }
@@ -123,6 +133,26 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
           (_selectedYear == now.year && _selectedMonth < now.month);
     }
     return _selectedYear < now.year;
+  }
+
+
+
+  // ═════════════════════════════════════════════════════════════
+  // Daily Data (ماہانہ چارٹ کے لیے)
+  // ═════════════════════════════════════════════════════════════
+  /// `stockMovements` سے روزانہ کی خرید/فروخت نکالیں
+  List<StockDailyStats> _buildDailyStats(
+      List<StockItem> items,
+      List<dynamic> stockMovements,
+      int year,
+      int month,
+      ) {
+    return StockAnalyticsService.buildDailyStats(
+      items: items,
+      movements: stockMovements.whereType<StockMovement>().toList(),
+      year: year,
+      month: month,
+    );
   }
 
   // ═════════════════════════════════════════════════════════════
@@ -158,8 +188,8 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
 
     final previousMonth = _selectedMonth == 1 ? 12 : _selectedMonth - 1;
     final previousMonthStats =
-        (_selectedMonth == 1 ? previousYearStats : yearlyStats)
-            .months[previousMonth - 1];
+    (_selectedMonth == 1 ? previousYearStats : yearlyStats)
+        .months[previousMonth - 1];
 
     final salesChange = _getChangePercent(
       currentMonthStats.salesRevenue,
@@ -196,25 +226,41 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
-        title: isUrdu ? 'اسٹاک خرید و فروخت رپورٹ' : 'Stock Purchase & Sales',
+        title: isUrdu ? 'خرید و فروخت رپورٹ' : 'Purchase & Sales',
         showBackButton: true,
       ),
       body: stockService.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+          : Column(
+        children: [
+          Container(
+            color: Colors.white,
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: AppTheme.darkColor,
+              labelColor: AppTheme.darkColor,
+              unselectedLabelColor: Colors.grey,
+              labelStyle: TextStyle(
+                fontFamily: fontFamily,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+              tabs: [
+                Tab(text: isUrdu ? 'ماہانہ' : 'Monthly'),
+                Tab(text: isUrdu ? 'سالانہ' : 'Yearly'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ═══ Period Toggle ═══
-                  _buildPeriodToggle(isUrdu, fontFamily),
-                  const SizedBox(height: 14),
-
-                  // ═══ Period Navigator ═══
                   _buildPeriodNavigator(isUrdu, fontFamily),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
 
-                  // ═══ Hero Cards ═══
                   _buildHeroSection(
                     isUrdu: isUrdu,
                     fontFamily: fontFamily,
@@ -235,60 +281,30 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                     isMonthly: _isMonthlyView,
                   ),
                   if ((_isMonthlyView
-                          ? currentMonthStats.uncostedSalesQuantity
-                          : yearlyStats.uncostedSalesQuantity) >
+                      ? currentMonthStats.uncostedSalesQuantity
+                      : yearlyStats.uncostedSalesQuantity) >
                       0) ...[
                     const SizedBox(height: 8),
                     _buildCostWarning(isUrdu, fontFamily),
                   ],
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
 
                   // ═══ Chart ═══
-                  _buildChart(
-                    yearlyStats,
-                    previousYearStats,
+                  _isMonthlyView
+                      ? _buildDailyChart(
+                    stockService.items,
+                    stockMovements,
+                    _selectedYear,
+                    _selectedMonth,
                     isUrdu,
                     fontFamily,
-                    isMonthly: _isMonthlyView,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // ═══ Stats Comparison ═══
-                  if (_isMonthlyView)
-                    _buildStatsComparison(
-                      isUrdu,
-                      fontFamily,
-                      salesCount: currentMonthStats.salesCount,
-                      purchaseCount: currentMonthStats.purchaseCount,
-                      itemCount: itemStats.length,
-                    )
-                  else
-                    _buildStatsComparison(
-                      isUrdu,
-                      fontFamily,
-                      salesCount: yearlyStats.salesCount,
-                      purchaseCount: yearlyStats.purchaseCount,
-                      itemCount: itemStats.length,
-                    ),
-                  const SizedBox(height: 16),
-
-                  // ═══ Monthly Breakdown ═══
-                  _buildSectionTitle(
-                    icon: PhosphorIcons.calendar(),
-                    title: isUrdu
-                        ? 'ماہانہ تفصیل $_selectedYear'
-                        : 'Monthly Breakdown $_selectedYear',
-                    isUrdu: isUrdu,
-                    fontFamily: fontFamily,
-                  ),
-                  const SizedBox(height: 10),
-                  _buildMonthlyBreakdown(
+                  )
+                      : _buildYearlyChart(
                     yearlyStats,
-                    previousYearStats,
                     isUrdu,
                     fontFamily,
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 8),
 
                   _buildSectionTitle(
                     icon: PhosphorIcons.package(),
@@ -296,9 +312,9 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                     isUrdu: isUrdu,
                     fontFamily: fontFamily,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   _buildItemBreakdown(itemStats, isUrdu, fontFamily),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 8),
 
                   _buildSectionTitle(
                     icon: PhosphorIcons.users(),
@@ -308,59 +324,35 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                     isUrdu: isUrdu,
                     fontFamily: fontFamily,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   _buildPartyBreakdown(partyStats, isUrdu, fontFamily),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 8),
 
-                  // ═══ Yearly Summary ═══
                   _buildSectionTitle(
                     icon: PhosphorIcons.chartLine(),
-                    title: isUrdu ? 'سالانہ خلاصہ' : 'Yearly Summary',
+                    title: _isMonthlyView
+                        ? (isUrdu ? 'ماہانہ خلاصہ' : 'Monthly Summary')
+                        : (isUrdu ? 'سالانہ خلاصہ' : 'Yearly Summary'),
                     isUrdu: isUrdu,
                     fontFamily: fontFamily,
                   ),
-                  const SizedBox(height: 10),
-                  _buildYearlySummary(
+                  const SizedBox(height: 8),
+                  _isMonthlyView
+                      ? _buildMonthlySummary(
+                    currentMonthStats,
+                    itemStats.length,
+                    isUrdu,
+                    fontFamily,
+                  )
+                      : _buildYearlySummary(
                     yearlyStats,
+                    itemStats.length,
                     isUrdu,
                     fontFamily,
                   ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 8),
                 ],
               ),
-            ),
-    );
-  }
-
-  // ═════════════════════════════════════════════════════════════
-  // 1. Period Toggle
-  // ═════════════════════════════════════════════════════════════
-  Widget _buildPeriodToggle(bool isUrdu, String? fontFamily) {
-    return Container(
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: AppTheme.backgroundColor,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildToggleBtn(
-              label: isUrdu ? 'ماہانہ' : 'Monthly',
-              icon: PhosphorIcons.calendar(),
-              isActive: _isMonthlyView,
-              onTap: () => setState(() => _isMonthlyView = true),
-              fontFamily: fontFamily,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: _buildToggleBtn(
-              label: isUrdu ? 'سالانہ' : 'Yearly',
-              icon: PhosphorIcons.chartLine(),
-              isActive: !_isMonthlyView,
-              onTap: () => setState(() => _isMonthlyView = false),
-              fontFamily: fontFamily,
             ),
           ),
         ],
@@ -368,70 +360,16 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
     );
   }
 
-  Widget _buildToggleBtn({
-    required String label,
-    required IconData icon,
-    required bool isActive,
-    required VoidCallback onTap,
-    String? fontFamily,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(11),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 11),
-          decoration: BoxDecoration(
-            color: isActive ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(11),
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: AppTheme.themeColor.withValues(alpha: 0.15),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 15,
-                color: isActive ? AppTheme.themeColor : AppTheme.textSecondary,
-              ),
-              const SizedBox(width: 8),
-              UrduAwareText(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color:
-                      isActive ? AppTheme.themeColor : AppTheme.textSecondary,
-                  fontFamily: fontFamily,
-                  letterSpacing: 0.2,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   // ═════════════════════════════════════════════════════════════
-  // 2. Period Navigator
+  // Period Navigator
   // ═════════════════════════════════════════════════════════════
   Widget _buildPeriodNavigator(bool isUrdu, String? fontFamily) {
     return Container(
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
       ),
       child: Row(
@@ -462,7 +400,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                     children: [
                       TextSpan(
                         text: _isMonthlyView
-                            ? '${isUrdu ? _getUrduMonthName(_selectedMonth) : _getMonthName(_selectedMonth)} '
+                            ? '${isUrdu ? _getUrduMonthName(_selectedMonth) : _getFullMonthName(_selectedMonth)} '
                             : '',
                         style: TextStyle(
                           fontSize: 15,
@@ -530,7 +468,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // 3. Hero Cards
+  // Hero Cards
   // ═════════════════════════════════════════════════════════════
   Widget _buildHeroSection({
     required bool isUrdu,
@@ -561,7 +499,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                 showChange: isMonthly,
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: _buildHeroCard(
                 icon: PhosphorIcons.arrowDownLeft(),
@@ -576,7 +514,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         _buildHeroCard(
           icon: PhosphorIcons.money(),
           label: isUrdu ? 'مجموعی اسٹاک منافع' : 'GROSS STOCK PROFIT',
@@ -586,7 +524,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
           bgColor: const Color(0xFFD97706).withValues(alpha: 0.10),
           fontFamily: fontFamily,
           subtitle:
-              '${profitMargin.toStringAsFixed(1)}% ${isUrdu ? "منافع" : "profit margin"}',
+          '${profitMargin.toStringAsFixed(1)}% ${isUrdu ? "منافع" : "profit margin"}',
           showChange: false,
           fullWidth: true,
           isUrdu: isUrdu,
@@ -609,10 +547,11 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
     bool isUrdu = false,
   }) {
     return Container(
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
       ),
       child: Column(
@@ -661,7 +600,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
             overflow: TextOverflow.ellipsis,
           ),
           if (showChange || subtitle != null) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             if (subtitle != null)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
@@ -746,93 +685,114 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // 4. Chart
+  // ⭐ سالانہ چارٹ — 12 ماہ
   // ═════════════════════════════════════════════════════════════
-  Widget _buildChart(StockYearlyStats yearly, StockYearlyStats previousYear,
-      bool isUrdu, String? fontFamily,
-      {required bool isMonthly}) {
-    final chartMonths = <StockMonthlyStats>[];
-    final now = DateTime.now();
-    if (isMonthly) {
-      for (var offset = 5; offset >= 0; offset--) {
-        final date = DateTime(_selectedYear, _selectedMonth - offset);
-        final source = date.year == yearly.year ? yearly : previousYear;
-        chartMonths.add(
-          source.months[date.month - 1],
-        );
-      }
-    } else {
-      chartMonths.addAll(yearly.months);
-    }
-
+  Widget _buildYearlyChart(
+      StockYearlyStats yearly,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
     double maxValue = 1;
-    for (final m in chartMonths) {
+    for (final m in yearly.months) {
       if (m.salesRevenue > maxValue) maxValue = m.salesRevenue;
       if (m.purchaseValue > maxValue) maxValue = m.purchaseValue;
+      if (m.grossProfit.abs() > maxValue) maxValue = m.grossProfit.abs();
     }
 
+    final now = DateTime.now();
+    final currentMonthIndex =
+    (yearly.year == now.year) ? now.month - 1 : -1;
+
     return Container(
-      padding: const EdgeInsets.all(18),
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
       ),
       child: Column(
         children: [
-          // Header
-          Row(
-            children: [
-              Icon(
-                PhosphorIcons.chartBar(),
-                size: 15,
-                color: AppTheme.themeColor,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: UrduAwareText(
-                  isUrdu ? 'ماہانہ خرید و فروخت' : 'Monthly Purchases & Sales',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.darkColor,
-                    fontFamily: fontFamily,
-                    letterSpacing: -0.2,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Row(
+              children: [
+                Icon(
+                  PhosphorIcons.chartBar(),
+                  size: 15,
+                  color: AppTheme.themeColor,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: UrduAwareText(
+                    isUrdu
+                        ? 'سال ${yearly.year} — ماہانہ خرید، فروخت اور منافع'
+                        : 'Year ${yearly.year} — Monthly Sales, Purchases & Profit',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.darkColor,
+                      fontFamily: fontFamily,
+                      letterSpacing: -0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ),
-              _buildLegendDot(
-                color: AppTheme.incomeColor,
-                label: isUrdu ? 'خالص فروخت' : 'Net sales',
-                fontFamily: fontFamily,
-              ),
-              const SizedBox(width: 10),
-              _buildLegendDot(
-                color: AppTheme.themeColor,
-                label: isUrdu ? 'خرید' : 'Purchase',
-                fontFamily: fontFamily,
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 8),
 
-          // Bars
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                _buildLegendDot(
+                  color: AppTheme.incomeColor,
+                  label: isUrdu ? 'فروخت' : 'Sales',
+                  fontFamily: fontFamily,
+                ),
+                const SizedBox(width: 8),
+                _buildLegendDot(
+                  color: AppTheme.themeColor,
+                  label: isUrdu ? 'خرید' : 'Purchase',
+                  fontFamily: fontFamily,
+                ),
+                const SizedBox(width: 8),
+                _buildLegendDot(
+                  color: const Color(0xFFD97706),
+                  label: isUrdu ? 'منافع' : 'Profit',
+                  fontFamily: fontFamily,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
           SizedBox(
-            height: 180,
+            height: 170,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
-              children: chartMonths.map((m) {
-                final salesH =
-                    maxValue > 0 ? (m.salesRevenue / maxValue) * 100 : 0.0;
-                final investH =
-                    maxValue > 0 ? (m.purchaseValue / maxValue) * 100 : 0.0;
-                final isActive = isMonthly
-                    ? (m.year == _selectedYear && m.month == _selectedMonth)
-                    : (m.month == now.month && m.year == now.year);
+              children: yearly.months.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final m = entry.value;
+                final isActive = idx == currentMonthIndex;
+
+                final salesH = maxValue > 0
+                    ? (m.salesRevenue / maxValue) * 120
+                    : 0.0;
+                final purchaseH = maxValue > 0
+                    ? (m.purchaseValue / maxValue) * 120
+                    : 0.0;
+                final profitH = maxValue > 0
+                    ? (m.grossProfit.abs() / maxValue) * 120
+                    : 0.0;
 
                 return Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 1),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -843,29 +803,43 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                             // Sales bar
                             Flexible(
                               child: Container(
-                                width: isMonthly ? 8 : 6,
-                                height: salesH == 0 ? 0 : salesH * 1.6,
-                                decoration: const BoxDecoration(
+                                width: 4.5,
+                                height: salesH == 0 ? 2 : salesH,
+                                decoration: BoxDecoration(
                                   color: AppTheme.incomeColor,
-                                  borderRadius: BorderRadius.vertical(
-                                    top: Radius.circular(4),
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(2),
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 1),
-                            // Invest bar
+                            const SizedBox(width: 0.5),
+                            // Purchase bar
                             Flexible(
                               child: Container(
-                                width: isMonthly ? 8 : 6,
-                                height: investH == 0 ? 0 : investH * 1.6,
+                                width: 4.5,
+                                height: purchaseH == 0 ? 2 : purchaseH,
                                 decoration: BoxDecoration(
                                   color: isActive
                                       ? AppTheme.themeColor
                                       : AppTheme.themeColor
-                                          .withValues(alpha: 0.7),
+                                      .withValues(alpha: 0.75),
                                   borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(4),
+                                    top: Radius.circular(2),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 0.5),
+                            // Profit bar
+                            Flexible(
+                              child: Container(
+                                width: 4.5,
+                                height: profitH == 0 ? 2 : profitH,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD97706),
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(2),
                                   ),
                                 ),
                               ),
@@ -875,19 +849,219 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
                         const SizedBox(height: 6),
                         UrduAwareText(
                           isUrdu
-                              ? m.monthNameUrdu.toUpperCase()
-                              : m.monthName.toUpperCase(),
+                              ? _getUrduMonthName(idx + 1)
+                              : _getMonthName(idx + 1),
                           style: TextStyle(
                             fontSize: 9,
-                            fontWeight:
-                                isActive ? FontWeight.w900 : FontWeight.w800,
+                            fontWeight: isActive
+                                ? FontWeight.w900
+                                : FontWeight.w700,
                             color: isActive
                                 ? AppTheme.themeColor
                                 : AppTheme.textSecondary,
-                            letterSpacing: 0.2,
                             fontFamily: isUrdu ? fontFamily : null,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═════════════════════════════════════════════════════════════
+  // ⭐ ماہانہ چارٹ — روزانہ (30-31 دن)
+  // ═════════════════════════════════════════════════════════════
+  Widget _buildDailyChart(
+      List<StockItem> items,
+      List<dynamic> stockMovements,
+      int year,
+      int month,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
+    final daily = _buildDailyStats(items, stockMovements, year, month);
+
+    double maxValue = 1;
+    for (final d in daily) {
+      if (d.sales > maxValue) maxValue = d.sales;
+      if (d.purchase > maxValue) maxValue = d.purchase;
+      if (d.profit.abs() > maxValue) maxValue = d.profit.abs();
+    }
+
+    final today = DateTime.now();
+    final isCurrentMonth = (year == today.year && month == today.month);
+    final todayDay = isCurrentMonth ? today.day : -1;
+
+    return Container(
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.fromLTRB(8, 16, 8, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: [
+                Icon(
+                  PhosphorIcons.chartBar(),
+                  size: 15,
+                  color: AppTheme.themeColor,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: UrduAwareText(
+                    isUrdu
+                        ? '${_getUrduMonthName(month)} $year — روزانہ خرید، فروخت اور منافع'
+                        : '${_getFullMonthName(month)} $year — Daily Sales, Purchases & Profit',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.darkColor,
+                      fontFamily: fontFamily,
+                      letterSpacing: -0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                _buildLegendDot(
+                  color: AppTheme.incomeColor,
+                  label: isUrdu ? 'فروخت' : 'Sales',
+                  fontFamily: fontFamily,
+                ),
+                const SizedBox(width: 8),
+                _buildLegendDot(
+                  color: AppTheme.themeColor,
+                  label: isUrdu ? 'خرید' : 'Purchase',
+                  fontFamily: fontFamily,
+                ),
+                const SizedBox(width: 8),
+                _buildLegendDot(
+                  color: const Color(0xFFD97706),
+                  label: isUrdu ? 'منافع' : 'Profit',
+                  fontFamily: fontFamily,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          SizedBox(
+            height: 150,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: daily.asMap().entries.map((entry) {
+                final d = entry.value;
+                final isToday = d.day == todayDay;
+
+                final salesH = maxValue > 0
+                    ? (d.sales / maxValue) * 100
+                    : 0.0;
+                final purchaseH = maxValue > 0
+                    ? (d.purchase / maxValue) * 100
+                    : 0.0;
+                final profitH = maxValue > 0
+                    ? (d.profit.abs() / maxValue) * 100
+                    : 0.0;
+
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 0.2),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            // Sales bar
+                            Flexible(
+                              child: Container(
+                                width: 2.2,
+                                height: salesH == 0 ? 1 : salesH,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.incomeColor,
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(1.5),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 0.3),
+                            // Purchase bar
+                            Flexible(
+                              child: Container(
+                                width: 2.2,
+                                height: purchaseH == 0 ? 1 : purchaseH,
+                                decoration: BoxDecoration(
+                                  color: isToday
+                                      ? AppTheme.themeColor
+                                      : AppTheme.themeColor
+                                      .withValues(alpha: 0.75),
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(1.5),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 0.3),
+                            // Profit bar
+                            Flexible(
+                              child: Container(
+                                width: 2.2,
+                                height: profitH == 0 ? 1 : profitH,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD97706),
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(1.5),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        if (d.day == 1 ||
+                            d.day % 5 == 0 ||
+                            d.day == daily.length)
+                          UrduAwareText(
+                            '${d.day}',
+                            style: TextStyle(
+                              fontSize: 8,
+                              fontWeight: isToday
+                                  ? FontWeight.w900
+                                  : FontWeight.w600,
+                              color: isToday
+                                  ? AppTheme.themeColor
+                                  : AppTheme.textSecondary,
+                              fontFamily: null,
+                            ),
+                            maxLines: 1,
+                          )
+                        else
+                          const SizedBox(height: 11),
                       ],
                     ),
                   ),
@@ -930,56 +1104,6 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
     );
   }
 
-  // ═════════════════════════════════════════════════════════════
-  // 5. Stats Comparison
-  // ═════════════════════════════════════════════════════════════
-  Widget _buildStatsComparison(
-    bool isUrdu,
-    String? fontFamily, {
-    required int salesCount,
-    required int purchaseCount,
-    required int itemCount,
-  }) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildCompareBox(
-                label: isUrdu ? 'مختلف خریداری بل' : 'PURCHASE BILLS',
-                value: '$purchaseCount',
-                sub: isUrdu ? 'انوکھے اندراج' : 'Unique transactions',
-                fontFamily: fontFamily,
-                isRaw: true,
-                isUrdu: isUrdu,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildCompareBox(
-                label: isUrdu ? 'مختلف فروخت بل' : 'SALES BILLS',
-                value: '$salesCount',
-                sub: isUrdu ? 'انوکھے اندراج' : 'Unique transactions',
-                fontFamily: fontFamily,
-                isRaw: true,
-                isUrdu: isUrdu,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        _buildCompareBox(
-          label: isUrdu ? 'خرید و فروخت والے آئٹمز' : 'ITEMS MOVED',
-          value: '$itemCount',
-          sub: isUrdu ? 'آئٹم وار تفصیل نیچے' : 'See item-wise breakdown below',
-          fontFamily: fontFamily,
-          isRaw: true,
-          isUrdu: isUrdu,
-        ),
-      ],
-    );
-  }
-
   String _formatQuantity(double quantity) {
     if (!quantity.isFinite) return '—';
     return quantity == quantity.roundToDouble()
@@ -987,244 +1111,23 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
         : quantity.toStringAsFixed(2);
   }
 
-  Widget _buildCompareBox({
-    required String label,
-    required String value,
-    required String sub,
-    String? fontFamily,
-    bool isRaw = false,
-    bool isUrdu = false,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          UrduAwareText(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.textSecondary,
-              letterSpacing: 0.5,
-              fontFamily: fontFamily,
-            ),
-          ),
-          const SizedBox(height: 6),
-          UrduAwareText(
-            value,
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
-              color: AppTheme.darkColor,
-              fontFamily: null,
-              letterSpacing: -0.4,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          UrduAwareText(
-            sub,
-            style: const TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textSecondary,
-              fontFamily: null,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-
   // ═════════════════════════════════════════════════════════════
-  // 6. Monthly Breakdown
-  // ═════════════════════════════════════════════════════════════
-  Widget _buildMonthlyBreakdown(
-    StockYearlyStats yearly,
-    StockYearlyStats previousYear,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
-    final now = DateTime.now();
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
-      ),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
-          childAspectRatio: 1.15,
-        ),
-        itemCount: 12,
-        itemBuilder: (context, index) {
-          final monthNum = index + 1;
-          final stats = yearly.months[monthNum - 1];
-
-          final prevMonth = monthNum == 1 ? 12 : monthNum - 1;
-          final prevYear = monthNum == 1 ? _selectedYear - 1 : _selectedYear;
-          final prevStats = (prevYear == yearly.year ? yearly : previousYear)
-              .months[prevMonth - 1];
-          final change = _getChangePercent(
-            stats.salesRevenue,
-            prevStats.salesRevenue,
-          );
-
-          final isCurrentMonth =
-              _selectedYear == now.year && monthNum == now.month;
-          final isSelected = _isMonthlyView && monthNum == _selectedMonth;
-          final isPast = _selectedYear < now.year ||
-              (_selectedYear == now.year && monthNum < now.month);
-          final isHigh = stats.salesRevenue > 0 &&
-              yearly.bestMonth != null &&
-              stats.month == yearly.bestMonth!.month;
-
-          return Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: isPast || isCurrentMonth
-                  ? () {
-                      setState(() {
-                        _selectedMonth = monthNum;
-                        _isMonthlyView = true;
-                      });
-                    }
-                  : null,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppTheme.themeColor.withValues(alpha: 0.10)
-                      : (isHigh
-                          ? AppTheme.incomeColor.withValues(alpha: 0.08)
-                          : AppTheme.backgroundColor.withValues(alpha: 0.5)),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected
-                        ? AppTheme.themeColor
-                        : (isHigh
-                            ? AppTheme.incomeColor.withValues(alpha: 0.4)
-                            : AppTheme.backgroundColor),
-                    width: 1.5,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    UrduAwareText(
-                      isUrdu
-                          ? stats.monthNameUrdu.toUpperCase()
-                          : stats.monthName.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: isSelected
-                            ? AppTheme.themeColor
-                            : (isHigh
-                                ? AppTheme.incomeColor
-                                : AppTheme.textSecondary),
-                        letterSpacing: 0.3,
-                        fontFamily: isUrdu ? fontFamily : null,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    UrduAwareText(
-                      stats.salesRevenue > 0
-                          ? _formatCompact(stats.salesRevenue)
-                          : '—',
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w900,
-                        color: AppTheme.darkColor,
-                        letterSpacing: -0.3,
-                        fontFamily: null,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    if (stats.salesRevenue > 0)
-                      Row(
-                        children: [
-                          Icon(
-                            change >= 0
-                                ? PhosphorIcons.caretUp()
-                                : PhosphorIcons.caretDown(),
-                            size: 8,
-                            color: change >= 0
-                                ? AppTheme.incomeColor
-                                : AppTheme.expenseColor,
-                          ),
-                          const SizedBox(width: 2),
-                          Flexible(
-                            child: UrduAwareText(
-                              '${change >= 0 ? "+" : ""}${change.toStringAsFixed(0)}%',
-                              style: const TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.incomeColor,
-                                fontFamily: null,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      )
-                    else
-                      UrduAwareText(
-                        isPast
-                            ? (isUrdu ? 'کوئی نہیں' : 'None')
-                            : (isUrdu ? 'باقی' : 'Pending'),
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textSecondary,
-                          fontFamily: isUrdu ? fontFamily : null,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // ═════════════════════════════════════════════════════════════
-  // 7. Yearly Summary
+  // Item Breakdown
   // ═════════════════════════════════════════════════════════════
   Widget _buildItemBreakdown(
-    List<StockItemStats> items,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
+      List<StockItemStats> items,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
     if (items.isEmpty) {
       return Container(
+        margin: EdgeInsets.zero,
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
         ),
         child: UrduAwareText(
           isUrdu
@@ -1240,10 +1143,12 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
     }
 
     return Container(
+      margin: EdgeInsets.zero,
+      width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
       ),
       child: Column(
@@ -1258,10 +1163,10 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
   }
 
   Widget _buildItemStatsRow(
-    StockItemStats item,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
+      StockItemStats item,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
     final hasUncostedSales = item.uncostedSalesQuantity > 0;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1328,18 +1233,23 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
     );
   }
 
+  // ═════════════════════════════════════════════════════════════
+  // Party Breakdown
+  // ═════════════════════════════════════════════════════════════
   Widget _buildPartyBreakdown(
-    List<StockPartyStats> parties,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
+      List<StockPartyStats> parties,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
     if (parties.isEmpty) {
       return Container(
+        margin: EdgeInsets.zero,
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
         ),
         child: UrduAwareText(
           isUrdu
@@ -1360,14 +1270,9 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (customers.isNotEmpty) ...[
-          _buildPartyGroupTitle(
-            isUrdu ? 'گاہکوں سے فروخت' : 'Sales to Customers',
-            fontFamily,
-          ),
-          const SizedBox(height: 8),
-          for (final party in customers) ...[
-            _buildPartyCard(party, isUrdu, fontFamily),
-            const SizedBox(height: 8),
+          for (var i = 0; i < customers.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            _buildPartyCard(customers[i], isUrdu, fontFamily),
           ],
         ],
         if (suppliers.isNotEmpty) ...[
@@ -1377,9 +1282,9 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
             fontFamily,
           ),
           const SizedBox(height: 8),
-          for (final party in suppliers) ...[
-            _buildPartyCard(party, isUrdu, fontFamily),
-            const SizedBox(height: 8),
+          for (var i = 0; i < suppliers.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            _buildPartyCard(suppliers[i], isUrdu, fontFamily),
           ],
         ],
       ],
@@ -1387,9 +1292,9 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
   }
 
   Widget _buildPartyGroupTitle(
-    String title,
-    String? fontFamily,
-  ) {
+      String title,
+      String? fontFamily,
+      ) {
     return Padding(
       padding: const EdgeInsets.only(left: 2, right: 2, top: 4),
       child: UrduAwareText(
@@ -1405,19 +1310,20 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
   }
 
   Widget _buildPartyCard(
-    StockPartyStats party,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
+      StockPartyStats party,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
     final amountColor =
-        party.totalValue < 0 ? AppTheme.expenseColor : AppTheme.darkColor;
+    party.totalValue < 0 ? AppTheme.expenseColor : AppTheme.darkColor;
     return Container(
       width: double.infinity,
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.backgroundColor, width: 1.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1487,11 +1393,16 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
 
   Widget _buildCostWarning(bool isUrdu, String? fontFamily) {
     return Container(
+      margin: EdgeInsets.zero,
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
         color: AppTheme.expenseColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppTheme.expenseColor.withValues(alpha: 0.20),
+          width: 1,
+        ),
       ),
       child: UrduAwareText(
         isUrdu
@@ -1506,11 +1417,113 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
     );
   }
 
+  // ═════════════════════════════════════════════════════════════
+  // Monthly Summary
+  // ═════════════════════════════════════════════════════════════
+  Widget _buildMonthlySummary(
+      StockMonthlyStats monthStats,
+      int itemCount,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
+    return Container(
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
+      ),
+      child: Column(
+        children: [
+          _buildYearlyRow(
+            icon: PhosphorIcons.arrowUpRight(),
+            iconColor: AppTheme.incomeColor,
+            iconBg: AppTheme.incomeColor.withValues(alpha: 0.10),
+            name: isUrdu
+                ? '${_getUrduMonthName(_selectedMonth)} کی کل فروخت'
+                : 'Total Sales ${_getFullMonthName(_selectedMonth)}',
+            meta: isUrdu ? 'اس مہینے کی خالص فروخت' : 'Net sales this month',
+            value: _formatCompact(monthStats.salesRevenue),
+            valueColor: AppTheme.incomeColor,
+            fontFamily: fontFamily,
+          ),
+          const Divider(height: 1, color: Color(0xFFEEF1F5)),
+          _buildYearlyRow(
+            icon: PhosphorIcons.arrowDownLeft(),
+            iconColor: AppTheme.themeColor,
+            iconBg: AppTheme.themeColor.withValues(alpha: 0.10),
+            name: isUrdu ? 'کل خریداری کی لاگت' : 'Total Purchase Cost',
+            meta: isUrdu ? 'اس مہینے کی خریداری' : 'Purchases this month',
+            value: _formatCompact(monthStats.purchaseValue),
+            valueColor: AppTheme.themeColor,
+            fontFamily: fontFamily,
+          ),
+          const Divider(height: 1, color: Color(0xFFEEF1F5)),
+          _buildYearlyRow(
+            icon: PhosphorIcons.money(),
+            iconColor: const Color(0xFFD97706),
+            iconBg: const Color(0xFFD97706).withValues(alpha: 0.10),
+            name: isUrdu ? 'مجموعی اسٹاک منافع' : 'Gross Stock Profit',
+            meta:
+            '${monthStats.profitMargin.toStringAsFixed(1)}% ${isUrdu ? "مارجن" : "margin"}',
+            value: _formatCompact(monthStats.grossProfit),
+            valueColor: monthStats.grossProfit >= 0
+                ? AppTheme.incomeColor
+                : AppTheme.expenseColor,
+            fontFamily: fontFamily,
+            isUrdu: isUrdu,
+          ),
+          const Divider(height: 1, color: Color(0xFFEEF1F5)),
+          _buildYearlyRow(
+            icon: PhosphorIcons.receipt(),
+            iconColor: AppTheme.themeColor,
+            iconBg: AppTheme.themeColor.withValues(alpha: 0.10),
+            name: isUrdu ? 'خریداری کے بل' : 'Purchase Bills',
+            meta: isUrdu ? 'اس مہینے کے اندراج' : 'Entries this month',
+            value: '${monthStats.purchaseCount}',
+            valueColor: AppTheme.darkColor,
+            fontFamily: fontFamily,
+            isUrdu: isUrdu,
+          ),
+          const Divider(height: 1, color: Color(0xFFEEF1F5)),
+          _buildYearlyRow(
+            icon: PhosphorIcons.receipt(),
+            iconColor: AppTheme.expenseColor,
+            iconBg: AppTheme.expenseColor.withValues(alpha: 0.10),
+            name: isUrdu ? 'فروخت کے بل' : 'Sales Bills',
+            meta: isUrdu ? 'اس مہینے کے اندراج' : 'Entries this month',
+            value: '${monthStats.salesCount}',
+            valueColor: AppTheme.darkColor,
+            fontFamily: fontFamily,
+            isUrdu: isUrdu,
+          ),
+          const Divider(height: 1, color: Color(0xFFEEF1F5)),
+          _buildYearlyRow(
+            icon: PhosphorIcons.package(),
+            iconColor: AppTheme.themeColor,
+            iconBg: AppTheme.themeColor.withValues(alpha: 0.10),
+            name: isUrdu ? 'خرید و فروخت والے آئٹمز' : 'Items Moved',
+            meta: isUrdu ? 'منفرد آئٹمز کی تعداد' : 'Unique items moved',
+            value: '$itemCount',
+            valueColor: AppTheme.darkColor,
+            fontFamily: fontFamily,
+            isUrdu: isUrdu,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═════════════════════════════════════════════════════════════
+  // Yearly Summary
+  // ═════════════════════════════════════════════════════════════
   Widget _buildYearlySummary(
-    StockYearlyStats yearly,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
+      StockYearlyStats yearly,
+      int itemCount,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
     final monthsWithData =
         yearly.months.where((m) => m.salesRevenue > 0).length;
     final now = DateTime.now();
@@ -1518,10 +1531,11 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
     final avgMonthly = yearly.averageMonthlySales(throughMonth: monthsElapsed);
 
     return Container(
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
       ),
       child: Column(
@@ -1558,7 +1572,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
             iconBg: const Color(0xFFD97706).withValues(alpha: 0.10),
             name: isUrdu ? 'مجموعی اسٹاک منافع' : 'Gross Stock Profit',
             meta:
-                '${yearly.profitMargin.toStringAsFixed(1)}% ${isUrdu ? "مارجن" : "margin"}',
+            '${yearly.profitMargin.toStringAsFixed(1)}% ${isUrdu ? "مارجن" : "margin"}',
             value: _formatCompact(yearly.grossProfit),
             valueColor: yearly.grossProfit >= 0
                 ? AppTheme.incomeColor
@@ -1594,13 +1608,25 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
           ),
           const Divider(height: 1, color: Color(0xFFEEF1F5)),
           _buildYearlyRow(
+            icon: PhosphorIcons.package(),
+            iconColor: AppTheme.themeColor,
+            iconBg: AppTheme.themeColor.withValues(alpha: 0.10),
+            name: isUrdu ? 'خرید و فروخت والے آئٹمز' : 'Items Moved',
+            meta: isUrdu ? 'منفرد آئٹمز کی تعداد' : 'Unique items moved',
+            value: '$itemCount',
+            valueColor: AppTheme.darkColor,
+            fontFamily: fontFamily,
+            isUrdu: isUrdu,
+          ),
+          const Divider(height: 1, color: Color(0xFFEEF1F5)),
+          _buildYearlyRow(
             icon: PhosphorIcons.calendar(),
             iconColor: const Color(0xFF607D8B),
             iconBg: const Color(0xFF607D8B).withValues(alpha: 0.10),
             name: isUrdu ? 'ماہانہ اوسط فروخت' : 'Average Monthly Sales',
             meta: isUrdu
-                ? 'جنوری تا ${_getMonthName(monthsElapsed)} · $monthsElapsed ماہ'
-                : 'Jan–${_getMonthName(monthsElapsed).substring(0, 3)} · $monthsElapsed months',
+                ? 'جنوری تا ${_getFullMonthName(monthsElapsed)} · $monthsElapsed ماہ'
+                : 'Jan–${_getFullMonthName(monthsElapsed).substring(0, 3)} · $monthsElapsed months',
             value: _formatCompact(avgMonthly),
             valueColor: AppTheme.darkColor,
             fontFamily: fontFamily,
@@ -1742,3 +1768,4 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen> {
     );
   }
 }
+

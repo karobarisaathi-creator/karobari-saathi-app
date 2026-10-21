@@ -534,51 +534,64 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
         children: [
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
               children: [
-                // 1. BILL NUMBER CARD
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  child: _buildBillNumberCard(isUrdu, fontFamily),
-                ),
-                const SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.darkColor.withValues(alpha: 0.09),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: const Color(0xFFE1E5EC), width: 1.5),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 1. BILL NUMBER SECTION
+                          _buildBillNumberCard(isUrdu, fontFamily),
 
-                // 2. PARTY SELECTION CARD (if _mode != _PayMode.full)
-                if (_mode != _PayMode.full) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        UrduAwareText(
-                          isUrdu ? 'پارٹی منتخب کریں' : 'Select party',
-                          style: TextStyle(
-                            fontFamily: fontFamily,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        if (_selectedAccount != null && !_isCashCustomer)
-                          PartyCard(
-                            party: _selectedAccount!,
-                            onView: _pickCustomer,
-                            onMessage: () {},
-                            showActions: false,
-                            margin: EdgeInsets.zero,
-                          )
-                        else
-                          _buildPickPartyPlaceholder(isUrdu, fontFamily),
-                      ],
+                          // 2. PARTY SELECTION SECTION (if _mode != _PayMode.full)
+                          if (_mode != _PayMode.full) ...[
+                            const Divider(height: 1, color: Color(0xFFE1E5EC)),
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (_selectedAccount != null && !_isCashCustomer)
+                                    PartyCard(
+                                      party: _selectedAccount!,
+                                      onView: _pickCustomer,
+                                      onMessage: () {},
+                                      showActions: false,
+                                      margin: EdgeInsets.zero,
+                                    )
+                                  else
+                                    _buildPickPartyPlaceholder(isUrdu, fontFamily),
+                                ],
+                              ),
+                            ),
+                          ],
+
+                          // 3. MAIN ITEMS SECTION
+                          const Divider(height: 1, color: Color(0xFFE1E5EC)),
+                          _buildMainBillCard(isUrdu, fontFamily),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                ],
-
-                // 3. MAIN ITEMS CARD (Items + Totals + Customer Paid at bottom)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  child: _buildMainBillCard(isUrdu, fontFamily),
                 ),
                 const SizedBox(height: 8),
               ],
@@ -594,13 +607,8 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
   // Bill Number Card
   // ═════════════════════════════════════════════════════════
   Widget _buildBillNumberCard(bool isUrdu, String? fontFamily) {
-    return Container(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE1E5EC), width: 1.5),
-      ),
       child: Row(
         children: [
           Icon(
@@ -634,10 +642,9 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
   // ═════════════════════════════════════════════════════════
   Widget _buildMainBillCard(bool isUrdu, String? fontFamily) {
     return Container(
-      decoration: BoxDecoration(
+      margin: EdgeInsets.zero,
+      decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE1E5EC), width: 1.5),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -649,8 +656,6 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
           Container(
             decoration: const BoxDecoration(
               color: Color(0xFFF5F7FA),
-              border:
-                  Border(top: BorderSide(color: Color(0xFFE1E5EC), width: 2)),
             ),
             child: Column(
               children: [
@@ -900,13 +905,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: AppTheme.incomeColor.withValues(alpha: 0.06),
-        border: Border(
-          top: BorderSide(
-            color: AppTheme.incomeColor.withValues(alpha: 0.20),
-            width: 1.5,
-          ),
-        ),
+        color: AppTheme.incomeColor.withValues(alpha: 0.09),
       ),
       child: Row(
         children: [
@@ -1278,11 +1277,11 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
               // Expanded discount card (opens upwards)
               if (_isDiscountExpanded) ...[
                 Container(
-                  margin: const EdgeInsets.only(bottom: 10),
+                  margin: const EdgeInsets.symmetric(vertical: 4),
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFAF5EC),
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: const Color(0xFFD97706).withValues(alpha: 0.3),
                       width: 1,

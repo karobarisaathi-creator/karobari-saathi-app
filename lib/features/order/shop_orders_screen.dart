@@ -92,7 +92,7 @@ class ShopOrdersScreen extends StatelessWidget {
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             itemCount: docs.length,
             itemBuilder: (context, index) {
               final doc = docs[index];
@@ -259,10 +259,10 @@ class _OrderCardState extends State<_OrderCard> {
     }
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
         boxShadow: [
           BoxShadow(

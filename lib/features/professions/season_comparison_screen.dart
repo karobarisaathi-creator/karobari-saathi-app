@@ -90,9 +90,9 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
 
     final oldReport = hasTwo
         ? SeasonReportService.buildReport(
-            profession: oldSeason!,
-            transactions: allTx,
-          )
+      profession: oldSeason!,
+      transactions: allTx,
+    )
         : null;
 
     return Scaffold(
@@ -104,7 +104,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         showBackButton: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         child: Column(
           children: [
             // ═══ Season Header ═══
@@ -112,7 +112,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               _buildSingleHeader(newSeason, newReport, isUrdu, fontFamily)
             else
               _buildCompareHeader(newSeason, oldSeason!, isUrdu, fontFamily),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
 
             // ═══ Hero Summary ═══
             if (!hasTwo)
@@ -120,7 +120,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             else
               _buildCompareHeroSummary(
                   newReport, oldReport!, isUrdu, fontFamily),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
 
             // ═══ Per Acre Metrics ═══
             if (!hasTwo)
@@ -128,12 +128,14 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             else
               _buildComparePerAcreCard(
                   newReport, oldReport!, isUrdu, fontFamily),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
 
             // ═══ Target Progress (single only) ═══
-            if (!hasTwo) ...[
+            if (!hasTwo &&
+                (newReport.targetProduction > 0 ||
+                    newReport.benchmarkCostPerUnit > 0)) ...[
               _buildTargetCard(newReport, isUrdu, fontFamily),
-              const SizedBox(height: 14),
+              const SizedBox(height: 8),
             ],
 
             // ═══ Income Categories ═══
@@ -166,7 +168,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                 isUrdu: isUrdu,
                 fontFamily: fontFamily,
               ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
 
             // ═══ Expense Categories ═══
             if (!hasTwo)
@@ -198,7 +200,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                 isUrdu: isUrdu,
                 fontFamily: fontFamily,
               ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
 
             // ═══ Budget Alerts (single only) ═══
             if (!hasTwo && newReport.budgetOverruns.isNotEmpty) ...[
@@ -207,10 +209,8 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                 isUrdu,
                 fontFamily,
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 8),
             ],
-
-            const SizedBox(height: 30),
           ],
         ),
       ),
@@ -230,9 +230,10 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
     String? fontFamily,
   }) {
     return Container(
+      margin: EdgeInsets.zero,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
       ),
       clipBehavior: Clip.antiAlias,
@@ -248,6 +249,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               ),
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   width: 30,
@@ -260,18 +262,27 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: UrduAwareText(
-                    title,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.darkColor,
-                      fontFamily: fontFamily,
-                      letterSpacing: -0.2,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: UrduAwareText(
+                      title,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.darkColor,
+                        fontFamily: fontFamily,
+                        letterSpacing: -0.2,
+                        height: 1.3,
+                      ),
                     ),
                   ),
                 ),
-                if (badge != null) badge,
+                if (badge != null) ...[
+                  const SizedBox(width: 6),
+                  badge,
+                ],
               ],
             ),
           ),
@@ -291,6 +302,8 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
       ),
       child: UrduAwareText(
         text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w800,
@@ -305,13 +318,13 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // 1. Season Header (Single)
   // ═════════════════════════════════════════════════════════
   Widget _buildSingleHeader(
-    Profession season,
-    SeasonReportData report,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
+      Profession season,
+      SeasonReportData report,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
     final displayName =
-        isUrdu && season.name.isNotEmpty ? season.name : season.name;
+    isUrdu && season.name.isNotEmpty ? season.name : season.name;
     final crop = season.cropType.isNotEmpty
         ? '${isUrdu ? 'فصل' : 'Crop'}: ${season.cropType}'
         : '';
@@ -320,104 +333,127 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
     final healthColor = _healthColor(health);
 
     return Container(
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                UrduAwareText(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: UrduAwareText(
                   displayName,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 15,
+                    fontSize: 16,
                     fontWeight: FontWeight.w900,
                     color: AppTheme.darkColor,
                     fontFamily: fontFamily,
                     letterSpacing: -0.3,
+                    height: 1.3,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 6,
-                  runSpacing: 3,
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: healthColor.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (crop.isNotEmpty)
-                      UrduAwareText(
-                        crop,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textSecondary,
-                          fontFamily: fontFamily,
-                        ),
+                    Icon(
+                      health == 'excellent' || health == 'good'
+                          ? PhosphorIcons.checkCircle(PhosphorIconsStyle.fill)
+                          : PhosphorIcons.warning(PhosphorIconsStyle.fill),
+                      size: 11,
+                      color: healthColor,
+                    ),
+                    const SizedBox(width: 4),
+                    UrduAwareText(
+                      _healthLabel(health, isUrdu),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: healthColor,
+                        fontFamily: fontFamily,
+                        letterSpacing: 0.2,
                       ),
-                    if (report.areaAcres > 0)
-                      UrduAwareText(
-                        '${_formatQty(report.areaAcres)} ${isUrdu ? "ایکڑ" : "acres"}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textSecondary,
-                          fontFamily: fontFamily,
-                        ),
-                      ),
-                    if (report.productionMun > 0)
-                      UrduAwareText(
-                        '${_formatQty(report.productionMun)} ${isUrdu ? "من" : "mun"}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textSecondary,
-                          fontFamily: fontFamily,
-                        ),
-                      ),
+                    ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: healthColor.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  health == 'excellent' || health == 'good'
-                      ? PhosphorIcons.checkCircle(PhosphorIconsStyle.fill)
-                      : PhosphorIcons.warning(PhosphorIconsStyle.fill),
-                  size: 11,
-                  color: healthColor,
+          const SizedBox(height: 10),
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 6,
+            children: [
+              if (crop.isNotEmpty)
+                _headerChip(
+                  icon: PhosphorIcons.plant(),
+                  label: crop,
+                  fontFamily: fontFamily,
                 ),
-                const SizedBox(width: 4),
-                UrduAwareText(
-                  _healthLabel(health, isUrdu),
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
-                    color: healthColor,
-                    fontFamily: fontFamily,
-                    letterSpacing: 0.2,
-                  ),
+              if (report.areaAcres > 0)
+                _headerChip(
+                  icon: PhosphorIcons.ruler(),
+                  label:
+                  '${_formatQty(report.areaAcres)} ${isUrdu ? "ایکڑ" : "acres"}',
+                  fontFamily: fontFamily,
                 ),
-              ],
-            ),
+              if (report.productionMun > 0)
+                _headerChip(
+                  icon: PhosphorIcons.package(),
+                  label:
+                  '${_formatQty(report.productionMun)} ${isUrdu ? "من" : "mun"}',
+                  fontFamily: fontFamily,
+                ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _headerChip({
+    required IconData icon,
+    required String label,
+    String? fontFamily,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: AppTheme.textSecondary),
+        const SizedBox(width: 4),
+        Flexible(
+          child: UrduAwareText(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textSecondary,
+              fontFamily: fontFamily,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -425,26 +461,29 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // 1b. Season Header (Comparison)
   // ═════════════════════════════════════════════════════════
   Widget _buildCompareHeader(
-    Profession newSeason,
-    Profession oldSeason,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
+      Profession newSeason,
+      Profession oldSeason,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
     return Container(
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Flexible(
             child: _seasonPill(
               newSeason.name.isNotEmpty ? newSeason.name : 'A',
               AppTheme.themeColor,
               fontFamily,
+              'A',
             ),
           ),
           Padding(
@@ -465,6 +504,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               oldSeason.name.isNotEmpty ? oldSeason.name : 'B',
               const Color(0xFFD97706),
               fontFamily,
+              'B',
             ),
           ),
         ],
@@ -472,23 +512,41 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
     );
   }
 
-  Widget _seasonPill(String label, Color color, String? fontFamily) {
+  Widget _seasonPill(
+      String label,
+      Color color,
+      String? fontFamily,
+      String tag,
+      ) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.30)),
+        border: Border.all(color: color.withValues(alpha: 0.30), width: 1.5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              tag,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                fontFamily: null,
+              ),
+            ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Flexible(
             child: UrduAwareText(
               label,
@@ -497,8 +555,9 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                 fontWeight: FontWeight.w900,
                 color: color,
                 fontFamily: fontFamily,
+                height: 1.3,
               ),
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -511,10 +570,10 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // 2. Hero Summary (Single)
   // ═════════════════════════════════════════════════════════
   Widget _buildHeroSummary(
-    SeasonReportData report,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
+      SeasonReportData report,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
     return Column(
       children: [
         Row(
@@ -530,7 +589,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                 fontFamily: fontFamily,
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: _heroCard(
                 label: isUrdu ? 'کل خرچ' : 'Total Expense',
@@ -544,7 +603,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         _heroCard(
           label: isUrdu ? 'خالص منافع' : 'Net Profit',
           value: 'Rs ${_formatFull(report.netProfit)}',
@@ -555,7 +614,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
           fullWidth: true,
           fontFamily: fontFamily,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         _heroCard(
           label: isUrdu ? 'منافع کی شرح' : 'Profit Margin',
           value: '${report.profitMargin.toStringAsFixed(1)}%',
@@ -581,25 +640,18 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
     String? fontFamily,
   }) {
     return Container(
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.transparent,
-            blurRadius: 0,
-            offset: Offset.zero,
-            spreadRadius: 0,
-          ),
-        ],
       ),
-
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 30,
@@ -612,34 +664,44 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: UrduAwareText(
-                  label,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textSecondary,
-                    letterSpacing: 0.5,
-                    fontFamily: fontFamily,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: UrduAwareText(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.textSecondary,
+                      letterSpacing: 0.5,
+                      fontFamily: fontFamily,
+                      height: 1.3,
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          UrduAwareText(
-            value,
-            style: TextStyle(
-              fontSize: fullWidth ? 22 : 18,
-              fontWeight: FontWeight.w900,
-              color: AppTheme.darkColor,
-              letterSpacing: -0.6,
-              fontFeatures: const [FontFeature.tabularFigures()],
-              fontFamily: null,
+          SizedBox(
+            width: double.infinity,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: UrduAwareText(
+                value,
+                style: TextStyle(
+                  fontSize: fullWidth ? 22 : 18,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.darkColor,
+                  letterSpacing: -0.6,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  fontFamily: null,
+                ),
+                maxLines: 1,
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -650,11 +712,11 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // 2b. Hero Summary (Comparison)
   // ═════════════════════════════════════════════════════════
   Widget _buildCompareHeroSummary(
-    SeasonReportData newR,
-    SeasonReportData oldR,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
+      SeasonReportData newR,
+      SeasonReportData oldR,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
     return _sectionCard(
       title: isUrdu ? 'مالیاتی موازنہ' : 'Financial Comparison',
       icon: PhosphorIcons.money(),
@@ -662,7 +724,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
       iconBg: AppTheme.themeColor.withValues(alpha: 0.10),
       fontFamily: fontFamily,
       children: [
-        _compareHeaderRow(isUrdu, newR.totalIncome, oldR.totalIncome),
+        _compareHeaderRow(isUrdu),
         _compareRow(
           isUrdu ? 'کل آمدن' : 'Total Income',
           newR.totalIncome,
@@ -693,7 +755,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
     );
   }
 
-  Widget _compareHeaderRow(bool isUrdu, double a, double b) {
+  Widget _compareHeaderRow(bool isUrdu) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: const BoxDecoration(
@@ -701,11 +763,14 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         border: Border(bottom: BorderSide(color: Color(0xFFE1E5EC))),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            flex: 2,
+            flex: 5,
             child: UrduAwareText(
               isUrdu ? 'تفصیل' : 'Metric',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
@@ -715,7 +780,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             ),
           ),
           const Expanded(
-            flex: 12,
+            flex: 3,
             child: UrduAwareText(
               'A',
               textAlign: TextAlign.center,
@@ -728,7 +793,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             ),
           ),
           const Expanded(
-            flex: 12,
+            flex: 3,
             child: UrduAwareText(
               'B',
               textAlign: TextAlign.center,
@@ -741,10 +806,12 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             ),
           ),
           Expanded(
-            flex: 12,
+            flex: 3,
             child: UrduAwareText(
               isUrdu ? 'فرق' : 'Diff',
               textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
@@ -759,13 +826,13 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   }
 
   Widget _compareRow(
-    String label,
-    double newVal,
-    double oldVal,
-    String? fontFamily, {
-    bool lowerIsBetter = false,
-    bool isPercent = false,
-  }) {
+      String label,
+      double newVal,
+      double oldVal,
+      String? fontFamily, {
+        bool lowerIsBetter = false,
+        bool isPercent = false,
+      }) {
     final diff = newVal - oldVal;
     final isGood = lowerIsBetter ? diff < 0 : diff > 0;
 
@@ -785,75 +852,81 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         border: Border(bottom: BorderSide(color: Color(0xFFEEF1F5))),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
-            flex: 2,
+            flex: 5,
             child: UrduAwareText(
               label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11.5,
                 fontWeight: FontWeight.w700,
                 color: AppTheme.darkColor,
                 fontFamily: fontFamily,
+                height: 1.35,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           Expanded(
-            flex: 12,
-            child: UrduAwareText(
-              newText,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                color: AppTheme.darkColor,
-                fontFeatures: [FontFeature.tabularFigures()],
+            flex: 3,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: UrduAwareText(
+                newText,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.darkColor,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+                maxLines: 1,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           Expanded(
-            flex: 12,
-            child: UrduAwareText(
-              oldText,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF8A9199),
-                fontFeatures: [FontFeature.tabularFigures()],
+            flex: 3,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: UrduAwareText(
+                oldText,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF8A9199),
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+                maxLines: 1,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           Expanded(
-            flex: 12,
+            flex: 3,
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 3),
+              padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 2),
               decoration: BoxDecoration(
-                color: (isGood
-                        ? AppTheme.incomeColor
-                        : AppTheme.expenseColor)
+                color: (isGood ? AppTheme.incomeColor : AppTheme.expenseColor)
                     .withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: UrduAwareText(
-                diffText,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  color: isGood
-                      ? AppTheme.incomeColor
-                      : AppTheme.expenseColor,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: UrduAwareText(
+                  diffText,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: isGood
+                        ? AppTheme.incomeColor
+                        : AppTheme.expenseColor,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                  maxLines: 1,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
@@ -866,10 +939,10 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // 3. Per Acre Metrics (Single)
   // ═════════════════════════════════════════════════════════
   Widget _buildPerAcreCard(
-    SeasonReportData report,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
+      SeasonReportData report,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
     return _sectionCard(
       title: isUrdu ? 'فی ایکڑ تفصیلات' : 'Per Acre Metrics',
       icon: PhosphorIcons.ruler(),
@@ -877,9 +950,9 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
       iconBg: AppTheme.themeColor.withValues(alpha: 0.10),
       badge: report.areaAcres > 0
           ? _badge(
-              '${_formatQty(report.areaAcres)} ${isUrdu ? "ایکڑ" : "acres"}',
-              AppTheme.themeColor,
-            )
+        '${_formatQty(report.areaAcres)} ${isUrdu ? "ایکڑ" : "acres"}',
+        AppTheme.themeColor,
+      )
           : null,
       fontFamily: fontFamily,
       children: [
@@ -946,38 +1019,53 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
     );
   }
 
+  // ═════════════════════════════════════════════════════════
+  // ⭐ _metricRow — تمام الفاظ پوری طرح
+  // ═════════════════════════════════════════════════════════
   Widget _metricRow(
-    String label,
-    String value,
-    String? fontFamily, {
-    Color? valueColor,
-  }) {
+      String label,
+      String value,
+      String? fontFamily, {
+        Color? valueColor,
+      }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Color(0xFFEEF1F5))),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
             child: UrduAwareText(
               label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w700,
                 color: AppTheme.textSecondary,
                 fontFamily: fontFamily,
+                height: 1.4,
               ),
             ),
           ),
-          UrduAwareText(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-              color: valueColor ?? AppTheme.darkColor,
-              letterSpacing: -0.3,
-              fontFeatures: const [FontFeature.tabularFigures()],
+          const SizedBox(width: 10),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: UrduAwareText(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: valueColor ?? AppTheme.darkColor,
+                  letterSpacing: -0.3,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+                maxLines: 1,
+              ),
             ),
           ),
         ],
@@ -989,11 +1077,11 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // 3b. Per Acre (Comparison)
   // ═════════════════════════════════════════════════════════
   Widget _buildComparePerAcreCard(
-    SeasonReportData newR,
-    SeasonReportData oldR,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
+      SeasonReportData newR,
+      SeasonReportData oldR,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
     return _sectionCard(
       title: isUrdu ? 'فی ایکڑ موازنہ' : 'Per Acre Comparison',
       icon: PhosphorIcons.ruler(),
@@ -1001,7 +1089,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
       iconBg: AppTheme.themeColor.withValues(alpha: 0.10),
       fontFamily: fontFamily,
       children: [
-        _compareHeaderRow(isUrdu, 0, 0),
+        _compareHeaderRow(isUrdu),
         _compareRow(
           isUrdu ? 'رقبہ' : 'Area',
           newR.areaAcres,
@@ -1040,6 +1128,13 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
           oldR.avgRatePerMun,
           fontFamily,
         ),
+        _compareRow(
+          isUrdu ? 'فی من لاگت' : 'Cost / Mun',
+          newR.costPerMun,
+          oldR.costPerMun,
+          fontFamily,
+          lowerIsBetter: true,
+        ),
       ],
     );
   }
@@ -1048,10 +1143,10 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // 4. Target Card (Single only)
   // ═════════════════════════════════════════════════════════
   Widget _buildTargetCard(
-    SeasonReportData report,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
+      SeasonReportData report,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
     if (report.targetProduction <= 0 && report.benchmarkCostPerUnit <= 0) {
       return const SizedBox.shrink();
     }
@@ -1104,14 +1199,14 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
     final health = percent >= 80
         ? 'excellent'
         : percent >= 60
-            ? 'good'
-            : percent >= 40
-                ? 'fair'
-                : 'poor';
+        ? 'good'
+        : percent >= 40
+        ? 'fair'
+        : 'poor';
     final color = _healthColor(health);
 
     final valueText =
-        unit == 'Rs' ? 'Rs ${_formatFull(value)}' : '${_formatQty(value)} $unit';
+    unit == 'Rs' ? 'Rs ${_formatFull(value)}' : '${_formatQty(value)} $unit';
     final targetText = unit == 'Rs'
         ? 'Rs ${_formatFull(target)}'
         : '${_formatQty(target)} $unit';
@@ -1125,19 +1220,24 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
                 child: UrduAwareText(
                   label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: AppTheme.darkColor,
                     fontFamily: fontFamily,
                     letterSpacing: -0.2,
+                    height: 1.35,
                   ),
                 ),
               ),
+              const SizedBox(width: 8),
               UrduAwareText(
                 '${percent.toStringAsFixed(0)}%',
                 style: TextStyle(
@@ -1162,23 +1262,20 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: UrduAwareText(
-                  isInverse
-                      ? '${inverseLabel ?? ""}: $targetText'
-                      : '$valueText / $targetText',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textSecondary,
-                    fontFamily: fontFamily,
-                  ),
-                ),
-              ),
-            ],
+          const SizedBox(height: 8),
+          UrduAwareText(
+            isInverse
+                ? '${inverseLabel ?? ""}: $targetText'
+                : '$valueText / $targetText',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textSecondary,
+              fontFamily: fontFamily,
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -1200,7 +1297,8 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
     required bool isUrdu,
     String? fontFamily,
   }) {
-    final colors = isIncome ? _incomeCategoryColors() : _expenseCategoryColors();
+    final colors =
+    isIncome ? _incomeCategoryColors() : _expenseCategoryColors();
 
     return _sectionCard(
       title: title,
@@ -1234,13 +1332,13 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   }
 
   Widget _catRow(
-    CategoryBreakdown cat,
-    double total,
-    Color color,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
-    final percent = cat.percentOf(total);
+      CategoryBreakdown cat,
+      double total,
+      Color color,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
+    final percent = total > 0 ? cat.percentOf(total) : 0.0;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1251,10 +1349,12 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 10,
                 height: 10,
+                margin: const EdgeInsets.only(top: 5),
                 decoration: BoxDecoration(
                   color: color,
                   borderRadius: BorderRadius.circular(3),
@@ -1264,31 +1364,39 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               Expanded(
                 child: UrduAwareText(
                   cat.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w800,
                     color: AppTheme.darkColor,
                     fontFamily: fontFamily,
                     letterSpacing: -0.1,
+                    height: 1.35,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 8),
-              UrduAwareText(
-                'Rs ${_formatFull(cat.amount)}',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  color: AppTheme.darkColor,
-                  letterSpacing: -0.3,
-                  fontFeatures: [FontFeature.tabularFigures()],
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: UrduAwareText(
+                    'Rs ${_formatFull(cat.amount)}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.darkColor,
+                      letterSpacing: -0.3,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                    maxLines: 1,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: Container(
@@ -1301,7 +1409,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -1317,6 +1425,8 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                 isUrdu
                     ? '${cat.entriesCount} اندراج'
                     : '${cat.entriesCount} entries',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
@@ -1357,12 +1467,14 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
 
     final rows = allNames.map((name) {
       final newC = newCategories.firstWhere(
-        (c) => c.name == name,
-        orElse: () => CategoryBreakdown(name: name, amount: 0, isIncome: isIncome),
+            (c) => c.name == name,
+        orElse: () =>
+            CategoryBreakdown(name: name, amount: 0, isIncome: isIncome),
       );
       final oldC = oldCategories.firstWhere(
-        (c) => c.name == name,
-        orElse: () => CategoryBreakdown(name: name, amount: 0, isIncome: isIncome),
+            (c) => c.name == name,
+        orElse: () =>
+            CategoryBreakdown(name: name, amount: 0, isIncome: isIncome),
       );
       return MapEntry(newC, oldC);
     }).toList()
@@ -1375,7 +1487,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
       iconBg: iconBg,
       fontFamily: fontFamily,
       children: [
-        _compareHeaderRow(isUrdu, 0, 0),
+        _compareHeaderRow(isUrdu),
         if (rows.isEmpty)
           Padding(
             padding: const EdgeInsets.all(16),
@@ -1405,11 +1517,14 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             border: Border(top: BorderSide(color: Color(0xFFE1E5EC), width: 2)),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                flex: 2,
+                flex: 5,
                 child: UrduAwareText(
                   isUrdu ? 'کل' : 'TOTAL',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w900,
@@ -1420,42 +1535,51 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                 ),
               ),
               Expanded(
-                flex: 12,
-                child: UrduAwareText(
-                  _formatMoney(newTotal),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    color: AppTheme.darkColor,
+                flex: 3,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: UrduAwareText(
+                    _formatMoney(newTotal),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.darkColor,
+                    ),
                   ),
                 ),
               ),
               Expanded(
-                flex: 12,
-                child: UrduAwareText(
-                  _formatMoney(oldTotal),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF8A9199),
+                flex: 3,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: UrduAwareText(
+                    _formatMoney(oldTotal),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF8A9199),
+                    ),
                   ),
                 ),
               ),
               Expanded(
-                flex: 12,
-                child: UrduAwareText(
-                  '${newTotal - oldTotal >= 0 ? "+" : ""}${_formatMoney(newTotal - oldTotal)}',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    color: (isIncome
-                            ? newTotal - oldTotal >= 0
-                            : newTotal - oldTotal <= 0)
-                        ? AppTheme.incomeColor
-                        : AppTheme.expenseColor,
+                flex: 3,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: UrduAwareText(
+                    '${newTotal - oldTotal >= 0 ? "+" : ""}${_formatMoney(newTotal - oldTotal)}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      color: (isIncome
+                          ? newTotal - oldTotal >= 0
+                          : newTotal - oldTotal <= 0)
+                          ? AppTheme.incomeColor
+                          : AppTheme.expenseColor,
+                    ),
                   ),
                 ),
               ),
@@ -1470,10 +1594,10 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // 6. Budget Alert Card
   // ═════════════════════════════════════════════════════════
   Widget _buildBudgetAlertCard(
-    List<MapEntry<String, MapEntry<double, double>>> overruns,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
+      List<MapEntry<String, MapEntry<double, double>>> overruns,
+      bool isUrdu,
+      String? fontFamily,
+      ) {
     return _sectionCard(
       title: isUrdu ? 'بجٹ کی حد' : 'Budget Alerts',
       icon: PhosphorIcons.bellRinging(),
@@ -1503,11 +1627,12 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               valueColor: AppTheme.expenseColor,
             ),
             Container(
-              margin: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: AppTheme.expenseColor.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(14),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1523,6 +1648,8 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                       isUrdu
                           ? '$name کی حد سے ${percent.toStringAsFixed(1)}% زیادہ (Rs ${_formatFull(over)})'
                           : '$name exceeded by ${percent.toStringAsFixed(1)}% (Rs ${_formatFull(over)})',
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -1544,10 +1671,10 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   List<Color> _incomeCategoryColors() {
     return const [
       AppTheme.incomeColor,
-      Color(0xFF10B981), // Emerald
-      Color(0xFF059669), // Green
-      Color(0xFF34D399), // Light Green
-      Color(0xFF047857), // Dark Green
+      Color(0xFF10B981),
+      Color(0xFF059669),
+      Color(0xFF34D399),
+      Color(0xFF047857),
       Color(0xFF6EE7B7),
     ];
   }
@@ -1555,26 +1682,11 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   List<Color> _expenseCategoryColors() {
     return const [
       AppTheme.expenseColor,
-      Color(0xFFEF4444), // Red
-      Color(0xFFD97706), // Amber
-      Color(0xFFDC2626), // Dark Red
-      Color(0xFFF59E0B), // Orange
+      Color(0xFFEF4444),
+      Color(0xFFD97706),
+      Color(0xFFDC2626),
+      Color(0xFFF59E0B),
       Color(0xFFB91C1C),
-    ];
-  }
-
-  // ═════════════════════════════════════════════════════════
-  // Category Colors
-  // ═════════════════════════════════════════════════════════
-  List<Color> _categoryColors() {
-    return const [
-      Color(0xFF515D11), // income olive
-      Color(0xFFD97706), // warning
-      Color(0xFF1D6ED6), // theme
-      Color(0xFFC83120), // expense
-      Color(0xFF607D8B), // gold
-      Color(0xFF8A9199), // gray
-      Color(0xFF6B7A1F), // dark olive
     ];
   }
 
@@ -1582,7 +1694,6 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // Health Helpers
   // ═════════════════════════════════════════════════════════
   Color _healthColor(String health) {
-    // ═════════════════════════════════════════════════════════
     switch (health) {
       case 'excellent':
         return AppTheme.incomeColor;

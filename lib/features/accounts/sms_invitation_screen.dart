@@ -110,14 +110,14 @@ Please verify. Thanks.""";
             ),
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0),
                 child: Column(
                   children: [
                     // Bill Paper Container Style (Matches Receipt)
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
                               color: Colors.black.withOpacity(0.1),

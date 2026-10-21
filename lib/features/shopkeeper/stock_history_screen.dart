@@ -67,7 +67,7 @@ class StockHistoryScreen extends StatelessWidget {
               ),
             )
           : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(0, 12, 0, 24),
+              padding: const EdgeInsets.fromLTRB(8, 12, 8, 24),
               itemCount: movements.length,
               itemBuilder: (context, index) {
                 final m = movements[index];
@@ -113,12 +113,11 @@ class StockHistoryScreen extends StatelessWidget {
                 return Directionality(
                   textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
                   child: Card(
-                    margin:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    margin: const EdgeInsets.symmetric(vertical: 4),
                     elevation: 0,
                     color: Theme.of(context).cardTheme.color,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(20),
                       side: BorderSide(color: Colors.grey.shade200),
                     ),
                     child: Padding(

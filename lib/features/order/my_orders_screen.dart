@@ -247,7 +247,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
             child: filtered.isEmpty
                 ? _buildEmptyState(isUrdu, fontFamily)
                 : ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     itemCount: filtered.length,
                     itemBuilder: (context, i) => _buildOrderCard(
                       filtered[i],
@@ -311,12 +311,12 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(20),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
             boxShadow: [
               BoxShadow(
@@ -359,10 +359,10 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
   // ═════════════════════════════════════════════════════════════
   Widget _buildOrderCard(MyOrder order, bool isUrdu, String? fontFamily) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
         boxShadow: [
           BoxShadow(

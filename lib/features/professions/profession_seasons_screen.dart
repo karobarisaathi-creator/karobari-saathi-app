@@ -168,10 +168,10 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                       SliverToBoxAdapter(
                         child: Container(
                           margin: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
                                   color: AppTheme.themeColor
@@ -409,12 +409,13 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                     if (completedSeasons.isNotEmpty) ...[
                       SliverToBoxAdapter(
                         child: Container(
-                          margin: const EdgeInsets.fromLTRB(12, 24, 12, 8),
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             color: AppTheme.darkColor.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                                 color:
                                     AppTheme.darkColor.withValues(alpha: 0.1)),
@@ -542,7 +543,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
         },
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -656,12 +657,12 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
     final profitColor = _getProfitColor(season.totalIncome, season.netProfit);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
           color: isExpanded
               ? AppTheme.darkColor.withValues(alpha: 0.08)
               : AppTheme.darkColor.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
               color: isExpanded
                   ? AppTheme.themeColor.withOpacity(0.2)
@@ -812,6 +813,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
     return Column(
       children: [
         ListView.builder(
+          padding: EdgeInsets.zero,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: txs.length,

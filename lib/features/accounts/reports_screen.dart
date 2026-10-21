@@ -152,7 +152,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

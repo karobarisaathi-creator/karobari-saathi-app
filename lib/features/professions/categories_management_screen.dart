@@ -101,15 +101,15 @@ class _CategoriesManagementScreenState
           ),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               itemCount: _categories.length,
               itemBuilder: (context, index) {
                 final cat = _categories[index];
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
+                  margin: const EdgeInsets.symmetric(vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
                           color: Colors.black.withValues(alpha: 0.02),

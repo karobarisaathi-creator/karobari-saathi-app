@@ -400,7 +400,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           ? const Center(
               child: CircularProgressIndicator(color: AppTheme.themeColor))
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
               child: Column(
                 children: [
                   // 1. Basic Info Card
@@ -438,7 +438,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       ],
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 4),
 
                   // 2. Items & Total Card
                   _buildSectionCard(
@@ -453,11 +453,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: _itemEntries.length,
                         separatorBuilder: (context, index) =>
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                         itemBuilder: (context, index) => _buildItemRow(
                             index, isUrdu, fontFamily, fontWeight),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 8),
                       _buildTextField(
                         controller: _amountController,
                         label: isUrdu ? 'کل رقم' : 'Grand Total',
@@ -468,7 +468,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 4),
 
                   // 3. Attachments Card
                   _buildSectionCard(
@@ -487,7 +487,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
 
                   // Dual Action Buttons
                   Row(
@@ -1251,11 +1251,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   Widget _buildSectionCard(
       {required List<Widget> children, EdgeInsets? padding}) {
     return Container(
+      margin: const EdgeInsets.symmetric(vertical: 2),
       padding:
-          padding ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: AppTheme.themeColor.withValues(alpha: 0.2),
           width: 1,
@@ -1278,7 +1279,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   Widget _buildSectionHeader(String title, String fontFamily, bool isUrdu,
       {double topPadding = 24}) {
     return Padding(
-      padding: EdgeInsets.only(top: topPadding, bottom: 8),
+      padding: EdgeInsets.only(top: topPadding, bottom: 4),
       child: UrduAwareText(
         title,
         style: TextStyle(

@@ -123,7 +123,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
                   color: AppTheme.themeColor,
                   backgroundColor: Colors.white,
                   child: ListView.builder(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                     itemCount: professions.length,
                     itemBuilder: (context, index) {
                       return _buildProfessionListItem(
@@ -203,7 +203,7 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
     }
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,

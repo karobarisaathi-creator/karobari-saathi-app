@@ -112,7 +112,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
           body: controller.isLoading
               ? const Center(child: CircularProgressIndicator())
               : SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 28),
+                  padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
                   child: Form(
                     key: _formKey,
                     child: Column(

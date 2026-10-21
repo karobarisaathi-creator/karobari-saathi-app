@@ -8,6 +8,7 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/party_card.dart';
+import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// گاہک منتخب کرنے کی شیٹ — نقد گاہک یا موجودہ پارٹیوں میں سے کوئی ایک۔
@@ -94,87 +95,26 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          InkWell(
-                            onTap: () => Navigator.pop(
-                              context,
-                              CustomerPickResult(isCashCustomer: true),
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.darkColor,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    PhosphorIcons.coins(),
-                                    color: Colors.white70,
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        UrduAwareText(
-                                          isUrdu ? 'نقد گاہک' : 'Cash customer',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 13.5,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        UrduAwareText(
-                                          isUrdu
-                                              ? 'کوئی کھاتہ نہیں بنے گا، صرف سیل ریکارڈ ہوگا'
-                                              : 'No party account, just a sale record',
-                                          style: const TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 11.5,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Icon(
-                                    PhosphorIcons.caretLeft(),
-                                    color: Colors.white70,
-                                    size: 16,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          TextField(
+                          SearchSortBar(
                             controller: _searchController,
-                            onChanged: (v) => setState(() => _query = v),
-                            decoration: InputDecoration(
-                              hintText: isUrdu
-                                  ? 'نام یا فون نمبر سے تلاش کریں'
-                                  : 'Search by name or phone',
-                              prefixIcon: Icon(
-                                PhosphorIcons.magnifyingGlass(),
-                                size: 18,
-                              ),
-                            ),
+                            hintText: isUrdu
+                                ? 'نام یا فون نمبر سے تلاش کریں'
+                                : 'Search by name or phone',
+                            onSearchChanged: (v) => setState(() => _query = v),
                           ),
                           const SizedBox(height: 12),
-                          UrduAwareText(
-                            isUrdu ? 'حالیہ پارٹیاں' : 'Recent parties',
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              color: Colors.black54,
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: UrduAwareText(
+                              isUrdu ? 'حالیہ پارٹیاں' : 'Recent parties',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: Colors.black54,
+                              ),
                             ),
                           ),
                         ],
@@ -184,22 +124,19 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                       ListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         itemCount: parties.length,
                         itemBuilder: (context, index) {
                           final account = parties[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: PartyCard(
-                              party: account,
-                              onView: () => Navigator.pop(
-                                context,
-                                CustomerPickResult(account: account),
-                              ),
-                              onMessage: () => Navigator.pop(
-                                context,
-                                CustomerPickResult(account: account),
-                              ),
+                          return PartyCard(
+                            party: account,
+                            onView: () => Navigator.pop(
+                              context,
+                              CustomerPickResult(account: account),
+                            ),
+                            onMessage: () => Navigator.pop(
+                              context,
+                              CustomerPickResult(account: account),
                             ),
                           );
                         },

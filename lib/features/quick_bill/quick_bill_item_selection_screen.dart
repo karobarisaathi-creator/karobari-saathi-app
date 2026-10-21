@@ -165,7 +165,7 @@ class _QuickBillItemSelectionScreenState
   final UrduAwareTextEditingController _customNameCtrl = UrduAwareTextEditingController();
   final UrduAwareTextEditingController _customRateCtrl = UrduAwareTextEditingController();
   final UrduAwareTextEditingController _customQtyCtrl = UrduAwareTextEditingController();
-  String _customUnit = 'ڈبہ';
+  String? _customUnit = 'ڈبہ';
   final Map<String, QuickBillCartLine> _cart = {};
 
   // Manual items list
@@ -435,7 +435,7 @@ class _QuickBillItemSelectionScreenState
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
         child: Column(
           children: [
             // ═══ Slide-Down Custom Item Card Panel (AddEditStockItemScreen style) ═══
@@ -444,13 +444,13 @@ class _QuickBillItemSelectionScreenState
               curve: Curves.easeInOut,
               child: _isCustomItemExpanded
                   ? Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppTheme.themeColor, width: 1.5),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppTheme.verifiedGold, width: 1.5),
                           boxShadow: [
                             BoxShadow(
                               color: AppTheme.themeColor.withValues(alpha: 0.1),
@@ -546,7 +546,15 @@ class _QuickBillItemSelectionScreenState
                                       selectedColor: AppTheme.themeColor,
                                       labelStyle: TextStyle(
                                           color: isSelected ? Colors.white : Colors.black87),
-                                      onSelected: (_) => setState(() => _customUnit = u),
+                                      onSelected: (_) {
+                                        setState(() {
+                                          if (_customUnit == u) {
+                                            _customUnit = null;
+                                          } else {
+                                            _customUnit = u;
+                                          }
+                                        });
+                                      },
                                     );
                                   }).toList(),
                                 ),

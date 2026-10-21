@@ -14,6 +14,9 @@ import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
+import 'package:account_app/core/widgets/search_sort_bar.dart';
+import 'package:account_app/core/widgets/party_card.dart';
+import 'package:account_app/core/widgets/custom_app_bar.dart';
 
 class StockAdjustmentDialog extends StatefulWidget {
   final StockItem item;
@@ -463,15 +466,19 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 1. Movement Type
+                        // 1. Movement Type & Unified Return Card
                         if (_shouldShowTypeSelector) ...[
-                          _buildTypeSelector(isUrdu, fontFamily),
+                          _buildReturnTypePills(isUrdu, fontFamily),
+                          const SizedBox(height: 16),
+                          _buildReturnUnifiedCard(isUrdu, fontFamily, context),
                           const SizedBox(height: 20),
                         ],
 
-                        // 2. Quantity Stepper + Preview
-                        _buildQuantitySection(isUrdu, fontFamily, context),
-                        const SizedBox(height: 20),
+                        // 2. Quantity Stepper + Preview (for non-returns)
+                        if (!_shouldShowTypeSelector) ...[
+                          _buildQuantitySection(isUrdu, fontFamily, context),
+                          const SizedBox(height: 20),
+                        ],
 
                         // 3. Unit Price
                         _buildUnitPrice(isUrdu, fontFamily),
@@ -507,22 +514,22 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
         case StockMovementType.purchase:
           iconData = PhosphorIcons.plusCircle();
           gradientColors = const [AppTheme.incomeColor, Color(0xFF6B7A1F)];
-          titleText = isUrdu ? 'سامان خریدا (+)' : 'Stock In (+)';
+          titleText = isUrdu ? 'سامان خریدا ' : 'Stock In ';
           break;
         case StockMovementType.sale:
           iconData = PhosphorIcons.minusCircle();
           gradientColors = const [AppTheme.expenseColor, Color(0xFFE04B36)];
-          titleText = isUrdu ? 'سامان بیچا (−)' : 'Stock Out (−)';
+          titleText = isUrdu ? 'سامان بیچا ' : 'Stock Out ';
           break;
         case StockMovementType.customerReturn:
           iconData = PhosphorIcons.arrowClockwise();
           gradientColors = const [AppTheme.incomeColor, Color(0xFF6B7A1F)];
-          titleText = isUrdu ? 'گاہک کی واپسی (+)' : 'Customer Return (+)';
+          titleText = isUrdu ? 'گاہک کی واپسی ' : 'Customer Return ';
           break;
         case StockMovementType.supplierReturn:
           iconData = PhosphorIcons.arrowCounterClockwise();
           gradientColors = const [AppTheme.expenseColor, Color(0xFFE04B36)];
-          titleText = isUrdu ? 'سپلائر کو واپسی (−)' : 'Supplier Return (−)';
+          titleText = isUrdu ? 'سپلائر کو واپسی ' : 'Supplier Return ';
           break;
         case StockMovementType.adjustment:
           iconData = PhosphorIcons.sliders();
@@ -635,9 +642,9 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
   }
 
   // ═════════════════════════════════════════════
-  // 1. Type Selector
+  // 1. Type Selector & Return Unified Card
   // ═════════════════════════════════════════════
-  Widget _buildTypeSelector(bool isUrdu, String? fontFamily) {
+  Widget _buildReturnTypePills(bool isUrdu, String? fontFamily) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -671,10 +678,172 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        _buildPartySelector(isUrdu, fontFamily),
       ],
     );
+  }
+
+  Widget _buildReturnUnifiedCard(bool isUrdu, String? fontFamily, BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.darkColor.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFFE1E5EC), width: 1.5),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. Party Selector
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: _buildPartySelector(isUrdu, fontFamily),
+              ),
+
+              const Divider(height: 1, color: Color(0xFFE1E5EC)),
+
+              // 2. Quantity Box (Spread with background gradient between upper and lower dividers)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFF5F7FA), Color(0xFFFAFCFF)],
+                  ),
+                ),
+                child: _buildQuantityBoxOnly(isUrdu, fontFamily),
+              ),
+
+              const Divider(height: 1, color: Color(0xFFE1E5EC)),
+
+              // 3. Live Preview styled like Grand Total
+              _buildGrandTotalStylePreview(isUrdu, fontFamily, context),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGrandTotalStylePreview(
+    bool isUrdu,
+    String? fontFamily,
+    BuildContext context,
+  ) {
+    final availableStock = _getAvailableStock(context);
+    final qty = _currentQty;
+    bool isIncreasePreview = _isIncrease;
+    bool isDecreasePreview = _isDecrease;
+    bool isWarning = false;
+    double newStock = availableStock;
+
+    if (isIncreasePreview) {
+      newStock = availableStock + qty;
+    } else if (isDecreasePreview) {
+      newStock = availableStock - qty;
+      if (newStock < 0) isWarning = true;
+    } else {
+      newStock = qty;
+    }
+
+    String formatQuantity(double value) => value == value.truncateToDouble()
+        ? value.toStringAsFixed(0)
+        : value.toString();
+
+    Color color;
+    Color bg;
+    IconData icon;
+    String message;
+
+    if (isWarning) {
+      color = const Color(0xFFD97706);
+      bg = const Color(0xFFD97706).withValues(alpha: 0.09);
+      icon = PhosphorIcons.warning(PhosphorIconsStyle.fill);
+      message = isUrdu
+          ? 'اتنا اسٹاک موجود نہیں! صرف ${formatQuantity(availableStock)} ${widget.item.unit}'
+          : 'Not enough stock! Only ${formatQuantity(availableStock)} ${widget.item.unit} available';
+    } else if (isIncreasePreview) {
+      color = AppTheme.incomeColor;
+      bg = AppTheme.incomeColor.withValues(alpha: 0.09);
+      icon = PhosphorIcons.checkCircle(PhosphorIconsStyle.fill);
+      message = isUrdu
+          ? 'اسٹاک بڑھے گا: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}'
+          : 'Stock will increase: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}';
+    } else if (isDecreasePreview) {
+      color = AppTheme.expenseColor;
+      bg = AppTheme.expenseColor.withValues(alpha: 0.09);
+      icon = PhosphorIcons.arrowDown();
+      message = isUrdu
+          ? 'اسٹاک کم ہوگا: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}'
+          : 'Stock will decrease: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}';
+    } else {
+      color = AppTheme.themeColor;
+      bg = AppTheme.themeColor.withValues(alpha: 0.09);
+      icon = PhosphorIcons.sliders();
+      message = isUrdu
+          ? 'اسٹاک ایڈجسٹ ہوگا: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}'
+          : 'Stock will adjust: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: bg,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: UrduAwareText(
+              message,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.darkColor,
+                fontFamily: fontFamily,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openPartyPicker(List<Account> parties, bool isUrdu, String? fontFamily) async {
+    final selected = await showModalBottomSheet<Account>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _MatchingPartyPickerSheet(parties: parties, isUrdu: isUrdu, fontFamily: fontFamily),
+    );
+    if (selected != null) {
+      setState(() {
+        _selectedPartyId = selected.id;
+      });
+    }
   }
 
   Widget _buildPartySelector(bool isUrdu, String? fontFamily) {
@@ -690,13 +859,13 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
             account.isActive && matchingPartyIds.contains(account.id))
         .toList()
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    final selectedPartyId = parties.any((party) => party.id == _selectedPartyId)
-        ? _selectedPartyId
-        : null;
-    final selectedLatestTransaction = selectedPartyId == null
+    
+    final selectedParty = parties.where((party) => party.id == _selectedPartyId).firstOrNull;
+    
+    final selectedLatestTransaction = selectedParty == null
         ? null
         : matchingTransactions
-            .where((transaction) => transaction.accountId == selectedPartyId)
+            .where((transaction) => transaction.accountId == selectedParty.id)
             .firstOrNull;
     final isCustomerReturn = _selectedType == StockMovementType.customerReturn;
 
@@ -711,69 +880,10 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
           fontFamily: fontFamily,
         ),
         const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          key: ValueKey(_selectedType),
-          initialValue: selectedPartyId,
-          isExpanded: true,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: const Color(0xFFF5F7FA),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: AppTheme.backgroundColor),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide:
-                  BorderSide(color: AppTheme.backgroundColor, width: 1.5),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide:
-                  const BorderSide(color: AppTheme.themeColor, width: 1.5),
-            ),
-          ),
-          hint: UrduAwareText(
-            isUrdu
-                ? (parties.isEmpty
-                    ? (isCustomerReturn
-                        ? 'اس آئٹم کی کوئی فروخت موجود نہیں'
-                        : 'اس آئٹم کی کوئی خریداری موجود نہیں')
-                    : 'پارٹی منتخب کریں')
-                : (parties.isEmpty
-                    ? (isCustomerReturn
-                        ? 'No sale transaction for this item'
-                        : 'No purchase transaction for this item')
-                    : 'Select a party'),
-            style: const TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 13,
-            ),
-          ),
-          items: parties
-              .map(
-                (party) => DropdownMenuItem<String>(
-                  value: party.id,
-                  child: UrduAwareText(
-                    party.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppTheme.darkColor,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: parties.isEmpty
-              ? null
-              : (partyId) => setState(() => _selectedPartyId = partyId),
-          validator: (partyId) {
-            if (partyId == null || partyId.isEmpty) {
+        FormField<String>(
+          initialValue: _selectedPartyId,
+          validator: (_) {
+            if (_selectedPartyId == null || _selectedPartyId!.isEmpty) {
               return isUrdu
                   ? (isCustomerReturn
                       ? 'گاہک منتخب کرنا ضروری ہے'
@@ -783,6 +893,59 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                       : 'Select a supplier');
             }
             return null;
+          },
+          builder: (state) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                InkWell(
+                  onTap: parties.isEmpty ? null : () => _openPartyPicker(parties, isUrdu, fontFamily),
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F7FA),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: state.hasError ? AppTheme.expenseColor : AppTheme.backgroundColor,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(PhosphorIcons.user(), color: AppTheme.textSecondary, size: 18),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: UrduAwareText(
+                            selectedParty != null
+                                ? selectedParty.name
+                                : (parties.isEmpty
+                                    ? (isCustomerReturn
+                                        ? 'اس آئٹم کی کوئی فروخت موجود نہیں'
+                                        : 'اس آئٹم کی کوئی خریداری موجود نہیں')
+                                    : (isUrdu ? 'پارٹی منتخب کرنے کے لیے یہاں کلک کریں' : 'Tap to select party')),
+                            style: TextStyle(
+                              color: selectedParty != null ? AppTheme.darkColor : AppTheme.textSecondary,
+                              fontSize: 13,
+                              fontWeight: selectedParty != null ? FontWeight.w600 : FontWeight.normal,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                        ),
+                        const Icon(Icons.arrow_drop_down, color: AppTheme.textSecondary),
+                      ],
+                    ),
+                  ),
+                ),
+                if (state.hasError) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    state.errorText ?? '',
+                    style: TextStyle(color: AppTheme.expenseColor, fontSize: 11.5, fontFamily: fontFamily),
+                  ),
+                ],
+              ],
+            );
           },
         ),
         if (selectedLatestTransaction != null) ...[
@@ -928,113 +1091,127 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
     String? fontFamily,
     BuildContext context,
   ) {
-    final availableStock = _getAvailableStock(context);
-    final qty = _currentQty;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionLabel(
-          icon: PhosphorIcons.stack(),
-          text: _selectedType == StockMovementType.adjustment
-              ? (isUrdu ? 'گنی گئی کل مقدار' : 'COUNTED STOCK')
-              : (isUrdu ? 'مقدار' : 'QUANTITY'),
-        ),
-        const SizedBox(height: 10),
-
-        // Stepper hero
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFFF5F7FA), Color(0xFFFAFCFF)],
-            ),
-            border: Border.all(color: AppTheme.backgroundColor, width: 2),
-            borderRadius: BorderRadius.circular(18),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.darkColor.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
-          child: Row(
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFFE1E5EC), width: 1.5),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Minus
-              _buildStepperButton(
-                icon: PhosphorIcons.minus(),
-                color: AppTheme.expenseColor,
-                onTap: _decrementQty,
-              ),
-              const SizedBox(width: 10),
-
-              // Value
-              Expanded(
-                child: Column(
-                  children: [
-                    TextFormField(
-                      controller: _qtyController,
-                      textAlign: TextAlign.center,
-                      textDirection: TextDirection.ltr,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900,
-                        color: AppTheme.darkColor,
-                        letterSpacing: -1.5,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                        filled: false,
-                      ),
-                      validator: (val) {
-                        if (val == null || val.trim().isEmpty) {
-                          return isUrdu ? 'مقدار' : 'Required';
-                        }
-                        final n = double.tryParse(val);
-                        if (n == null ||
-                            !n.isFinite ||
-                            (_selectedType == StockMovementType.adjustment
-                                ? n < 0
-                                : n <= 0)) {
-                          return isUrdu ? 'درست' : 'Invalid';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 2),
-                    UrduAwareText(
-                      widget.item.unit.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textSecondary,
-                        fontFamily: fontFamily,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
+              // 1. Quantity Box inside gradient container
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFF5F7FA), Color(0xFFFAFCFF)],
+                  ),
                 ),
+                child: _buildQuantityBoxOnly(isUrdu, fontFamily),
               ),
-              const SizedBox(width: 10),
 
-              // Plus
-              _buildStepperButton(
-                icon: PhosphorIcons.plus(),
-                color: AppTheme.incomeColor,
-                onTap: _incrementQty,
+              const Divider(height: 1, color: Color(0xFFE1E5EC)),
+
+              // 2. Live Preview styled like Grand Total
+              _buildGrandTotalStylePreview(isUrdu, fontFamily, context),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuantityBoxOnly(bool isUrdu, String? fontFamily) {
+    return Row(
+      children: [
+        // Minus
+        _buildStepperButton(
+          icon: PhosphorIcons.minus(),
+          color: AppTheme.expenseColor,
+          onTap: _decrementQty,
+        ),
+        const SizedBox(width: 10),
+
+        // Value
+        Expanded(
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _qtyController,
+                textAlign: TextAlign.center,
+                textDirection: TextDirection.ltr,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.darkColor,
+                  letterSpacing: -1.5,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
+                  filled: false,
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return isUrdu ? 'مقدار' : 'Required';
+                  }
+                  final n = double.tryParse(val);
+                  if (n == null ||
+                      !n.isFinite ||
+                      (_selectedType == StockMovementType.adjustment
+                          ? n < 0
+                          : n <= 0)) {
+                    return isUrdu ? 'درست' : 'Invalid';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 2),
+              UrduAwareText(
+                widget.item.unit.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textSecondary,
+                  fontFamily: fontFamily,
+                  letterSpacing: 0.5,
+                ),
               ),
             ],
           ),
         ),
+        const SizedBox(width: 10),
 
-        const SizedBox(height: 12),
-
-        // Live Preview
-        _buildLivePreview(qty, availableStock, isUrdu, fontFamily),
+        // Plus
+        _buildStepperButton(
+          icon: PhosphorIcons.plus(),
+          color: AppTheme.incomeColor,
+          onTap: _incrementQty,
+        ),
       ],
     );
   }
@@ -1069,112 +1246,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
     );
   }
 
-  Widget _buildLivePreview(
-    double qty,
-    double availableStock,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
-    // Determine preview state
-    bool isIncreasePreview = _isIncrease;
-    bool isDecreasePreview = _isDecrease;
-    bool isWarning = false;
 
-    double newStock = availableStock;
-
-    if (isIncreasePreview) {
-      newStock = availableStock + qty;
-    } else if (isDecreasePreview) {
-      newStock = availableStock - qty;
-      if (newStock < 0) {
-        isWarning = true;
-      }
-    } else {
-      // adjustment — treat qty as new absolute value
-      newStock = qty;
-    }
-
-    String formatQuantity(double value) => value == value.truncateToDouble()
-        ? value.toStringAsFixed(0)
-        : value.toString();
-
-    // Colors
-    Color color;
-    Color bg;
-    Color border;
-    IconData icon;
-    String message;
-
-    if (isWarning) {
-      color = const Color(0xFFD97706);
-      bg = const Color(0xFFD97706).withValues(alpha: 0.08);
-      border = const Color(0xFFD97706).withValues(alpha: 0.25);
-      icon = PhosphorIcons.warning(PhosphorIconsStyle.fill);
-      message = isUrdu
-          ? 'اتنا اسٹاک موجود نہیں! صرف ${formatQuantity(availableStock)} ${widget.item.unit}'
-          : 'Not enough stock! Only ${formatQuantity(availableStock)} ${widget.item.unit} available';
-    } else if (isIncreasePreview) {
-      color = AppTheme.incomeColor;
-      bg = AppTheme.incomeColor.withValues(alpha: 0.06);
-      border = AppTheme.incomeColor.withValues(alpha: 0.20);
-      icon = PhosphorIcons.checkCircle(PhosphorIconsStyle.fill);
-      message = isUrdu
-          ? 'اسٹاک بڑھے گا: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}'
-          : 'Stock will increase: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}';
-    } else if (isDecreasePreview) {
-      color = AppTheme.expenseColor;
-      bg = AppTheme.expenseColor.withValues(alpha: 0.06);
-      border = AppTheme.expenseColor.withValues(alpha: 0.20);
-      icon = PhosphorIcons.arrowDown();
-      message = isUrdu
-          ? 'اسٹاک کم ہوگا: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}'
-          : 'Stock will decrease: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}';
-    } else {
-      color = AppTheme.themeColor;
-      bg = AppTheme.themeColor.withValues(alpha: 0.06);
-      border = AppTheme.themeColor.withValues(alpha: 0.20);
-      icon = PhosphorIcons.sliders();
-      message = isUrdu
-          ? 'اسٹاک ایڈجسٹ ہوگا: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}'
-          : 'Stock will adjust: ${formatQuantity(availableStock)} → ${formatQuantity(newStock)} ${widget.item.unit}';
-    }
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: border, width: 1.5),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 26,
-            height: 26,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 14, color: color),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: UrduAwareText(
-              message,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.darkColor,
-                fontFamily: fontFamily,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   // ═════════════════════════════════════════════
   // 3. Unit Price
@@ -1500,3 +1572,112 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
     );
   }
 }
+
+class _MatchingPartyPickerSheet extends StatefulWidget {
+  final List<Account> parties;
+  final bool isUrdu;
+  final String? fontFamily;
+
+  const _MatchingPartyPickerSheet({
+    required this.parties,
+    required this.isUrdu,
+    required this.fontFamily,
+  });
+
+  @override
+  State<_MatchingPartyPickerSheet> createState() => _MatchingPartyPickerSheetState();
+}
+
+class _MatchingPartyPickerSheetState extends State<_MatchingPartyPickerSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.parties
+        .where((a) =>
+            _query.isEmpty ||
+            a.name.toLowerCase().contains(_query.toLowerCase()) ||
+            a.phone.contains(_query))
+        .toList();
+
+    final contentHeight = MediaQuery.of(context).size.height * 0.78;
+
+    return Container(
+      constraints: BoxConstraints(maxHeight: contentHeight),
+      decoration: const BoxDecoration(
+        color: Color(0xFFEEF2F5),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CustomAppBar(
+              title: widget.isUrdu ? 'پارٹی منتخب کریں' : 'Select party',
+              showBackButton: false,
+              backgroundColor: AppTheme.darkColor,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              centerTitle: true,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+              ),
+              actions: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+                      child: SearchSortBar(
+                        controller: _searchController,
+                        hintText: widget.isUrdu ? 'نام یا فون نمبر سے تلاش کریں' : 'Search by name or phone',
+                        onSearchChanged: (v) => setState(() => _query = v),
+                      ),
+                    ),
+                    if (filtered.isNotEmpty)
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final account = filtered[index];
+                          return PartyCard(
+                            party: account,
+                            onView: () => Navigator.pop(context, account),
+                            onMessage: () => Navigator.pop(context, account),
+                          );
+                        },
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                        child: UrduAwareText(
+                          widget.isUrdu ? 'کوئی پارٹی نہیں ملی' : 'No parties found',
+                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

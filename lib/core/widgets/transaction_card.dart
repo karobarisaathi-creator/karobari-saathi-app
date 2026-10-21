@@ -31,9 +31,9 @@ class TransactionCard extends StatelessWidget {
     final Color bgColor = isIncome ? Colors.green.shade50 : Colors.red.shade50;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: ListTile(
         leading: Container(
           width: 40,

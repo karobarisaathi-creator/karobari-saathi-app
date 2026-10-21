@@ -299,6 +299,70 @@ class StockAnalyticsService {
     );
   }
 
+  static List<StockDailyStats> buildDailyStats({
+    required List<StockItem> items,
+    required List<StockMovement> movements,
+    required int year,
+    required int month,
+  }) {
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final daily = List.generate(
+      daysInMonth,
+      (i) => StockDailyStats(day: i + 1),
+    );
+
+    final trackedItems = {
+      for (final item in items)
+        if (item.trackStock) item.id: item,
+    };
+    final states = {
+      for (final item in trackedItems.values) item.id: _ItemState(item),
+    };
+    final sortedMovements = [...movements]
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    for (final movement in sortedMovements) {
+      final item = trackedItems[movement.stockItemId];
+      if (item == null ||
+          movement.timestamp.isBefore(item.createdAt) ||
+          movement.reason == 'Initial Opening Stock') {
+        continue;
+      }
+      final state = states[item.id]!;
+      
+      final inTargetMonth = movement.timestamp.year == year && movement.timestamp.month == month;
+      final dayIndex = inTargetMonth ? movement.timestamp.day - 1 : -1;
+
+      _applyMovement(
+        item: item,
+        state: state,
+        movement: movement,
+        onPurchase: (quantity, value) {
+          if (inTargetMonth && dayIndex >= 0 && dayIndex < daysInMonth) {
+            if (movement.type == StockMovementType.purchase) {
+              daily[dayIndex].purchase += value;
+            } else if (movement.type == StockMovementType.supplierReturn) {
+              daily[dayIndex].purchase -= value;
+            }
+          }
+        },
+        onSale: (quantity, revenue, profit, uncostedQuantity) {
+          if (inTargetMonth && dayIndex >= 0 && dayIndex < daysInMonth) {
+            if (movement.type == StockMovementType.sale) {
+              daily[dayIndex].sales += revenue;
+              daily[dayIndex].profit += profit;
+            } else if (movement.type == StockMovementType.customerReturn) {
+              daily[dayIndex].sales -= revenue;
+              daily[dayIndex].profit -= profit;
+            }
+          }
+        },
+      );
+    }
+
+    return daily;
+  }
+
   static List<StockItemStats> buildItemStats({
     required List<StockItem> items,
     required List<StockMovement> movements,

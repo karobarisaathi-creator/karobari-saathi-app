@@ -140,7 +140,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       decoration: BoxDecoration(
         gradient: LinearGradient(
             colors: [AppTheme.themeColor, const Color(0xFF1E3A8A)]),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -218,7 +218,7 @@ class _NotificationListTabState extends State<_NotificationListTab>
     return RefreshIndicator(
       onRefresh: widget.onRefresh,
       child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         itemCount: allNotifications.length,
         itemBuilder: (context, index) {
           final n = allNotifications[index];
@@ -237,11 +237,11 @@ class _NotificationListTabState extends State<_NotificationListTab>
             final isAdded = data['isAdded'] == true;
 
             return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              margin: const EdgeInsets.symmetric(vertical: 4),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.02),

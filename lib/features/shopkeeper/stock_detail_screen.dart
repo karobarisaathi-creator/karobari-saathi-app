@@ -66,7 +66,7 @@ class StockDetailScreen extends StatelessWidget {
         title: isUrdu ? 'آئٹم تفصیل' : 'Item Details',
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+        padding: const EdgeInsets.fromLTRB(8, 12, 8, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -80,23 +80,23 @@ class StockDetailScreen extends StatelessWidget {
               isUrdu,
               fontFamily,
             ),
-            const SizedBox(height: 14),
 
             // ═══ 2. Quick Actions ═══
             if (item.trackStock) ...[
+              const SizedBox(height: 8),
               _buildActionButtons(context, isUrdu, fontFamily),
-              const SizedBox(height: 14),
+              const SizedBox(height: 8),
             ],
 
             // ═══ 3. Pricing Card ═══
             _buildPricingCard(avgCost, isUrdu, fontFamily),
-            const SizedBox(height: 14),
 
             // ═══ 4. Details Card ═══
             if (_hasDetails()) ...[
               _buildDetailsCard(isUrdu, fontFamily),
-              const SizedBox(height: 14),
             ],
+
+            const SizedBox(height: 8),
 
             // ═══ 5. Movement History ═══
             _buildHistorySection(
@@ -193,7 +193,7 @@ class StockDetailScreen extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [Color(0xFFFFFFFF), Color(0xFFFAFCFF)],
         ),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
         boxShadow: [
           BoxShadow(
@@ -901,11 +901,11 @@ class StockDetailScreen extends StatelessWidget {
             ),
           if (item.description.isNotEmpty)
             Container(
-              margin: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+              margin: const EdgeInsets.fromLTRB(0, 4, 0, 4),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: AppTheme.backgroundColor.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: AppTheme.backgroundColor,
                   width: 1,
@@ -1161,11 +1161,11 @@ class StockDetailScreen extends StatelessWidget {
     final qtyAbs = movement.quantity.abs();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: AppTheme.backgroundColor,
           width: 1.5,
@@ -1268,9 +1268,10 @@ class StockDetailScreen extends StatelessWidget {
     String? fontFamily,
   }) {
     return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
         boxShadow: [
           BoxShadow(

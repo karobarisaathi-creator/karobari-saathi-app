@@ -35,10 +35,10 @@ class NotificationCard extends StatelessWidget {
     final isAdded = data?['isAdded'] == true;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.02),
@@ -49,7 +49,7 @@ class NotificationCard extends StatelessWidget {
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         child: Column(
           children: [
             if (isSystem) _buildSystemHeader(),

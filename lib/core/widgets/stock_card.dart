@@ -99,7 +99,7 @@ class StockCard extends StatelessWidget {
         : 1.0;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: AppTheme.lightColor,
         borderRadius: BorderRadius.circular(20),

@@ -137,10 +137,10 @@ class _PartyCardState extends State<PartyCard> {
          (remoteAddress.isNotEmpty && remoteAddress != localAddress));
 
     return Container(
-      margin: widget.margin ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      margin: widget.margin ?? const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -153,7 +153,7 @@ class _PartyCardState extends State<PartyCard> {
         color: Colors.transparent,
         child: InkWell(
           onTap: widget.onView,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           child: Column(
             children: [
               Padding(

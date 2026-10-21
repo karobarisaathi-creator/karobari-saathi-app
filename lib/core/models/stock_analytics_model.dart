@@ -179,3 +179,17 @@ class StockPartyItemStats {
     required this.value,
   });
 }
+
+class StockDailyStats {
+  final int day;
+  double sales;
+  double purchase;
+  double profit;
+
+  StockDailyStats({
+    required this.day,
+    this.sales = 0,
+    this.purchase = 0,
+    this.profit = 0,
+  });
+}

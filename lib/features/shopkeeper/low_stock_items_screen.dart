@@ -62,7 +62,7 @@ class LowStockItemsScreen extends StatelessWidget {
               ),
             )
           : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(0, 12, 0, 24),
+              padding: const EdgeInsets.fromLTRB(8, 12, 8, 24),
               itemCount: lowStockItems.length,
               itemBuilder: (context, index) {
                 final item = lowStockItems[index];

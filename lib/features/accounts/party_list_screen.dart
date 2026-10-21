@@ -292,7 +292,7 @@ class _PartyListScreenState extends State<PartyListScreen> {
     );
 
     return ListView.builder(
-      padding: EdgeInsets.zero,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       itemCount: headers.length +
           filteredParties.length +
           (filteredParties.isEmpty ? 1 : 0),

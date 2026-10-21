@@ -283,7 +283,7 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
                   sub: 'دوسرا نام آزمائیں',
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(0, 4, 0, 24),
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 24),
                   itemCount: filtered.length,
                   itemBuilder: (context, i) => ShopCardWidget(
                     shop: filtered[i],
