@@ -1,0 +1,91 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- سیکیورٹی ہیلپرز ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // --- ایپ سیٹنگز ---
+    match /settings/{document} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /userData/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // --- صارفین کا ڈیٹا (کھاتہ، ٹرانزیکشنز) ---
+    match /backups/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /public_shops/{shopId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isOwner(shopId);
+
+      match /items/{itemId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isOwner(shopId);
+      }
+
+      match /orders/{orderId} {
+        allow create: if isSignedIn()
+          && request.resource.data.customerId == request.auth.uid
+          && request.resource.data.shopId == shopId
+          && request.resource.data.status == 'pending';
+        allow read: if isOwner(shopId)
+          || (isSignedIn() && resource.data.customerId == request.auth.uid);
+        allow update: if isOwner(shopId)
+          || (isSignedIn()
+            && resource.data.customerId == request.auth.uid
+            && resource.data.status == 'pending'
+            && request.resource.data.status == 'cancelled'
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['status', 'cancelledAt']));
+        allow delete: if false;
+      }
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId);
+
+      match /accounts/{accountId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /categories/{categoryId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /professions/{professionId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /transactions/{transactionId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /stock_items/{itemId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /stock_movements/{movementId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /notifications/{notificationId} {
+        allow read, delete, update: if isOwner(userId);
+        allow create: if isSignedIn();
+      }
+    }
+
+    match /{path=**}/orders/{orderId} {
+      allow read: if isSignedIn()
+        && resource.data.customerId == request.auth.uid;
+    }
+
+    // --- گلوبل سرچ سپورٹ ---
+  }
+}

@@ -1,0 +1,138 @@
+# 📱 Karobari Saathi - Project Documentation (پروجیکٹ گائیڈ)
+
+This document provides a detailed overview of each screen and its functionality within the application.
+اس دستاویز میں ایپ کی ہر اسکرین اور اس کے فیچرز کی مکمل تفصیل اردو اور انگلش میں دی گئی ہے۔
+
+---
+
+## 1. Dashboard Screen (ڈیش بورڈ اسکرین)
+**Main Hub of the App / ایپ کا مرکزی حصہ**
+
+*   **English:**
+    *   **Net Balance:** View total amounts to receive and pay at a glance.
+    *   **Party List:** Search and manage all your business contacts (Parties).
+    *   **Profession Stats:** Real-time summary of profit/loss for your active businesses.
+    *   **Quick Actions:** Add new parties or access notifications instantly.
+*   **اردو:**
+    *   **کل بیلنس:** ایک نظر میں دیکھیں کہ کتنے پیسے لینے ہیں اور کتنے دینے ہیں۔
+    *   **پارٹی لسٹ:** تمام کاروباری ساتھیوں کو تلاش اور مینیج کریں۔
+    *   **پیشوں کی رپورٹ:** جاری کاروباروں کے منافع اور نقصان کا فوری خلاصہ۔
+    *   **فوری بٹن:** نئی پارٹی شامل کرنے یا نوٹیفیکیشنز تک رسائی۔
+
+---
+
+## 2. Party Detail Screen (پارٹی کی تفصیلات)
+**Managing specific accounts / مخصوص کھاتہ مینیج کرنا**
+
+*   **English:**
+    *   **Transaction Ledger:** View all money-in and money-out records for a specific person.
+    *   **Profession Reference:** See which business/project a transaction belongs to.
+    *   **PDF Reports:** Generate and share professional PDF statements.
+    *   **Bulk Entry:** Add multiple entries quickly using the "Page Entry" feature.
+*   **اردو:**
+    *   **لین دین کا ریکارڈ:** کسی خاص بندے کے ساتھ تمام پیسوں کا حساب کتاب دیکھیں۔
+    *   **پیشے کا حوالہ:** دیکھیں کہ کون سا لین دین کس کاروبار یا کام کی مد میں ہوا۔
+    *   **پی ڈی ایف رپورٹ:** کھاتے کی پروفیشنل رپورٹ بنائیں اور شیئر کریں۔
+    *   **پیج انٹری:** ایک ساتھ کئی انٹریز جلدی سے درج کریں۔
+
+---
+
+## 3. Add Transaction Screen (نیا لین دین)
+**Recording money flow / رقم کا اندراج**
+
+*   **English:**
+    *   **Smart Item Search:** Auto-suggests items and previous rates while typing.
+    *   **Profession Selection:** Link transactions to a specific active business for profit calculation.
+    *   **Bill Images:** Attach photos of receipts or bills for record-keeping.
+    *   **Dual Entry:** Record both "Received" and "Paid" amounts easily.
+*   **اردو:**
+    *   **سمارٹ سرچ:** آئٹم کا نام لکھتے وقت پرانے ریٹ اور نام خود بخود تجویز کرنا۔
+    *   **پیشہ منتخب کریں:** ٹرانزیکشن کو کسی خاص کاروبار سے جوڑیں تاکہ منافع کا حساب درست رہے۔
+    *   **بل کی تصاویر:** رسید یا بل کی تصویر ریکارڈ کے لیے محفوظ کریں۔
+    *   **ڈبل انٹری:** رقم لی (جمع) یا رقم دی (بنام) کا آسان اندراج۔
+
+---
+
+## 4. Profession Detail Screen (پیشے کی مکمل رپورٹ)
+**Business Analytics / کاروباری تجزیہ**
+
+*   **English:**
+    *   **Live Profit/Loss:** Automatically calculates totals from linked transactions.
+    *   **Cross Reference:** Shows which Party (Account) paid or received the money in the list.
+    *   **Cost Per Unit:** Tracks expenses against production (e.g., Cost per KG in Agriculture).
+*   **اردو:**
+    *   **لائیو منافع/نقصان:** منسلک ٹرانزیکشنز سے خودکار حساب کتاب۔
+    *   **کھاتہ دار کا نام:** لسٹ میں دیکھیں کہ کس پارٹی سے کتنا لین دین ہوا۔
+    *   **فی یونٹ لاگت:** پیداوار کے مقابلے میں خرچے کا حساب (جیسے فی کلو لاگت)۔
+
+---
+
+## 5. Party History Screen (تجزیہ و ریکارڈ)
+**Advanced analysis / گہرا تجزیہ**
+
+*   **English:**
+    *   **Rate History:** Track how item prices changed over time with this party.
+    *   **Hide Feature:** Swipe to hide specific rates from history without affecting balance.
+    *   **Trust Score:** A 5-star rating based on payment frequency and volume.
+*   **اردو:**
+    *   **ریٹ ہسٹری:** دیکھیں کہ وقت کے ساتھ آئٹمز کے ریٹ میں کیا تبدیلی آئی۔
+    *   **چھپانے کا فیچر:** بیلنس خراب کیے بغیر کسی ریٹ کو لسٹ سے غائب کرنا۔
+    *   **اعتماد کا اسکور:** ادائیگیوں کی ترتیب اور حجم پر مبنی 5 سٹار ریٹنگ۔
+
+---
+
+## 6. Notifications Screen (اطلاعات)
+**Real-time Alerts / الرٹس**
+
+*   **English:**
+    *   **Transaction Alerts:** Get notified when someone adds an entry for you.
+    *   **Add to Ledger:** Instantly add a received notification into your own records with one click.
+    *   **Real-time Sync:** Screen updates instantly as new notifications arrive.
+*   **اردو:**
+    *   **لین دین کے الرٹ:** جب کوئی آپ کے نام انٹری کرے تو فوری اطلاع ملنا۔
+    *   **کھاتے میں شامل کریں:** موصولہ اطلاع کو ایک کلک سے اپنے ریکارڈ میں درج کریں۔
+    *   **فوری اپ ڈیٹ:** نئے میسج آتے ہی اسکرین خود بخود اپ ڈیٹ ہو جاتی ہے۔
+
+---
+
+## 10. Professions & Seasons (پیشے اور سیزن)
+**Advanced Business Tracking / کاروباری حساب کتاب کا مکمل نظام**
+
+*   **English:**
+    *   **Master-Season Hierarchy:** Group multiple cyclical projects (Seasons) under one Master Profession (e.g., "Wheat Farming" -> 2023, 2024).
+    *   **How to Start:** Click the "+" button, choose a professional icon, and write a detailed 4-line description for your record.
+    *   **The Dashboard:** Top header shows your **Total Income, Expense, and Net Profit**.
+    *   **Active Season:** Stays at the top with a dedicated card. All its transactions are listed directly inside this card for quick viewing.
+    *   **Adding Records:** Use the floating (+) button at the bottom right to add daily expenses or income for the active season.
+    *   **Legacy Data:** Records created before this update will appear as a **"Base Record"** under the completed list.
+    *   **Silent New Season:** Click "Start New Season" to auto-create a new record for the current year. It copies your settings automatically.
+    *   **Reactivate (Long Press):** Long-press any old season to make it "Active" again. Note: This will automatically mark your current active season as "Completed".
+    *   **Delete (Long Press):** Long-press and confirm via checkbox to delete a season and all its linked transactions.
+    *   **Category Management:** Click the Gear icon to set custom labels (e.g., Seeds, Wages). These apply to all future seasons you start.
+*   **اردو:**
+    *   **ماسٹر-سیزن سسٹم:** ایک بڑے پیشے کے تحت اپنے ہر سال یا ہر باری کا الگ حساب رکھیں (مثلاً: "گندم" کے اندر 2023 اور 2024 کا الگ حساب)۔
+    *   **آغاز کیسے کریں:** پلس (+) بٹن دبائیں، ایک خوبصورت آئیکن چنیں اور 4 لائنوں میں اپنے کام کی تفصیل لکھیں تاکہ ریکارڈ یاد رہے۔
+    *   **ڈیش بورڈ:** اوپر پٹی میں پورے پیشے کی **کل آمدنی، خرچ اور بچت** دیکھیں۔ 
+    *   **جاری سیزن:** یہ ہمیشہ سکرین پر سب سے اوپر ایک بڑے کارڈ میں نظر آئے گا۔ اس کی تمام ٹرانزیکشنز اسی کارڈ کے اندر ہی شو ہوں گی۔
+    *   **اندراج:** نیچے دائیں طرف موجود پلس (+) بٹن سے صرف جاری سیزن کے اخراجات یا آمدنی ڈالیں۔ 
+    *   **پرانا ڈیٹا:** اس اپ ڈیٹ سے پہلے کی تمام ٹرانزیکشنز آپ کو **"بنیادی ریکارڈ"** کے نام سے پرانی لسٹ میں ملیں گی۔
+    *   **نیا سال/سیزن:** سال ختم ہونے پر صرف ایک کلک سے نیا سیزن شروع کریں، نام اور کیٹیگریز خود بخود پرانے ریکارڈ سے آ جائیں گی۔
+    *   **دوبارہ فعال کریں (لانگ پریس):** کسی بھی پرانے سیزن کو تھوڑی دیر دبا کر رکھیں تو وہ دوبارہ "جاری" ہو جائے گا۔ (یاد رہے: ایسا کرنے سے موجودہ جاری سیزن خود بخود "مکمل" ہو جائے گا)۔
+    *   **حفاظتی ڈیلیٹ (لانگ پریس):** سیزن کو دبا کر رکھیں اور ڈیلیٹ منتخب کریں۔ غلطی سے بچنے کے لیے پہلے چیک باکس پر ٹک کرنا لازمی ہے۔
+    *   **زمرہ سیٹنگز:** اوپر سیٹنگز (Gear) بٹن سے اپنی مرضی کے زمرے بنائیں (مثلاً: بیج، ڈیزل، مزدوری) جو ہر نئے سیزن میں کام آئیں گے۔
+
+---
+
+## 11. Shopkeeper & Stock (دکاندار اور اسٹاک)
+* **English:**
+    * Record stock-in, stock-out, returns, and stocktakes. For a stocktake, enter the **counted total quantity**; the app records the signed difference.
+    * Opening stock is fixed after item creation. Use a stocktake adjustment to correct inventory without rewriting its opening balance.
+    * Archived items are removed from new bills while their movement history and analytics remain available.
+    * Quick Bill reports a stock-sync failure after saving and offers a retry. A return entry changes stock only; record any customer or supplier balance adjustment separately.
+* **اردو:**
+    * اسٹاک کی آمد، فروخت، واپسی اور گنتی درج کریں۔ اسٹاک گنتے وقت **کل گنی ہوئی مقدار** لکھیں؛ ایپ فرق کو خود ریکارڈ کرے گی۔
+    * آئٹم بنانے کے بعد ابتدائی اسٹاک مقرر رہتا ہے۔ موجودہ مقدار درست کرنے کے لیے اسٹاک گنتی/ایڈجسٹمنٹ استعمال کریں۔
+    * آرکائیو آئٹم نئے بلوں سے ہٹ جاتی ہے، مگر اس کی پرانی ہسٹری اور رپورٹ برقرار رہتی ہے۔
+    * Quick Bill میں اسٹاک سنک ناکام ہو تو ایپ دوبارہ کوشش دیتی ہے۔ واپسی صرف اسٹاک بدلتی ہے؛ گاہک یا سپلائر کے کھاتے کی تبدیلی الگ درج کریں۔
+
+---

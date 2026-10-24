@@ -1,0 +1,88 @@
+# Miscellaneous
+.env
+*.env
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+.artifacts/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Android-specific ignores
+.gradle/
+android/.gradle/
+android/wrapper/dists/
+android/app/src/main/res/raw/
+*.keystore
+*.jks
+android/key.properties
+
+# iOS-specific ignores
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/GeneratedPluginRegistrant.h
+ios/Flutter/GeneratedPluginRegistrant.m
+ios/Runner/GeneratedPluginRegistrant.h
+ios/Runner/GeneratedPluginRegistrant.m
+ios/Podfile.lock
+ios/Pods/
+ios/Runner/GeneratedPluginRegistrant.swift
+
+# MacOS-specific ignores
+macos/Flutter/Generated.xcconfig
+macos/Flutter/flutter_export_environment.sh
+macos/Flutter/ephemeral/
+macos/Pods/
+
+# Linux-specific ignores
+linux/flutter/ephemeral/
+
+# Windows-specific ignores
+windows/flutter/ephemeral/
+
+# Web-specific ignores
+web/flutter_service_worker.js

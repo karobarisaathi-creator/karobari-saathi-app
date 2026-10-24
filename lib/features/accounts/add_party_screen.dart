@@ -1,0 +1,690 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:flutter_contacts/flutter_contacts.dart' hide Account;
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:io';
+import 'dart:async';
+import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/services/language_service.dart';
+import 'package:account_app/core/services/database_service.dart';
+import 'package:account_app/core/services/auto_sync_service.dart';
+import 'package:account_app/core/models/account_model.dart';
+import 'package:account_app/core/utils/helpers.dart';
+import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/core/theme/app_theme.dart';
+import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/widgets/profile_info_widget.dart';
+import 'package:account_app/core/widgets/category_chip.dart';
+import 'package:account_app/core/widgets/app_filter_chip.dart';
+import 'package:account_app/core/widgets/image_selector_field.dart';
+import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
+import 'package:account_app/l10n/app_localizations.dart';
+
+class AddPartyScreen extends StatefulWidget {
+  final Account? partyToEdit;
+
+  const AddPartyScreen({Key? key, this.partyToEdit}) : super(key: key);
+
+  @override
+  _AddPartyScreenState createState() => _AddPartyScreenState();
+}
+
+class _AddPartyScreenState extends State<AddPartyScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+
+  late String _selectedCategory;
+  File? _profileImage;
+  String? _remoteImageUrl; // For profiles found via global lookup
+  bool _isLoading = false;
+  bool _isSearchingProfile = false;
+  Map<String, String>? _foundProfile;
+
+  final ImagePicker _picker = ImagePicker();
+  final List<AppCategory> _partyCategories = CategoryChip.partyCategories;
+  Timer? _searchTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.addListener(_updatePreview);
+    _addressController.addListener(_updatePreview);
+    _phoneController.addListener(_onPhoneChanged);
+    
+    if (widget.partyToEdit != null) {
+      _nameController.text = widget.partyToEdit!.name;
+      _phoneController.text = widget.partyToEdit!.phone;
+      _addressController.text = widget.partyToEdit!.address ?? '';
+      
+      _selectedCategory = widget.partyToEdit!.category;
+
+      if (widget.partyToEdit!.profileImage != null) {
+        final imgPath = widget.partyToEdit!.profileImage!.trim();
+        if (imgPath.startsWith('http')) {
+          _remoteImageUrl = imgPath;
+        } else if (!imgPath.startsWith('assets/')) {
+          final file = File(imgPath);
+          if (file.existsSync()) {
+            _profileImage = file;
+          }
+        }
+      }
+    } else {
+      _selectedCategory = 'general';
+    }
+  }
+
+  void _updatePreview() {
+    setState(() {});
+  }
+
+  void _onPhoneChanged() {
+    _updatePreview();
+    
+    // Global profile lookup logic
+    final phone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+    if (phone.length >= 10) {
+      if (_searchTimer?.isActive ?? false) _searchTimer!.cancel();
+      _searchTimer = Timer(const Duration(milliseconds: 800), () {
+        _lookupProfile(phone);
+      });
+    } else {
+      if (_foundProfile != null) {
+        setState(() => _foundProfile = null);
+      }
+    }
+  }
+
+  Future<void> _lookupProfile(String phone) async {
+    if (widget.partyToEdit != null) return; // Don't lookup in edit mode
+
+    setState(() => _isSearchingProfile = true);
+    final dbService = Provider.of<DatabaseService>(context, listen: false);
+    final profile = await dbService.findPublicProfileByPhone(phone);
+    
+    if (mounted) {
+      setState(() {
+        _foundProfile = profile;
+        _isSearchingProfile = false;
+      });
+    }
+  }
+
+  void _useFoundProfile() {
+    if (_foundProfile == null) return;
+    setState(() {
+      _nameController.text = _foundProfile!['name'] ?? _nameController.text;
+      if (_foundProfile!['address']?.isNotEmpty == true) {
+        _addressController.text = _foundProfile!['address']!;
+      }
+      _remoteImageUrl = _foundProfile!['photoUrl'];
+      _profileImage = null; // Clear local image if using remote
+      _foundProfile = null; // Hide the lookup card
+    });
+  }
+
+
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final languageService = Provider.of<LanguageService>(context);
+    final isUrdu = languageService.isUrdu;
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
+    final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
+
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
+      appBar: CustomAppBar(
+        title: widget.partyToEdit != null ? l10n.editParty : l10n.addParty,
+      ),
+      body: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Profile Image Selector
+                    ImageSelectorField(
+                      isProfile: true,
+                      selectedFiles: _profileImage != null ? [_profileImage!] : [],
+                      remoteUrls: _remoteImageUrl != null && _remoteImageUrl!.isNotEmpty ? [_remoteImageUrl!] : [],
+                      onFilesChanged: (files) {
+                        setState(() {
+                          _profileImage = files.isNotEmpty ? files.first : null;
+                          if (files.isNotEmpty) _remoteImageUrl = null;
+                        });
+                      },
+                      onRemoteRemoved: (_) => setState(() => _remoteImageUrl = null),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Modern Live Preview / Found Profile Card
+                    Stack(
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: _foundProfile != null 
+                                  ? Colors.green.withOpacity(0.5) 
+                                  : AppTheme.themeColor.withOpacity(0.3),
+                              width: 1.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                ProfileInfoWidget(
+                                  name: (_foundProfile != null && _nameController.text.isEmpty)
+                                      ? (_foundProfile!['name'] ?? l10n.partyName)
+                                      : (_nameController.text.isEmpty ? l10n.partyName : _nameController.text),
+                                  phone: _phoneController.text.isEmpty ? '03000000000' : _phoneController.text,
+                                  profileImage: _remoteImageUrl ?? (_foundProfile != null && _profileImage == null ? _foundProfile!['photoUrl'] : null) ?? _profileImage?.path ?? widget.partyToEdit?.profileImage,
+                                  category: _foundProfile != null 
+                                      ? (_foundProfile!['profession']?.isNotEmpty == true 
+                                          ? _foundProfile!['profession'] 
+                                          : (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account'))
+                                      : (isUrdu ? 'نیا کھاتہ' : 'New Account'),
+                                  address: _foundProfile != null 
+                                      ? (_foundProfile!['address']?.isNotEmpty == true 
+                                          ? _foundProfile!['address'] 
+                                          : (isUrdu ? 'پہلے سے موجود اکاؤنٹ' : 'Existing Account')) 
+                                      : (_addressController.text.isNotEmpty ? _addressController.text : null),
+                                  isLarge: true,
+                                  isVerticalCategory: true,
+                                  customSize: 90, // تصویر کا سائز بڑھا دیا گیا
+                                ),
+                                if (_foundProfile != null) ...[
+                                  const Divider(height: 24, thickness: 0.5),
+                                  AppButton(
+                                    text: isUrdu ? 'یہ معلومات استعمال کریں' : 'Use this information',
+                                    onPressed: _useFoundProfile,
+                                    icon: PhosphorIcons.checkCircle(PhosphorIconsStyle.fill),
+                                    isFullWidth: true,
+                                    color: Colors.green,
+                                    size: AppButtonSize.large,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (_foundProfile != null)
+                          Positioned.directional(
+                            textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
+                            top: 0,
+                            end: 0,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                borderRadius: BorderRadius.only(
+                                  topRight: isUrdu ? Radius.zero : const Radius.circular(16),
+                                  bottomLeft: isUrdu ? Radius.zero : const Radius.circular(16),
+                                  topLeft: isUrdu ? const Radius.circular(16) : Radius.zero,
+                                  bottomRight: isUrdu ? const Radius.circular(16) : Radius.zero,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)
+                                ],
+                              ),
+                              child: UrduAwareText(
+                                isUrdu ? 'اکاؤنٹ ملا' : 'Account Found',
+                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+              
+                    // Phone Field (Moved Up for better lookup experience)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _phoneController,
+                            label: l10n.phone,
+                            icon: PhosphorIcons.phone(),
+                            isPhone: true,
+                            fontFamily: '',
+                            fontWeight: FontWeight.bold,
+                            suffix: _isSearchingProfile ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.themeColor)) : null,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) return l10n.invalidPhone;
+                              if (!RegExp(r'^[\d\+\-\s]+$').hasMatch(value)) return l10n.invalidPhone;
+                              return null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        AppButton(
+                          onPressed: () => _showPhoneSelectionDialog(isUrdu, fontFamily, fontWeight),
+                          icon: PhosphorIcons.addressBook(),
+                          text: '',
+                          color: AppTheme.darkColor,
+                          size: AppButtonSize.large,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Name Field
+                    _buildTextField(
+                      controller: _nameController,
+                      label: l10n.name,
+                      icon: PhosphorIcons.user(),
+                      fontFamily: fontFamily,
+                      fontWeight: fontWeight,
+                      validator: (value) => value == null || value.isEmpty ? l10n.invalidName : null,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Address Field
+                    _buildTextField(
+                      controller: _addressController,
+                      label: l10n.address,
+                      icon: PhosphorIcons.mapPin(),
+                      fontFamily: fontFamily,
+                      fontWeight: fontWeight,
+                    ),
+                    const SizedBox(height: 40),
+              
+                    // Save Button
+                    AppButton(
+                      text: l10n.save,
+                      onPressed: _saveParty,
+                      icon: PhosphorIcons.floppyDisk(),
+                      isFullWidth: true,
+                      size: AppButtonSize.large,
+                      color: AppTheme.darkColor,
+                      isLoading: _isLoading,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildSectionLabel(String label, bool isUrdu, String fontFamily) {
+    return Align(
+      alignment: isUrdu ? Alignment.centerRight : Alignment.centerLeft,
+      child: UrduAwareText(
+        label,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: isUrdu ? FontWeight.bold : FontWeight.bold,
+          color: AppTheme.darkColor.withOpacity(0.7),
+          fontFamily: fontFamily,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    IconData? icon,
+    bool isPhone = false,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+    required String fontFamily,
+    required FontWeight fontWeight,
+    Widget? suffix,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: isPhone ? TextInputType.phone : TextInputType.text,
+      maxLines: maxLines,
+      style: TextStyle(
+        color: AppTheme.darkColor,
+        fontFamily: isPhone ? '' : fontFamily,
+        fontWeight: isPhone ? FontWeight.bold : fontWeight,
+        fontSize: 16,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(fontFamily: fontFamily, color: AppTheme.textSecondary, fontSize: 14, fontWeight: fontWeight),
+        fillColor: Colors.white,
+        filled: true,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0),
+          borderSide: BorderSide(color: Colors.grey.shade200, width: 1),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0),
+          borderSide: BorderSide(color: Colors.grey.shade200, width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0),
+          borderSide: const BorderSide(color: AppTheme.themeColor, width: 1.5),
+        ),
+        prefixIcon: icon != null ? Icon(icon, color: AppTheme.darkColor.withOpacity(0.6), size: 20) : null,
+        suffixIcon: suffix != null ? Padding(padding: const EdgeInsets.all(12), child: suffix) : null,
+        alignLabelWithHint: maxLines > 1,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      ),
+      validator: validator,
+    );
+  }
+
+  Future<void> _showPhoneSelectionDialog(bool isUrdu, String fontFamily, FontWeight fontWeight) async {
+    if (await FlutterContacts.requestPermission()) {
+      List<Contact> contacts = await FlutterContacts.getContacts(withProperties: true, withPhoto: false);
+      contacts = contacts.where((c) => c.phones.isNotEmpty).toList();
+
+      showDialog(
+        context: context,
+        builder: (context) => _ContactSelectionDialog(
+          contacts: contacts,
+          isUrdu: isUrdu,
+          fontFamily: fontFamily,
+          fontWeight: fontWeight,
+          onSelect: (name, phone) {
+            setState(() {
+              _nameController.text = name;
+              _phoneController.text = phone.replaceAll(' ', '');
+            });
+            Navigator.pop(context);
+          },
+        ),
+      );
+    } else {
+      AppToast.warning(
+        context,
+        isUrdu
+            ? 'رابطوں تک رسائی کی اجازت نہیں دی گئی'
+            : 'Permission to access contacts denied',
+      );
+    }
+  }
+
+  Future<void> _saveParty() async {
+    final l10n = AppLocalizations.of(context);
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final databaseService = Provider.of<DatabaseService>(context, listen: false);
+
+      // Check for duplicate phone number
+      final existingAccounts = databaseService.getAccounts();
+      final cleanNewPhone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+      
+      bool isDuplicate = existingAccounts.any((a) {
+        String p1 = a.phone.replaceAll(RegExp(r'\D'), '');
+        String p2 = cleanNewPhone;
+        // Normalize 92 to 0
+        if (p1.startsWith('92')) p1 = '0${p1.substring(2)}';
+        if (p2.startsWith('92')) p2 = '0${p2.substring(2)}';
+        
+        return p1 == p2 && (widget.partyToEdit == null || a.id != widget.partyToEdit!.id);
+      });
+
+      if (isDuplicate) {
+        setState(() => _isLoading = false);
+        AppToast.warning(
+          context,
+          isUrdu
+              ? 'اس فون نمبر پر پہلے ہی ایک اکاؤنٹ موجود ہے۔'
+              : 'An account with this phone number already exists.',
+        );
+        return;
+      }
+
+      final syncService = Provider.of<AutoSyncService>(context, listen: false);
+
+      // Check connectivity
+      bool isConnected = false;
+      try {
+        final result = await InternetAddress.lookup('google.com');
+        if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+          isConnected = true;
+        }
+      } on SocketException catch (_) {
+        isConnected = false;
+      }
+
+      String? finalImagePath = _remoteImageUrl ?? _profileImage?.path ?? widget.partyToEdit?.profileImage;
+
+      if (widget.partyToEdit != null) {
+        // Edit Mode
+        final updatedParty = widget.partyToEdit!.copyWith(
+          name: _nameController.text,
+          phone: _phoneController.text,
+          address: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
+          category: _selectedCategory,
+          profileImage: finalImagePath,
+          updatedAt: DateTime.now(),
+        );
+
+        await databaseService.updateAccount(updatedParty);
+
+        AppToast.success(context, l10n.updatedSuccessfully);
+      } else {
+        // Add Mode
+        final party = Account(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          name: _nameController.text,
+          phone: _phoneController.text,
+          address: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
+          category: _selectedCategory,
+          initialBalance: 0.0,
+          balanceType: 'receivable',
+          balance: 0.0,
+          profileImage: finalImagePath,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          isActive: true,
+        );
+
+        await databaseService.addAccount(party);
+        
+        if (isConnected) {
+           try {
+             await syncService.syncNewAccount(party);
+           } catch (e) {
+             print("Sync error: $e");
+           }
+        }
+
+        AppToast.success(
+          context,
+          isConnected
+              ? l10n.addedSuccessfully
+              : (isUrdu
+                  ? 'پارٹی محفوظ ہوگئی (آف لائن)'
+                  : 'Party saved locally (Offline)'),
+        );
+      }
+
+      Navigator.pop(context);
+    } catch (e) {
+      AppToast.error(context, '${l10n.error}: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchTimer?.cancel();
+    _nameController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    super.dispose();
+  }
+}
+
+class _ContactSelectionDialog extends StatefulWidget {
+  final List<Contact> contacts;
+  final bool isUrdu;
+  final String fontFamily;
+  final FontWeight fontWeight;
+  final Function(String, String) onSelect;
+
+  const _ContactSelectionDialog({
+    Key? key,
+    required this.contacts,
+    required this.isUrdu,
+    required this.fontFamily,
+    required this.fontWeight,
+    required this.onSelect,
+  }) : super(key: key);
+
+  @override
+  __ContactSelectionDialogState createState() => __ContactSelectionDialogState();
+}
+
+class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
+  late List<Contact> _filteredContacts;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredContacts = widget.contacts;
+    _searchController.addListener(_filterContacts);
+  }
+
+  void _filterContacts() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _filteredContacts = widget.contacts.where((contact) {
+        final name = contact.displayName.toLowerCase();
+        final phone = contact.phones.isNotEmpty ? contact.phones.first.number : '';
+        return name.contains(query) || phone.contains(query);
+      }).toList();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+      title: UrduAwareText(
+        widget.isUrdu ? 'رابطوں سے منتخب کریں' : 'Select Contact',
+        style: TextStyle(
+          fontFamily: widget.fontFamily,
+          color: AppTheme.darkColor,
+          fontWeight: widget.fontWeight,
+        ),
+      ),
+      content: Container(
+        width: double.maxFinite,
+        height: 450,
+        child: Column(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F7F9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TextField(
+                controller: _searchController,
+                style: const TextStyle(color: AppTheme.darkColor, fontFamily: ''),
+                decoration: InputDecoration(
+                  hintText: widget.isUrdu ? 'تلاش کریں...' : 'Search...',
+                  hintStyle: TextStyle(fontFamily: widget.fontFamily, color: Colors.grey, fontWeight: widget.fontWeight),
+                  prefixIcon: Icon(PhosphorIcons.magnifyingGlass(), color: AppTheme.themeColor, size: 20),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: _filteredContacts.isEmpty
+                  ? Center(
+                      child: UrduAwareText(
+                        widget.isUrdu ? 'کوئی رابطہ نہیں ملا' : 'No contacts found',
+                        style: TextStyle(fontFamily: widget.fontFamily, color: AppTheme.textSecondary, fontWeight: widget.fontWeight),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      shrinkWrap: true,
+                      itemCount: _filteredContacts.length,
+                      itemBuilder: (context, index) {
+                        Contact contact = _filteredContacts[index];
+                        String phone = contact.phones.isNotEmpty ? contact.phones.first.number : (widget.isUrdu ? 'نمبر موجود نہیں' : 'No number');
+                        return Container(
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.withOpacity(0.1)),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: AppTheme.themeColor.withOpacity(0.1),
+                              child: UrduAwareText(
+                                contact.displayName.isNotEmpty ? contact.displayName[0] : '?',
+                                style: const TextStyle(color: AppTheme.themeColor, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            title: UrduAwareText(
+                              contact.displayName,
+                              style: TextStyle(
+                                fontFamily: widget.fontFamily,
+                                color: AppTheme.darkColor,
+                                fontWeight: widget.isUrdu ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                            subtitle: UrduAwareText(
+                              phone,
+                              style: const TextStyle(fontFamily: '', fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.bold),
+                            ),
+                            onTap: () => widget.onSelect(contact.displayName, phone),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: UrduAwareText(
+            widget.isUrdu ? 'منسوخ' : 'Cancel',
+            style: TextStyle(fontFamily: widget.fontFamily, color: AppTheme.expenseColor, fontWeight: widget.fontWeight),
+          ),
+        ),
+      ],
+    );
+  }
+}

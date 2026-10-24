@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "970333277244",
+    "project_id": "account-fec31",
+    "storage_bucket": "account-fec31.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:970333277244:android:7da2acc79d9f6dab6e0739",
+        "android_client_info": {
+          "package_name": "com.zalooq.account_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "970333277244-tc76ske59dvjpf13d4asd4dun988jae1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.zalooq.account_app",
+            "certificate_hash": "4f9f17834edc7feb9111cacb1672c1f31a823004"
+          }
+        },
+        {
+          "client_id": "970333277244-jaa93bilb9vf577bpsprd3ch9sfk3qsh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBS1LHJg1d9D1jK7gq0dXxW2Nv5w92W1Pc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "970333277244-jaa93bilb9vf577bpsprd3ch9sfk3qsh.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "970333277244-ook69dkk66hred763bgrd3fc4ho1b77v.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.accountApp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
