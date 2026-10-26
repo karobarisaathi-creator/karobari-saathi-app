@@ -700,7 +700,7 @@ class NotificationService with ChangeNotifier {
         bodyBuffer.writeln('کل رقم: Rs. ${amount.toStringAsFixed(0)}');
 
         if (items != null && items.isNotEmpty) {
-          bodyBuffer.writeln('--- آئٹمز ---');
+          bodyBuffer.writeln('--- اشیاء ---');
           for (final item in items) {
             final name = item['description'] ?? item['name'] ?? '';
             final qty = item['quantity'] ?? 1;

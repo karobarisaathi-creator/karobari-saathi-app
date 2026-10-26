@@ -247,7 +247,7 @@ class ExcelService with ChangeNotifier {
       Formatters.formatAmountWithCurrency(totalStockValue),
     ]);
     rows.add([
-      isUrdu ? 'کل آئٹمز' : 'Total Items',
+      isUrdu ? 'کل اشیاء' : 'Total Items',
       active.length.toString(),
     ]);
 

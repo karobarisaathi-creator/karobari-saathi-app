@@ -326,11 +326,11 @@ class PdfService with ChangeNotifier {
         children: [
           _buildText(isUrdu ? 'خلاصہ' : 'Summary', isUrdu, true, 14),
           pw.SizedBox(height: 10),
-          _buildSummaryRow(isUrdu ? 'کل آئٹمز:' : 'Total Items:',
+          _buildSummaryRow(isUrdu ? 'کل اشیاء:' : 'Total Items:',
               totalItems.toString(), isUrdu),
           _buildSummaryRow(isUrdu ? 'کل اسٹاک مالیت:' : 'Total Stock Value:',
               Formatters.formatAmountWithCurrency(totalValue), isUrdu),
-          _buildSummaryRow(isUrdu ? 'کم اسٹاک آئٹمز:' : 'Low Stock Items:',
+          _buildSummaryRow(isUrdu ? 'کم اسٹاک اشیاء:' : 'Low Stock Items:',
               lowStock.toString(), isUrdu,
               isBold: true,
               color: lowStock > 0 ? PdfColors.red : PdfColors.green),

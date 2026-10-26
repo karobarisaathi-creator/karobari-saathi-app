@@ -326,6 +326,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
     final databaseService =
         Provider.of<DatabaseService>(context, listen: false);
     final stockService = _stockService;

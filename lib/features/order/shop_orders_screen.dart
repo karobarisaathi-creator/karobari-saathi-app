@@ -32,7 +32,9 @@ class ShopOrdersScreen extends StatelessWidget {
         ),
         body: Center(
           child: UrduAwareText(
-            isUrdu ? 'آرڈرز دیکھنے کے لیے سائن اِن کریں' : 'Sign in to view orders',
+            isUrdu
+                ? 'آرڈرز دیکھنے کے لیے سائن اِن کریں'
+                : 'Sign in to view orders',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -132,7 +134,9 @@ class ShopOrdersScreen extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             UrduAwareText(
-              isUrdu ? 'ابھی کوئی آرڈر موصول نہیں ہوا' : 'No orders received yet',
+              isUrdu
+                  ? 'ابھی کوئی آرڈر موصول نہیں ہوا'
+                  : 'No orders received yet',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w900,
@@ -182,30 +186,44 @@ class _OrderCard extends StatefulWidget {
 class _OrderCardState extends State<_OrderCard> {
   bool _busy = false;
 
-  Future<void> _updateOrder({required bool accept}) async {
+  Future<void> _updateOrder({required String action}) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
       final service = ShopOrderService();
-      if (accept) {
-        await service.acceptOrder(
-          shopId: widget.shopId,
-          orderId: widget.orderId,
-        );
-      } else {
-        await service.rejectOrder(
-          shopId: widget.shopId,
-          orderId: widget.orderId,
-        );
+      switch (action) {
+        case 'accept':
+          await service.acceptOrder(
+            shopId: widget.shopId,
+            orderId: widget.orderId,
+          );
+          break;
+        case 'reject':
+          await service.rejectOrder(
+            shopId: widget.shopId,
+            orderId: widget.orderId,
+          );
+          break;
+        case 'deliver':
+          await service.markOrderDelivered(
+            shopId: widget.shopId,
+            orderId: widget.orderId,
+          );
+          break;
       }
       if (!mounted) return;
       AppToast.success(
         context,
-        accept
-            ? (widget.isUrdu
-                ? '✓ آرڈر قبول ہو گیا اور اسٹاک اپڈیٹ ہو گیا'
-                : '✓ Order accepted & stock updated')
-            : (widget.isUrdu ? 'آرڈر مسترد کر دیا گیا' : 'Order rejected'),
+        switch (action) {
+          'accept' => widget.isUrdu
+              ? '✓ آرڈر قبول ہو گیا اور اسٹاک اپڈیٹ ہو گیا'
+              : '✓ Order accepted & stock updated',
+          'reject' =>
+            widget.isUrdu ? 'آرڈر مسترد کر دیا گیا' : 'Order rejected',
+          _ => widget.isUrdu
+              ? 'آرڈر کی ڈیلیوری مکمل ہوگئی'
+              : 'Order marked as delivered',
+        },
       );
     } catch (error) {
       if (!mounted) return;
@@ -250,6 +268,18 @@ class _OrderCardState extends State<_OrderCard> {
         statusFg = AppTheme.expenseColor;
         statusIcon = PhosphorIcons.xCircle(PhosphorIconsStyle.fill);
         statusLabel = widget.isUrdu ? 'مسترد' : 'Rejected';
+        break;
+      case 'delivered':
+        statusBg = const Color(0xFFECFCCB);
+        statusFg = AppTheme.incomeColor;
+        statusIcon = PhosphorIcons.checkCircle(PhosphorIconsStyle.fill);
+        statusLabel = widget.isUrdu ? 'پہنچا دیا گیا' : 'Delivered';
+        break;
+      case 'cancelled':
+        statusBg = const Color(0xFFFEE2E2);
+        statusFg = AppTheme.expenseColor;
+        statusIcon = PhosphorIcons.xCircle(PhosphorIconsStyle.fill);
+        statusLabel = widget.isUrdu ? 'منسوخ' : 'Cancelled';
         break;
       default:
         statusBg = const Color(0xFFFEF3C7);
@@ -408,6 +438,27 @@ class _OrderCardState extends State<_OrderCard> {
               ),
             ],
 
+            if ((widget.data['note'] ?? '').toString().trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.backgroundColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: UrduAwareText(
+                  '${widget.isUrdu ? 'نوٹ' : 'Note'}: ${widget.data['note']}',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textSecondary,
+                    fontFamily: widget.fontFamily,
+                  ),
+                ),
+              ),
+            ],
+
             const SizedBox(height: 10),
             const Divider(color: Color(0xFFEEF1F5), height: 1),
             const SizedBox(height: 10),
@@ -448,7 +499,8 @@ class _OrderCardState extends State<_OrderCard> {
                       variant: AppButtonVariant.outlined,
                       color: AppTheme.expenseColor,
                       isLoading: _busy,
-                      onPressed: _busy ? null : () => _updateOrder(accept: false),
+                      onPressed:
+                          _busy ? null : () => _updateOrder(action: 'reject'),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -458,10 +510,24 @@ class _OrderCardState extends State<_OrderCard> {
                       variant: AppButtonVariant.primary,
                       color: AppTheme.incomeColor,
                       isLoading: _busy,
-                      onPressed: _busy ? null : () => _updateOrder(accept: true),
+                      onPressed:
+                          _busy ? null : () => _updateOrder(action: 'accept'),
                     ),
                   ),
                 ],
+              ),
+            ] else if (status == 'accepted') ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: AppButton(
+                  text: widget.isUrdu ? 'ڈیلیوری مکمل کریں' : 'Mark Delivered',
+                  variant: AppButtonVariant.primary,
+                  color: AppTheme.incomeColor,
+                  isLoading: _busy,
+                  onPressed:
+                      _busy ? null : () => _updateOrder(action: 'deliver'),
+                ),
               ),
             ],
           ],

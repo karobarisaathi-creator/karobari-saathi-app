@@ -1,4 +1,5 @@
 import 'package:account_app/features/shopkeeper/stock_history_screen.dart';
+import 'package:account_app/features/order/shop_orders_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -521,7 +522,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
               child: _quickActionCard(
                 isUrdu: isUrdu,
                 fontFamily: fontFamily,
-                title: isUrdu ? 'اسٹاک آئٹمز' : 'Stock Items',
+                title: isUrdu ? 'اسٹاک اشیاء' : 'Stock Items',
                 sub: isUrdu
                     ? 'تمام اسٹاک پراڈکٹس کی لسٹ'
                     : 'All inventory stock items',
@@ -808,7 +809,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                   const SizedBox(height: 2),
                   UrduAwareText(
                     isUrdu
-                        ? '$lowStockCount آئٹمز اسٹاک سے کم ہیں'
+                        ? '$lowStockCount اشیاء اسٹاک سے کم ہیں'
                         : '$lowStockCount items below minimum stock',
                     style: TextStyle(
                       fontFamily: fontFamily,
@@ -1001,7 +1002,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                             style: const TextStyle(fontFamily: null),
                           ),
                           TextSpan(
-                            text: ' آئٹمز',
+                            text: ' اشیاء',
                             style: TextStyle(fontFamily: fontFamily),
                           ),
                         ],
@@ -1094,7 +1095,7 @@ class _StockListScreenState extends State<StockListScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
-        title: isUrdu ? 'اسٹاک آئٹمز' : 'Stock Items',
+        title: isUrdu ? 'اسٹاک اشیاء' : 'Stock Items',
         backgroundColor: AppTheme.darkColor,
         elevation: 0,
         showBackButton: Navigator.canPop(context),

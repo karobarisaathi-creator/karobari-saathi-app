@@ -66,6 +66,7 @@ class MyOrder {
   final double delivery;
   final double discount;
   final double total;
+  final String note;
   final String paymentMethod;
   final String address;
   final List<OrderTimelineStep> timeline;
@@ -85,6 +86,7 @@ class MyOrder {
     required this.delivery,
     required this.discount,
     required this.total,
+    required this.note,
     required this.paymentMethod,
     required this.address,
     required this.timeline,
@@ -141,7 +143,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
         : <OrderItem>[];
     final status = switch (data['status']) {
       'accepted' => 'confirmed',
-      'rejected' => 'cancelled',
+      'rejected' || 'cancelled' => 'cancelled',
       final String value => value,
       _ => 'pending',
     };
@@ -156,6 +158,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     final acceptedAt = data['acceptedAt'];
     final rejectedAt = data['rejectedAt'];
     final cancelledAt = data['cancelledAt'];
+    final deliveredAt = data['deliveredAt'];
     final timeline = <OrderTimelineStep>[
       OrderTimelineStep(
         label: isUrdu ? 'آرڈر دیا گیا' : 'Order placed',
@@ -185,6 +188,15 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
           time: '—',
           state: status == 'confirmed' ? 'active' : 'done',
         ),
+        if (status == 'delivered')
+          OrderTimelineStep(
+            label: isUrdu ? 'آرڈر پہنچا دیا گیا' : 'Order delivered',
+            time: deliveredAt is Timestamp
+                ? DateFormat('dd MMM yyyy, hh:mm a')
+                    .format(deliveredAt.toDate())
+                : '—',
+            state: 'done',
+          ),
       ],
     ];
 
@@ -204,6 +216,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
       delivery: (data['deliveryFee'] as num?)?.toDouble() ?? 0,
       discount: (data['discount'] as num?)?.toDouble() ?? 0,
       total: total,
+      note: (data['note'] ?? '').toString(),
       paymentMethod:
           (data['paymentMethod'] ?? (isUrdu ? 'متعین نہیں' : 'Not specified'))
               .toString(),
@@ -247,13 +260,15 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
+                  debugPrint(
+                      'Firestore orders query failed: ${snapshot.error}');
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
                       child: UrduAwareText(
                         isUrdu
-                            ? 'آرڈرز لوڈ نہیں ہوسکے: ${snapshot.error}'
-                            : 'Could not load orders: ${snapshot.error}',
+                            ? 'آرڈرز لوڈ نہیں ہوسکے۔ براہ کرم کنسول لاگ (Debug Console) میں فائر بیس انڈیکس کا لنک چیک کریں۔'
+                            : 'Could not load orders. Please check debug console for Firebase index link.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: AppTheme.expenseColor,
@@ -452,23 +467,14 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                           width: 46,
                           height: 46,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [AppTheme.themeColor, Color(0xFF4A8FE3)],
-                            ),
+                            color: AppTheme.themeColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(13),
-                            boxShadow: [
-                              BoxShadow(
-                                color:
-                                    AppTheme.themeColor.withValues(alpha: 0.4),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
                           ),
                           child: Center(
-                            child: Text(
-                              order.shopLogo,
-                              style: const TextStyle(fontSize: 22),
+                            child: Icon(
+                              PhosphorIcons.storefront(),
+                              color: AppTheme.themeColor,
+                              size: 24,
                             ),
                           ),
                         ),
@@ -555,13 +561,17 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                                 ),
                               ),
                               _dot(),
-                              Text(
-                                order.id,
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.textSecondary,
-                                  fontFamily: 'monospace',
+                              Expanded(
+                                child: Text(
+                                  order.id,
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.textSecondary,
+                                    fontFamily: 'monospace',
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
@@ -593,7 +603,6 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                               .entries
                               .map((entry) {
                             final i = entry.key;
-                            final item = entry.value;
                             return Positioned(
                               right: i * 26.0,
                               child: Container(
@@ -619,9 +628,10 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                                   ],
                                 ),
                                 child: Center(
-                                  child: Text(
-                                    item.emoji,
-                                    style: const TextStyle(fontSize: 17),
+                                  child: Icon(
+                                    PhosphorIcons.package(),
+                                    size: 16,
+                                    color: AppTheme.themeColor,
                                   ),
                                 ),
                               ),
@@ -681,7 +691,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                           const SizedBox(height: 2),
                           UrduAwareText(
                             isUrdu
-                                ? 'کل ${order.items.length} آئٹمز'
+                                ? 'کل ${order.items.length} اشیاء'
                                 : '${order.items.length} items total',
                             style: TextStyle(
                               fontSize: 10.5,
@@ -698,7 +708,9 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
               ),
 
               // ─── Progress tracker ───
-              if (order.status == 'pending' || order.status == 'confirmed')
+              if (order.status == 'pending' ||
+                  order.status == 'confirmed' ||
+                  order.status == 'delivered')
                 Padding(
                   padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
                   child: _buildProgressTracker(order, isUrdu, fontFamily),
@@ -856,7 +868,12 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
       isUrdu ? 'ڈیلیوری' : 'Deliver',
       isUrdu ? 'پہنچا' : 'Done',
     ];
-    final doneCount = order.status == 'pending' ? 2 : 3;
+    final doneCount = switch (order.status) {
+      'pending' => 1,
+      'confirmed' => 3,
+      'delivered' => 5,
+      _ => 1,
+    };
 
     return Column(
       children: [
@@ -878,7 +895,8 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
               // Dot
               final dotIndex = index ~/ 2;
               final isDone = dotIndex < doneCount;
-              final isActive = dotIndex == doneCount - 1;
+              final isActive =
+                  order.status != 'delivered' && dotIndex == doneCount - 1;
               return Container(
                 width: 14,
                 height: 14,
@@ -916,8 +934,9 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
           children: stages.asMap().entries.map((entry) {
             final i = entry.key;
             final label = entry.value;
-            final isActive = i == doneCount - 1;
-            final isDone = i < doneCount - 1;
+            final isActive = order.status != 'delivered' && i == doneCount - 1;
+            final isDone = i < doneCount - 1 ||
+                (order.status == 'delivered' && i < doneCount);
             return Expanded(
               child: Center(
                 child: UrduAwareText(
@@ -1365,9 +1384,10 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Center(
-                                    child: Text(
-                                      item.emoji,
-                                      style: const TextStyle(fontSize: 18),
+                                    child: Icon(
+                                      PhosphorIcons.package(),
+                                      size: 18,
+                                      color: AppTheme.themeColor,
                                     ),
                                   ),
                                 ),
@@ -1524,6 +1544,15 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                             smallValue: true,
                             fontFamily: fontFamily,
                           ),
+                          if (order.note.trim().isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            _buildSummaryRow(
+                              isUrdu ? 'آرڈر نوٹ' : 'Order note',
+                              order.note,
+                              smallValue: true,
+                              fontFamily: fontFamily,
+                            ),
+                          ],
                         ],
                       ),
                     ),

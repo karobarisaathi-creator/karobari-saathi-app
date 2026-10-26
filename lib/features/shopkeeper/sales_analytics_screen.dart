@@ -265,17 +265,35 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
                   color: Colors.white,
                   child: TabBar(
                     controller: _tabController,
-                    indicatorColor: AppTheme.darkColor,
-                    labelColor: AppTheme.darkColor,
-                    unselectedLabelColor: Colors.grey,
+                    indicatorColor: AppTheme.themeColor,
+                    labelColor: AppTheme.themeColor,
+                    unselectedLabelColor: AppTheme.textSecondary,
                     labelStyle: TextStyle(
                       fontFamily: fontFamily,
                       fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                      fontSize: 12,
                     ),
                     tabs: [
-                      Tab(text: isUrdu ? 'ماہانہ' : 'Monthly'),
-                      Tab(text: isUrdu ? 'سالانہ' : 'Yearly'),
+                      Tab(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(PhosphorIcons.calendarBlank(), size: 14),
+                            const SizedBox(width: 4),
+                            Text(isUrdu ? 'ماہانہ' : 'Monthly'),
+                          ],
+                        ),
+                      ),
+                      Tab(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(PhosphorIcons.calendarCheck(), size: 14),
+                            const SizedBox(width: 4),
+                            Text(isUrdu ? 'سالانہ' : 'Yearly'),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1517,8 +1535,8 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
             icon: PhosphorIcons.package(),
             iconColor: AppTheme.themeColor,
             iconBg: AppTheme.themeColor.withValues(alpha: 0.10),
-            name: isUrdu ? 'خرید و فروخت والے آئٹمز' : 'Items Moved',
-            meta: isUrdu ? 'منفرد آئٹمز کی تعداد' : 'Unique items moved',
+            name: isUrdu ? 'خرید و فروخت والے اشیاء' : 'Items Moved',
+            meta: isUrdu ? 'منفرد اشیاء کی تعداد' : 'Unique items moved',
             value: '$itemCount',
             valueColor: AppTheme.darkColor,
             fontFamily: fontFamily,
@@ -1625,8 +1643,8 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
             icon: PhosphorIcons.package(),
             iconColor: AppTheme.themeColor,
             iconBg: AppTheme.themeColor.withValues(alpha: 0.10),
-            name: isUrdu ? 'خرید و فروخت والے آئٹمز' : 'Items Moved',
-            meta: isUrdu ? 'منفرد آئٹمز کی تعداد' : 'Unique items moved',
+            name: isUrdu ? 'خرید و فروخت والے اشیاء' : 'Items Moved',
+            meta: isUrdu ? 'منفرد اشیاء کی تعداد' : 'Unique items moved',
             value: '$itemCount',
             valueColor: AppTheme.darkColor,
             fontFamily: fontFamily,

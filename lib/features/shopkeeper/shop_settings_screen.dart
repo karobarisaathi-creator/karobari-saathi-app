@@ -527,7 +527,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
               const Divider(height: 1),
               _buildSwitchTile(
                 title: isUrdu
-                    ? 'دستیاب آئٹمز کی تعداد دکھائیں'
+                    ? 'دستیاب اشیاء کی تعداد دکھائیں'
                     : 'Show Items Count',
                 subtitle: isUrdu
                     ? 'دکان پر دستیاب کل پروڈکٹس کی تعداد'

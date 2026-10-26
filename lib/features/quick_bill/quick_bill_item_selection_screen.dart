@@ -995,7 +995,7 @@ class _QuickBillItemSelectionScreenState
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           UrduAwareText(
-                            isUrdu ? 'آئٹمز منتخب' : 'items selected',
+                            isUrdu ? 'اشیاء منتخب' : 'items selected',
                             style: const TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w700,

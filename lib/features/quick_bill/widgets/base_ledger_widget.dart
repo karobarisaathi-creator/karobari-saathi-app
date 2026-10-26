@@ -493,11 +493,11 @@ class BaseLedgerWidget extends StatelessWidget {
   // اصول: "جمع = لیا، بنام = دیا"
   //
   // isIncomingReceipt = false → Outgoing (میری طرف)
-  //   آئٹمز → بنام 🔴
+  //   اشیاء → بنام 🔴
   //   وصول → جمع 🟢
   //
   // isIncomingReceipt = true → Incoming (پارٹی کی طرف)
-  //   آئٹمز → جمع 🟢
+  //   اشیاء → جمع 🟢
   //   ادا شدہ → بنام 🔴
   // ═════════════════════════════════════════════════════════════
   Widget _buildTAccount(

@@ -13,6 +13,8 @@ import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/models/shop_model.dart';
 import 'package:account_app/features/order/shop_detail_screen.dart';
 import 'package:account_app/features/order/widgets/shop_card_widget.dart';
+import 'package:account_app/features/order/widgets/shop_catalog_item_card.dart';
+import 'package:account_app/features/order/widgets/item_detail_dialog.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN SCREEN: NEARBY SHOPS LIST
@@ -286,7 +288,7 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
 
         const SizedBox(height: 8),
 
-        // List using ShopCardWidget
+        // List using ShopSectionWidget (Shop Card + Horizontal Item Cards)
         Expanded(
           child: filtered.isEmpty
               ? _buildEmptyState(
@@ -298,8 +300,10 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(8, 4, 8, 24),
                   itemCount: filtered.length,
-                  itemBuilder: (context, i) => ShopCardWidget(
+                  itemBuilder: (context, i) => _ShopSectionWidget(
                     shop: filtered[i],
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
                     onTap: () => _openShopDetail(filtered[i]),
                   ),
                 ),
@@ -406,5 +410,154 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
         ],
       ),
     );
+  }
+}
+
+class _ShopSectionWidget extends StatefulWidget {
+  final Shop shop;
+  final bool isUrdu;
+  final String? fontFamily;
+  final VoidCallback onTap;
+
+  const _ShopSectionWidget({
+    required this.shop,
+    required this.isUrdu,
+    required this.fontFamily,
+    required this.onTap,
+  });
+
+  @override
+  State<_ShopSectionWidget> createState() => _ShopSectionWidgetState();
+}
+
+class _ShopSectionWidgetState extends State<_ShopSectionWidget> {
+  List<ShopItem> _items = [];
+  bool _isLoadingItems = true;
+
+  static const Map<String, String> _categoryNamesUrdu = {
+    'General': 'عمومی',
+    'Grocery': 'کریانہ',
+    'Food': 'خوراک',
+    'Beverages': 'مشروبات',
+    'Clothing': 'کپڑے',
+    'Electronics': 'الیکٹرانکس',
+    'Household': 'گھریلو سامان',
+    'Personal Care': 'ذاتی استعمال',
+    'Medicine': 'ادویات',
+    'Other': 'دیگر',
+    'عام': 'عام',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchItems();
+  }
+
+  void _fetchItems() {
+    FirebaseFirestore.instance
+        .collection('public_shops')
+        .doc(widget.shop.id)
+        .collection('items')
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted) return;
+      final items = snapshot.docs.map((doc) {
+        final data = doc.data();
+        final quantity = (data['availableQuantity'] as num?)?.toDouble();
+        final tracksStock = data['trackStock'] != false;
+        return ShopItem(
+          id: doc.id,
+          stockItemId: doc.id,
+          name: (data['name'] ?? '').toString(),
+          nameUrdu: (data['nameUrdu'] ?? '').toString(),
+          description: (data['description'] ?? '').toString(),
+          rate: (data['rate'] as num?)?.toDouble() ?? 0,
+          oldRate: (data['oldRate'] as num?)?.toDouble(),
+          unit: (data['unit'] ?? '').toString(),
+          emoji: '📦',
+          category: (data['category'] ?? 'عام').toString(),
+          imageUrl: (data['imageUrl'] ?? '').toString(),
+          rating: (data['rating'] as num?)?.toDouble() ?? 4.5,
+          stock: tracksStock ? (quantity ?? 0) : 1000000000,
+        );
+      }).where((item) => item.name.trim().isNotEmpty).toList();
+
+      if (mounted) {
+        setState(() {
+          _items = items;
+          _isLoadingItems = false;
+        });
+      }
+    }, onError: (_) {
+      if (mounted) setState(() => _isLoadingItems = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final totalCount = _items.isNotEmpty ? _items.length : widget.shop.availableItemCount;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
+              children: [
+                UrduAwareText(
+                  '🏪 ${widget.shop.name} · $totalCount ${widget.isUrdu ? 'اشیاء' : 'items'}',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textSecondary,
+                    fontFamily: widget.fontFamily,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 270,
+            child: _isLoadingItems
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    itemCount: 1 + _items.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return SizedBox(
+                          width: 260,
+                          height: 270,
+                          child: ShopCardWidget(
+                            shop: widget.shop.copyWith(items: _items, itemCount: totalCount),
+                            onTap: widget.onTap,
+                          ),
+                        );
+                      }
+                      final item = _items[index - 1];
+                      return SizedBox(
+                        width: 260,
+                        height: 270,
+                        child: ShopCatalogItemCard(
+                          item: item,
+                          onTap: () => _showItemDetailModal(context, item),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showItemDetailModal(BuildContext context, ShopItem item) {
+    showItemDetailDialog(context, item);
   }
 }

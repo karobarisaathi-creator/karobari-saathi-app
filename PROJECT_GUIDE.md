@@ -75,7 +75,7 @@ This document provides a detailed overview of each screen and its functionality 
     *   **Hide Feature:** Swipe to hide specific rates from history without affecting balance.
     *   **Trust Score:** A 5-star rating based on payment frequency and volume.
 *   **اردو:**
-    *   **ریٹ ہسٹری:** دیکھیں کہ وقت کے ساتھ آئٹمز کے ریٹ میں کیا تبدیلی آئی۔
+    *   **ریٹ ہسٹری:** دیکھیں کہ وقت کے ساتھ اشیاء کے ریٹ میں کیا تبدیلی آئی۔
     *   **چھپانے کا فیچر:** بیلنس خراب کیے بغیر کسی ریٹ کو لسٹ سے غائب کرنا۔
     *   **اعتماد کا اسکور:** ادائیگیوں کی ترتیب اور حجم پر مبنی 5 سٹار ریٹنگ۔
 

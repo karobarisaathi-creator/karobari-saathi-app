@@ -19,7 +19,13 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.zalooq.account_app"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "28.2.13676358"
+
+    externalNativeBuild {
+        cmake {
+            version = "3.31.0"
+        }
+    }
 
     compileOptions {
         // Flag to enable support for the new language APIs

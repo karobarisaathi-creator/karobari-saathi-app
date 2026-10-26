@@ -57,7 +57,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
         AppToast.error(
           context,
           isUrdu
-              ? 'پروفائل محفوظ ہوگیا، مگر دکان کے آئٹمز شائع نہیں ہوسکے: $catalogError'
+              ? 'پروفائل محفوظ ہوگیا، مگر دکان کے اشیاء شائع نہیں ہوسکے: $catalogError'
               : 'Profile saved, but shop items could not be published: $catalogError',
         );
         return;

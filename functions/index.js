@@ -1,7 +1,67 @@
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const {
+  onDocumentCreated,
+  onDocumentWritten,
+} = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
+
+exports.aggregateShopReview = onDocumentWritten(
+  "public_shops/{shopId}/reviews/{userId}",
+  async (event) => {
+    const db = admin.firestore();
+    const shopRef = db.collection("public_shops").doc(event.params.shopId);
+    const reviewRef = shopRef.collection("reviews").doc(event.params.userId);
+    const stateRef = shopRef
+      .collection("_rating_state")
+      .doc(event.params.userId);
+
+    await db.runTransaction(async (transaction) => {
+      const [shopSnapshot, reviewSnapshot, stateSnapshot] = await Promise.all([
+        transaction.get(shopRef),
+        transaction.get(reviewRef),
+        transaction.get(stateRef),
+      ]);
+      if (!shopSnapshot.exists) return;
+
+      const previousRating = stateSnapshot.exists
+        ? Number(stateSnapshot.data().rating)
+        : null;
+      const currentValue = reviewSnapshot.exists
+        ? Number(reviewSnapshot.data().rating)
+        : null;
+      const currentRating =
+        Number.isInteger(currentValue) && currentValue >= 1 && currentValue <= 5
+          ? currentValue
+          : null;
+      if (previousRating === currentRating) return;
+
+      const shop = shopSnapshot.data();
+      const oldTotal = Number(shop.communityRatingTotal) || 0;
+      const oldCount = Number(shop.communityReviewCount) || 0;
+      const ratingTotal = Math.max(
+        0,
+        oldTotal - (previousRating || 0) + (currentRating || 0),
+      );
+      const reviewCount = Math.max(
+        0,
+        oldCount - (previousRating == null ? 0 : 1) +
+          (currentRating == null ? 0 : 1),
+      );
+
+      transaction.update(shopRef, {
+        communityRatingTotal: ratingTotal,
+        communityReviewCount: reviewCount,
+        communityRating: reviewCount > 0 ? ratingTotal / reviewCount : 0,
+      });
+      if (currentRating == null) {
+        if (stateSnapshot.exists) transaction.delete(stateRef);
+      } else {
+        transaction.set(stateRef, { rating: currentRating });
+      }
+    });
+  },
+);
 
 exports.sendNotificationOnCreate = onDocumentCreated(
   "users/{userId}/notifications/{notificationId}",

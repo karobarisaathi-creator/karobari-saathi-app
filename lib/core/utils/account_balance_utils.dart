@@ -53,8 +53,8 @@ class AccountBalanceUtils {
 
     if (transaction.isQuickBill) {
       // ⭐ کھاتہ اور رسید کو ۱۰۰٪ برابر رکھنا:
-      // بنام (First Column) = نیٹ آئٹمز ٹوٹل (Sale) یا ادا شدہ رقم (Purchase)
-      // جمع (Second Column) = موصول شدہ رقم (Sale) یا نیٹ آئٹمز ٹوٹل (Purchase)
+      // بنام (First Column) = نیٹ اشیاء ٹوٹل (Sale) یا ادا شدہ رقم (Purchase)
+      // جمع (Second Column) = موصول شدہ رقم (Sale) یا نیٹ اشیاء ٹوٹل (Purchase)
       return AccountTransactionColumns(
         firstColumn: isIncome ? netTotal : transaction.receivedAmount,
         secondColumn: isIncome ? transaction.receivedAmount : netTotal,

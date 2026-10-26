@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
+import 'package:account_app/core/models/stock_movement_model.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
@@ -45,39 +46,58 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
 
     // ═══ Metrics ═══
     final summary = stockService.getStockSummary();
-    final totalItems = summary['totalItems'] as int? ?? 0;
     final totalPurchaseValue = summary['totalPurchaseValue'] as double? ?? 0.0;
-    final outOfStockCount = summary['outOfStockCount'] as int? ?? 0;
+    final activeTrackedItems = stockService.items
+        .where((item) => !item.isArchived && item.trackStock)
+        .toList();
+    final totalItems = activeTrackedItems.length;
 
-    final lowStockItems = stockService.items.where((i) {
-      if (i.isArchived || !i.trackStock) return false;
-      final currentStock = stockService.calculateCurrentStock(i.id);
-      return currentStock <= i.minStockAlert && currentStock > 0;
+    final lowStockItems = activeTrackedItems.where((item) {
+      final currentStock = stockService.calculateCurrentStock(item.id);
+      return currentStock > 0 && currentStock <= item.minStockAlert;
     }).toList();
 
-    final outOfStockItems = stockService.items.where((i) {
-      if (i.isArchived || !i.trackStock) return false;
-      return stockService.calculateCurrentStock(i.id) <= 0;
+    final outOfStockItems = activeTrackedItems.where((item) {
+      return stockService.calculateCurrentStock(item.id) <= 0;
     }).toList();
+
+    final recentSalesCounts = <String, int>{};
+    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+    for (final movement in stockService.movements) {
+      if (movement.type == StockMovementType.sale &&
+          !movement.timestamp.isBefore(thirtyDaysAgo)) {
+        recentSalesCounts.update(
+          movement.stockItemId,
+          (count) => count + 1,
+          ifAbsent: () => 1,
+        );
+      }
+    }
 
     final turnover = stockService.calculateInventoryTurnover();
     final holdingDays = stockService.calculateHoldingDays();
     final stockoutRate = stockService.calculateStockoutRate();
-    final deadStock = stockService.identifyDeadStock();
+    final deadStock = <StockItem>[];
+    final fastItems = <StockItem>[];
+    final slowItems = <StockItem>[];
+    for (final item in activeTrackedItems) {
+      final recentSalesCount = recentSalesCounts[item.id] ?? 0;
+      if (recentSalesCount >= 10) {
+        fastItems.add(item);
+      } else if (recentSalesCount > 0) {
+        slowItems.add(item);
+      } else if (stockService.calculateCurrentStock(item.id) > 0) {
+        deadStock.add(item);
+      }
+    }
+
     final deadStockValue = deadStock.fold<double>(
       0,
       (sum, item) =>
-          sum + (stockService.calculateCurrentStock(item.id) * item.purchasePrice),
+          sum +
+          (stockService.calculateCurrentStock(item.id) *
+              stockService.calculateWeightedAverageCost(item.id)),
     );
-
-    final fastItems = <StockItem>[];
-    final slowItems = <StockItem>[];
-    for (final item in stockService.items) {
-      if (item.isArchived || !item.trackStock) continue;
-      final velocity = stockService.getItemVelocity(item);
-      if (velocity == 'fast') fastItems.add(item);
-      if (velocity == 'slow') slowItems.add(item);
-    }
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
@@ -144,7 +164,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
                   isUrdu: isUrdu,
                   fontFamily: fontFamily,
                   totalItems: totalItems,
-                  outOfStockCount: outOfStockCount,
+                  outOfStockCount: outOfStockItems.length,
                   lowStockCount: lowStockItems.length,
                   totalPurchaseValue: totalPurchaseValue,
                   turnover: turnover,
@@ -198,7 +218,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
     required int deadStockCount,
   }) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -210,7 +230,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
             lowStockCount: lowStockCount,
             totalPurchaseValue: totalPurchaseValue,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           _buildAdvancedMetricsCard(
             isUrdu: isUrdu,
             fontFamily: fontFamily,
@@ -237,7 +257,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
     required StockService stockService,
   }) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -248,11 +268,13 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
             slowCount: slowCount,
             deadCount: deadCount,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           if (fastItems.isNotEmpty) ...[
             _buildSectionHeader(
               icon: PhosphorIcons.checkCircle(),
-              title: isUrdu ? 'تیز فروخت ($fastCount)' : 'Fast Selling ($fastCount)',
+              title: isUrdu
+                  ? 'تیز فروخت ($fastCount)'
+                  : 'Fast Selling ($fastCount)',
               color: AppTheme.incomeColor,
               fontFamily: fontFamily,
             ),
@@ -269,7 +291,9 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
           if (slowItems.isNotEmpty) ...[
             _buildSectionHeader(
               icon: PhosphorIcons.clock(),
-              title: isUrdu ? 'سست فروخت ($slowCount)' : 'Slow Moving ($slowCount)',
+              title: isUrdu
+                  ? 'سست فروخت ($slowCount)'
+                  : 'Slow Moving ($slowCount)',
               color: Colors.orange,
               fontFamily: fontFamily,
             ),
@@ -286,7 +310,9 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
           if (deadItems.isNotEmpty) ...[
             _buildSectionHeader(
               icon: PhosphorIcons.warning(),
-              title: isUrdu ? 'مردہ اسٹاک ($deadCount)' : 'Dead Stock ($deadCount)',
+              title: isUrdu
+                  ? 'مردہ اسٹاک ($deadCount)'
+                  : 'Dead Stock ($deadCount)',
               color: AppTheme.expenseColor,
               fontFamily: fontFamily,
             ),
@@ -313,7 +339,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
     required StockService stockService,
   }) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -393,17 +419,14 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppTheme.darkColor, Color(0xFF1E293B)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.darkColor.withValues(alpha: 0.15),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: AppTheme.darkColor.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -421,7 +444,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
                   fontFamily: fontFamily,
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: AppTheme.darkColor,
                 ),
               ),
             ],
@@ -431,7 +454,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
             children: [
               Expanded(
                 child: _buildHealthStat(
-                  title: isUrdu ? 'کل آئٹمز' : 'Total Items',
+                  title: isUrdu ? 'کل اشیاء' : 'Total Items',
                   value: totalItems.toString(),
                   icon: PhosphorIcons.package(),
                   color: AppTheme.themeColor,
@@ -466,7 +489,8 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
               Expanded(
                 child: _buildHealthStat(
                   title: isUrdu ? 'کل اسٹاک سرمایا' : 'Stock Capital',
-                  value: Formatters.formatAmountWithCurrency(totalPurchaseValue),
+                  value:
+                      Formatters.formatAmountWithCurrency(totalPurchaseValue),
                   icon: PhosphorIcons.currencyCircleDollar(),
                   color: AppTheme.incomeColor,
                   fontFamily: fontFamily,
@@ -511,7 +535,9 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
                   size: 18, color: AppTheme.themeColor),
               const SizedBox(width: 8),
               UrduAwareText(
-                isUrdu ? 'ایڈوانسڈ انوینٹری اشاریے' : 'Advanced Inventory Metrics',
+                isUrdu
+                    ? 'ایڈوانسڈ انوینٹری اشاریے'
+                    : 'Advanced Inventory Metrics',
                 style: TextStyle(
                   fontFamily: fontFamily,
                   fontSize: 14,
@@ -528,7 +554,9 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
             value: '${turnover.toStringAsFixed(2)}x',
             valueColor: AppTheme.themeColor,
             fontFamily: fontFamily,
-            hint: isUrdu ? 'سالانہ اسٹاک گردش کی رفتار' : 'Annual stock rotation speed',
+            hint: isUrdu
+                ? 'سالانہ اسٹاک گردش کی رفتار'
+                : 'Annual stock rotation speed',
           ),
           const Divider(height: 16),
           _buildMetricRow(
@@ -551,8 +579,12 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
                     : AppTheme.expenseColor,
             fontFamily: fontFamily,
             hint: isUrdu
-                ? (stockoutRate <= 5 ? 'بہت اچھا — کم آئٹمز ختم' : 'خراب — بہت سے آئٹمز ختم')
-                : (stockoutRate <= 5 ? 'Excellent — few out' : 'Poor — many out'),
+                ? (stockoutRate <= 5
+                    ? 'بہت اچھا — کم اشیاء ختم'
+                    : 'خراب — بہت سے اشیاء ختم')
+                : (stockoutRate <= 5
+                    ? 'Excellent — few out'
+                    : 'Poor — many out'),
           ),
           const Divider(height: 16),
           _buildMetricRow(
@@ -564,7 +596,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
                 : AppTheme.expenseColor,
             fontFamily: fontFamily,
             hint: isUrdu
-                ? '$deadStockCount آئٹمز — نقصان سے بچیں'
+                ? '$deadStockCount اشیاء — نقصان سے بچیں'
                 : '$deadStockCount items — avoid loss',
           ),
         ],
@@ -664,7 +696,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
                   size: 18, color: AppTheme.themeColor),
               const SizedBox(width: 8),
               UrduAwareText(
-                isUrdu ? 'آئٹمز کی رفتار' : 'Item Velocity',
+                isUrdu ? 'اشیاء کی رفتار' : 'Item Velocity',
                 style: TextStyle(
                   fontFamily: fontFamily,
                   fontSize: 14,
@@ -727,9 +759,9 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.25), width: 1.5),
+        border: Border.all(color: Colors.grey.shade200, width: 1.2),
       ),
       child: Column(
         children: [
@@ -837,8 +869,8 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: color.withValues(alpha: 0.25),
-            width: 1.5,
+            color: Colors.grey.shade200,
+            width: 1.2,
           ),
         ),
         child: Row(
@@ -932,8 +964,8 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: color.withValues(alpha: 0.25),
-            width: 1.5,
+            color: Colors.grey.shade200,
+            width: 1.2,
           ),
         ),
         child: Row(
@@ -1002,9 +1034,9 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        border: Border.all(color: Colors.grey.shade200, width: 1.2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1019,7 +1051,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
                   style: TextStyle(
                     fontFamily: fontFamily,
                     fontSize: 11,
-                    color: Colors.white70,
+                    color: AppTheme.textSecondary,
                     fontWeight: FontWeight.w600,
                   ),
                   maxLines: 1,
@@ -1034,7 +1066,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
             style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w900,
-              color: Colors.white,
+              color: AppTheme.darkColor,
               fontFamily: '',
             ),
             maxLines: 1,

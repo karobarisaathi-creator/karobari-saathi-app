@@ -204,6 +204,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SettingsService()..loadSettings()),
       ],
       child: Consumer2<LanguageService, ThemeService>(
+        child: AppWrapper(),
         builder: (context, languageService, themeService, child) {
           return MaterialApp(
             title: 'کاروباری ساتھی',
@@ -229,7 +230,7 @@ class MyApp extends StatelessWidget {
             ],
 
             // RTL/LTR Support
-            builder: (context, child) {
+            builder: (context, restChild) {
               final mediaQueryData = MediaQuery.of(context);
 
               return MediaQuery(
@@ -244,13 +245,13 @@ class MyApp extends StatelessWidget {
                     bottom: true,
                     left: false,
                     right: false,
-                    child: child!,
+                    child: restChild!,
                   ),
                 ),
               );
             },
 
-            home: AppWrapper(),
+            home: child,
 
             routes: {
               '/dashboard': (context) => const PartyListScreen(),

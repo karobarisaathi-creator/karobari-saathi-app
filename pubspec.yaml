@@ -4,7 +4,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.3.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -95,6 +95,8 @@ flutter_launcher_icons:
 # Temporary override to fix dependency conflict in record_linux
 dependency_overrides:
   record_linux: ^1.2.0
+  phosphor_flutter:
+    path: ./packages/phosphor_flutter
 
 flutter:
   uses-material-design: true
@@ -118,3 +120,21 @@ flutter:
         - asset: assets/fonts/NotoSans-Regular.ttf
         - asset: assets/fonts/NotoSans-Bold.ttf
           weight: 700
+    - family: Phosphor
+      fonts:
+        - asset: packages/phosphor_flutter/lib/fonts/Phosphor.ttf
+    - family: PhosphorBold
+      fonts:
+        - asset: packages/phosphor_flutter/lib/fonts/Phosphor-Bold.ttf
+    - family: PhosphorDuotone
+      fonts:
+        - asset: packages/phosphor_flutter/lib/fonts/Phosphor-Duotone.ttf
+    - family: PhosphorFill
+      fonts:
+        - asset: packages/phosphor_flutter/lib/fonts/Phosphor-Fill.ttf
+    - family: PhosphorLight
+      fonts:
+        - asset: packages/phosphor_flutter/lib/fonts/Phosphor-Light.ttf
+    - family: PhosphorThin
+      fonts:
+        - asset: packages/phosphor_flutter/lib/fonts/Phosphor-Thin.ttf

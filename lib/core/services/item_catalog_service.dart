@@ -93,7 +93,7 @@ class ItemCatalogService {
     return catalog;
   }
 
-  /// آئٹمز کو ان کے زمرے کے حساب سے گروپ کرتا ہے، فوری بل کے زمرہ سلائیڈر کے لیے۔
+  /// اشیاء کو ان کے زمرے کے حساب سے گروپ کرتا ہے، فوری بل کے زمرہ سلائیڈر کے لیے۔
   static List<String> categoriesIn(Map<String, ItemCatalogEntry> catalog) {
     final set = <String>{};
     for (final entry in catalog.values) {

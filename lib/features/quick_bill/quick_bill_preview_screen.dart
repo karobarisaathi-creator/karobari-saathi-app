@@ -13,6 +13,7 @@ import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
+import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/party_card.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
@@ -289,7 +290,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
         AppToast.warning(
           context,
           isUrdu
-              ? 'منتخب اسٹاک آئٹم اب دستیاب نہیں۔ آئٹمز دوبارہ منتخب کریں۔'
+              ? 'منتخب اسٹاک آئٹم اب دستیاب نہیں۔ اشیاء دوبارہ منتخب کریں۔'
               : 'A selected stock item is no longer available. Please select items again.',
         );
         return;
@@ -1492,59 +1493,29 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
     final needsParty =
         _pendingAmount > 0 && (_isCashCustomer || _selectedAccount == null);
 
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed:
-            _saving ? null : (needsParty ? _pickCustomerAndConfirm : _confirm),
-        style: ElevatedButton.styleFrom(
-          backgroundColor:
-              needsParty ? const Color(0xFFD97706) : AppTheme.themeColor,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          elevation: 0,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (_saving)
-              const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            else
-              Icon(
-                needsParty ? PhosphorIcons.userPlus() : Icons.check_rounded,
-                size: 18,
-              ),
-            const SizedBox(width: 8),
-            UrduAwareText(
-              _saving
-                  ? (isUrdu ? 'محفوظ ہو رہا ہے...' : 'Saving...')
-                  : needsParty
-                      ? (isUrdu ? 'پارٹی منتخب کریں' : 'Select Party')
-                      : widget.transactionToEdit != null
-                          ? (isUrdu ? 'تبدیلیاں محفوظ کریں' : 'Save changes')
-                          : (isUrdu
-                              ? 'ٹھیک ہے — رسید بنائیں'
-                              : 'OK — create receipt'),
-              style: TextStyle(
-                fontFamily: fontFamily,
-                fontSize: 14.5,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.2,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return AppButton(
+      text: needsParty
+          ? (isUrdu ? 'پارٹی منتخب کریں' : 'Select Party')
+          : widget.transactionToEdit != null
+              ? (isUrdu ? 'تبدیلیاں محفوظ کریں' : 'Save changes')
+              : (isUrdu ? 'ٹھیک ہے — رسید بنائیں' : 'OK — create receipt'),
+      onPressed: needsParty ? _pickCustomerAndConfirm : _confirm,
+      icon: needsParty ? PhosphorIcons.userPlus() : Icons.check_rounded,
+      isLoading: _saving,
+      loadingTexts: isUrdu
+          ? [
+              'محفوظ ہو رہا ہے...',
+              'اسٹاک اپ ڈیٹ ہو رہا ہے...',
+              'رسید تیار ہو رہی ہے...'
+            ]
+          : [
+              'Saving transaction...',
+              'Updating stock...',
+              'Generating receipt...'
+            ],
+      color: needsParty ? const Color(0xFFD97706) : null,
+      size: AppButtonSize.large,
+      isFullWidth: true,
     );
   }
 }

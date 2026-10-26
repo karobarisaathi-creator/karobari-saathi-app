@@ -346,7 +346,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
 
     final allTransactions = databaseService.getAllTransactions();
 
-    // Only and only Quick Bill transactions (فوری بل)
+    // Only Quick Bill transactions (صرف فوری بل والی انٹریز)
     final quickBillTransactions = allTransactions
         .where((t) => t.isQuickBill && t.type == 'income')
         .toList()

@@ -24,6 +24,8 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/features/settings/app_lock_screen.dart';
 import 'package:account_app/features/order/nearby_shops_screen.dart';
 import 'package:account_app/features/shopkeeper/shop_settings_screen.dart';
+import 'package:account_app/features/shopkeeper/sales_analytics_screen.dart';
+import 'package:account_app/features/order/my_orders_screen.dart';
 import 'currency_settings_dialog.dart';
 import 'package:account_app/features/settings/backup_screen.dart';
 import 'package:account_app/features/shopkeeper/stock_history_screen.dart';
@@ -143,6 +145,20 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const BackupScreen()),
+                  );
+                },
+              ),
+
+              // Sales Analytics
+              _buildItem(
+                context,
+                icon: PhosphorIcons.chartBar(),
+                label: isUrdu ? 'تجزیہ' : 'Analytics',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const SalesAnalyticsScreen()),
                   );
                 },
               ),

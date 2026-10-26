@@ -196,8 +196,8 @@ class Transaction extends HiveObject {
   bool get isFullyPaid => receivedAmount >= amount;
   bool get isQuickBill {
     final normalizedDescription = description.trim().toLowerCase();
-    return normalizedDescription == 'quick bill' ||
-        normalizedDescription == 'فوری بل' ||
+    final ref = referenceNumber?.trim().toUpperCase() ?? '';
+    return ref.startsWith('QB-') ||
         normalizedDescription.contains('فوری بل') ||
         normalizedDescription.contains('quick bill');
   }

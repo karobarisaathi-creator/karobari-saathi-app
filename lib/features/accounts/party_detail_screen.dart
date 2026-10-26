@@ -167,17 +167,35 @@ class _PartyCombinedScreenState extends State<PartyCombinedScreen>
                 color: Colors.white,
                 child: TabBar(
                   controller: _tabController,
-                  indicatorColor: AppTheme.darkColor,
-                  labelColor: AppTheme.darkColor,
-                  unselectedLabelColor: Colors.grey,
+                  indicatorColor: AppTheme.themeColor,
+                  labelColor: AppTheme.themeColor,
+                  unselectedLabelColor: AppTheme.textSecondary,
                   labelStyle: TextStyle(
                     fontFamily: fontFamily,
                     fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                    fontSize: 12,
                   ),
                   tabs: [
-                    Tab(text: isUrdu ? 'لین دین' : 'Transactions'),
-                    Tab(text: isUrdu ? 'ٹولز اور ہسٹری' : 'Tools & History'),
+                    Tab(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(PhosphorIcons.receipt(), size: 14),
+                          const SizedBox(width: 4),
+                          Text(isUrdu ? 'لین دین' : 'Transactions'),
+                        ],
+                      ),
+                    ),
+                    Tab(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(PhosphorIcons.wrench(), size: 14),
+                          const SizedBox(width: 4),
+                          Text(isUrdu ? 'ٹولز اور ہسٹری' : 'Tools & History'),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1294,7 +1312,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                         ],
                         const SizedBox(width: 8),
                         UrduAwareText(
-                          "${Formatters.formatAmountWithCurrency(runningBalance.abs())}",
+                          "${Formatters.formatAmount(runningBalance.abs())}",
                           style: const TextStyle(
                             color: AppTheme.textSecondary,
                             fontSize: 11,
@@ -1313,7 +1331,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                 alignment: Alignment.centerLeft,
                 child: UrduAwareText(
                   columns.firstColumn > 0
-                      ? Formatters.formatAmountWithCurrency(columns.firstColumn)
+                      ? Formatters.formatAmount(columns.firstColumn)
                       : "-",
                   style: const TextStyle(
                     color: AppTheme.expenseColor,
@@ -1330,7 +1348,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                 alignment: Alignment.centerLeft,
                 child: UrduAwareText(
                   columns.secondColumn > 0
-                      ? Formatters.formatAmountWithCurrency(
+                      ? Formatters.formatAmount(
                           columns.secondColumn)
                       : "-",
                   style: const TextStyle(

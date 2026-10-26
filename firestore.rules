@@ -28,27 +28,108 @@ service cloud.firestore {
 
     match /public_shops/{shopId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isOwner(shopId);
+      allow create, delete: if isOwner(shopId);
+      allow update: if isOwner(shopId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'communityRating',
+          'communityReviewCount',
+          'communityRatingTotal'
+        ]);
 
       match /items/{itemId} {
         allow read: if isSignedIn();
         allow create, update, delete: if isOwner(shopId);
       }
 
+      match /reviews/{userId} {
+        allow read: if isSignedIn();
+        allow create, update: if isSignedIn()
+          && request.auth.uid == userId
+          && request.auth.uid != shopId
+          && request.resource.data.keys().hasAll([
+            'userId', 'rating', 'comment', 'updatedAt'
+          ])
+          && request.resource.data.keys().hasOnly([
+            'userId', 'rating', 'comment', 'updatedAt'
+          ])
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.rating is int
+          && request.resource.data.rating >= 1
+          && request.resource.data.rating <= 5
+          && request.resource.data.comment is string
+          && request.resource.data.comment.size() <= 500
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isSignedIn()
+          && request.auth.uid == userId
+          && request.auth.uid != shopId;
+      }
+
       match /orders/{orderId} {
         allow create: if isSignedIn()
           && request.resource.data.customerId == request.auth.uid
           && request.resource.data.shopId == shopId
-          && request.resource.data.status == 'pending';
+          && request.resource.data.id == orderId
+          && request.resource.data.status == 'pending'
+          && request.resource.data.keys().hasAll([
+            'id', 'shopId', 'customerId', 'status', 'items',
+            'subtotal', 'deliveryFee', 'minimumOrder', 'total', 'note',
+            'createdAt'
+          ])
+          && request.resource.data.keys().hasOnly([
+            'id', 'shopId', 'shopName', 'shopOwnerName', 'customerId',
+            'customerName', 'customerPhone', 'status', 'items', 'subtotal',
+            'deliveryFee', 'minimumOrder', 'total', 'note', 'createdAt'
+          ])
+          && request.resource.data.items is list
+          && request.resource.data.items.size() > 0
+          && request.resource.data.subtotal is number
+          && request.resource.data.subtotal >= 0
+          && request.resource.data.deliveryFee is number
+          && request.resource.data.deliveryFee >= 0
+          && request.resource.data.minimumOrder is number
+          && request.resource.data.minimumOrder >= 0
+          && request.resource.data.subtotal
+            >= request.resource.data.minimumOrder
+          && request.resource.data.total is number
+          && request.resource.data.total
+            == request.resource.data.subtotal + request.resource.data.deliveryFee
+          && request.resource.data.note is string
+          && request.resource.data.note.size() <= 500
+          && request.resource.data.createdAt == request.time;
         allow read: if isOwner(shopId)
           || (isSignedIn() && resource.data.customerId == request.auth.uid);
-        allow update: if isOwner(shopId)
-          || (isSignedIn()
+        allow update: if (
+            isOwner(shopId)
+            && resource.data.status == 'pending'
+            && (
+              (request.resource.data.status == 'accepted'
+                && request.resource.data.acceptedAt == request.time
+                && request.resource.data.diff(resource.data).affectedKeys()
+                  .hasOnly([
+                    'status', 'acceptedAt', 'items', 'subtotal',
+                    'deliveryFee', 'minimumOrder', 'total'
+                  ]))
+              || (request.resource.data.status == 'rejected'
+                && request.resource.data.rejectedAt == request.time
+                && request.resource.data.diff(resource.data).affectedKeys()
+                  .hasOnly(['status', 'rejectedAt']))
+            )
+          ) || (
+            isOwner(shopId)
+            && resource.data.status == 'accepted'
+            && request.resource.data.status == 'delivered'
+            && request.resource.data.deliveredAt == request.time
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['status', 'deliveredAt'])
+          ) || (
+            isSignedIn()
             && resource.data.customerId == request.auth.uid
             && resource.data.status == 'pending'
             && request.resource.data.status == 'cancelled'
+            && request.resource.data.cancelledAt == request.time
             && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['status', 'cancelledAt']));
+              .hasOnly(['status', 'cancelledAt'])
+          );
         allow delete: if false;
       }
     }
@@ -81,11 +162,10 @@ service cloud.firestore {
       }
     }
 
+    // --- Collection Group Query rule for customer orders ---
     match /{path=**}/orders/{orderId} {
       allow read: if isSignedIn()
         && resource.data.customerId == request.auth.uid;
     }
-
-    // --- گلوبل سرچ سپورٹ ---
   }
 }
