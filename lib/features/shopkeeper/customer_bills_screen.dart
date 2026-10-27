@@ -71,7 +71,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
   }
 
   Widget _buildBillsList(BuildContext context, List<Transaction> bills,
-      bool isUrdu, String? fontFamily, StockService stockService) {
+      bool isUrdu, String? fontFamily, StockService stockService, DatabaseService databaseService) {
     if (bills.isEmpty) {
       return Center(
         child: Column(
@@ -128,15 +128,19 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: Colors.grey.shade200, width: 1.5),
+            side: BorderSide(color: AppTheme.themeColor.withValues(alpha: 0.2), width: 1.2),
           ),
           color: Colors.white,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Date Header inside Card
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                decoration: BoxDecoration(
+                  color: AppTheme.themeColor.withValues(alpha: 0.08),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                ),
                 child: Row(
                   children: [
                     Icon(PhosphorIcons.calendarBlank(),
@@ -156,7 +160,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppTheme.themeColor.withValues(alpha: 0.1),
+                        color: AppTheme.themeColor.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: UrduAwareText(
@@ -182,6 +186,10 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
                 final billNo = tx.referenceNumber?.trim().isNotEmpty == true
                     ? tx.referenceNumber!
                     : tx.id.substring(tx.id.length - 4);
+                final partyAccount = (tx.accountId != QuickBillConstants.cashCustomerAccountId)
+                    ? databaseService.getAccount(tx.accountId)
+                    : null;
+                final partyName = partyAccount?.name.trim();
                 final displayAmount = _getTxDisplayAmount(tx);
                 final txProfit = _calculateTxProfit(tx, stockService);
 
@@ -219,14 +227,34 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  UrduAwareText(
-                                    '${isUrdu ? 'بل #' : 'Bill #'}$billNo',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13.5,
-                                      fontFamily: fontFamily,
-                                      color: AppTheme.darkColor,
-                                    ),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      UrduAwareText(
+                                        '${isUrdu ? "بل " : "Bill "}$billNo',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                          fontFamily: fontFamily,
+                                          color: AppTheme.darkColor,
+                                        ),
+                                      ),
+                                      if (partyName != null && partyName.isNotEmpty) ...[
+                                        const SizedBox(width: 5),
+                                        Flexible(
+                                          child: UrduAwareText(
+                                            '- $partyName',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13,
+                                              fontFamily: fontFamily,
+                                              color: AppTheme.textSecondary,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                   const SizedBox(height: 2),
                                   Row(
@@ -295,8 +323,12 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
               const Divider(height: 1, color: Color(0xFFEEF1F5)),
 
               // Bottom Total Row
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                decoration: BoxDecoration(
+                  color: AppTheme.themeColor.withValues(alpha: 0.06),
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+                ),
                 child: Row(
                   children: [
                     UrduAwareText(
@@ -377,17 +409,35 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
             color: Colors.white,
             child: TabBar(
               controller: _tabController,
-              indicatorColor: AppTheme.darkColor,
-              labelColor: AppTheme.darkColor,
-              unselectedLabelColor: Colors.grey,
+              indicatorColor: AppTheme.themeColor,
+              labelColor: AppTheme.themeColor,
+              unselectedLabelColor: AppTheme.textSecondary,
               labelStyle: TextStyle(
                 fontFamily: fontFamily,
                 fontWeight: FontWeight.bold,
-                fontSize: 13,
+                fontSize: 12,
               ),
               tabs: [
-                Tab(text: isUrdu ? 'نقد سیل' : 'Cash Sales'),
-                Tab(text: isUrdu ? 'ادھار سیل' : 'Credit Sales'),
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(PhosphorIcons.money(), size: 14),
+                      const SizedBox(width: 4),
+                      Text(isUrdu ? 'نقد سیل' : 'Cash Sales'),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(PhosphorIcons.creditCard(), size: 14),
+                      const SizedBox(width: 4),
+                      Text(isUrdu ? 'ادھار سیل' : 'Credit Sales'),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -396,9 +446,9 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
               controller: _tabController,
               children: [
                 _buildBillsList(
-                    context, cashSales, isUrdu, fontFamily, stockService),
+                    context, cashSales, isUrdu, fontFamily, stockService, databaseService),
                 _buildBillsList(
-                    context, creditSales, isUrdu, fontFamily, stockService),
+                    context, creditSales, isUrdu, fontFamily, stockService, databaseService),
               ],
             ),
           ),

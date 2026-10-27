@@ -11,6 +11,7 @@ import 'package:account_app/core/models/stock_movement_model.dart';
 import 'package:account_app/core/models/stock_category_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
+import 'package:account_app/core/services/offline_queue_service.dart';
 
 class StockService with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -377,34 +378,48 @@ class StockService with ChangeNotifier {
     final user = _auth.currentUser;
     if (user == null) throw StateError('Sign in to add a stock item.');
 
-    final userDoc = _firestore.collection('users').doc(user.uid);
-    final batch = _firestore.batch();
-    batch.set(userDoc.collection('stock_items').doc(item.id), item.toMap());
+    // Instant local UI update
+    _items.removeWhere((i) => i.id == item.id);
+    _items.add(item);
 
-    if (item.trackStock && item.initialQuantity > 0) {
-      final movement = StockMovement(
-        id: 'mov_${DateTime.now().millisecondsSinceEpoch}',
-        stockItemId: item.id,
-        stockItemName: item.name,
-        type: StockMovementType.purchase,
-        quantity: item.initialQuantity,
-        unitPrice: item.purchasePrice,
-        reason: 'Initial Opening Stock',
-        timestamp: DateTime.now(),
+    try {
+      final userDoc = _firestore.collection('users').doc(user.uid);
+      final batch = _firestore.batch();
+      batch.set(userDoc.collection('stock_items').doc(item.id), item.toMap());
+
+      if (item.trackStock && item.initialQuantity > 0) {
+        final movement = StockMovement(
+          id: 'mov_${DateTime.now().millisecondsSinceEpoch}',
+          stockItemId: item.id,
+          stockItemName: item.name,
+          type: StockMovementType.purchase,
+          quantity: item.initialQuantity,
+          unitPrice: item.purchasePrice,
+          reason: 'Initial Opening Stock',
+          timestamp: DateTime.now(),
+        );
+        batch.set(
+          userDoc.collection('stock_movements').doc(movement.id),
+          movement.toMap(),
+        );
+      }
+
+      await batch.commit();
+      await _syncPublicItem(
+        user.uid,
+        item,
+        availableStock: item.trackStock ? item.initialQuantity : null,
       );
-      batch.set(
-        userDoc.collection('stock_movements').doc(movement.id),
-        movement.toMap(),
+    } catch (e) {
+      debugPrint('StockService: Offline or network error adding item, queueing: $e');
+      await OfflineQueueService().enqueueOperation(
+        module: 'stock',
+        action: 'create',
+        payload: item.toMap(),
       );
+    } finally {
+      notifyListeners();
     }
-
-    await batch.commit();
-    await _syncPublicItem(
-      user.uid,
-      item,
-      availableStock: item.trackStock ? item.initialQuantity : null,
-    );
-    notifyListeners();
   }
 
   /// ✏️ Update Existing Stock Item
@@ -414,15 +429,33 @@ class StockService with ChangeNotifier {
 
     final availableStock =
         item.trackStock ? calculateCurrentStock(item.id) : null;
-    await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .collection('stock_items')
-        .doc(item.id)
-        .set(item.toMap(), SetOptions(merge: true));
 
-    await _syncPublicItem(user.uid, item, availableStock: availableStock);
-    notifyListeners();
+    final idx = _items.indexWhere((i) => i.id == item.id);
+    if (idx != -1) {
+      _items[idx] = item;
+    } else {
+      _items.add(item);
+    }
+
+    try {
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('stock_items')
+          .doc(item.id)
+          .set(item.toMap(), SetOptions(merge: true));
+
+      await _syncPublicItem(user.uid, item, availableStock: availableStock);
+    } catch (e) {
+      debugPrint('StockService: Offline or network error updating item, queueing: $e');
+      await OfflineQueueService().enqueueOperation(
+        module: 'stock',
+        action: 'update',
+        payload: item.toMap(),
+      );
+    } finally {
+      notifyListeners();
+    }
   }
 
   /// 🗑️ Delete Stock Item
@@ -437,17 +470,30 @@ class StockService with ChangeNotifier {
         _items.where((candidate) => candidate.id == itemId).firstOrNull;
     if (item == null) throw StateError('Stock item $itemId is unavailable.');
 
-    await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .collection('stock_items')
-        .doc(itemId)
-        .set(
-          item.copyWith(isArchived: true, updatedAt: DateTime.now()).toMap(),
-          SetOptions(merge: true),
-        );
-    await _syncPublicItem(user.uid, item.copyWith(isArchived: true));
-    notifyListeners();
+    final updated = item.copyWith(isArchived: true, updatedAt: DateTime.now());
+    _items.removeWhere((i) => i.id == itemId);
+
+    try {
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('stock_items')
+          .doc(itemId)
+          .set(
+            updated.toMap(),
+            SetOptions(merge: true),
+          );
+      await _syncPublicItem(user.uid, updated);
+    } catch (e) {
+      debugPrint('StockService: Offline or network error archiving item, queueing: $e');
+      await OfflineQueueService().enqueueOperation(
+        module: 'stock',
+        action: 'update',
+        payload: updated.toMap(),
+      );
+    } finally {
+      notifyListeners();
+    }
   }
 
   Future<void> _syncPublicItem(
@@ -474,6 +520,9 @@ class StockService with ChangeNotifier {
       'name': item.name,
       'nameUrdu': item.nameUrdu,
       'description': item.description,
+      'brand': item.brand,
+      'model': item.model,
+      'allowReturn': item.allowReturn,
       'rate': item.sellingPrice,
       'oldRate': item.mrp > item.sellingPrice ? item.mrp : null,
       'unit': item.unit,

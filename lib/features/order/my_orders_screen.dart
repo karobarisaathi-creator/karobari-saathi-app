@@ -1,5 +1,6 @@
 // lib/features/order/my_orders_screen.dart
 
+import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_button.dart';
@@ -15,6 +17,7 @@ import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/features/order/services/shop_order_service.dart';
+import 'package:account_app/core/services/database/profile_service.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // MODELS
@@ -279,10 +282,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                   );
                 }
                 if (!snapshot.hasData) {
-                  return const Center(
-                    child:
-                        CircularProgressIndicator(color: AppTheme.themeColor),
-                  );
+                  return _buildShimmerOrdersList();
                 }
 
                 final orderDocuments = snapshot.data!.docs.toList()
@@ -370,6 +370,44 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildShimmerOrdersList() {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      itemCount: 4,
+      itemBuilder: (_, __) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: const [
+                SkeletonShimmer(width: 140, height: 16, borderRadius: 6),
+                SkeletonShimmer(width: 70, height: 22, borderRadius: 12),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const SkeletonShimmer(width: 200, height: 12, borderRadius: 4),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: const [
+                SkeletonShimmer(width: 100, height: 14, borderRadius: 6),
+                SkeletonShimmer(width: 80, height: 16, borderRadius: 6),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1095,14 +1133,20 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     }
 
     try {
-      final shopSnapshot = await FirebaseFirestore.instance
-          .collection('public_shops')
-          .doc(order.shopId)
-          .get();
-      final shopData = shopSnapshot.data();
-      var phone = (shopData?['phoneNumber'] ?? shopData?['phone'] ?? '')
-          .toString()
-          .trim();
+      final profile = await ProfileService().findPublicProfileByUid(order.shopId);
+      var phone = (profile?['phone'] ?? '').toString().trim();
+
+      if (phone.isEmpty) {
+        final shopSnapshot = await FirebaseFirestore.instance
+            .collection('public_shops')
+            .doc(order.shopId)
+            .get();
+        final shopData = shopSnapshot.data();
+        phone = (shopData?['phoneNumber'] ?? shopData?['phone'] ?? '')
+            .toString()
+            .trim();
+      }
+
       if (phone.isEmpty) {
         final ownerSnapshot = await FirebaseFirestore.instance
             .collection('users')
@@ -1409,12 +1453,15 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 2),
-                                      Text(
-                                        '${item.qty.toInt()} ${item.unit} × Rs ${item.rate.toStringAsFixed(0)}',
-                                        style: const TextStyle(
-                                          fontSize: 10.5,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppTheme.textSecondary,
+                                      Directionality(
+                                        textDirection: ui.TextDirection.ltr,
+                                        child: Text(
+                                          '${item.qty.toInt()} ${item.unit} × Rs ${item.rate.toStringAsFixed(0)}',
+                                          style: const TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppTheme.textSecondary,
+                                          ),
                                         ),
                                       ),
                                     ],

@@ -1,11 +1,13 @@
 // lib/features/order/shop_orders_screen.dart
 
+import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
+import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_button.dart';
@@ -81,11 +83,7 @@ class ShopOrdersScreen extends StatelessWidget {
             );
           }
           if (!snapshot.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(
-                color: AppTheme.themeColor,
-              ),
-            );
+            return _buildShimmerShopOrdersList();
           }
 
           final docs = snapshot.data!.docs;
@@ -108,6 +106,50 @@ class ShopOrdersScreen extends StatelessWidget {
             },
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildShimmerShopOrdersList() {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      itemCount: 4,
+      itemBuilder: (_, __) => Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: const [
+                SkeletonShimmer(width: 130, height: 16, borderRadius: 6),
+                SkeletonShimmer(width: 65, height: 20, borderRadius: 10),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: const [
+                SkeletonShimmer(width: 24, height: 24, borderRadius: 12),
+                SizedBox(width: 8),
+                SkeletonShimmer(width: 120, height: 14, borderRadius: 6),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: const [
+                SkeletonShimmer(width: 90, height: 14, borderRadius: 6),
+                SkeletonShimmer(width: 75, height: 16, borderRadius: 6),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -423,13 +465,16 @@ class _OrderCardState extends State<_OrderCard> {
                         color: AppTheme.backgroundColor,
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: UrduAwareText(
-                        '${rawItem['quantity']} ${rawItem['unit'] ?? ''} × Rs ${(rawItem['rate'] as num?)?.toStringAsFixed(0) ?? '0'}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textSecondary,
-                          fontFamily: widget.fontFamily,
+                      child: Directionality(
+                        textDirection: ui.TextDirection.ltr,
+                        child: UrduAwareText(
+                          '${rawItem['quantity']} ${rawItem['unit'] ?? ''} × Rs ${(rawItem['rate'] as num?)?.toStringAsFixed(0) ?? '0'}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textSecondary,
+                            fontFamily: widget.fontFamily,
+                          ),
                         ),
                       ),
                     ),

@@ -16,6 +16,7 @@ import 'package:account_app/core/models/shop_model.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
+import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 import 'package:account_app/features/order/order_preview_screen.dart';
 import 'package:account_app/features/order/widgets/shop_item_card_widget.dart';
 
@@ -132,59 +133,61 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: UrduAwareText(isUrdu ? 'دکان کو ریٹ کریں' : 'Rate this shop', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w900)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              UrduAwareText(
-                isUrdu
-                    ? 'اپنا تجربہ بتائیں — کمیونٹی ریٹنگ'
-                    : 'Share your experience — Community rating',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontFamily: fontFamily),
-              ),
-              const SizedBox(height: 4),
-              UrduAwareText(
-                isUrdu
-                    ? 'ایک اکاؤنٹ سے ایک ریٹنگ؛ آپ بعد میں اسے بدل سکتے ہیں'
-                    : 'One rating per account; you can update it later.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontFamily: fontFamily, fontSize: 11, color: AppTheme.textSecondary),
-              ),
-              const SizedBox(height: 12),
-              Directionality(
-                textDirection: TextDirection.ltr,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    5,
-                    (index) => IconButton(
-                      tooltip: '${index + 1}',
-                      visualDensity: VisualDensity.compact,
-                      onPressed: _isSavingRating
-                          ? null
-                          : () => setDialogState(
-                                () => selectedRating = index + 1,
-                              ),
-                      icon: Icon(
-                        index < selectedRating
-                            ? PhosphorIcons.star(PhosphorIconsStyle.fill)
-                            : PhosphorIcons.star(),
-                        color: AppTheme.verifiedGold,
-                        size: 30,
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                UrduAwareText(
+                  isUrdu
+                      ? 'اپنا تجربہ بتائیں — کمیونٹی ریٹنگ'
+                      : 'Share your experience — Community rating',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontFamily: fontFamily),
+                ),
+                const SizedBox(height: 4),
+                UrduAwareText(
+                  isUrdu
+                      ? 'ایک اکاؤنٹ سے ایک ریٹنگ؛ آپ بعد میں اسے بدل سکتے ہیں'
+                      : 'One rating per account; you can update it later.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontFamily: fontFamily, fontSize: 11, color: AppTheme.textSecondary),
+                ),
+                const SizedBox(height: 12),
+                Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      5,
+                      (index) => IconButton(
+                        tooltip: '${index + 1}',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _isSavingRating
+                            ? null
+                            : () => setDialogState(
+                                  () => selectedRating = index + 1,
+                                ),
+                        icon: Icon(
+                          index < selectedRating
+                              ? PhosphorIcons.star(PhosphorIconsStyle.fill)
+                              : PhosphorIcons.star(),
+                          color: AppTheme.verifiedGold,
+                          size: 30,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              TextField(
-                controller: controller,
-                maxLines: 3,
-                maxLength: 500,
-                decoration: InputDecoration(
-                  hintText: isUrdu ? 'تبصرہ (اختیاری)' : 'Review (optional)',
+                TextField(
+                  controller: controller,
+                  maxLines: 3,
+                  maxLength: 500,
+                  decoration: InputDecoration(
+                    hintText: isUrdu ? 'تبصرہ (اختیاری)' : 'Review (optional)',
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -205,7 +208,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
         ),
       ),
     );
-    controller.dispose();
+    Future.delayed(const Duration(milliseconds: 500), () => controller.dispose());
     if (result == null || !mounted) return;
 
     setState(() => _isSavingRating = true);
@@ -354,12 +357,18 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
               final data = doc.data();
               final quantity = (data['availableQuantity'] as num?)?.toDouble();
               final tracksStock = data['trackStock'] != false;
+              final brandVal = (data['brand'] ?? '').toString();
+              final modelVal = (data['model'] ?? '').toString();
+              final allowReturnVal = data['allowReturn'] == true;
               return ShopItem(
                 id: doc.id,
                 stockItemId: doc.id,
                 name: (data['name'] ?? '').toString(),
                 nameUrdu: (data['nameUrdu'] ?? '').toString(),
                 description: (data['description'] ?? '').toString(),
+                brand: brandVal.isNotEmpty ? brandVal : null,
+                model: modelVal.isNotEmpty ? modelVal : null,
+                allowReturn: allowReturnVal,
                 rate: (data['rate'] as num?)?.toDouble() ?? 0,
                 oldRate: (data['oldRate'] as num?)?.toDouble(),
                 unit: (data['unit'] ?? '').toString(),
@@ -559,7 +568,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                   // Items list
                   Expanded(
                     child: _isLoadingItems
-                        ? const Center(child: CircularProgressIndicator())
+                        ? _buildShimmerCatalogGrid()
                         : _itemsError != null
                             ? Center(
                                 child: UrduAwareText(
@@ -1109,6 +1118,65 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildShimmerCatalogGrid() {
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 100),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.72,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+      ),
+      itemCount: 6,
+      itemBuilder: (_, __) => Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppTheme.backgroundColor,
+            width: 1.5,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SkeletonShimmer(
+              width: double.infinity,
+              height: 110,
+              borderRadius: 0,
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  SkeletonShimmer(
+                    width: 120,
+                    height: 14,
+                    borderRadius: 6,
+                  ),
+                  SizedBox(height: 8),
+                  SkeletonShimmer(
+                    width: 80,
+                    height: 14,
+                    borderRadius: 6,
+                  ),
+                  SizedBox(height: 12),
+                  SkeletonShimmer(
+                    width: 60,
+                    height: 10,
+                    borderRadius: 4,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

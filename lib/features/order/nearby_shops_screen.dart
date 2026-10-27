@@ -11,10 +11,38 @@ import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/models/shop_model.dart';
+import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 import 'package:account_app/features/order/shop_detail_screen.dart';
 import 'package:account_app/features/order/widgets/shop_card_widget.dart';
 import 'package:account_app/features/order/widgets/shop_catalog_item_card.dart';
 import 'package:account_app/features/order/widgets/item_detail_dialog.dart';
+
+// ═══════════════════════════════════════════════════════════════
+// IN-MEMORY CACHE FOR NEARBY SHOPS & ITEMS (COST & PERFORMANCE OPTIMIZATION)
+// ═══════════════════════════════════════════════════════════════
+class _NearbyShopsCache {
+  static List<Shop>? cachedShops;
+  static DateTime? lastShopsFetchTime;
+  static final Map<String, List<ShopItem>> cachedShopItems = {};
+  static final Map<String, DateTime> lastItemsFetchTime = {};
+
+  static bool isShopsCacheValid({Duration ttl = const Duration(minutes: 5)}) {
+    if (cachedShops == null || lastShopsFetchTime == null) return false;
+    return DateTime.now().difference(lastShopsFetchTime!) < ttl;
+  }
+
+  static bool isItemsCacheValid(String shopId, {Duration ttl = const Duration(minutes: 5)}) {
+    if (!cachedShopItems.containsKey(shopId) || !lastItemsFetchTime.containsKey(shopId)) return false;
+    return DateTime.now().difference(lastItemsFetchTime[shopId]!) < ttl;
+  }
+
+  static void clear() {
+    cachedShops = null;
+    lastShopsFetchTime = null;
+    cachedShopItems.clear();
+    lastItemsFetchTime.clear();
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN SCREEN: NEARBY SHOPS LIST
@@ -45,14 +73,30 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
     _loadPublicShops();
   }
 
-  Future<void> _loadPublicShops() async {
+  Future<void> _loadPublicShops({bool forceRefresh = false}) async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+
+    // Check in-memory cache first for instant 0ms load time
+    if (!forceRefresh && _NearbyShopsCache.isShopsCacheValid()) {
+      setState(() {
+        _shops = _NearbyShopsCache.cachedShops!;
+        _isLoading = false;
+        _loadError = null;
+      });
+      return;
+    }
+
+    if (_NearbyShopsCache.cachedShops != null && !forceRefresh) {
+      _shops = _NearbyShopsCache.cachedShops!;
+    } else if (_NearbyShopsCache.cachedShops == null) {
+      setState(() => _isLoading = true);
+    }
 
     try {
       final snapshot = await _firestore
           .collection('public_shops')
           .orderBy('updatedAt', descending: true)
+          .limit(30)
           .get();
 
       if (!mounted) return;
@@ -64,12 +108,20 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
           .where((shop) => shop.name.trim().isNotEmpty)
           .toList();
 
+      _NearbyShopsCache.cachedShops = loaded;
+      _NearbyShopsCache.lastShopsFetchTime = DateTime.now();
+
       _shops = loaded;
       _loadError = null;
     } catch (error) {
       if (!mounted) return;
-      _shops = [];
-      _loadError = error.toString();
+      if (_NearbyShopsCache.cachedShops != null) {
+        _shops = _NearbyShopsCache.cachedShops!;
+        _loadError = null;
+      } else {
+        _shops = [];
+        _loadError = error.toString();
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -204,7 +256,7 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
               ),
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? _buildShimmerLoadingList()
                   : _loadError != null
                       ? Center(
                           child: Padding(
@@ -242,6 +294,8 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
       filtered.sort((a, b) => b.rating.compareTo(a.rating));
     } else if (_sortBy == 'time') {
       filtered.sort((a, b) => a.timeVal.compareTo(b.timeVal));
+    } else if (_sortBy == 'nearest') {
+      filtered.sort((a, b) => a.distanceVal.compareTo(b.distanceVal));
     }
 
     return Column(
@@ -258,6 +312,13 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
                 'recent',
                 isUrdu ? 'نئی دکانیں' : 'Recent',
                 PhosphorIcons.mapPin(),
+                fontFamily: fontFamily,
+              ),
+              const SizedBox(width: 8),
+              _buildSortChip(
+                'nearest',
+                isUrdu ? 'قریبی ترین' : 'Nearest',
+                PhosphorIcons.navigationArrow(),
                 fontFamily: fontFamily,
               ),
               const SizedBox(width: 8),
@@ -297,14 +358,20 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
                   sub: isUrdu ? 'دوسرا نام آزمائیں' : 'Try another search',
                   fontFamily: fontFamily,
                 )
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 24),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, i) => _ShopSectionWidget(
-                    shop: filtered[i],
-                    isUrdu: isUrdu,
-                    fontFamily: fontFamily,
-                    onTap: () => _openShopDetail(filtered[i]),
+              : RefreshIndicator(
+                  color: AppTheme.themeColor,
+                  onRefresh: () => _loadPublicShops(forceRefresh: true),
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 24),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, i) => _ShopSectionWidget(
+                      key: ValueKey(filtered[i].id),
+                      shop: filtered[i],
+                      isUrdu: isUrdu,
+                      fontFamily: fontFamily,
+                      onTap: () => _openShopDetail(filtered[i]),
+                    ),
                   ),
                 ),
         ),
@@ -411,6 +478,99 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
       ),
     );
   }
+
+  Widget _buildShimmerLoadingList() {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+      itemCount: 3,
+      itemBuilder: (context, index) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SkeletonShimmer(width: 180, height: 16, borderRadius: 6),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 270,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: 3,
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (_, __) => Container(
+                    width: 290,
+                    height: 270,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppTheme.backgroundColor,
+                        width: 1.5,
+                      ),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SkeletonShimmer(
+                          width: double.infinity,
+                          height: 110,
+                          borderRadius: 0,
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              SkeletonShimmer(
+                                width: 160,
+                                height: 16,
+                                borderRadius: 6,
+                              ),
+                              SizedBox(height: 8),
+                              SkeletonShimmer(
+                                width: 120,
+                                height: 14,
+                                borderRadius: 6,
+                              ),
+                              SizedBox(height: 16),
+                              SkeletonShimmer(
+                                width: 200,
+                                height: 12,
+                                borderRadius: 4,
+                              ),
+                              SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  SkeletonShimmer(
+                                    width: 100,
+                                    height: 14,
+                                    borderRadius: 6,
+                                  ),
+                                  SkeletonShimmer(
+                                    width: 60,
+                                    height: 14,
+                                    borderRadius: 6,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _ShopSectionWidget extends StatefulWidget {
@@ -420,6 +580,7 @@ class _ShopSectionWidget extends StatefulWidget {
   final VoidCallback onTap;
 
   const _ShopSectionWidget({
+    super.key,
     required this.shop,
     required this.isUrdu,
     required this.fontFamily,
@@ -454,24 +615,49 @@ class _ShopSectionWidgetState extends State<_ShopSectionWidget> {
     _fetchItems();
   }
 
-  void _fetchItems() {
-    FirebaseFirestore.instance
-        .collection('public_shops')
-        .doc(widget.shop.id)
-        .collection('items')
-        .snapshots()
-        .listen((snapshot) {
+  void _fetchItems({bool forceRefresh = false}) async {
+    final shopId = widget.shop.id;
+
+    if (!forceRefresh && _NearbyShopsCache.isItemsCacheValid(shopId)) {
+      if (mounted) {
+        setState(() {
+          _items = _NearbyShopsCache.cachedShopItems[shopId]!;
+          _isLoadingItems = false;
+        });
+      }
+      return;
+    }
+
+    if (_NearbyShopsCache.cachedShopItems.containsKey(shopId)) {
+      _items = _NearbyShopsCache.cachedShopItems[shopId]!;
+      _isLoadingItems = false;
+    }
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('public_shops')
+          .doc(shopId)
+          .collection('items')
+          .limit(10)
+          .get();
+
       if (!mounted) return;
       final items = snapshot.docs.map((doc) {
         final data = doc.data();
         final quantity = (data['availableQuantity'] as num?)?.toDouble();
         final tracksStock = data['trackStock'] != false;
+        final brandVal = (data['brand'] ?? '').toString();
+        final modelVal = (data['model'] ?? '').toString();
+        final allowReturnVal = data['allowReturn'] == true;
         return ShopItem(
           id: doc.id,
           stockItemId: doc.id,
           name: (data['name'] ?? '').toString(),
           nameUrdu: (data['nameUrdu'] ?? '').toString(),
           description: (data['description'] ?? '').toString(),
+          brand: brandVal.isNotEmpty ? brandVal : null,
+          model: modelVal.isNotEmpty ? modelVal : null,
+          allowReturn: allowReturnVal,
           rate: (data['rate'] as num?)?.toDouble() ?? 0,
           oldRate: (data['oldRate'] as num?)?.toDouble(),
           unit: (data['unit'] ?? '').toString(),
@@ -483,15 +669,18 @@ class _ShopSectionWidgetState extends State<_ShopSectionWidget> {
         );
       }).where((item) => item.name.trim().isNotEmpty).toList();
 
+      _NearbyShopsCache.cachedShopItems[shopId] = items;
+      _NearbyShopsCache.lastItemsFetchTime[shopId] = DateTime.now();
+
       if (mounted) {
         setState(() {
           _items = items;
           _isLoadingItems = false;
         });
       }
-    }, onError: (_) {
+    } catch (_) {
       if (mounted) setState(() => _isLoadingItems = false);
-    });
+    }
   }
 
   @override
@@ -532,7 +721,7 @@ class _ShopSectionWidgetState extends State<_ShopSectionWidget> {
                     itemBuilder: (context, index) {
                       if (index == 0) {
                         return SizedBox(
-                          width: 260,
+                          width: 290,
                           height: 270,
                           child: ShopCardWidget(
                             shop: widget.shop.copyWith(items: _items, itemCount: totalCount),
@@ -542,7 +731,7 @@ class _ShopSectionWidgetState extends State<_ShopSectionWidget> {
                       }
                       final item = _items[index - 1];
                       return SizedBox(
-                        width: 260,
+                        width: 290,
                         height: 270,
                         child: ShopCatalogItemCard(
                           item: item,

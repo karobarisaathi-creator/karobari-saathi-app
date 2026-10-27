@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/stock_analytics_model.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
@@ -258,7 +259,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
         showBackButton: true,
       ),
       body: stockService.isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? _buildShimmerAnalytics()
           : Column(
               children: [
                 Container(
@@ -1795,6 +1796,33 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
               overflow: TextOverflow.ellipsis,
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShimmerAnalytics() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          Row(
+            children: const [
+              Expanded(
+                child: SkeletonShimmer(width: double.infinity, height: 90, borderRadius: 16),
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: SkeletonShimmer(width: double.infinity, height: 90, borderRadius: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const SkeletonShimmer(width: double.infinity, height: 180, borderRadius: 20),
+          const SizedBox(height: 12),
+          const SkeletonShimmer(width: double.infinity, height: 120, borderRadius: 16),
+          const SizedBox(height: 12),
+          const SkeletonShimmer(width: double.infinity, height: 120, borderRadius: 16),
         ],
       ),
     );

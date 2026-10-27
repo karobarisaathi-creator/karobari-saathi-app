@@ -3,13 +3,26 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/models/account_model.dart';
+import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/widgets/in_app_notification_banner.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
+
+const String _pendingPartyNotificationsBoxName =
+    'pending_party_notifications_v1';
+
+enum PartyNotificationResult {
+  savedToInbox,
+  recipientNotFound,
+  sameUser,
+  notSignedIn,
+}
 
 class NotificationService with ChangeNotifier {
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
@@ -25,9 +38,11 @@ class NotificationService with ChangeNotifier {
   StreamSubscription<String>? _tokenRefreshSubscription;
   StreamSubscription<RemoteMessage>? _foregroundMessageSubscription;
   StreamSubscription<RemoteMessage>? _openedMessageSubscription;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   String? _fcmToken;
   String? _activeUserId;
   bool _isDisposed = false;
+  bool _isProcessingPendingPartyNotifications = false;
 
   GlobalKey<NavigatorState>? _navigatorKey;
 
@@ -39,6 +54,12 @@ class NotificationService with ChangeNotifier {
     _initNotifications();
     _authStateSubscription =
         _auth.authStateChanges().listen(_handleAuthStateChanged);
+    _connectivitySubscription =
+        Connectivity().onConnectivityChanged.listen((results) {
+      if (!results.contains(ConnectivityResult.none)) {
+        unawaited(_processPendingPartyNotifications());
+      }
+    });
   }
 
   @override
@@ -49,6 +70,7 @@ class NotificationService with ChangeNotifier {
     _tokenRefreshSubscription?.cancel();
     _foregroundMessageSubscription?.cancel();
     _openedMessageSubscription?.cancel();
+    _connectivitySubscription?.cancel();
     super.dispose();
   }
 
@@ -76,6 +98,7 @@ class NotificationService with ChangeNotifier {
     if (!_isDisposed && _auth.currentUser != null) {
       _handleAuthStateChanged(_auth.currentUser);
     }
+    unawaited(_processPendingPartyNotifications());
   }
 
   Future<void> _handleAuthStateChanged(User? user) async {
@@ -96,6 +119,7 @@ class NotificationService with ChangeNotifier {
 
     _startFirestoreListener();
     await _registerCurrentToken(userId);
+    unawaited(_processPendingPartyNotifications());
   }
 
   Future<void> _registerCurrentToken(String userId) async {
@@ -356,7 +380,8 @@ class NotificationService with ChangeNotifier {
             } else {
               return Scaffold(
                 appBar: AppBar(title: UrduAwareText('Details')),
-                body: Center(child: UrduAwareText('Account details not found.')),
+                body:
+                    Center(child: UrduAwareText('Account details not found.')),
               );
             }
           }
@@ -649,7 +674,7 @@ class NotificationService with ChangeNotifier {
         _notifications.where((notification) => !notification.isRead).length;
   }
 
-  Future<void> notifyPartyByPhone({
+  Future<PartyNotificationResult> notifyPartyByPhone({
     required String partyPhoneNumber,
     required double amount,
     required String transactionType,
@@ -666,9 +691,10 @@ class NotificationService with ChangeNotifier {
     double? discountAmount,
     double? discountPercent,
     String? discountReason,
+    String? notificationId,
   }) async {
     final currentUser = _auth.currentUser;
-    if (currentUser == null) return;
+    if (currentUser == null) return PartyNotificationResult.notSignedIn;
 
     String myName = currentUser.displayName ?? '';
     if (myName.isEmpty) myName = currentUser.phoneNumber ?? 'ایک صارف';
@@ -689,7 +715,9 @@ class NotificationService with ChangeNotifier {
 
       if (querySnapshot.docs.isNotEmpty) {
         final targetUserId = querySnapshot.docs.first.id;
-        if (targetUserId == currentUser.uid) return;
+        if (targetUserId == currentUser.uid) {
+          return PartyNotificationResult.sameUser;
+        }
 
         // Build detailed receipt message body
         final StringBuffer bodyBuffer = StringBuffer();
@@ -719,7 +747,10 @@ class NotificationService with ChangeNotifier {
           }
         }
 
-        final notifId = DateTime.now().millisecondsSinceEpoch.toString();
+        final notifId = notificationId ??
+            (transactionId != null
+                ? 'transaction_${currentUser.uid}_$transactionId'
+                : DateTime.now().millisecondsSinceEpoch.toString());
         final notification = AppNotification(
           id: notifId,
           title: '📄 تفصیلی بل / رسید',
@@ -757,9 +788,124 @@ class NotificationService with ChangeNotifier {
             .collection('notifications')
             .doc(notifId)
             .set(notification.toMap());
+        return PartyNotificationResult.savedToInbox;
       }
-    } catch (e) {
-      debugPrint('Error notifying party with receipt: $e');
+      return PartyNotificationResult.recipientNotFound;
+    } catch (error, stackTrace) {
+      debugPrint('Error notifying party with receipt: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  Future<bool> enqueuePendingPartyNotification({
+    required model.Transaction transaction,
+    required String partyPhoneNumber,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null || partyPhoneNumber.trim().isEmpty) return false;
+
+    try {
+      final box = await _getPendingPartyNotificationsBox();
+      final queueId = '${user.uid}_${transaction.id}';
+      await box.put(queueId, {
+        'senderUid': user.uid,
+        'partyPhoneNumber': partyPhoneNumber,
+        'transaction': transaction.toMap(),
+      });
+      unawaited(_processPendingPartyNotifications());
+      return true;
+    } catch (error, stackTrace) {
+      debugPrint('Unable to queue the party notification for retry: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return false;
+    }
+  }
+
+  Future<Box> _getPendingPartyNotificationsBox() async {
+    if (Hive.isBoxOpen(_pendingPartyNotificationsBoxName)) {
+      return Hive.box(_pendingPartyNotificationsBoxName);
+    }
+    return Hive.openBox(_pendingPartyNotificationsBoxName);
+  }
+
+  Future<void> _processPendingPartyNotifications() async {
+    if (_isDisposed || _isProcessingPendingPartyNotifications) return;
+
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final connectivity = await Connectivity().checkConnectivity();
+      if (connectivity.contains(ConnectivityResult.none)) return;
+
+      final box = await _getPendingPartyNotificationsBox();
+      _isProcessingPendingPartyNotifications = true;
+      for (final key in box.keys.toList()) {
+        final rawEntry = box.get(key);
+        if (rawEntry is! Map) {
+          debugPrint('Removing invalid pending party notification: $key');
+          await box.delete(key);
+          continue;
+        }
+
+        final entry = Map<String, dynamic>.from(rawEntry);
+        if (entry['senderUid'] != user.uid) continue;
+
+        try {
+          final transactionMap =
+              Map<String, dynamic>.from(entry['transaction'] as Map);
+          final transaction = model.Transaction.fromMap(transactionMap);
+          final recipientPhone = entry['partyPhoneNumber'] as String? ?? '';
+          if (recipientPhone.trim().isEmpty) {
+            await box.delete(key);
+            continue;
+          }
+
+          await _firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('transactions')
+              .doc(transaction.id)
+              .set(transaction.toMap(), SetOptions(merge: true))
+              .timeout(const Duration(seconds: 8));
+
+          if (_auth.currentUser?.uid != user.uid) continue;
+
+          final result = await notifyPartyByPhone(
+            partyPhoneNumber: recipientPhone,
+            amount: transaction.amount,
+            transactionType: transaction.type,
+            category: transaction.category,
+            paymentMethod: transaction.paymentMethod,
+            description: transaction.description,
+            items: transaction.items.map((item) => item.toMap()).toList(),
+            receivedAmount: transaction.receivedAmount,
+            pendingAmount: transaction.pendingAmount,
+            transactionId: transaction.id,
+            transactionDate: transaction.date,
+            referenceNumber: transaction.referenceNumber,
+            subtotal: transaction.subtotal,
+            discountAmount: transaction.discountAmount,
+            discountPercent: transaction.discountPercent,
+            discountReason: transaction.discountReason,
+          );
+
+          if (result == PartyNotificationResult.savedToInbox ||
+              result == PartyNotificationResult.recipientNotFound ||
+              result == PartyNotificationResult.sameUser) {
+            await box.delete(key);
+          }
+        } catch (error, stackTrace) {
+          debugPrint('Pending party notification will be retried: $error');
+          debugPrintStack(stackTrace: stackTrace);
+        }
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Unable to process pending party notifications: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    } finally {
+      _isProcessingPendingPartyNotifications = false;
     }
   }
 

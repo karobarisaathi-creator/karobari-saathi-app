@@ -6,7 +6,6 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/offline_queue_service.dart';
-import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 
 class OfflineStatusBannerWidget extends StatelessWidget {
@@ -29,68 +28,66 @@ class OfflineStatusBannerWidget extends StatelessWidget {
         final offlineQueue = Provider.of<OfflineQueueService>(context);
         final pendingCount = offlineQueue.pendingCount;
 
-        if (!isOffline && pendingCount == 0) {
-          return const SizedBox.shrink();
-        }
+        // Colorful, borderless, vibrant config
+        final backgroundColor = isOffline
+            ? const Color(0xFFEF4444) // Vibrant Red
+            : (pendingCount > 0 ? const Color(0xFFF59E0B) : const Color(0xFF22C55E)); // Vibrant Amber or Green
+
+        final iconData = isOffline
+            ? PhosphorIcons.wifiSlash()
+            : (pendingCount > 0 ? PhosphorIcons.cloudArrowUp() : PhosphorIcons.wifiHigh());
+
+        final titleText = isOffline
+            ? (isUrdu ? 'انٹرنیٹ منقطع ہے (آف لائن موڈ)' : 'Internet Disconnected (Offline)')
+            : (pendingCount > 0
+                ? (isUrdu ? 'پینڈنگ ڈیٹا سنک کے لیے تیار ہے' : 'Pending Data Ready to Sync')
+                : (isUrdu ? 'انٹرنیٹ بحال ہے (آن لائن موڈ)' : 'Internet Connected (Online)'));
 
         return Container(
-          margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: isOffline
-                ? const Color(0xFFFEF2F2)
-                : const Color(0xFFFFFBEB),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isOffline
-                  ? const Color(0xFFEF4444).withValues(alpha: 0.3)
-                  : const Color(0xFFF59E0B).withValues(alpha: 0.3),
-              width: 1.5,
-            ),
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isOffline
-                      ? const Color(0xFFEF4444).withValues(alpha: 0.15)
-                      : const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  isOffline ? PhosphorIcons.wifiSlash() : PhosphorIcons.cloudArrowUp(),
-                  size: 16,
-                  color: isOffline ? const Color(0xFFDC2626) : const Color(0xFFD97706),
-                ),
+              Icon(
+                iconData,
+                size: 16,
+                color: Colors.white,
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    UrduAwareText(
-                      isOffline
-                          ? (isUrdu ? 'آف لائن موڈ — انٹرنیٹ منقطع ہے' : 'Offline Mode — No Internet')
-                          : (isUrdu ? 'پینڈنگ ڈیٹا سنک کے لیے تیار ہے' : 'Pending Data Ready to Sync'),
-                      style: TextStyle(
-                        fontFamily: fontFamily,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w800,
-                        color: isOffline ? const Color(0xFF991B1B) : const Color(0xFF92400E),
+                    Flexible(
+                      child: UrduAwareText(
+                        titleText,
+                        style: TextStyle(
+                          fontFamily: fontFamily,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                     if (pendingCount > 0) ...[
-                      const SizedBox(height: 2),
-                      UrduAwareText(
-                        isUrdu
-                            ? 'محفوظ شدہ ٹرانزیکشنز: $pendingCount'
-                            : 'Queued operations: $pendingCount',
-                        style: TextStyle(
-                          fontFamily: fontFamily,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: isOffline ? const Color(0xB2991B1B) : const Color(0xB292400E),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: UrduAwareText(
+                          '$pendingCount',
+                          style: TextStyle(
+                            fontFamily: fontFamily,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ],
@@ -111,26 +108,27 @@ class OfflineStatusBannerWidget extends StatelessWidget {
                           }
                         },
                   style: TextButton.styleFrom(
-                    backgroundColor: const Color(0xFFD97706),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFFD97706),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                   ),
                   icon: offlineQueue.isSyncing
                       ? const SizedBox(
-                          width: 12,
-                          height: 12,
+                          width: 10,
+                          height: 10,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                              strokeWidth: 2, color: Color(0xFFD97706)),
                         )
-                      : Icon(PhosphorIcons.arrowsClockwise(), size: 14),
+                      : Icon(PhosphorIcons.arrowsClockwise(), size: 12),
                   label: UrduAwareText(
-                    isUrdu ? 'سنک کریں' : 'Sync',
+                    isUrdu ? 'سنک' : 'Sync',
                     style: TextStyle(
                       fontFamily: fontFamily,
-                      fontSize: 11,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

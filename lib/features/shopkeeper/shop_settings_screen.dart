@@ -364,9 +364,12 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
 
             // Live Shop Card Preview Widget
             AbsorbPointer(
-              child: ShopCardWidget(
-                shop: previewShop,
-                onTap: () {},
+              child: SizedBox(
+                height: 220,
+                child: ShopCardWidget(
+                  shop: previewShop,
+                  onTap: () {},
+                ),
               ),
             ),
 

@@ -14,15 +14,15 @@ import 'package:account_app/core/services/language_service.dart';
 
 class CurrencySettingsDialog extends StatefulWidget {
   final bool isUrdu;
-  final String fontFamily;
+  final String? fontFamily;
 
   const CurrencySettingsDialog({
     super.key,
     required this.isUrdu,
-    required this.fontFamily,
+    this.fontFamily,
   });
 
-  static void show(BuildContext context, bool isUrdu, String fontFamily) {
+  static void show(BuildContext context, bool isUrdu, String? fontFamily) {
     showDialog(
       context: context,
       builder: (context) => CurrencySettingsDialog(
@@ -38,28 +38,36 @@ class CurrencySettingsDialog extends StatefulWidget {
 
 class _CurrencySettingsDialogState extends State<CurrencySettingsDialog> {
   late AppSettings _tempSettings;
+  late String _tempLanguageCode;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
     final settingsService =
-    Provider.of<SettingsService>(context, listen: false);
+        Provider.of<SettingsService>(context, listen: false);
     _tempSettings = settingsService.settings;
+    final languageService =
+        Provider.of<LanguageService>(context, listen: false);
+    _tempLanguageCode = languageService.currentLocale.languageCode;
   }
 
   Future<void> _saveSettings() async {
     setState(() => _isSaving = true);
     try {
       final settingsService =
-      Provider.of<SettingsService>(context, listen: false);
+          Provider.of<SettingsService>(context, listen: false);
+      final languageService =
+          Provider.of<LanguageService>(context, listen: false);
+
       await settingsService.updateSettings(_tempSettings);
       Formatters.updateSettings(_tempSettings);
+      await languageService.changeLanguage(_tempLanguageCode);
 
       if (mounted) {
         AppToast.success(
           context,
-          widget.isUrdu ? 'سیٹنگز محفوظ ہو گئیں' : 'Settings saved',
+          _tempLanguageCode == 'ur' ? 'سیٹنگز محفوظ ہو گئیں' : 'Settings saved',
         );
         Navigator.pop(context);
       }
@@ -76,8 +84,8 @@ class _CurrencySettingsDialogState extends State<CurrencySettingsDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final isUrdu = widget.isUrdu;
-    final fontFamily = widget.fontFamily;
+    final isUrdu = _tempLanguageCode == 'ur';
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
 
     return Dialog(
       alignment: Alignment.topCenter,
@@ -146,6 +154,7 @@ class _CurrencySettingsDialogState extends State<CurrencySettingsDialog> {
                   Expanded(
                     child: AppButton(
                       text: isUrdu ? 'محفوظ کریں' : 'Save',
+                      loadingText: isUrdu ? 'محفوظ ہو رہا ہے...' : 'Saving...',
                       onPressed: _saveSettings,
                       isLoading: _isSaving,
                       size: AppButtonSize.small,
@@ -163,11 +172,9 @@ class _CurrencySettingsDialogState extends State<CurrencySettingsDialog> {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 1. LANGUAGE SECTION — فوری تبدیلی
+  // 1. LANGUAGE SECTION — عارضی انتخاب (محفوظ کرنے پر تبدیلی)
   // ═══════════════════════════════════════════════════════════
-  Widget _buildLanguageSection(bool isUrdu, String fontFamily) {
-    final languageService = Provider.of<LanguageService>(context);
-
+  Widget _buildLanguageSection(bool isUrdu, String? fontFamily) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -201,12 +208,9 @@ class _CurrencySettingsDialogState extends State<CurrencySettingsDialog> {
                 child: _buildLanguageOption(
                   label: 'اردو',
                   flag: '🇵🇰',
-                  isActive: languageService.isUrdu,
+                  isActive: _tempLanguageCode == 'ur',
                   fontFamily: fontFamily,
-                  onTap: () {
-                    languageService.changeLanguage('ur');
-                    setState(() {});
-                  },
+                  onTap: () => setState(() => _tempLanguageCode = 'ur'),
                 ),
               ),
               const SizedBox(width: 8),
@@ -214,12 +218,9 @@ class _CurrencySettingsDialogState extends State<CurrencySettingsDialog> {
                 child: _buildLanguageOption(
                   label: 'English',
                   flag: '🇬🇧',
-                  isActive: !languageService.isUrdu,
+                  isActive: _tempLanguageCode == 'en',
                   fontFamily: fontFamily,
-                  onTap: () {
-                    languageService.changeLanguage('en');
-                    setState(() {});
-                  },
+                  onTap: () => setState(() => _tempLanguageCode = 'en'),
                 ),
               ),
             ],
@@ -233,7 +234,7 @@ class _CurrencySettingsDialogState extends State<CurrencySettingsDialog> {
     required String label,
     required String flag,
     required bool isActive,
-    required String fontFamily,
+    required String? fontFamily,
     required VoidCallback onTap,
   }) {
     return InkWell(
@@ -281,7 +282,7 @@ class _CurrencySettingsDialogState extends State<CurrencySettingsDialog> {
   // ═══════════════════════════════════════════════════════════
   // 2. CURRENCY SECTION — صرف dropdown
   // ═══════════════════════════════════════════════════════════
-  Widget _buildCurrencySection(bool isUrdu, String fontFamily) {
+  Widget _buildCurrencySection(bool isUrdu, String? fontFamily) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -397,7 +398,7 @@ class _CurrencySettingsDialogState extends State<CurrencySettingsDialog> {
   // ═══════════════════════════════════════════════════════════
   // 3. LIVE PREVIEW
   // ═══════════════════════════════════════════════════════════
-  Widget _buildLivePreview(bool isUrdu, String fontFamily) {
+  Widget _buildLivePreview(bool isUrdu, String? fontFamily) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -451,7 +452,7 @@ class _CurrencySettingsDialogState extends State<CurrencySettingsDialog> {
   Widget _buildPreviewRow({
     required String label,
     required String value,
-    required String fontFamily,
+    required String? fontFamily,
     bool isHighlight = false,
   }) {
     return Row(
@@ -483,7 +484,7 @@ class _CurrencySettingsDialogState extends State<CurrencySettingsDialog> {
   // ═══════════════════════════════════════════════════════════
   // Currency Picker (nested dialog)
   // ═══════════════════════════════════════════════════════════
-  void _showCurrencyPickerDialog(bool isUrdu, String fontFamily) {
+  void _showCurrencyPickerDialog(bool isUrdu, String? fontFamily) {
     showDialog(
       context: context,
       builder: (dialogCtx) {
@@ -588,7 +589,7 @@ class _CurrencySettingsDialogState extends State<CurrencySettingsDialog> {
                                 Text(
                                   isUrdu
                                       ? currency['nameUrdu']!
-                                      : currency['name']!,
+                                      : currency['name']! ,
                                   style: TextStyle(
                                     fontFamily: isUrdu ? fontFamily : null,
                                     fontSize: 13,

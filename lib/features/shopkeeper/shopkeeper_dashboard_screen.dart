@@ -1,4 +1,3 @@
-import 'package:account_app/features/shopkeeper/stock_history_screen.dart';
 import 'package:account_app/features/order/shop_orders_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -27,7 +26,6 @@ import 'package:account_app/features/shopkeeper/sales_analytics_screen.dart';
 import 'package:account_app/features/shopkeeper/stock_detail_screen.dart';
 import 'package:account_app/features/order/nearby_shops_screen.dart';
 import 'widgets/shopkeeper_tools_grid.dart';
-import 'package:account_app/core/widgets/offline_status_banner_widget.dart';
 
 // ═══════════════════════════════════════════
 // SHOPKEEPER DASHBOARD SCREEN
@@ -170,15 +168,11 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(8, 16, 8, 30),
+                padding: const EdgeInsets.fromLTRB(8, 12, 8, 30),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    OfflineStatusBannerWidget(
-                      isUrdu: isUrdu,
-                      fontFamily: fontFamily,
-                    ),
-                    const SizedBox(height: 12),
+
                     _buildQuickActions(
                       context,
                       isUrdu,
@@ -193,15 +187,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                       fontFamily: fontFamily,
                       title: isUrdu ? 'اسٹاک کی معلومات' : 'Stock Movements',
                       icon: Icons.access_time_rounded,
-                      showAction: true,
-                      onActionTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => StockHistoryScreen(),
-                          ),
-                        );
-                      },
+                      showAction: false,
                     ),
                     const SizedBox(height: 12),
                     _buildActivityList(stockService, isUrdu, fontFamily),

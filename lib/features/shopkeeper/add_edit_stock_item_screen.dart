@@ -326,7 +326,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                   _buildImageRow(isUrdu, fontFamily, isLast: true),
                 ],
               ),
-              const SizedBox(height: 14),
+
 
               // ═══ 2. بنیادی معلومات ═══
               _buildSectionCard(
@@ -374,7 +374,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+
 
               // ═══ 3. کیٹیگری اور اکائی ═══
               _buildSectionCard(
@@ -415,7 +415,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+
 
               // ═══ 4. قیمت ═══
               _buildSectionCard(
@@ -490,7 +490,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+
 
               // ═══ 5. اسٹاک ═══
               _buildSectionCard(
@@ -535,7 +535,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+
 
               // ═══ 6. اضافی تفصیلات ═══
               _buildSectionCard(
@@ -571,7 +571,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+
 
               // ═══ 7. سپلائر اور وارنٹی ═══
               _buildSectionCard(
@@ -608,7 +608,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+
 
               // ═══ 8. خصوصیات ═══
               _buildSectionCard(

@@ -96,6 +96,9 @@ class DatabaseService extends ChangeNotifier {
     return stockSynced;
   }
 
+  Future<bool> syncTransactionToCloud(model.Transaction transaction) =>
+      _transactionService.syncTransactionToCloud(transaction);
+
   Future<bool> updateTransaction(model.Transaction t) async {
     await _transactionService.updateTransaction(t);
     final stockSynced = await _syncTransactionStock(t);

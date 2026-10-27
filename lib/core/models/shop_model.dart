@@ -99,6 +99,9 @@ class ShopItem {
   final String id;
   final String name;
   final String? description;
+  final String? brand;
+  final String? model;
+  final bool allowReturn;
   final double rate;
   final double? oldRate;
   final String unit;
@@ -117,6 +120,9 @@ class ShopItem {
     required this.id,
     required this.name,
     this.description,
+    this.brand,
+    this.model,
+    this.allowReturn = false,
     required this.rate,
     this.oldRate,
     required this.unit,

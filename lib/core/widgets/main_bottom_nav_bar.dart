@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 
-class MainBottomNavBar extends StatelessWidget {
+class MainBottomNavBar extends StatefulWidget {
   final int selectedIndex;
   final ValueChanged<int> onItemTapped;
 
@@ -17,17 +20,85 @@ class MainBottomNavBar extends StatelessWidget {
   });
 
   @override
+  State<MainBottomNavBar> createState() => _MainBottomNavBarState();
+}
+
+class _MainBottomNavBarState extends State<MainBottomNavBar> {
+  Color _navColor = AppTheme.darkColor;
+  bool? _wasOffline;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initConnectivityListener();
+  }
+
+  void _initConnectivityListener() {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
+      final isOffline = results.contains(ConnectivityResult.none);
+      if (_wasOffline != null && _wasOffline != isOffline) {
+        if (isOffline) {
+          if (mounted) {
+            setState(() {
+              _navColor = const Color(0xFFEF4444); // Red
+            });
+            final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+            AppToast.warning(
+              context,
+              isUrdu ? 'انٹرنیٹ منقطع ہو گیا (آف لائن)' : 'Internet Disconnected',
+            );
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted) {
+                setState(() {
+                  _navColor = AppTheme.darkColor;
+                });
+              }
+            });
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              _navColor = const Color(0xFF22C55E); // Green
+            });
+            final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+            AppToast.success(
+              context,
+              isUrdu ? 'انٹرنیٹ بحال ہو گیا (آن لائن)' : 'Internet Connected',
+            );
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted) {
+                setState(() {
+                  _navColor = AppTheme.darkColor;
+                });
+              }
+            });
+          }
+        }
+      }
+      _wasOffline = isOffline;
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final languageService = Provider.of<LanguageService>(context);
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 400),
       padding: EdgeInsets.only(bottom: bottomPadding),
-      decoration: const BoxDecoration(
-        color: AppTheme.darkColor,
-        borderRadius: BorderRadius.vertical(
+      decoration: BoxDecoration(
+        color: _navColor,
+        borderRadius: const BorderRadius.vertical(
           top: Radius.circular(15),
         ),
       ),
@@ -88,12 +159,12 @@ class MainBottomNavBar extends StatelessWidget {
     required IconData icon,
     required IconData activeIcon,
   }) {
-    final isActive = selectedIndex == index;
+    final isActive = widget.selectedIndex == index;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => onItemTapped(index),
+        onTap: () => widget.onItemTapped(index),
         borderRadius: BorderRadius.circular(12),
         child: Container(
           height: 66,
@@ -114,7 +185,7 @@ class MainBottomNavBar extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => onItemTapped(2),
+        onTap: () => widget.onItemTapped(2),
         borderRadius: BorderRadius.circular(999),
         child: Container(
           height: 66,
@@ -170,12 +241,12 @@ class MainBottomNavBar extends StatelessWidget {
   }
 
   Widget _buildNotificationItem({int index = 4}) {
-    final isActive = selectedIndex == index;
+    final isActive = widget.selectedIndex == index;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => onItemTapped(index),
+        onTap: () => widget.onItemTapped(index),
         borderRadius: BorderRadius.circular(12),
         child: Container(
           height: 66,

@@ -1,6 +1,10 @@
 import 'base_service.dart';
 
 class ProfileService extends BaseService {
+  static final Map<String, Map<String, String>> _profileCacheMap = {};
+
+  static void clearCache() => _profileCacheMap.clear();
+
   Future<Map<String, String>?> findPublicProfileByPhone(String phone) async {
     final clean = phone.replaceAll(RegExp(r'\D'), '');
     final potentials = <String>[];
@@ -32,6 +36,10 @@ class ProfileService extends BaseService {
       if (query.docs.isNotEmpty) {
         final data = query.docs.first.data();
         final uid = query.docs.first.id;
+
+        if (_profileCacheMap.containsKey(uid)) {
+          return _profileCacheMap[uid];
+        }
         
         String addr = (data['businessAddress'] ??
                 data['address'] ??
@@ -53,7 +61,7 @@ class ProfileService extends BaseService {
           } catch (_) {}
         }
 
-        return {
+        final res = {
           'uid': uid,
           'name': (data['displayName'] ?? data['name'] ?? '').toString(),
           'photoUrl': (data['photoURL'] ??
@@ -63,6 +71,9 @@ class ProfileService extends BaseService {
           'profession': (data['profession'] ?? data['category'] ?? data['shopName'] ?? '').toString(),
           'address': addr,
         };
+
+        _profileCacheMap[uid] = res;
+        return res;
       }
     }
 
@@ -70,15 +81,21 @@ class ProfileService extends BaseService {
   }
 
   Future<Map<String, String>?> findPublicProfileByUid(String uid) async {
+    if (_profileCacheMap.containsKey(uid)) {
+      return _profileCacheMap[uid];
+    }
+
     final localAccount = accountsBox?.get(uid);
     if (localAccount != null) {
-      return {
+      final res = {
         'uid': localAccount.id,
         'name': localAccount.name,
         'photoUrl': localAccount.profileImage ?? '',
         'phone': localAccount.phone,
         'address': localAccount.address ?? '',
       };
+      _profileCacheMap[uid] = res;
+      return res;
     }
 
     final doc = await firestore.collection('users').doc(uid).get();
@@ -90,7 +107,7 @@ class ProfileService extends BaseService {
               data['storeAddress'] ??
               data['location'] ??
               '')
-          .toString();
+            .toString();
 
       if (addr.isEmpty) {
         try {
@@ -104,7 +121,7 @@ class ProfileService extends BaseService {
         } catch (_) {}
       }
 
-      return {
+      final res = {
         'uid': uid,
         'name': (data['displayName'] ?? data['name'] ?? '').toString(),
         'photoUrl':
@@ -113,6 +130,9 @@ class ProfileService extends BaseService {
         'profession': (data['profession'] ?? data['category'] ?? data['shopName'] ?? '').toString(),
         'address': addr,
       };
+
+      _profileCacheMap[uid] = res;
+      return res;
     }
     return null;
   }

@@ -87,6 +87,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final Map<String, StockItem> _stockItemsByName = {};
   late StockService _stockService;
   bool _isLoading = false;
+  String? _activeActionType; // 'income' or 'expense'
+  String _saveStage = 'local';
   bool _isProfessionCentric = false;
   bool _didLoadNextBillNumber = false;
 
@@ -401,131 +403,136 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             ? (isUrdu ? 'لین دین میں ترمیم' : 'Edit Transaction')
             : (isUrdu ? 'نیا لین دین' : 'New Transaction'),
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.themeColor))
-          : SingleChildScrollView(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-              child: Column(
-                children: [
-                  // 1. Basic Info Card
-                  _buildSectionCard(
-                    children: [
-                      _buildSectionHeader(
-                          isUrdu ? 'بنیادی معلومات' : 'Basic Information',
-                          fontFamily,
-                          isUrdu,
-                          topPadding: 0),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildTextField(
-                              controller: _referenceNumberController,
-                              label: isUrdu ? 'بل نمبر' : 'Bill Number',
-                              isNumber: true,
-                              icon: PhosphorIcons.hash(),
-                              fontFamily: '',
-                              fontWeight: fontWeight,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildEditableDateSelector(
-                                isUrdu, fontFamily, fontWeight),
-                          ),
-                        ],
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+        child: Column(
+          children: [
+            // 1. Basic Info Card
+            _buildSectionCard(
+              children: [
+                _buildSectionHeader(
+                    isUrdu ? 'بنیادی معلومات' : 'Basic Information',
+                    fontFamily,
+                    isUrdu,
+                    topPadding: 0),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _referenceNumberController,
+                        label: isUrdu ? 'بل نمبر' : 'Bill Number',
+                        isNumber: true,
+                        icon: PhosphorIcons.hash(),
+                        fontFamily: '',
+                        fontWeight: fontWeight,
                       ),
-                      if (widget.forcedProfession == null &&
-                          _professions.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        _buildProfessionSelectionArea(
-                            isUrdu, fontFamily, fontWeight),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-
-                  // 2. Items & Total Card
-                  _buildSectionCard(
-                    children: [
-                      _buildSectionHeader(
-                          isUrdu ? 'ایٹمز اور کل رقم' : 'Items & Total Amount',
-                          fontFamily,
-                          isUrdu,
-                          topPadding: 0),
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _itemEntries.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 8),
-                        itemBuilder: (context, index) => _buildItemRow(
-                            index, isUrdu, fontFamily, fontWeight),
-                      ),
-                      const SizedBox(height: 8),
-                      _buildTextField(
-                        controller: _amountController,
-                        label: isUrdu ? 'کل رقم' : 'Grand Total',
-                        isCurrency: true,
-                        icon: PhosphorIcons.wallet(),
-                        fontFamily: fontFamily,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-
-                  // 3. Attachments Card
-                  _buildSectionCard(
-                    children: [
-                      _buildSectionHeader(isUrdu ? 'منسلکات' : 'Attachments',
-                          fontFamily, isUrdu,
-                          topPadding: 0),
-                      ImageSelectorField(
-                        selectedFiles: _billImages,
-                        onFilesChanged: (newList) =>
-                            setState(() => _billImages = newList),
-                        maxTotal: 1,
-                        isVertical: true,
-                        isFullWidth: true,
-                        aspectRatio: 3,
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildEditableDateSelector(
+                          isUrdu, fontFamily, fontWeight),
+                    ),
+                  ],
+                ),
+                if (widget.forcedProfession == null &&
+                    _professions.isNotEmpty) ...[
                   const SizedBox(height: 12),
-
-                  // Dual Action Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: AppButton(
-                          text: isUrdu ? 'رقم لی / جمع' : 'Received',
-                          icon: PhosphorIcons.arrowDownLeft(
-                              PhosphorIconsStyle.bold),
-                          color: AppTheme.incomeColor,
-                          variant: AppButtonVariant.primary,
-                          size: AppButtonSize.large,
-                          onPressed: () => _saveTransaction('income'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: AppButton(
-                          text: isUrdu ? 'رقم دی / بنام' : 'Paid',
-                          icon: PhosphorIcons.arrowUpRight(
-                              PhosphorIconsStyle.bold),
-                          color: AppTheme.expenseColor,
-                          variant: AppButtonVariant.primary,
-                          size: AppButtonSize.large,
-                          onPressed: () => _saveTransaction('expense'),
-                        ),
-                      ),
-                    ],
-                  ),
+                  _buildProfessionSelectionArea(isUrdu, fontFamily, fontWeight),
                 ],
-              ),
+              ],
             ),
+            const SizedBox(height: 4),
+
+            // 2. Items & Total Card
+            _buildSectionCard(
+              children: [
+                _buildSectionHeader(
+                    isUrdu ? 'ایٹمز اور کل رقم' : 'Items & Total Amount',
+                    fontFamily,
+                    isUrdu,
+                    topPadding: 0),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _itemEntries.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 8),
+                  itemBuilder: (context, index) =>
+                      _buildItemRow(index, isUrdu, fontFamily, fontWeight),
+                ),
+                const SizedBox(height: 8),
+                _buildTextField(
+                  controller: _amountController,
+                  label: isUrdu ? 'کل رقم' : 'Grand Total',
+                  isCurrency: true,
+                  icon: PhosphorIcons.wallet(),
+                  fontFamily: fontFamily,
+                  fontWeight: FontWeight.bold,
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+
+            // 3. Attachments Card
+            _buildSectionCard(
+              children: [
+                _buildSectionHeader(
+                    isUrdu ? 'منسلکات' : 'Attachments', fontFamily, isUrdu,
+                    topPadding: 0),
+                ImageSelectorField(
+                  selectedFiles: _billImages,
+                  onFilesChanged: (newList) =>
+                      setState(() => _billImages = newList),
+                  maxTotal: 1,
+                  isVertical: true,
+                  isFullWidth: true,
+                  aspectRatio: 3,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Dual Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: AppButton(
+                    key: ValueKey('income_save_$_saveStage'),
+                    text: isUrdu ? 'رقم لی / جمع' : 'Received',
+                    isLoading: _isLoading && _activeActionType == 'income',
+                    loadingText: (_isLoading && _activeActionType == 'income')
+                        ? _saveStageText(isUrdu)
+                        : null,
+                    icon: PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold),
+                    color: AppTheme.incomeColor,
+                    variant: AppButtonVariant.primary,
+                    size: AppButtonSize.large,
+                    onPressed:
+                        _isLoading ? null : () => _saveTransaction('income'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AppButton(
+                    key: ValueKey('expense_save_$_saveStage'),
+                    text: isUrdu ? 'رقم دی / بنام' : 'Paid',
+                    isLoading: _isLoading && _activeActionType == 'expense',
+                    loadingText: (_isLoading && _activeActionType == 'expense')
+                        ? _saveStageText(isUrdu)
+                        : null,
+                    icon: PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold),
+                    color: AppTheme.expenseColor,
+                    variant: AppButtonVariant.primary,
+                    size: AppButtonSize.large,
+                    onPressed:
+                        _isLoading ? null : () => _saveTransaction('expense'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1431,6 +1438,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   }
 
   Future<void> _saveTransaction(String type) async {
+    if (_isLoading) return;
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
 
     final stockService = Provider.of<StockService>(context, listen: false);
@@ -1498,7 +1506,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _activeActionType = type;
+      _saveStage = 'local';
+    });
     try {
       final databaseService =
           Provider.of<DatabaseService>(context, listen: false);
@@ -1562,9 +1574,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         accountId: _selectedAccountId ?? 'default_account',
         amount: grandTotal,
         pendingAmount: grandTotal,
-        type: type,
+        type: (_selectedProfessionId != null && _professionSyncType != null)
+            ? _professionSyncType!
+            : type,
         category: (_selectedProfessionId != null && _professionSyncType != null)
-            ? '${_professionSyncType == 'income' ? 'INC' : 'EXP'}:${_selectedCategory ?? 'دیگر'}'
+            ? '${_professionSyncType == 'income' ? 'INC:' : 'EXP:'}${_selectedCategory ?? 'دیگر'}'
             : (_selectedCategory ?? type),
         description: mainDescription.isEmpty ? 'دیگر' : mainDescription,
         date: _selectedDate,
@@ -1583,53 +1597,151 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             widget.transactionToEdit?.receiptFromCounterparty ?? false,
       );
 
-      if (widget.transactionToEdit != null) {
+      final isEditing = widget.transactionToEdit != null;
+      var billNumberSaveFailed = false;
+      if (isEditing) {
         await databaseService.updateTransaction(transaction);
       } else {
         await databaseService.addTransaction(transaction);
         final referenceNumber = transaction.referenceNumber?.trim() ?? '';
         if (referenceNumber.isNotEmpty) {
-          await BillNumbering.saveNextNumber(databaseService, referenceNumber);
-        }
-
-        // Safely find account
-        final accountIndex =
-            _accounts.indexWhere((a) => a.id == _selectedAccountId);
-        if (accountIndex != -1) {
-          final account = _accounts[accountIndex];
-          if (account.phone.isNotEmpty) {
-            notificationService
-                .notifyPartyByPhone(
-                  partyPhoneNumber: account.phone,
-                  amount: grandTotal,
-                  transactionType: type,
-                  category: transaction.category,
-                  paymentMethod: transaction.paymentMethod,
-                  description: transaction.description,
-                  items: transaction.items.map((e) => e.toMap()).toList(),
-                  receivedAmount: transaction.receivedAmount,
-                  pendingAmount: transaction.pendingAmount,
-                  transactionId: transaction.id,
-                  transactionDate: transaction.date,
-                  referenceNumber: transaction.referenceNumber,
-                  subtotal: transaction.subtotal,
-                  discountAmount: transaction.discountAmount,
-                  discountPercent: transaction.discountPercent,
-                  discountReason: transaction.discountReason,
-                )
-                .catchError((e) => debugPrint(e.toString()));
+          try {
+            await BillNumbering.saveNextNumber(
+              databaseService,
+              referenceNumber,
+            );
+          } catch (error, stackTrace) {
+            billNumberSaveFailed = true;
+            debugPrint('Could not update the next bill number: $error');
+            debugPrintStack(stackTrace: stackTrace);
           }
+        }
+      }
+
+      if (mounted) setState(() => _saveStage = 'cloud');
+      final cloudSynced =
+          await databaseService.syncTransactionToCloud(transaction);
+
+      PartyNotificationResult? notificationResult;
+      var notificationFailed = false;
+      var partyNotificationQueued = false;
+      if (!isEditing) {
+        final account = _accounts
+            .where((candidate) => candidate.id == _selectedAccountId)
+            .firstOrNull;
+        if (account == null || account.phone.trim().isEmpty) {
+          notificationFailed = true;
+        } else if (cloudSynced) {
+          if (mounted) setState(() => _saveStage = 'notification');
+          try {
+            notificationResult = await notificationService.notifyPartyByPhone(
+              partyPhoneNumber: account.phone,
+              amount: grandTotal,
+              transactionType: type,
+              category: transaction.category,
+              paymentMethod: transaction.paymentMethod,
+              description: transaction.description,
+              items: transaction.items.map((e) => e.toMap()).toList(),
+              receivedAmount: transaction.receivedAmount,
+              pendingAmount: transaction.pendingAmount,
+              transactionId: transaction.id,
+              transactionDate: transaction.date,
+              referenceNumber: transaction.referenceNumber,
+              subtotal: transaction.subtotal,
+              discountAmount: transaction.discountAmount,
+              discountPercent: transaction.discountPercent,
+              discountReason: transaction.discountReason,
+            );
+          } catch (error, stackTrace) {
+            notificationFailed = true;
+            debugPrint('Could not notify the transaction party: $error');
+            debugPrintStack(stackTrace: stackTrace);
+            partyNotificationQueued =
+                await notificationService.enqueuePendingPartyNotification(
+              transaction: transaction,
+              partyPhoneNumber: account.phone,
+            );
+          }
+        } else {
+          partyNotificationQueued =
+              await notificationService.enqueuePendingPartyNotification(
+            transaction: transaction,
+            partyPhoneNumber: account.phone,
+          );
+          notificationFailed = !partyNotificationQueued;
         }
       }
 
       if (!mounted) return;
 
-      // Close the screen first to avoid UI lag/spinner sticking
+      final resultMessages = <String>[
+        cloudSynced
+            ? (isUrdu ? 'آن لائن سرور پر محفوظ' : 'Saved to online server')
+            : (isUrdu
+                ? 'فون میں محفوظ؛ کلاؤڈ سنک باقی ہے'
+                : 'Saved on this phone; cloud sync pending'),
+      ];
+      if (billNumberSaveFailed) {
+        resultMessages.add(isUrdu
+            ? 'اگلا بل نمبر اپڈیٹ نہیں ہو سکا۔'
+            : 'The next bill number could not be updated.');
+      }
+      if (!isEditing) {
+        if (notificationResult == PartyNotificationResult.savedToInbox) {
+          resultMessages.add(isUrdu
+              ? 'پارٹی کے ایپ ان باکس میں اطلاع محفوظ'
+              : 'Notice saved to party’s in-app inbox');
+        } else if (notificationResult ==
+            PartyNotificationResult.recipientNotFound) {
+          resultMessages.add(isUrdu
+              ? 'پارٹی کا ایپ اکاؤنٹ نہیں ملا؛ اطلاع نہیں بھیجی گئی'
+              : 'Party app account not found; no notice sent');
+        } else if (notificationResult == PartyNotificationResult.sameUser) {
+          resultMessages.add(isUrdu
+              ? 'یہ آپ کا اپنا فون نمبر ہے؛ اطلاع نہیں بھیجی گئی'
+              : 'This is your phone number; no notice sent');
+        } else if (notificationResult == PartyNotificationResult.notSignedIn) {
+          resultMessages.add(isUrdu
+              ? 'سائن اِن نہ ہونے کے باعث اطلاع نہیں بھیجی گئی'
+              : 'Not signed in; no notice sent');
+        } else if (partyNotificationQueued) {
+          resultMessages.add(isUrdu
+              ? 'پارٹی کی اطلاع قطار میں محفوظ؛ انٹرنیٹ ملنے پر خود بھیجی جائے گی'
+              : 'Party notice queued; it will retry when internet is available');
+        } else if (notificationFailed) {
+          resultMessages.add(isUrdu
+              ? 'پارٹی کا فون نمبر نہیں ملا یا اطلاع محفوظ نہیں ہو سکی'
+              : 'Party phone missing or notice could not be saved');
+        } else if (!cloudSynced) {
+          resultMessages.add(isUrdu
+              ? 'کلاؤڈ سنک کے بعد پارٹی کو اطلاع دی جا سکے گی'
+              : 'Party can be notified after cloud sync');
+        }
+      }
+
+      final needsAttention = !cloudSynced ||
+          billNumberSaveFailed ||
+          (!isEditing &&
+              notificationResult != PartyNotificationResult.savedToInbox);
+      final toastTitle = needsAttention
+          ? (isUrdu
+              ? 'لین دین محفوظ؛ توجہ درکار'
+              : 'Transaction saved; attention needed')
+          : (isUrdu ? 'لین دین محفوظ ہوگیا' : 'Transaction saved');
+      final toastSubtitle = resultMessages.join(' • ');
+
+      if (needsAttention) {
+        AppToast.warning(context, toastTitle, subtitle: toastSubtitle);
+      } else {
+        AppToast.success(context, toastTitle, subtitle: toastSubtitle);
+      }
       Navigator.pop(context);
-      _showSnackBar(isUrdu ? 'محفوظ ہوگیا' : 'Saved successfully', false);
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _activeActionType = null;
+        });
         _showSnackBar('Error: $e', true);
       }
     }
@@ -1641,6 +1753,21 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       AppToast.error(context, message);
     } else {
       AppToast.success(context, message);
+    }
+  }
+
+  String _saveStageText(bool isUrdu) {
+    switch (_saveStage) {
+      case 'cloud':
+        return isUrdu ? 'سرور سے سنک کی تصدیق...' : 'Confirming cloud sync...';
+      case 'notification':
+        return isUrdu
+            ? 'پارٹی کو اطلاع دے رہے ہیں...'
+            : 'Notifying the party...';
+      default:
+        return isUrdu
+            ? 'فون میں محفوظ ہو رہا ہے...'
+            : 'Saving on this device...';
     }
   }
 

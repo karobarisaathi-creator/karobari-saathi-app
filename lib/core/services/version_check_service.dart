@@ -5,9 +5,17 @@ import 'package:flutter/material.dart';
 
 class VersionCheckService {
   static const String _lastDismissedKey = 'update_banner_dismissed_at';
+  static Map<String, dynamic>? _cachedVersionData;
+  static DateTime? _lastCheckTime;
 
   // یہ چیک کرے گا کہ کیا واقعی نیا ورژن دستیاب ہے اور یوزر نے حال ہی میں اسے ڈسمس نہیں کیا
   Future<Map<String, dynamic>?> getUpdateData() async {
+    if (_cachedVersionData != null &&
+        _lastCheckTime != null &&
+        DateTime.now().difference(_lastCheckTime!).inHours < 1) {
+      return _cachedVersionData;
+    }
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastDismissedStr = prefs.getString(_lastDismissedKey);
@@ -32,6 +40,8 @@ class VersionCheckService {
       String latestVersion = data['latest_version'] ?? currentVersion;
       
       if (_isNewVersionAvailable(currentVersion, latestVersion)) {
+        _cachedVersionData = data;
+        _lastCheckTime = DateTime.now();
         return data;
       }
     } catch (e) {

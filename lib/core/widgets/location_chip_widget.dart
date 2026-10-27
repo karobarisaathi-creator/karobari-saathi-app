@@ -294,7 +294,12 @@ class _LocationChipWidgetState extends State<LocationChipWidget> {
       parts.add(widget.address!.trim());
     }
 
-    final dist = _distanceText ?? (widget.isUrdu ? '1.5 کلومیٹر' : '1.5 km');
+    final dist = _distanceText ??
+        (_calculating
+            ? (widget.isUrdu ? 'فاصلہ معلوم ہو رہا ہے...' : 'Calculating distance...')
+            : (widget.isUrdu
+                ? 'فاصلہ دستیاب نہیں'
+                : 'Distance unavailable'));
     parts.add(dist);
 
     if (widget.showTime && _timeText != null) parts.add(_timeText!);
@@ -324,7 +329,7 @@ class _LocationChipWidgetState extends State<LocationChipWidget> {
             child: UrduAwareText(
               label,
               style: textStyle,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ),

@@ -10,19 +10,19 @@ import 'package:account_app/core/services/security_service.dart';
 class AppLockScreen extends StatefulWidget {
   final bool isSettingUp;
   final bool isChangingPin;
-  final bool isVerifyingOnly;   // ⭐ نیا
+  final bool isVerifyingOnly; // ⭐ نیا
   final VoidCallback? onUnlock;
 
   const AppLockScreen({
     super.key,
     this.isSettingUp = false,
     this.isChangingPin = false,
-    this.isVerifyingOnly = false,   // ⭐ نیا
+    this.isVerifyingOnly = false, // ⭐ نیا
     this.onUnlock,
   });
 
   @override
-  _AppLockScreenState createState() => _AppLockScreenState();
+  State<AppLockScreen> createState() => _AppLockScreenState();
 }
 
 class _AppLockScreenState extends State<AppLockScreen> {
@@ -35,7 +35,6 @@ class _AppLockScreenState extends State<AppLockScreen> {
   bool _isError = false;
   bool _isBiometricAvailable = false;
 
-  final Color _themeColor = const Color(0xFF123248);
   final Color _greyColor = const Color(0xFF607D8B);
 
   @override
@@ -57,15 +56,13 @@ class _AppLockScreenState extends State<AppLockScreen> {
 
   Future<void> _checkBiometricsAndFocus() async {
     // ⭐ verifyOnly کے لیے صرف keyboard — biometrics نہیں
-    if (widget.isSettingUp ||
-        _isVerifyingOldPin ||
-        widget.isVerifyingOnly) {
+    if (widget.isSettingUp || _isVerifyingOldPin || widget.isVerifyingOnly) {
       _showKeyboard();
       return;
     }
 
     final securityService =
-    Provider.of<SecurityService>(context, listen: false);
+        Provider.of<SecurityService>(context, listen: false);
     final isAvailable = await securityService.isBiometricsAvailable();
     final isEnabled = await securityService.isBiometricEnabled();
 
@@ -91,11 +88,10 @@ class _AppLockScreenState extends State<AppLockScreen> {
 
   Future<void> _authenticateWithBiometrics() async {
     final securityService =
-    Provider.of<SecurityService>(context, listen: false);
+        Provider.of<SecurityService>(context, listen: false);
     FocusScope.of(context).unfocus();
 
-    final isAuthenticated =
-    await securityService.authenticateWithBiometrics();
+    final isAuthenticated = await securityService.authenticateWithBiometrics();
 
     if (isAuthenticated && mounted) {
       widget.onUnlock?.call();
@@ -115,185 +111,303 @@ class _AppLockScreenState extends State<AppLockScreen> {
   Widget build(BuildContext context) {
     final languageService = Provider.of<LanguageService>(context);
     final isUrdu = languageService.isUrdu;
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
 
     return Scaffold(
-      backgroundColor: _themeColor,
+      backgroundColor: const Color(0xFF0B1628),
       resizeToAvoidBottomInset: true,
-      body: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: _showKeyboard,
-        child: SafeArea(
-          child: _isLoading
-              ? Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(_greyColor),
-            ),
-          )
-              : Stack(
-            children: [
-              Container(
-                width: 1,
-                height: 1,
-                child: TextField(
-                  controller: _pinController,
-                  focusNode: _focusNode,
-                  keyboardType: TextInputType.number,
-                  maxLength: 4,
-                  autofocus: false,
-                  showCursor: false,
-                  enableSuggestions: false,
-                  autocorrect: false,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly
-                  ],
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    counterText: "",
-                  ),
-                  style: const TextStyle(color: Colors.transparent),
-                  onChanged: (value) {
-                    setState(() {
-                      _isError = false;
-                    });
-                    if (value.length == 4) {
-                      _validatePin(value);
-                    }
-                  },
-                ),
+      body: Stack(
+        children: [
+          Positioned(
+            top: -110,
+            right: -85,
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF1D6ED6).withValues(alpha: 0.16),
               ),
-              Center(
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+            ),
+          ),
+          SafeArea(
+            child: _isLoading
+                ? Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(_greyColor),
+                    ),
+                  )
+                : Stack(
                     children: [
-                      Image.asset(
-                        'assets/images/icons/zalooq.png',
-                        width: 100,
-                        height: 100,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) =>
-                        const Icon(Icons.lock,
-                            size: 80, color: Colors.white24),
-                      ),
-                      const SizedBox(height: 40),
-                      UrduAwareText(
-                        isUrdu ? 'کاروباری ساتھی' : 'Karobari Sathi',
-                        style: const TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          fontFamily: 'NooriNastaleeq',
-                          letterSpacing: 1.0,
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        child: SizedBox(
+                          width: 1,
+                          height: 1,
+                          child: TextField(
+                            controller: _pinController,
+                            focusNode: _focusNode,
+                            keyboardType: TextInputType.number,
+                            maxLength: 4,
+                            showCursor: false,
+                            enableSuggestions: false,
+                            autocorrect: false,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              counterText: '',
+                            ),
+                            style: const TextStyle(color: Colors.transparent),
+                            onChanged: (value) {
+                              setState(() => _isError = false);
+                              if (value.length == 4) _validatePin(value);
+                            },
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      UrduAwareText(
-                        _getStatusText(isUrdu),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.white.withOpacity(0.7),
-                          fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                          fontWeight: isUrdu
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                      const SizedBox(height: 30),
                       GestureDetector(
+                        behavior: HitTestBehavior.opaque,
                         onTap: _showKeyboard,
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
-                          color: Colors.transparent,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(4, (index) {
-                              bool isFilled =
-                                  index < _pinController.text.length;
-                              return AnimatedContainer(
-                                duration: const Duration(
-                                    milliseconds: 200),
-                                margin: const EdgeInsets.symmetric(
-                                    horizontal: 10),
-                                width: 18,
-                                height: 18,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: isFilled
-                                      ? (_isError
-                                      ? Colors.redAccent
-                                      : _greyColor)
-                                      : Colors.white.withOpacity(0.2),
-                                  border: isFilled
-                                      ? null
-                                      : Border.all(
-                                      color: Colors.white
-                                          .withOpacity(0.5),
-                                      width: 1.5),
-                                ),
-                              );
-                            }),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      if (_isError)
-                        UrduAwareText(
-                          _getErrorText(isUrdu),
-                          style: TextStyle(
-                            color: Colors.redAccent,
-                            fontSize: 16,
-                            fontFamily: isUrdu
-                                ? 'NooriNastaleeq'
-                                : '',
-                            fontWeight: isUrdu
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        )
-                      else
-                        const SizedBox(height: 20),
-                      // ⭐ verifyOnly میں biometrics نہ دکھائیں
-                      if (_isBiometricAvailable &&
-                          !widget.isSettingUp &&
-                          !_isVerifyingOldPin &&
-                          !widget.isVerifyingOnly)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 20.0),
-                          child: IconButton(
-                            icon: Icon(Icons.fingerprint,
-                                size: 50, color: _greyColor),
-                            onPressed: _authenticateWithBiometrics,
-                          ),
-                        ),
-                      const SizedBox(height: 80),
-                      // ⭐ verifyOnly میں "بعد میں" نہ دکھائیں
-                      if ((widget.isSettingUp ||
-                          widget.isChangingPin) &&
-                          _newPinCache == null &&
-                          !widget.isVerifyingOnly)
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: UrduAwareText(
-                            isUrdu ? 'بعد میں' : 'Later',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 16,
-                              fontFamily: isUrdu
-                                  ? 'NooriNastaleeq'
-                                  : '',
-                              fontWeight: isUrdu
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
+                        child: Center(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 22,
+                              vertical: 28,
+                            ),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 440),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 72,
+                                    height: 72,
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(24),
+                                      border: Border.all(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.12),
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.lock_rounded,
+                                      color: Color(0xFF78B7FF),
+                                      size: 34,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  UrduAwareText(
+                                    isUrdu
+                                        ? 'کاروباری ساتھی'
+                                        : 'Karobari Sathi',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700,
+                                      fontFamily: fontFamily,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 28),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.fromLTRB(
+                                      24,
+                                      30,
+                                      24,
+                                      24,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF14243A)
+                                          .withValues(alpha: 0.94),
+                                      borderRadius: BorderRadius.circular(30),
+                                      border: Border.all(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.08),
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.22),
+                                          blurRadius: 32,
+                                          offset: const Offset(0, 18),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        UrduAwareText(
+                                          _getStatusText(isUrdu),
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 19,
+                                            height: 1.6,
+                                            fontWeight: FontWeight.w700,
+                                            fontFamily: fontFamily,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        UrduAwareText(
+                                          isUrdu
+                                              ? 'اپنا 4 ہندسوں کا پن درج کریں'
+                                              : 'Enter your 4-digit PIN',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.58),
+                                            fontSize: 13,
+                                            fontFamily: fontFamily,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 26),
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: List.generate(4, (index) {
+                                            final isFilled = index <
+                                                _pinController.text.length;
+                                            return AnimatedContainer(
+                                              duration: const Duration(
+                                                milliseconds: 180,
+                                              ),
+                                              margin:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 9,
+                                              ),
+                                              width: 54,
+                                              height: 58,
+                                              decoration: BoxDecoration(
+                                                color: isFilled
+                                                    ? const Color(0xFF1D6ED6)
+                                                        .withValues(alpha: 0.2)
+                                                    : Colors.white.withValues(
+                                                        alpha: 0.04,
+                                                      ),
+                                                borderRadius:
+                                                    BorderRadius.circular(17),
+                                                border: Border.all(
+                                                  color: _isError
+                                                      ? Colors.redAccent
+                                                      : isFilled
+                                                          ? const Color(
+                                                              0xFF78B7FF)
+                                                          : Colors.white
+                                                              .withValues(
+                                                              alpha: 0.13,
+                                                            ),
+                                                  width: 1.4,
+                                                ),
+                                              ),
+                                              child: Center(
+                                                child: AnimatedContainer(
+                                                  duration: const Duration(
+                                                    milliseconds: 180,
+                                                  ),
+                                                  width: isFilled ? 12 : 8,
+                                                  height: isFilled ? 12 : 8,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: isFilled
+                                                        ? (_isError
+                                                            ? Colors.redAccent
+                                                            : const Color(
+                                                                0xFF78B7FF,
+                                                              ))
+                                                        : Colors.white
+                                                            .withValues(
+                                                            alpha: 0.24,
+                                                          ),
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          }),
+                                        ),
+                                        const SizedBox(height: 18),
+                                        AnimatedSwitcher(
+                                          duration:
+                                              const Duration(milliseconds: 180),
+                                          child: _isError
+                                              ? UrduAwareText(
+                                                  _getErrorText(isUrdu),
+                                                  key: const ValueKey(
+                                                      'pin-error'),
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    color:
+                                                        const Color(0xFFFF7B7B),
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontFamily: fontFamily,
+                                                  ),
+                                                )
+                                              : const SizedBox(
+                                                  key: ValueKey('pin-hint'),
+                                                  height: 18,
+                                                ),
+                                        ),
+                                        if (_isBiometricAvailable &&
+                                            !widget.isSettingUp &&
+                                            !_isVerifyingOldPin &&
+                                            !widget.isVerifyingOnly) ...[
+                                          const SizedBox(height: 16),
+                                          TextButton.icon(
+                                            onPressed:
+                                                _authenticateWithBiometrics,
+                                            icon: const Icon(
+                                              Icons.fingerprint_rounded,
+                                              size: 22,
+                                            ),
+                                            label: UrduAwareText(
+                                              isUrdu
+                                                  ? 'فنگر پرنٹ سے تصدیق'
+                                                  : 'Use fingerprint',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontFamily: fontFamily,
+                                              ),
+                                            ),
+                                            style: TextButton.styleFrom(
+                                              foregroundColor:
+                                                  const Color(0xFF9ACBFF),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  if ((widget.isSettingUp ||
+                                          widget.isChangingPin ||
+                                          widget.isVerifyingOnly) &&
+                                      _newPinCache == null) ...[
+                                    const SizedBox(height: 18),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: UrduAwareText(
+                                        isUrdu ? 'واپس جائیں' : 'Cancel',
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontWeight: FontWeight.w600,
+                                          fontFamily: fontFamily,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
+                      ),
                     ],
                   ),
-                ),
-              ),
-            ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -302,32 +416,25 @@ class _AppLockScreenState extends State<AppLockScreen> {
     if (_isVerifyingOldPin) {
       return isUrdu ? 'پرانا پن کوڈ درج کریں' : 'Enter old PIN code';
     }
-    if (widget.isSettingUp ||
-        (widget.isChangingPin && !_isVerifyingOldPin)) {
+    if (widget.isSettingUp || (widget.isChangingPin && !_isVerifyingOldPin)) {
       if (_newPinCache == null) {
         return isUrdu
             ? 'نیا 4 ہندسوں کا کوڈ درج کریں'
             : 'Enter new 4-digit PIN';
       } else {
-        return isUrdu
-            ? 'تصدیق کے لیے دوبارہ درج کریں'
-            : 'Re-enter to confirm';
+        return isUrdu ? 'تصدیق کے لیے دوبارہ درج کریں' : 'Re-enter to confirm';
       }
     }
     // ⭐ verifyOnly کے لیے واضح متن
     if (widget.isVerifyingOnly) {
-      return isUrdu
-          ? 'تصدیق کے لیے پن کوڈ درج کریں'
-          : 'Enter PIN to verify';
+      return isUrdu ? 'تصدیق کے لیے پن کوڈ درج کریں' : 'Enter PIN to verify';
     }
     return isUrdu ? 'اپنا پن کوڈ درج کریں' : 'Enter your PIN code';
   }
 
   String _getErrorText(bool isUrdu) {
     if (_isVerifyingOldPin) {
-      return isUrdu
-          ? 'پرانا پن کوڈ درست نہیں ہے'
-          : 'Old PIN is incorrect';
+      return isUrdu ? 'پرانا پن کوڈ درست نہیں ہے' : 'Old PIN is incorrect';
     }
     if (widget.isSettingUp || widget.isChangingPin) {
       return isUrdu ? 'پن کوڈ میچ نہیں ہوا' : 'PINs do not match';
@@ -340,7 +447,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
     if (!mounted) return;
 
     final securityService =
-    Provider.of<SecurityService>(context, listen: false);
+        Provider.of<SecurityService>(context, listen: false);
     final cleanPin = enteredPin.trim();
 
     if (_isVerifyingOldPin) {

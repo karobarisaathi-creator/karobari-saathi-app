@@ -54,11 +54,11 @@ class ShopCatalogItemCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: AppTheme.backgroundColor,
               width: 1.5,
@@ -76,29 +76,23 @@ class ShopCatalogItemCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ═══ بڑی تصویر ═══
-              SizedBox(
-                height: 110,
-                child: Stack(
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: isOut
-                              ? [
-                                  Colors.grey.shade200,
-                                  Colors.grey.shade300,
-                                ]
-                              : const [
-                                  Color(0xFFEEF4FF),
-                                  Color(0xFFDCE7F7),
-                                ],
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
+                child: SizedBox(
+                  height: 110,
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: isOut
+                              ? Colors.grey.shade300
+                              : AppTheme.themeColor.withValues(alpha: 0.25),
                         ),
+                        child: _buildImage(item, isOut),
                       ),
-                      child: _buildImage(item, isOut),
-                    ),
 
                     // ⭐ سٹاک بیج (اوپر دائیں)
                     Positioned(
@@ -176,6 +170,7 @@ class ShopCatalogItemCard extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
 
               // ═══ تفصیل ═══
               Expanded(

@@ -203,13 +203,16 @@ class _OrderPreviewScreenState extends State<OrderPreviewScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 2),
-                                      UrduAwareText(
-                                        '${Formatters.formatAmountWithCurrency(item.rate)} × ${item.quantity.toInt()} ${item.unit}',
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppTheme.textSecondary,
-                                          fontFamily: fontFamily,
+                                      Directionality(
+                                        textDirection: TextDirection.ltr,
+                                        child: UrduAwareText(
+                                          '${item.quantity.toInt()} ${item.unit} × ${Formatters.formatAmountWithCurrency(item.rate)}',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppTheme.textSecondary,
+                                            fontFamily: fontFamily,
+                                          ),
                                         ),
                                       ),
                                     ],

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'base_service.dart';
 import 'account_service.dart';
@@ -36,6 +37,29 @@ class TransactionService extends BaseService {
           .set(transaction.toMap())
           .catchError(
               (e) => debugPrint("Offline Sync: Transaction addition delayed"));
+    }
+  }
+
+  Future<bool> syncTransactionToCloud(
+    model.Transaction transaction, {
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    final user = auth.currentUser;
+    if (user == null) return false;
+
+    try {
+      await firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('transactions')
+          .doc(transaction.id)
+          .set(transaction.toMap(), SetOptions(merge: true))
+          .timeout(timeout);
+      return true;
+    } catch (error, stackTrace) {
+      debugPrint('Transaction cloud sync not confirmed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return false;
     }
   }
 

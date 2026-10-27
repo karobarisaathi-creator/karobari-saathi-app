@@ -16,19 +16,15 @@ import 'package:account_app/core/services/pdf_service.dart';
 import 'package:account_app/core/services/excel_service.dart';
 import 'package:account_app/core/services/auth_service.dart';
 import 'package:account_app/core/services/database_service.dart';
-import 'package:account_app/core/services/security_service.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/features/settings/app_lock_screen.dart';
-import 'package:account_app/features/order/nearby_shops_screen.dart';
+import 'package:account_app/features/settings/app_lock_settings_screen.dart';
 import 'package:account_app/features/shopkeeper/shop_settings_screen.dart';
 import 'package:account_app/features/shopkeeper/sales_analytics_screen.dart';
-import 'package:account_app/features/order/my_orders_screen.dart';
 import 'currency_settings_dialog.dart';
 import 'package:account_app/features/settings/backup_screen.dart';
-import 'package:account_app/features/shopkeeper/stock_history_screen.dart';
 
 class ShopkeeperToolsGrid extends StatefulWidget {
   final bool isUrdu;
@@ -163,8 +159,6 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                 },
               ),
 
-
-
               // 5. Settings
               _buildItem(
                 context,
@@ -192,8 +186,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                 context,
                 icon: PhosphorIcons.info(),
                 label: isUrdu ? 'معلومات' : 'About',
-                onTap: () =>
-                    _showAboutAppDialog(context, isUrdu, fontFamily),
+                onTap: () => _showAboutAppDialog(context, isUrdu, fontFamily),
               ),
 
               // 8. Privacy
@@ -212,63 +205,18 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                 onTap: () => _showLogoutDialog(context, isUrdu, fontFamily),
               ),
 
-              // 10. Stock Log
-              _buildItem(
-                context,
-                icon: PhosphorIcons.clockCounterClockwise(),
-                label: isUrdu ? 'اسٹاک ہسٹری' : 'Stock Log',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const StockHistoryScreen()),
-                  );
-                },
-              ),
-
-              // 11. Nearby Shops
-              _buildItem(
-                context,
-                icon: PhosphorIcons.storefront(),
-                label: isUrdu ? 'قریبی دکاندار' : 'Nearby',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const OrderSelectionScreen()),
-                  );
-                },
-              ),
-
-              // 12. App Lock — with verification
+              // 12. Security settings
               _buildItem(
                 context,
                 icon: PhosphorIcons.lock(),
-                label: isUrdu ? 'ایپ لاک' : 'App Lock',
-                onTap: () => _toggleAppLock(context, isUrdu, fontFamily),
-              ),
-
-              // 13. Change PIN
-              _buildItem(
-                context,
-                icon: PhosphorIcons.key(),
-                label: isUrdu ? 'پن کوڈ' : 'Change PIN',
-                onTap: () async {
-                  final result = await Navigator.push(
+                label: isUrdu ? 'سیکیورٹی' : 'Security',
+                onTap: () {
+                  Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                      const AppLockScreen(isChangingPin: true),
+                      builder: (_) => const AppLockSettingsScreen(),
                     ),
                   );
-                  if (result == true && context.mounted) {
-                    AppToast.success(
-                      context,
-                      isUrdu
-                          ? 'پن کوڈ تبدیل ہو گیا'
-                          : 'PIN changed successfully',
-                    );
-                  }
                 },
               ),
 
@@ -277,8 +225,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                 context,
                 icon: PhosphorIcons.userMinus(),
                 label: isUrdu ? 'اکاؤنٹ بند' : 'Deactivate',
-                onTap: () =>
-                    _showDeactivateDialog(context, isUrdu, fontFamily),
+                onTap: () => _showDeactivateDialog(context, isUrdu, fontFamily),
               ),
 
               // 15. Language & Currency Settings
@@ -286,7 +233,8 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                 context,
                 icon: PhosphorIcons.currencyCircleDollar(),
                 label: isUrdu ? 'زبان اور کرنسی' : 'Language & Currency',
-                onTap: () => CurrencySettingsDialog.show(context, isUrdu, fontFamily),
+                onTap: () =>
+                    CurrencySettingsDialog.show(context, isUrdu, fontFamily),
               ),
             ],
           ),
@@ -299,12 +247,12 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
   // ITEM BUILDER
   // ═══════════════════════════════════════════════════════════
   Widget _buildItem(
-      BuildContext context, {
-        required IconData icon,
-        required String label,
-        required VoidCallback? onTap,
-        bool isBusy = false,
-      }) {
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+    bool isBusy = false,
+  }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -363,7 +311,9 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
       if (context.mounted) {
         AppToast.warning(
           context,
-          isUrdu ? 'انٹرنیٹ نہیں ہے، پہلے کنیکٹ کریں' : 'No internet, connect first',
+          isUrdu
+              ? 'انٹرنیٹ نہیں ہے، پہلے کنیکٹ کریں'
+              : 'No internet, connect first',
         );
       }
       return;
@@ -372,8 +322,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
     setState(() => _isSyncing = true);
 
     try {
-      final syncService =
-      Provider.of<AutoSyncService>(context, listen: false);
+      final syncService = Provider.of<AutoSyncService>(context, listen: false);
       await syncService.syncAllDataToCloud();
 
       if (context.mounted) {
@@ -397,16 +346,14 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
   // ═══════════════════════════════════════════════════════════
   // 2. REPORT — 3 options (Sales / Stock / Profit)
   // ═══════════════════════════════════════════════════════════
-  void _showExportDialog(
-      BuildContext context, bool isUrdu, String fontFamily) {
+  void _showExportDialog(BuildContext context, bool isUrdu, String fontFamily) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            Icon(PhosphorIcons.filePdf(),
-                size: 20, color: AppTheme.themeColor),
+            Icon(PhosphorIcons.filePdf(), size: 20, color: AppTheme.themeColor),
             const SizedBox(width: 8),
             UrduAwareText(
               isUrdu ? 'رپورٹ ایکسپورٹ' : 'Export Report',
@@ -420,6 +367,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildReportOption(
               icon: PhosphorIcons.receipt(),
@@ -441,9 +389,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
               icon: PhosphorIcons.package(),
               color: AppTheme.themeColor,
               title: isUrdu ? 'اسٹاک رپورٹ' : 'Stock Report',
-              sub: isUrdu
-                  ? 'موجودہ اسٹاک اور مالیت'
-                  : 'Current stock & value',
+              sub: isUrdu ? 'موجودہ اسٹاک اور مالیت' : 'Current stock & value',
               isUrdu: isUrdu,
               fontFamily: fontFamily,
               onTap: () => _exportReport(
@@ -470,14 +416,32 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                 type: 'profit',
               ),
             ),
+            const SizedBox(height: 8),
+            _buildReportOption(
+              icon: PhosphorIcons.calendar(),
+              color: AppTheme.purpleColor,
+              title: isUrdu ? 'سالانہ رپورٹ (سال)' : 'Yearly Report (Year)',
+              sub: isUrdu ? 'رواں سال کا مکمل ریکارڈ' : 'Current year record',
+              isUrdu: isUrdu,
+              fontFamily: fontFamily,
+              onTap: () => _exportReport(
+                context,
+                dialogContext,
+                isUrdu,
+                fontFamily,
+                type: 'yearly',
+              ),
+            ),
+            const SizedBox(height: 16),
+            AppButton(
+              text: isUrdu ? 'بند کریں' : 'Close',
+              color: AppTheme.themeColor,
+              isFullWidth: true,
+              onPressed: () => Navigator.pop(dialogContext),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: UrduAwareText(isUrdu ? 'بند' : 'Close'),
-          ),
-        ],
+        actions: const [],
       ),
     );
   }
@@ -548,12 +512,12 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
   }
 
   Future<void> _exportReport(
-      BuildContext context,
-      BuildContext dialogContext,
-      bool isUrdu,
-      String fontFamily, {
-        required String type,
-      }) async {
+    BuildContext context,
+    BuildContext dialogContext,
+    bool isUrdu,
+    String fontFamily, {
+    required String type,
+  }) async {
     Navigator.pop(dialogContext);
 
     // Show choice: PDF or Excel
@@ -567,6 +531,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             AppButton(
               text: 'PDF',
@@ -581,14 +546,16 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
               isFullWidth: true,
               onPressed: () => Navigator.pop(ctx, 'excel'),
             ),
+            const SizedBox(height: 16),
+            AppButton(
+              text: isUrdu ? 'منسوخ کریں' : 'Cancel',
+              color: AppTheme.themeColor,
+              isFullWidth: true,
+              onPressed: () => Navigator.pop(ctx),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel'),
-          ),
-        ],
+        actions: const [],
       ),
     );
 
@@ -622,10 +589,9 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
 
     try {
       final pdfService = Provider.of<PdfService>(context, listen: false);
-      final excelService =
-      Provider.of<ExcelService>(context, listen: false);
+      final excelService = Provider.of<ExcelService>(context, listen: false);
       final databaseService =
-      Provider.of<DatabaseService>(context, listen: false);
+          Provider.of<DatabaseService>(context, listen: false);
       final stockService = Provider.of<StockService>(context, listen: false);
 
       switch (type) {
@@ -672,6 +638,23 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
             );
           }
           break;
+        case 'yearly':
+          final currentYear = DateTime.now().year;
+          final yearlyTransactions = databaseService.transactions
+              .where((t) => t.date.year == currentYear)
+              .toList();
+          if (format == 'pdf') {
+            await pdfService.generateSalesReport(
+              yearlyTransactions,
+              isUrdu,
+            );
+          } else {
+            await excelService.generateSalesCsv(
+              yearlyTransactions,
+              isUrdu,
+            );
+          }
+          break;
       }
 
       if (context.mounted) {
@@ -688,8 +671,6 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
       }
     }
   }
-
-
 
   // ═══════════════════════════════════════════════════════════
   // 6. SHARE — Play Store link
@@ -721,8 +702,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 decoration: const BoxDecoration(
                   color: AppTheme.themeColor,
-                  borderRadius:
-                  BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
                 child: Center(
                   child: Column(
@@ -735,8 +715,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                           shape: BoxShape.circle,
                         ),
                         padding: const EdgeInsets.all(8),
-                        child:
-                        Image.asset('assets/images/icons/zalooq.png'),
+                        child: Image.asset('assets/images/icons/zalooq.png'),
                       ),
                       const SizedBox(height: 12),
                       UrduAwareText(
@@ -765,9 +744,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                     _buildAboutItem(
                       PhosphorIcons.shieldCheck(),
                       isUrdu ? 'محفوظ ڈیٹا' : 'Secure Data',
-                      isUrdu
-                          ? 'آپ کا ڈیٹا محفوظ ہے'
-                          : 'Your data is secure',
+                      isUrdu ? 'آپ کا ڈیٹا محفوظ ہے' : 'Your data is secure',
                       isUrdu,
                       fontFamily,
                     ),
@@ -775,9 +752,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                     _buildAboutItem(
                       PhosphorIcons.cloudArrowUp(),
                       isUrdu ? 'آٹو کلاؤڈ سنک' : 'Auto Cloud Sync',
-                      isUrdu
-                          ? 'آن لائن بیک اپ'
-                          : 'Online backup',
+                      isUrdu ? 'آن لائن بیک اپ' : 'Online backup',
                       isUrdu,
                       fontFamily,
                     ),
@@ -826,8 +801,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                       value: isUrdu
                           ? 'پلے سٹور پر ریٹنگ دیں'
                           : 'Rate on Play Store',
-                      onTap: () =>
-                          _launchUrl(_playStoreUrl, context, isUrdu),
+                      onTap: () => _launchUrl(_playStoreUrl, context, isUrdu),
                     ),
                     const Divider(),
                     // ⭐ Terms link
@@ -846,7 +820,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
               // Close
               Padding(
                 padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 child: AppButton(
                   text: isUrdu ? 'بند کریں' : 'Close',
                   onPressed: () => Navigator.pop(dialogContext),
@@ -862,14 +836,14 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
   }
 
   Widget _buildSupportItem(
-      BuildContext context, {
-        required bool isUrdu,
-        required String fontFamily,
-        required IconData icon,
-        required String title,
-        required String value,
-        required VoidCallback onTap,
-      }) {
+    BuildContext context, {
+    required bool isUrdu,
+    required String fontFamily,
+    required IconData icon,
+    required String title,
+    required String value,
+    required VoidCallback onTap,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -910,8 +884,8 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
     );
   }
 
-  Widget _buildAboutItem(IconData icon, String title, String sub, bool isUrdu,
-      String fontFamily) {
+  Widget _buildAboutItem(
+      IconData icon, String title, String sub, bool isUrdu, String fontFamily) {
     return Row(
       children: [
         Icon(icon, color: AppTheme.themeColor, size: 24),
@@ -930,9 +904,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
               UrduAwareText(
                 sub,
                 style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 12,
-                    fontFamily: fontFamily),
+                    color: Colors.grey, fontSize: 12, fontFamily: fontFamily),
               ),
             ],
           ),
@@ -941,8 +913,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
     );
   }
 
-  Future<void> _launchUrl(
-      String url, BuildContext context, bool isUrdu) async {
+  Future<void> _launchUrl(String url, BuildContext context, bool isUrdu) async {
     try {
       final uri = Uri.parse(url);
       if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
@@ -1012,9 +983,11 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
           ),
         ),
         actions: [
-          TextButton(
+          AppButton(
+            text: isUrdu ? 'بند' : 'Close',
+            variant: AppButtonVariant.outlined,
+            size: AppButtonSize.small,
             onPressed: () => Navigator.pop(dialogContext),
-            child: UrduAwareText(isUrdu ? 'بند' : 'Close'),
           ),
         ],
       ),
@@ -1024,8 +997,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
   // ═══════════════════════════════════════════════════════════
   // 9. LOGOUT — with sync warning
   // ═══════════════════════════════════════════════════════════
-  void _showLogoutDialog(
-      BuildContext context, bool isUrdu, String fontFamily) {
+  void _showLogoutDialog(BuildContext context, bool isUrdu, String fontFamily) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -1097,7 +1069,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
               Navigator.pop(dialogContext);
               try {
                 final syncService =
-                Provider.of<AutoSyncService>(context, listen: false);
+                    Provider.of<AutoSyncService>(context, listen: false);
                 await syncService.syncAllDataToCloud();
               } catch (_) {}
               if (context.mounted) {
@@ -1109,100 +1081,6 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
               isUrdu ? 'سنک + لاگ آؤٹ' : 'Sync + Logout',
               style: const TextStyle(
                   color: AppTheme.incomeColor, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // 12. APP LOCK — با تصدیق disable
-  // ═══════════════════════════════════════════════════════════
-  Future<void> _toggleAppLock(
-      BuildContext context, bool isUrdu, String fontFamily) async {
-    final securityService =
-    Provider.of<SecurityService>(context, listen: false);
-    final isEnabled = await securityService.isAppLockEnabled();
-
-    if (isEnabled) {
-      // ⭐ Disable کرنے سے پہلے تصدیق کرائیں
-      final verified = await _verifyBeforeDisable(context, isUrdu, fontFamily);
-      if (verified != true) return;
-
-      await securityService.setAppLockEnabled(false);
-      if (context.mounted) {
-        AppToast.success(
-          context,
-          isUrdu ? 'ایپ لاک غیر فعال' : 'App Lock disabled',
-        );
-      }
-    } else {
-      // Enable
-      final result = await Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (_) => const AppLockScreen(isSettingUp: true)),
-      );
-      if (result == true && context.mounted) {
-        AppToast.success(
-          context,
-          isUrdu ? 'ایپ لاک فعال' : 'App Lock enabled',
-        );
-      }
-    }
-  }
-
-  Future<bool?> _verifyBeforeDisable(
-      BuildContext context, bool isUrdu, String fontFamily) async {
-    return showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(PhosphorIcons.lock(),
-                size: 20, color: AppTheme.expenseColor),
-            const SizedBox(width: 8),
-            UrduAwareText(
-              isUrdu ? 'ایپ لاک بند کریں؟' : 'Disable App Lock?',
-              style: TextStyle(
-                fontFamily: fontFamily,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ],
-        ),
-        content: UrduAwareText(
-          isUrdu
-              ? 'ایپ لاک بند کرنے کے لیے اپنا موجودہ PIN درج کریں۔'
-              : 'Enter your current PIN to disable App Lock.',
-          style: TextStyle(fontFamily: fontFamily),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              // ⭐ PIN verification screen کھولیں
-              final verified = await Navigator.push<bool>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const AppLockScreen(
-                    isChangingPin: false,
-                    isVerifyingOnly: true,
-                  ),
-                ),
-              );
-              // Note: یہاں result کو parent تک پہنچائیں
-            },
-            child: UrduAwareText(
-              isUrdu ? 'PIN درج کریں' : 'Enter PIN',
-              style: const TextStyle(color: AppTheme.themeColor),
             ),
           ),
         ],
@@ -1249,7 +1127,9 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
             ),
             const SizedBox(height: 12),
             UrduAwareText(
-              isUrdu ? 'تصدیق کے لیے "DELETE" لکھیں:' : 'Type "DELETE" to confirm:',
+              isUrdu
+                  ? 'تصدیق کے لیے "DELETE" لکھیں:'
+                  : 'Type "DELETE" to confirm:',
               style: TextStyle(
                   fontFamily: fontFamily,
                   fontSize: 11,
@@ -1260,10 +1140,10 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
               controller: confirmController,
               decoration: InputDecoration(
                 border:
-                OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 hintText: 'DELETE',
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 10),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               ),
             ),
           ],
@@ -1294,7 +1174,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                     'isDeactivated': true,
                     'deactivatedAt': FieldValue.serverTimestamp(),
                     'restoreDeadline':
-                    DateTime.now().add(const Duration(days: 30)),
+                        DateTime.now().add(const Duration(days: 30)),
                   }, SetOptions(merge: true));
 
                   if (context.mounted) {

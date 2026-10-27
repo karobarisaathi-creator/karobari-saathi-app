@@ -164,6 +164,122 @@ void showItemDetailDialog(BuildContext context, ShopItem item,
               ],
             ),
 
+            // Brand, Model & Returnable Badges
+            if ((item.brand != null && item.brand!.isNotEmpty) ||
+                (item.model != null && item.model!.isNotEmpty) ||
+                item.allowReturn) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  if (item.brand != null && item.brand!.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.themeColor.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: AppTheme.themeColor.withValues(alpha: 0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            PhosphorIcons.factory(),
+                            size: 12,
+                            color: AppTheme.themeColor,
+                          ),
+                          const SizedBox(width: 4),
+                          UrduAwareText(
+                            isUrdu
+                                ? 'برانڈ: ${item.brand}'
+                                : 'Brand: ${item.brand}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.themeColor,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (item.model != null && item.model!.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.darkColor.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: AppTheme.darkColor.withValues(alpha: 0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            PhosphorIcons.wrench(),
+                            size: 12,
+                            color: AppTheme.darkColor,
+                          ),
+                          const SizedBox(width: 4),
+                          UrduAwareText(
+                            isUrdu
+                                ? 'ماڈل: ${item.model}'
+                                : 'Model: ${item.model}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.darkColor,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (item.allowReturn)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: const Color(0xFFBBF7D0),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            PhosphorIcons.arrowsCounterClockwise(),
+                            size: 12,
+                            color: AppTheme.incomeColor,
+                          ),
+                          const SizedBox(width: 4),
+                          UrduAwareText(
+                            isUrdu ? 'قابلِ واپسی' : 'Returnable',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.incomeColor,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
+
             // Description
             if (item.description != null &&
                 item.description!.trim().isNotEmpty) ...[

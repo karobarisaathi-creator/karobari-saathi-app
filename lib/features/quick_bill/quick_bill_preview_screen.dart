@@ -56,6 +56,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
   Account? _selectedAccount;
   bool _isCashCustomer = true;
   bool _saving = false;
+  String _savingStage = 'local';
   bool _didInitializeEditState = false;
   bool _didInitializeBillNumber = false;
   bool _isDiscountExpanded = false;
@@ -325,7 +326,10 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
       }
     }
 
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _savingStage = 'local';
+    });
 
     try {
       final databaseService =
@@ -465,39 +469,103 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
         }
       }
 
+      if (mounted) setState(() => _savingStage = 'cloud');
+      final cloudSynced =
+          await databaseService.syncTransactionToCloud(transaction);
+      if (!cloudSynced) {
+        followUpFailures.add(
+          isUrdu
+              ? 'بل فون میں محفوظ ہے؛ کلاؤڈ سنک باقی ہے۔'
+              : 'Bill is saved on this phone; cloud sync is pending.',
+        );
+      }
+
       if (!mounted) return;
 
-      if (_pendingAmount > 0 &&
+      if (originalTransaction == null &&
           !_isCashCustomer &&
-          _selectedAccount != null &&
-          account.id != QuickBillConstants.cashCustomerAccountId &&
-          _selectedAccount!.phone.isNotEmpty) {
-        try {
-          final notifService =
-              Provider.of<NotificationService>(context, listen: false);
-          await notifService.notifyPartyByPhone(
-            partyPhoneNumber: _selectedAccount!.phone,
-            amount: _total,
-            transactionType: 'income',
-            category: transaction.category,
-            paymentMethod: transaction.paymentMethod,
-            description: transactionDescription,
-            items: items.map((i) => i.toMap()).toList(),
-            receivedAmount: _receivedAmount,
-            pendingAmount: _pendingAmount,
-            transactionId: transaction.id,
-            transactionDate: transaction.date,
-            referenceNumber: transaction.referenceNumber,
-            subtotal: transaction.subtotal,
-            discountAmount: transaction.discountAmount,
-            discountPercent: transaction.discountPercent,
-            discountReason: transaction.discountReason,
-          );
-        } catch (error) {
+          account.id != QuickBillConstants.cashCustomerAccountId) {
+        final notifService =
+            Provider.of<NotificationService>(context, listen: false);
+        if (account.phone.trim().isEmpty) {
           followUpFailures.add(
             isUrdu
-                ? 'پارٹی کو اطلاع نہیں بھیجی جا سکی: $error'
-                : 'Could not notify the party: $error',
+                ? 'پارٹی کا فون نمبر موجود نہیں؛ اطلاع نہیں بھیجی جا سکی۔'
+                : 'Party phone number is missing; no notice was sent.',
+          );
+        } else if (cloudSynced) {
+          try {
+            if (mounted) setState(() => _savingStage = 'notification');
+            final result = await notifService.notifyPartyByPhone(
+              partyPhoneNumber: account.phone,
+              amount: _total,
+              transactionType: 'income',
+              category: transaction.category,
+              paymentMethod: transaction.paymentMethod,
+              description: transactionDescription,
+              items: items.map((i) => i.toMap()).toList(),
+              receivedAmount: _receivedAmount,
+              pendingAmount: _pendingAmount,
+              transactionId: transaction.id,
+              transactionDate: transaction.date,
+              referenceNumber: transaction.referenceNumber,
+              subtotal: transaction.subtotal,
+              discountAmount: transaction.discountAmount,
+              discountPercent: transaction.discountPercent,
+              discountReason: transaction.discountReason,
+            );
+            switch (result) {
+              case PartyNotificationResult.savedToInbox:
+                break;
+              case PartyNotificationResult.recipientNotFound:
+                followUpFailures.add(
+                  isUrdu
+                      ? 'پارٹی کا ایپ اکاؤنٹ نہیں ملا؛ اطلاع نہیں بھیجی گئی۔'
+                      : 'Party app account not found; no notice was sent.',
+                );
+              case PartyNotificationResult.sameUser:
+                followUpFailures.add(
+                  isUrdu
+                      ? 'یہ آپ کا اپنا نمبر ہے؛ اطلاع نہیں بھیجی گئی۔'
+                      : 'This is your own number; no notice was sent.',
+                );
+              case PartyNotificationResult.notSignedIn:
+                followUpFailures.add(
+                  isUrdu
+                      ? 'سائن اِن نہ ہونے کے باعث اطلاع نہیں بھیجی گئی۔'
+                      : 'Not signed in; no notice was sent.',
+                );
+            }
+          } catch (error, stackTrace) {
+            debugPrint('Quick bill party notification failed: $error');
+            debugPrintStack(stackTrace: stackTrace);
+            final queued = await notifService.enqueuePendingPartyNotification(
+              transaction: transaction,
+              partyPhoneNumber: account.phone,
+            );
+            followUpFailures.add(
+              queued
+                  ? (isUrdu
+                      ? 'پارٹی کی اطلاع قطار میں محفوظ؛ انٹرنیٹ ملنے پر دوبارہ بھیجی جائے گی۔'
+                      : 'Party notice queued; it will retry when internet is available.')
+                  : (isUrdu
+                      ? 'پارٹی کو اطلاع نہیں بھیجی جا سکی اور دوبارہ کوشش بھی محفوظ نہیں ہوئی۔'
+                      : 'Could not notify the party or save a retry.'),
+            );
+          }
+        } else {
+          final queued = await notifService.enqueuePendingPartyNotification(
+            transaction: transaction,
+            partyPhoneNumber: account.phone,
+          );
+          followUpFailures.add(
+            queued
+                ? (isUrdu
+                    ? 'پارٹی کی اطلاع قطار میں محفوظ؛ انٹرنیٹ ملنے پر دوبارہ بھیجی جائے گی۔'
+                    : 'Party notice queued; it will retry when internet is available.')
+                : (isUrdu
+                    ? 'پارٹی کی اطلاع دوبارہ بھیجنے کے لیے محفوظ نہیں ہو سکی۔'
+                    : 'Could not save the party notice for retry.'),
           );
         }
       }
@@ -821,7 +889,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                 Directionality(
                   textDirection: TextDirection.ltr,
                   child: Text(
-                    '${line.quantity.toStringAsFixed(line.quantity == line.quantity.roundToDouble() ? 0 : 1)} ${line.unit ?? ""} × Rs ${line.rate.toStringAsFixed(0)}',
+                    '${line.quantity.toStringAsFixed(line.quantity == line.quantity.roundToDouble() ? 0 : 1)}${(line.unit != null && line.unit!.isNotEmpty) ? " ${line.unit}" : ""} × Rs ${line.rate.toStringAsFixed(0)}',
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -1502,21 +1570,26 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
       onPressed: needsParty ? _pickCustomerAndConfirm : _confirm,
       icon: needsParty ? PhosphorIcons.userPlus() : Icons.check_rounded,
       isLoading: _saving,
-      loadingTexts: isUrdu
-          ? [
-              'محفوظ ہو رہا ہے...',
-              'اسٹاک اپ ڈیٹ ہو رہا ہے...',
-              'رسید تیار ہو رہی ہے...'
-            ]
-          : [
-              'Saving transaction...',
-              'Updating stock...',
-              'Generating receipt...'
-            ],
+      loadingText: _saving ? _savingStageText(isUrdu) : null,
       color: needsParty ? const Color(0xFFD97706) : null,
       size: AppButtonSize.large,
       isFullWidth: true,
     );
+  }
+
+  String _savingStageText(bool isUrdu) {
+    switch (_savingStage) {
+      case 'cloud':
+        return isUrdu ? 'کلاؤڈ سنک کی تصدیق...' : 'Confirming cloud sync...';
+      case 'notification':
+        return isUrdu
+            ? 'پارٹی کو اطلاع دے رہے ہیں...'
+            : 'Notifying the party...';
+      default:
+        return isUrdu
+            ? 'بل اور اسٹاک محفوظ ہو رہے ہیں...'
+            : 'Saving bill and stock...';
+    }
   }
 }
 

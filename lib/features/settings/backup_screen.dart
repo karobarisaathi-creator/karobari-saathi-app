@@ -1,5 +1,6 @@
 // backup_screen.dart
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
@@ -10,7 +11,13 @@ import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/theme/app_theme.dart';
+import 'package:hive/hive.dart';
+
+import 'package:account_app/core/models/stock_item_model.dart';
+import 'package:account_app/core/models/category_model.dart';
+import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/features/settings/master_profile_screen.dart';
+import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 
 class BackupScreen extends StatefulWidget {
   const BackupScreen({super.key});
@@ -39,21 +46,25 @@ class _BackupScreenState extends State<BackupScreen> {
   }
 
   Future<void> _loadBackupInfo() async {
-    setState(() => _isLoading = true);
+    if (mounted) setState(() => _isLoading = true);
 
     try {
       _backupInfo = await _backupService.getBackupInfo();
 
-      // Get additional stats from database
-      final accounts = await _databaseService.getAccounts();
-      final transactions = await _databaseService.getAllTransactions();
+      final accounts = _databaseService.getAccounts();
+      final transactions = _databaseService.getAllTransactions();
+
+      final stockBox = Hive.isBoxOpen('stock_items') ? Hive.box<StockItem>('stock_items') : await Hive.openBox<StockItem>('stock_items');
+      final categoriesBox = Hive.isBoxOpen('categories') ? Hive.box<Category>('categories') : await Hive.openBox<Category>('categories');
+      final professionsBox = Hive.isBoxOpen('professions') ? Hive.box<Profession>('professions') : await Hive.openBox<Profession>('professions');
 
       _backupInfo['totalAccounts'] = accounts.length;
       _backupInfo['totalTransactions'] = transactions.length;
-    } catch (e) {
-      print('Error loading backup info: $e');
+      _backupInfo['totalStockItems'] = stockBox.length;
+      _backupInfo['totalCategories'] = categoriesBox.length + professionsBox.length;
+    } catch (_) {
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -78,7 +89,7 @@ class _BackupScreenState extends State<BackupScreen> {
         title: isUrdu ? 'ڈیٹا بیک اپ' : 'Data Backup',
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.themeColor))
+          ? _buildShimmerLoading()
           : SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
               child: Column(
@@ -100,6 +111,86 @@ class _BackupScreenState extends State<BackupScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildShimmerLoading() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
+      child: Column(
+        children: [
+          // Shimmer 1: Status Card
+          Card(
+            elevation: 0,
+            margin: const EdgeInsets.symmetric(vertical: 2),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: const Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      SkeletonShimmer(width: 130, height: 20, borderRadius: 8),
+                      SkeletonShimmer(width: 90, height: 16, borderRadius: 6),
+                    ],
+                  ),
+                  SizedBox(height: 16),
+                  SkeletonShimmer(width: double.infinity, height: 40, borderRadius: 12),
+                  SizedBox(height: 10),
+                  SkeletonShimmer(width: double.infinity, height: 40, borderRadius: 12),
+                  SizedBox(height: 10),
+                  SkeletonShimmer(width: double.infinity, height: 40, borderRadius: 12),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Shimmer 2: Data Stats Card
+          Card(
+            elevation: 0,
+            margin: const EdgeInsets.symmetric(vertical: 2),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: const Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonShimmer(width: 140, height: 18, borderRadius: 8),
+                  SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(child: SkeletonShimmer(width: double.infinity, height: 60, borderRadius: 14)),
+                      SizedBox(width: 10),
+                      Expanded(child: SkeletonShimmer(width: double.infinity, height: 60, borderRadius: 14)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Shimmer 3: Actions Card
+          Card(
+            elevation: 0,
+            margin: const EdgeInsets.symmetric(vertical: 2),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: const Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  SkeletonShimmer(width: double.infinity, height: 48, borderRadius: 14),
+                  SizedBox(height: 10),
+                  SkeletonShimmer(width: double.infinity, height: 48, borderRadius: 14),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -131,7 +222,7 @@ class _BackupScreenState extends State<BackupScreen> {
                 ),
                 TextButton.icon(
                   onPressed: _navigateToProfile,
-                  icon: const Icon(Icons.edit, size: 16, color: AppTheme.themeColor),
+                  icon: Icon(PhosphorIcons.pencilSimple(), size: 16, color: AppTheme.themeColor),
                   label: UrduAwareText(
                     isUrdu ? 'ای میل تبدیل کریں' : 'Change Email',
                     style: TextStyle(
@@ -153,8 +244,8 @@ class _BackupScreenState extends State<BackupScreen> {
                   : isUrdu
                   ? 'درج نہیں ہے (پروفائل میں جوڑیں)'
                   : 'Not set (Link in Profile)',
-              Icons.email,
-              AppTheme.purpleColor,
+              PhosphorIcons.envelopeSimple(),
+              AppTheme.verifiedGold,
               isUrdu,
             ),
 
@@ -165,8 +256,8 @@ class _BackupScreenState extends State<BackupScreen> {
                   : isUrdu
                   ? 'کبھی نہیں'
                   : 'Never',
-              Icons.backup,
-              AppTheme.incomeColor,
+              PhosphorIcons.cloudArrowUp(),
+              AppTheme.verifiedGold,
               isUrdu,
             ),
 
@@ -177,15 +268,15 @@ class _BackupScreenState extends State<BackupScreen> {
                   : isUrdu
                   ? 'کبھی نہیں'
                   : 'Never',
-              Icons.restore,
-              AppTheme.themeColor,
+              PhosphorIcons.cloudArrowDown(),
+              AppTheme.verifiedGold,
               isUrdu,
             ),
 
             _buildStatusItem(
               isUrdu ? 'بیک اپ سائز:' : 'Backup Size:',
               _formatFileSize(_backupInfo['backupSize'] ?? 0),
-              Icons.storage,
+              PhosphorIcons.hardDrive(),
               AppTheme.verifiedGold,
               isUrdu,
             ),
@@ -220,19 +311,44 @@ class _BackupScreenState extends State<BackupScreen> {
               children: [
                 Expanded(
                   child: _buildStatItem(
-                    isUrdu ? 'اکاؤنٹس' : 'Accounts',
+                    isUrdu ? 'اکاؤنٹس / پارٹیاں' : 'Accounts',
                     _backupInfo['totalAccounts']?.toString() ?? '0',
-                    Icons.people,
-                    AppTheme.incomeColor,
+                    PhosphorIcons.users(),
+                    AppTheme.verifiedGold,
                     isUrdu,
                   ),
                 ),
                 Expanded(
                   child: _buildStatItem(
-                    isUrdu ? 'لین دین' : 'Transactions',
+                    isUrdu ? 'لین دین / بل' : 'Transactions',
                     _backupInfo['totalTransactions']?.toString() ?? '0',
-                    Icons.account_balance_wallet,
-                    AppTheme.themeColor,
+                    PhosphorIcons.receipt(),
+                    AppTheme.verifiedGold,
+                    isUrdu,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(height: 1, color: Color(0xFFEEF1F5)),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatItem(
+                    isUrdu ? 'اسٹاک اشیاء' : 'Stock Items',
+                    _backupInfo['totalStockItems']?.toString() ?? '0',
+                    PhosphorIcons.package(),
+                    AppTheme.verifiedGold,
+                    isUrdu,
+                  ),
+                ),
+                Expanded(
+                  child: _buildStatItem(
+                    isUrdu ? 'زمرے و پروجیکٹس' : 'Categories',
+                    _backupInfo['totalCategories']?.toString() ?? '0',
+                    PhosphorIcons.folders(),
+                    AppTheme.verifiedGold,
                     isUrdu,
                   ),
                 ),
@@ -267,11 +383,22 @@ class _BackupScreenState extends State<BackupScreen> {
 
             AppButton(
               text: isUrdu ? 'کلاؤڈ پر بیک اپ کریں' : 'Backup to Cloud',
-              icon: Icons.cloud_upload,
+              icon: PhosphorIcons.cloudArrowUp(),
               color: AppTheme.incomeColor,
               size: AppButtonSize.large,
               isLoading: _isBackingUp,
               isFullWidth: true,
+              loadingTexts: isUrdu
+                  ? [
+                      'ڈیٹا تیار ہو رہا ہے...',
+                      'کلاؤڈ پر اپ لوڈ ہو رہا ہے...',
+                      'بیک اپ مکمل ہو رہا ہے...',
+                    ]
+                  : [
+                      'Preparing data...',
+                      'Uploading to cloud...',
+                      'Finalizing backup...',
+                    ],
               onPressed: _createCloudBackup,
             ),
 
@@ -279,11 +406,22 @@ class _BackupScreenState extends State<BackupScreen> {
 
             AppButton(
               text: isUrdu ? 'کلاؤڈ سے بحالی کریں' : 'Restore from Cloud',
-              icon: Icons.cloud_download,
+              icon: PhosphorIcons.cloudArrowDown(),
               color: AppTheme.themeColor,
               size: AppButtonSize.large,
               isLoading: _isRestoring,
               isFullWidth: true,
+              loadingTexts: isUrdu
+                  ? [
+                      'کلاؤڈ سے رابطہ کیا جا رہا ہے...',
+                      'ڈیٹا ڈاؤن لوڈ ہو رہا ہے...',
+                      'مقامی ڈیٹا بحال ہو رہا ہے...',
+                    ]
+                  : [
+                      'Connecting to cloud...',
+                      'Downloading data...',
+                      'Restoring local database...',
+                    ],
               onPressed: _restoreFromCloud,
             ),
           ],
@@ -332,9 +470,9 @@ class _BackupScreenState extends State<BackupScreen> {
                   onChanged: _toggleAutoBackup,
                   thumbIcon: WidgetStateProperty.resolveWith<Icon?>((states) {
                     if (states.contains(WidgetState.selected)) {
-                      return const Icon(Icons.check, size: 14, color: Colors.white);
+                      return Icon(PhosphorIcons.check(), size: 14, color: Colors.white);
                     }
-                    return const Icon(Icons.close, size: 14, color: Colors.grey);
+                    return Icon(PhosphorIcons.x(), size: 14, color: Colors.grey);
                   }),
                 ),
               ],

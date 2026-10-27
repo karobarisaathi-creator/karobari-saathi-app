@@ -11,8 +11,8 @@ class SeasonReportService {
   }) {
     final seasonTx = transactions.where((tx) => tx.professionId == profession.id).toList();
 
-    double totalIncome = profession.totalIncome;
-    double totalExpense = profession.totalExpense;
+    double calculatedIncome = 0.0;
+    double calculatedExpense = 0.0;
 
     Map<String, double> incomeMap = {};
     Map<String, int> incomeCountMap = {};
@@ -21,16 +21,21 @@ class SeasonReportService {
 
     for (final tx in seasonTx) {
       final side = tx.professionSide;
-      if (side == 'income' || tx.type == 'income') {
+      if (side == 'income') {
         final cat = tx.category.isNotEmpty ? tx.category : 'General';
         incomeMap[cat] = (incomeMap[cat] ?? 0) + tx.amount;
         incomeCountMap[cat] = (incomeCountMap[cat] ?? 0) + 1;
-      } else if (side == 'expense' || tx.type == 'expense') {
+        calculatedIncome += tx.amount;
+      } else if (side == 'expense') {
         final cat = tx.category.isNotEmpty ? tx.category : 'General';
         expenseMap[cat] = (expenseMap[cat] ?? 0) + tx.amount;
         expenseCountMap[cat] = (expenseCountMap[cat] ?? 0) + 1;
+        calculatedExpense += tx.amount;
       }
     }
+
+    final totalIncome = calculatedIncome > 0 ? calculatedIncome : profession.totalIncome;
+    final totalExpense = calculatedExpense > 0 ? calculatedExpense : profession.totalExpense;
 
     if (incomeMap.isEmpty && totalIncome > 0) {
       incomeMap['Income'] = totalIncome;

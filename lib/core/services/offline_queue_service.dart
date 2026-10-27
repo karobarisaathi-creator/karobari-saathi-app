@@ -155,9 +155,52 @@ class OfflineQueueService extends ChangeNotifier {
 
   Future<bool> _syncStockOrBillOp(String uid, String? action, Map<String, dynamic> payload) async {
     try {
-      final collection = FirebaseFirestore.instance.collection('users').doc(uid).collection('stock_items');
+      final userDoc = FirebaseFirestore.instance.collection('users').doc(uid);
       final id = payload['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
-      await collection.doc(id).set(payload, SetOptions(merge: true));
+
+      if (action == 'delete') {
+        await userDoc.collection('stock_items').doc(id).delete();
+      } else {
+        await userDoc.collection('stock_items').doc(id).set(payload, SetOptions(merge: true));
+
+        // Sync public shop catalog item if public shop exists
+        final shopRef = FirebaseFirestore.instance.collection('public_shops').doc(uid);
+        final shopDoc = await shopRef.get();
+        if (shopDoc.exists) {
+          final isArchived = payload['isArchived'] == true;
+          final itemRef = shopRef.collection('items').doc(id);
+          if (isArchived) {
+            final prev = await itemRef.get();
+            if (prev.exists) {
+              await itemRef.delete();
+              await shopRef.update({'itemCount': FieldValue.increment(-1)});
+            }
+          } else {
+            final prev = await itemRef.get();
+            await itemRef.set({
+              'id': id,
+              'name': payload['name'] ?? '',
+              'nameUrdu': payload['nameUrdu'] ?? '',
+              'description': payload['description'] ?? '',
+              'brand': payload['brand'] ?? '',
+              'model': payload['model'] ?? '',
+              'allowReturn': payload['allowReturn'] == true,
+              'rate': payload['sellingPrice'] ?? payload['rate'] ?? 0,
+              'oldRate': (payload['mrp'] != null && payload['sellingPrice'] != null && (payload['mrp'] as num) > (payload['sellingPrice'] as num)) ? payload['mrp'] : null,
+              'unit': payload['unit'] ?? '',
+              'category': payload['categoryName'] ?? payload['category'] ?? 'عام',
+              'imageUrl': payload['imagePath'] ?? payload['imageUrl'] ?? '',
+              'availableQuantity': payload['initialQuantity'] ?? payload['availableQuantity'],
+              'trackStock': payload['trackStock'] != false,
+              'isAvailable': payload['trackStock'] == false || (((payload['initialQuantity'] ?? 0) as num) > 0),
+              'updatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+            if (!prev.exists) {
+              await shopRef.update({'itemCount': FieldValue.increment(1)});
+            }
+          }
+        }
+      }
       return true;
     } catch (e) {
       debugPrint('_syncStockOrBillOp error: $e');

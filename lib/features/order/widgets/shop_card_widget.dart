@@ -39,6 +39,7 @@ class ShopCardWidget extends StatelessWidget {
           ),
         ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
@@ -54,7 +55,7 @@ class ShopCardWidget extends StatelessWidget {
                 children: [
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
+                      top: Radius.circular(20),
                     ),
                     child: SizedBox(
                       height: 85,
@@ -133,8 +134,8 @@ class ShopCardWidget extends StatelessWidget {
                               Expanded(
                                 child: UrduAwareText(
                                   shop.name,
-                                  textAlign: TextAlign.right,
-                                  textDirection: TextDirection.rtl,
+                                  textAlign: isUrdu ? TextAlign.right : TextAlign.left,
+                                  textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
                                   style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w900,
@@ -213,7 +214,38 @@ class ShopCardWidget extends StatelessWidget {
                                   green: shop.deliveryFee == '???',
                                   fontFamily: fontFamily,
                                 ),
+                              if (shop.minOrder.isNotEmpty)
+                                _buildInfoPill(
+                                  PhosphorIcons.money(),
+                                  isUrdu
+                                      ? 'کم از کم: ${shop.minOrder}'
+                                      : 'Min: ${shop.minOrder}',
+                                  fontFamily: fontFamily,
+                                ),
                             ]),
+                          ],
+                          if (shop.showTags && shop.tags.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: shop.tags.map((tag) => Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.themeColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: UrduAwareText(
+                                  tag,
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.themeColor,
+                                    fontFamily: fontFamily,
+                                  ),
+                                ),
+                              )).toList(),
+                            ),
                           ],
                         ],
                       ),
@@ -257,8 +289,8 @@ class ShopCardWidget extends StatelessWidget {
                             Expanded(
                               child: UrduAwareText(
                                 shop.owner,
-                                textAlign: TextAlign.right,
-                                textDirection: TextDirection.rtl,
+                                textAlign: isUrdu ? TextAlign.right : TextAlign.left,
+                                textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,
