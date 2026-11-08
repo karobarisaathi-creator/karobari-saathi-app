@@ -115,6 +115,25 @@ class Formatters {
     return _settings.formatAmount(amount.toDouble());
   }
 
+  static String formatAmountWithoutCurrency(num amount) {
+    return _settings.formatNumber(amount.toDouble());
+  }
+
+  static double? tryParseAmount(String value) {
+    var normalized = value.trim();
+    if (_settings.currencySymbol.isNotEmpty) {
+      normalized = normalized.replaceAll(_settings.currencySymbol, '');
+    }
+    if (_settings.thousandSeparator.isNotEmpty) {
+      normalized = normalized.replaceAll(_settings.thousandSeparator, '');
+    }
+    if (_settings.decimalSeparator != '.') {
+      normalized = normalized.replaceAll(_settings.decimalSeparator, '.');
+    }
+    normalized = normalized.replaceAll(RegExp(r'\s'), '');
+    return double.tryParse(normalized);
+  }
+
   /// ⭐ Compact — "Rs 1.2K", "Rs 1.5M"
   static String formatCompact(double amount) {
     return _settings.formatCompact(amount);

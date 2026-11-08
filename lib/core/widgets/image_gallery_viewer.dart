@@ -175,14 +175,23 @@ class ImageGalleryViewer extends StatelessWidget {
   }
 
   void _openGallery(BuildContext context, int initialIndex) {
-    showDialog(
-      context: context,
-      builder: (context) => _SimpleGalleryDialog(
-        imagePaths: imagePaths,
-        initialIndex: initialIndex,
-      ),
-    );
+    openFullScreenImageGallery(context, imagePaths, initialIndex: initialIndex);
   }
+}
+
+void openFullScreenImageGallery(
+  BuildContext context,
+  List<String> imagePaths, {
+  int initialIndex = 0,
+}) {
+  if (imagePaths.isEmpty) return;
+  showDialog(
+    context: context,
+    builder: (context) => _SimpleGalleryDialog(
+      imagePaths: imagePaths,
+      initialIndex: initialIndex,
+    ),
+  );
 }
 
 class _SimpleGalleryDialog extends StatefulWidget {

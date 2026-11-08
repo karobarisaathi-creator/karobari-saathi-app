@@ -367,7 +367,9 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
                                 ? (isUrdu
                                     ? 'بل کی رسید (از: ${targetAccount.name})'
                                     : 'Transaction Receipt (From: ${targetAccount.name})')
-                                : (isUrdu ? 'بل کی رسید' : 'Transaction Receipt')),
+                                : (isUrdu
+                                    ? 'بل کی رسید'
+                                    : 'Transaction Receipt')),
                         style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w800,
@@ -378,9 +380,7 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-
                     const Spacer(),
-
                     IconButton(
                       icon: const Icon(Icons.close_rounded, size: 22),
                       color: AppTheme.textSecondary,
@@ -463,7 +463,8 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
                     ],
                     Row(
                       children: [
-                        if (widget.isLocalTransaction) ...[
+                        if (widget.isLocalTransaction &&
+                            !widget.transaction.isQuickBill) ...[
                           Expanded(
                             child: AppButton(
                               text: isUrdu ? 'ایڈٹ کریں' : 'Edit',
@@ -474,42 +475,34 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
                             ),
                           ),
                           const SizedBox(width: 10),
-                          Expanded(
-                            child: AppButton(
-                              text: isUrdu ? 'شیئر کریں' : 'Share',
-                              onPressed:
-                              _isSharing ? null : () => _shareReceipt(isUrdu),
-                              icon: PhosphorIcons.shareNetwork(),
-                              color: AppTheme.themeColor,
-                              size: AppButtonSize.small,
-                            ),
-                          ),
-                        ] else ...[
-                          if (widget.showDeleteButton)
-                            Expanded(
-                              child: AppButton(
-                                text: isUrdu ? 'حذف کریں' : 'Delete',
-                                onPressed: () {
-                                  Navigator.of(context).pop();
-                                  widget.onDeletePressed?.call();
-                                },
-                                icon: PhosphorIcons.trash(),
-                                color: AppTheme.expenseColor,
-                                size: AppButtonSize.small,
-                              ),
-                            ),
-                          if (widget.showDeleteButton) const SizedBox(width: 10),
-                          Expanded(
-                            child: AppButton(
-                              text: isUrdu ? 'شیئر کریں' : 'Share',
-                              onPressed:
-                              _isSharing ? null : () => _shareReceipt(isUrdu),
-                              icon: PhosphorIcons.shareNetwork(),
-                              color: AppTheme.themeColor,
-                              size: AppButtonSize.small,
-                            ),
-                          ),
                         ],
+                        if (!widget.isLocalTransaction &&
+                            widget.showDeleteButton)
+                          Expanded(
+                            child: AppButton(
+                              text: isUrdu ? 'حذف کریں' : 'Delete',
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                widget.onDeletePressed?.call();
+                              },
+                              icon: PhosphorIcons.trash(),
+                              color: AppTheme.expenseColor,
+                              size: AppButtonSize.small,
+                            ),
+                          ),
+                        if (!widget.isLocalTransaction &&
+                            widget.showDeleteButton)
+                          const SizedBox(width: 10),
+                        Expanded(
+                          child: AppButton(
+                            text: isUrdu ? 'شیئر کریں' : 'Share',
+                            onPressed:
+                                _isSharing ? null : () => _shareReceipt(isUrdu),
+                            icon: PhosphorIcons.shareNetwork(),
+                            color: AppTheme.themeColor,
+                            size: AppButtonSize.small,
+                          ),
+                        ),
                       ],
                     ),
                   ],

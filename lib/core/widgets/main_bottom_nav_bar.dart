@@ -7,7 +7,6 @@ import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/app_toast.dart';
 
 class MainBottomNavBar extends StatefulWidget {
   final int selectedIndex;
@@ -24,8 +23,11 @@ class MainBottomNavBar extends StatefulWidget {
 }
 
 class _MainBottomNavBarState extends State<MainBottomNavBar> {
-  Color _navColor = AppTheme.darkColor;
-  bool? _wasOffline;
+  bool _isOffline = true;
+  bool _hasConnectivityState = false;
+  bool _showConnectivityStatus = false;
+  int _connectivityRevision = 0;
+  Timer? _statusDismissTimer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   @override
@@ -35,53 +37,73 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
   }
 
   void _initConnectivityListener() {
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
-      final isOffline = results.contains(ConnectivityResult.none);
-      if (_wasOffline != null && _wasOffline != isOffline) {
-        if (isOffline) {
-          if (mounted) {
-            setState(() {
-              _navColor = const Color(0xFFEF4444); // Red
-            });
-            final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-            AppToast.warning(
-              context,
-              isUrdu ? 'انٹرنیٹ منقطع ہو گیا (آف لائن)' : 'Internet Disconnected',
-            );
-            Future.delayed(const Duration(seconds: 3), () {
-              if (mounted) {
-                setState(() {
-                  _navColor = AppTheme.darkColor;
-                });
-              }
-            });
-          }
-        } else {
-          if (mounted) {
-            setState(() {
-              _navColor = const Color(0xFF22C55E); // Green
-            });
-            final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-            AppToast.success(
-              context,
-              isUrdu ? 'انٹرنیٹ بحال ہو گیا (آن لائن)' : 'Internet Connected',
-            );
-            Future.delayed(const Duration(seconds: 3), () {
-              if (mounted) {
-                setState(() {
-                  _navColor = AppTheme.darkColor;
-                });
-              }
-            });
-          }
-        }
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
+      (results) {
+        _connectivityRevision++;
+        _updateConnectivity(results);
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: error,
+            stack: stackTrace,
+            library: 'bottom navigation connectivity',
+            context:
+                ErrorDescription('while listening for connectivity changes'),
+          ),
+        );
+      },
+    );
+    _loadInitialConnectivity();
+  }
+
+  Future<void> _loadInitialConnectivity() async {
+    final revision = _connectivityRevision;
+    try {
+      final results = await Connectivity().checkConnectivity();
+      if (!mounted || revision != _connectivityRevision) return;
+      _updateConnectivity(results);
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'bottom navigation connectivity',
+          context: ErrorDescription('while checking the initial connectivity'),
+        ),
+      );
+    }
+  }
+
+  void _updateConnectivity(List<ConnectivityResult> results) {
+    final isOffline = results.contains(ConnectivityResult.none);
+    if (!mounted) return;
+
+    if (!_hasConnectivityState) {
+      setState(() {
+        _isOffline = isOffline;
+        _hasConnectivityState = true;
+      });
+      return;
+    }
+
+    if (_isOffline == isOffline) return;
+
+    setState(() {
+      _isOffline = isOffline;
+      _showConnectivityStatus = true;
+    });
+    _statusDismissTimer?.cancel();
+    _statusDismissTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() => _showConnectivityStatus = false);
       }
-      _wasOffline = isOffline;
     });
   }
 
   @override
   void dispose() {
+    _statusDismissTimer?.cancel();
     _connectivitySubscription?.cancel();
     super.dispose();
   }
@@ -93,63 +115,105 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
+    final statusColor =
+        _isOffline ? AppTheme.expenseColor : AppTheme.incomeColor;
+
+    return Container(
       padding: EdgeInsets.only(bottom: bottomPadding),
       decoration: BoxDecoration(
-        color: _navColor,
+        color: AppTheme.darkColor,
         borderRadius: const BorderRadius.vertical(
           top: Radius.circular(15),
         ),
       ),
-      child: SizedBox(
-        height: 60,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // ═══ Shopkeeper Dashboard (Tab 0) ═══
-            Expanded(
-              flex: 2,
-              child: _buildNavItem(
-                index: 0,
-                icon: PhosphorIcons.shoppingBag(),
-                activeIcon: PhosphorIcons.shoppingBag(PhosphorIconsStyle.fill),
-              ),
-            ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeInOut,
+            child: _showConnectivityStatus
+                ? Container(
+                    width: double.infinity,
+                    height: 25,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(15),
+                      ),
+                    ),
+                    child: UrduAwareText(
+                      isUrdu
+                          ? (_isOffline
+                              ? 'کاروباری ساتھی آف لائن'
+                              : 'کاروباری ساتھی آن لائن')
+                          : (_isOffline
+                              ? 'Karobari Saathi Offline'
+                              : 'Karobari Saathi Online'),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: fontFamily,
+                        height: 1,
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+          SizedBox(
+            height: 60,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // ═══ Shopkeeper Dashboard (Tab 0) ═══
+                Expanded(
+                  flex: 2,
+                  child: _buildNavItem(
+                    index: 0,
+                    icon: PhosphorIcons.shoppingBag(),
+                    activeIcon:
+                        PhosphorIcons.shoppingBag(PhosphorIconsStyle.fill),
+                  ),
+                ),
 
-            // ═══ Parties / Accounts (Tab 1) ═══
-            Expanded(
-              flex: 2,
-              child: _buildNavItem(
-                index: 1,
-                icon: PhosphorIcons.users(),
-                activeIcon: PhosphorIcons.users(PhosphorIconsStyle.fill),
-              ),
-            ),
+                // ═══ Parties / Accounts (Tab 1) ═══
+                Expanded(
+                  flex: 2,
+                  child: _buildNavItem(
+                    index: 1,
+                    icon: PhosphorIcons.users(),
+                    activeIcon: PhosphorIcons.users(PhosphorIconsStyle.fill),
+                  ),
+                ),
 
-            // ═══ Quick Bill (Center Pill) (Tab 2) ═══
-            Expanded(
-              flex: 5,
-              child: _buildQuickBillPill(isUrdu, fontFamily),
-            ),
+                // ═══ Quick Bill (Center Pill) (Tab 2) ═══
+                Expanded(
+                  flex: 5,
+                  child: _buildQuickBillPill(isUrdu, fontFamily),
+                ),
 
-            // ═══ Professions / Projects (Tab 3) ═══
-            Expanded(
-              flex: 2,
-              child: _buildNavItem(
-                index: 3,
-                icon: PhosphorIcons.briefcase(),
-                activeIcon: PhosphorIcons.briefcase(PhosphorIconsStyle.fill),
-              ),
-            ),
+                // ═══ Professions / Projects (Tab 3) ═══
+                Expanded(
+                  flex: 2,
+                  child: _buildNavItem(
+                    index: 3,
+                    icon: PhosphorIcons.briefcase(),
+                    activeIcon:
+                        PhosphorIcons.briefcase(PhosphorIconsStyle.fill),
+                  ),
+                ),
 
-            // ═══ Notifications (Tab 4) ═══
-            Expanded(
-              flex: 2,
-              child: _buildNotificationItem(index: 4),
+                // ═══ Notifications (Tab 4) ═══
+                Expanded(
+                  flex: 2,
+                  child: _buildNotificationItem(index: 4),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -172,9 +236,8 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
           child: Icon(
             isActive ? activeIcon : icon,
             size: 22,
-            color: isActive
-                ? Colors.white
-                : Colors.white.withValues(alpha: 0.55),
+            color:
+                isActive ? Colors.white : Colors.white.withValues(alpha: 0.55),
           ),
         ),
       ),

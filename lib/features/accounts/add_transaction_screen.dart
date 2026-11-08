@@ -102,7 +102,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     if (widget.transactionToEdit != null) {
       final t = widget.transactionToEdit!;
-      _amountController.text = Formatters.formatAmountWithCurrency(t.amount);
+      _amountController.text = Formatters.formatAmountWithoutCurrency(t.amount);
       _selectedDate = t.date;
       _selectedAccountId = t.accountId;
       _selectedProfessionId = t.professionId;
@@ -129,9 +129,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           entry.descriptionController.text = item.description;
           entry.quantityController.text = item.quantity.toString();
           entry.rateController.text =
-              Formatters.formatAmountWithCurrency(item.rate);
+              Formatters.formatAmountWithoutCurrency(item.rate);
           entry.totalController.text =
-              Formatters.formatAmountWithCurrency(item.total);
+              Formatters.formatAmountWithoutCurrency(item.total);
           entry.unit = item.unit ?? 'Pieces';
           entry.stockItemId = item.stockItemId;
           entry.rateWasManuallyEdited = item.stockItemId != null;
@@ -143,9 +143,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         entry.descriptionController.text = t.description;
         entry.quantityController.text = t.quantity.toString();
         entry.rateController.text =
-            Formatters.formatAmountWithCurrency(t.amount);
+            Formatters.formatAmountWithoutCurrency(t.amount);
         entry.totalController.text =
-            Formatters.formatAmountWithCurrency(t.amount);
+            Formatters.formatAmountWithoutCurrency(t.amount);
         _itemEntries.add(entry);
         _setupEntryListeners(entry);
       }
@@ -158,12 +158,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         }
         if (widget.initialAmount != null) {
           entry.rateController.text =
-              Formatters.formatAmountWithCurrency(widget.initialAmount!);
+              Formatters.formatAmountWithoutCurrency(widget.initialAmount!);
           entry.quantityController.text = '1';
           entry.totalController.text =
-              Formatters.formatAmountWithCurrency(widget.initialAmount!);
+              Formatters.formatAmountWithoutCurrency(widget.initialAmount!);
           _amountController.text =
-              Formatters.formatAmountWithCurrency(widget.initialAmount!);
+              Formatters.formatAmountWithoutCurrency(widget.initialAmount!);
         }
       }
     }
@@ -254,11 +254,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   void _setupEntryListeners(_ItemEntry entry) {
     void calculate() {
       final finalQuantity = _effectiveEntryQuantity(entry);
-      double rate =
-          double.tryParse(entry.rateController.text.replaceAll(',', '')) ?? 0;
+      final rate = Formatters.tryParseAmount(entry.rateController.text) ?? 0;
 
       final total = finalQuantity * rate;
-      final formattedTotal = Formatters.formatAmountWithCurrency(total);
+      final formattedTotal = Formatters.formatAmountWithoutCurrency(total);
       if (entry.totalController.text != formattedTotal) {
         entry.totalController.text = formattedTotal;
       }
@@ -309,17 +308,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     entry.stockSuggestedRate = rate;
     entry.rateWasManuallyEdited = false;
     entry.applyingSuggestedRate = true;
-    entry.rateController.text = Formatters.formatAmountWithCurrency(rate);
+    entry.rateController.text = Formatters.formatAmountWithoutCurrency(rate);
     entry.applyingSuggestedRate = false;
   }
 
   void _calculateGrandTotal() {
     double grandTotal = 0;
     for (var entry in _itemEntries) {
-      grandTotal +=
-          double.tryParse(entry.totalController.text.replaceAll(',', '')) ?? 0;
+      grandTotal += Formatters.tryParseAmount(entry.totalController.text) ?? 0;
     }
-    final formattedGrandTotal = Formatters.formatAmountWithCurrency(grandTotal);
+    final formattedGrandTotal =
+        Formatters.formatAmountWithoutCurrency(grandTotal);
     if (_amountController.text != formattedGrandTotal) {
       setState(() {
         _amountController.text = formattedGrandTotal;
@@ -593,7 +592,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                               selection.trim().toLowerCase()) {
                             setState(() {
                               entry.rateController.text =
-                                  Formatters.formatAmountWithCurrency(it.rate);
+                                  Formatters.formatAmountWithoutCurrency(
+                                      it.rate);
                               entry.unit = it.unit ?? 'Pieces';
                             });
                             found = true;
@@ -604,7 +604,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                           selection.trim().toLowerCase()) {
                         setState(() {
                           entry.rateController.text =
-                              Formatters.formatAmountWithCurrency(tx.rate);
+                              Formatters.formatAmountWithoutCurrency(tx.rate);
                         });
                         found = true;
                       }
@@ -1460,7 +1460,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       final defaultRate =
           type == 'income' ? stockItem.sellingPrice : stockItem.purchasePrice;
       final currentRate =
-          double.tryParse(entry.rateController.text.replaceAll(',', '')) ?? 0;
+          Formatters.tryParseAmount(entry.rateController.text) ?? 0;
       if (defaultRate > 0 &&
           (!entry.rateWasManuallyEdited ||
               currentRate == entry.stockSuggestedRate)) {
@@ -1499,8 +1499,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       }
     }
 
-    double grandTotal =
-        double.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
+    final grandTotal = Formatters.tryParseAmount(_amountController.text) ?? 0;
     if (grandTotal <= 0) {
       _showSnackBar(isUrdu ? 'رقم درج کریں' : 'Please enter amount', true);
       return;
@@ -1522,15 +1521,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       for (var entry in _itemEntries) {
         final desc = entry.descriptionController.text;
         final total =
-            double.tryParse(entry.totalController.text.replaceAll(',', '')) ??
-                0;
+            Formatters.tryParseAmount(entry.totalController.text) ?? 0;
         if (total > 0 || desc.isNotEmpty) {
           items.add(TransactionItem(
             description: desc,
             quantity: _effectiveEntryQuantity(entry),
-            rate: double.tryParse(
-                    entry.rateController.text.replaceAll(',', '')) ??
-                total,
+            rate: Formatters.tryParseAmount(entry.rateController.text) ?? total,
             total: total,
             unit: entry.unit,
             stockItemId: entry.stockItemId,
@@ -1568,15 +1564,21 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         }
       }
 
+      final existingTransaction = widget.transactionToEdit;
       final transaction = Transaction(
         id: widget.transactionToEdit?.id ??
             DateTime.now().millisecondsSinceEpoch.toString(),
         accountId: _selectedAccountId ?? 'default_account',
         amount: grandTotal,
-        pendingAmount: grandTotal,
-        type: (_selectedProfessionId != null && _professionSyncType != null)
-            ? _professionSyncType!
-            : type,
+        receivedAmount: existingTransaction?.receivedAmount ?? 0,
+        pendingAmount: existingTransaction == null
+            ? grandTotal
+            : (existingTransaction.pendingAmount +
+                    grandTotal -
+                    existingTransaction.amount)
+                .clamp(0.0, double.infinity)
+                .toDouble(),
+        type: type,
         category: (_selectedProfessionId != null && _professionSyncType != null)
             ? '${_professionSyncType == 'income' ? 'INC:' : 'EXP:'}${_selectedCategory ?? 'دیگر'}'
             : (_selectedCategory ?? type),
@@ -1759,15 +1761,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   String _saveStageText(bool isUrdu) {
     switch (_saveStage) {
       case 'cloud':
-        return isUrdu ? 'سرور سے سنک کی تصدیق...' : 'Confirming cloud sync...';
+        return isUrdu ? 'کلاؤڈ سنک...' : 'Cloud sync...';
       case 'notification':
-        return isUrdu
-            ? 'پارٹی کو اطلاع دے رہے ہیں...'
-            : 'Notifying the party...';
+        return isUrdu ? 'اطلاع جا رہی ہے...' : 'Notifying...';
       default:
-        return isUrdu
-            ? 'فون میں محفوظ ہو رہا ہے...'
-            : 'Saving on this device...';
+        return isUrdu ? 'محفوظ ہو رہا ہے...' : 'Saving...';
     }
   }
 

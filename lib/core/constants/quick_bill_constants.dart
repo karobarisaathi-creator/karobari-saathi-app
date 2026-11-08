@@ -1,5 +1,6 @@
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/services/database_service.dart';
+import 'package:account_app/core/utils/quick_bill_trust_metrics.dart';
 
 /// فوری بل سسٹم کے مستقل اصول۔
 ///
@@ -8,7 +9,8 @@ import 'package:account_app/core/services/database_service.dart';
 /// اس لیے ایک مستقل، ہمیشہ ایک ہی آئی ڈی والا "نقد فروخت" اکاؤنٹ رکھا گیا ہے —
 /// اسے عام پارٹیوں کی فہرست اور گاہک کے انتخاب میں نہیں دکھایا جاتا۔
 class QuickBillConstants {
-  static const String cashCustomerAccountId = 'quick_bill_cash_customer';
+  static const String cashCustomerAccountId =
+      QuickBillTrustMetrics.cashCustomerAccountId;
   static const String cashCustomerName = 'نقد گاہک';
 
   static const String itemCategoriesSettingKey = 'quick_bill_item_categories';

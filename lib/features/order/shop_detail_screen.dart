@@ -2,7 +2,6 @@
 
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -15,10 +14,10 @@ import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/shop_model.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/app_button.dart';
-import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 import 'package:account_app/features/order/order_preview_screen.dart';
 import 'package:account_app/features/order/widgets/shop_item_card_widget.dart';
+import 'package:account_app/features/order/widgets/trust_popup_dialog.dart';
 
 class ShopDetailScreen extends StatefulWidget {
   final Shop shop;
@@ -39,29 +38,21 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   bool _isSearchVisible = false;
   bool _isLoadingItems = true;
   String? _itemsError;
-  double _communityRating = 0;
-  int _communityReviewCount = 0;
-  double? _myRating;
-  bool _isLoadingRating = true;
-  bool _isSavingRating = false;
-  String? _ratingError;
 
   final TextEditingController _searchCtrl = TextEditingController();
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _itemsSubscription;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
       _shopRatingSubscription;
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
-      _myRatingSubscription;
 
   @override
   void initState() {
     super.initState();
     _shop = widget.shop;
     _listenToPublicItems();
-    _listenToShopRating();
+    _listenToShopTrust();
   }
 
-  void _listenToShopRating() {
+  void _listenToShopTrust() {
     final shopRef =
         FirebaseFirestore.instance.collection('public_shops').doc(_shop.id);
     _shopRatingSubscription = shopRef.snapshots().listen(
@@ -69,278 +60,24 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
         final data = snapshot.data();
         if (!mounted) return;
         setState(() {
-          _communityRating =
-              (data?['communityRating'] as num?)?.toDouble() ?? 0;
-          _communityReviewCount =
-              (data?['communityReviewCount'] as num?)?.toInt() ?? 0;
-          _isLoadingRating = false;
-          _ratingError = null;
+          if (data != null) {
+            _shop = _shop.copyWith(
+              customerCount: (data['customerCount'] as num?)?.toInt() ??
+                  _shop.customerCount,
+              satisfiedCustomerPercent:
+                  (data['quickBillSatisfactionPercent'] as num?)?.toInt() ??
+                      _shop.satisfiedCustomerPercent,
+              billCount:
+                  (data['quickBillCount'] as num?)?.toInt() ?? _shop.billCount,
+              showTrust: data['showTrust'] != false,
+            );
+          }
         });
       },
       onError: (Object error) {
         if (!mounted) return;
-        setState(() {
-          _isLoadingRating = false;
-          _ratingError = error.toString();
-        });
+        debugPrint('Could not load shop trust info: $error');
       },
-    );
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || user.uid == _shop.id) return;
-    _myRatingSubscription =
-        shopRef.collection('reviews').doc(user.uid).snapshots().listen(
-      (snapshot) {
-        final rating = snapshot.data()?['rating'];
-        if (!mounted) return;
-        setState(() {
-          _myRating = rating is num ? rating.toDouble() : null;
-        });
-      },
-      onError: (Object error) {
-        if (!mounted) return;
-        debugPrint('Could not load the current user shop rating: $error');
-      },
-    );
-  }
-
-  Future<void> _showRatingDialog(bool isUrdu) async {
-    final user = FirebaseAuth.instance.currentUser;
-    final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
-    if (user == null) {
-      AppToast.warning(
-        context,
-        isUrdu
-            ? 'ریٹنگ دینے کے لیے سائن اِن کریں'
-            : 'Sign in to rate this shop',
-      );
-      return;
-    }
-    if (user.uid == _shop.id) {
-      AppToast.warning(
-        context,
-        isUrdu
-            ? 'آپ اپنی دکان کو ریٹ نہیں کر سکتے'
-            : 'You cannot rate your own shop',
-      );
-      return;
-    }
-
-    final controller = TextEditingController();
-    var selectedRating = _myRating?.round() ?? 0;
-    final result = await showDialog<Map<String, Object>>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: UrduAwareText(isUrdu ? 'دکان کو ریٹ کریں' : 'Rate this shop', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w900)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                UrduAwareText(
-                  isUrdu
-                      ? 'اپنا تجربہ بتائیں — کمیونٹی ریٹنگ'
-                      : 'Share your experience — Community rating',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontFamily: fontFamily),
-                ),
-                const SizedBox(height: 4),
-                UrduAwareText(
-                  isUrdu
-                      ? 'ایک اکاؤنٹ سے ایک ریٹنگ؛ آپ بعد میں اسے بدل سکتے ہیں'
-                      : 'One rating per account; you can update it later.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontFamily: fontFamily, fontSize: 11, color: AppTheme.textSecondary),
-                ),
-                const SizedBox(height: 12),
-                Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      5,
-                      (index) => IconButton(
-                        tooltip: '${index + 1}',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: _isSavingRating
-                            ? null
-                            : () => setDialogState(
-                                  () => selectedRating = index + 1,
-                                ),
-                        icon: Icon(
-                          index < selectedRating
-                              ? PhosphorIcons.star(PhosphorIconsStyle.fill)
-                              : PhosphorIcons.star(),
-                          color: AppTheme.verifiedGold,
-                          size: 30,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                TextField(
-                  controller: controller,
-                  maxLines: 3,
-                  maxLength: 500,
-                  decoration: InputDecoration(
-                    hintText: isUrdu ? 'تبصرہ (اختیاری)' : 'Review (optional)',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed:
-                  _isSavingRating ? null : () => Navigator.pop(dialogContext),
-              child: UrduAwareText(isUrdu ? 'واپس' : 'Cancel', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w800)),
-            ),
-            FilledButton(
-              onPressed: selectedRating == 0 || _isSavingRating
-                  ? null
-                  : () => Navigator.pop(dialogContext, {
-                        'rating': selectedRating,
-                        'comment': controller.text.trim(),
-                      }),
-              child: UrduAwareText(isUrdu ? 'جمع کریں' : 'Submit', style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w800)),
-            ),
-          ],
-        ),
-      ),
-    );
-    Future.delayed(const Duration(milliseconds: 500), () => controller.dispose());
-    if (result == null || !mounted) return;
-
-    setState(() => _isSavingRating = true);
-    try {
-      await FirebaseFirestore.instance
-          .collection('public_shops')
-          .doc(_shop.id)
-          .collection('reviews')
-          .doc(user.uid)
-          .set({
-        'userId': user.uid,
-        'rating': result['rating'],
-        'comment': result['comment'],
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      if (!mounted) return;
-      setState(() => _myRating = (result['rating'] as int).toDouble());
-      AppToast.success(
-        context,
-        isUrdu ? 'آپ کی ریٹنگ محفوظ ہوگئی' : 'Your rating was saved',
-      );
-    } catch (error) {
-      if (!mounted) return;
-      AppToast.error(
-        context,
-        isUrdu
-            ? 'ریٹنگ محفوظ نہیں ہوسکی: $error'
-            : 'Could not save your rating: $error',
-      );
-    } finally {
-      if (mounted) setState(() => _isSavingRating = false);
-    }
-  }
-
-  void _showCommunityReviews(bool isUrdu) {
-    final reviewsQuery = FirebaseFirestore.instance
-        .collection('public_shops')
-        .doc(_shop.id)
-        .collection('reviews')
-        .orderBy('updatedAt', descending: true)
-        .limit(20);
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      builder: (context) => SafeArea(
-        child: SizedBox(
-          height: MediaQuery.of(context).size.height * 0.65,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: UrduAwareText(
-                  isUrdu ? 'کمیونٹی ریویوز' : 'Community reviews',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.darkColor,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: reviewsQuery.snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Text(
-                            isUrdu
-                                ? 'ریویوز لوڈ نہیں ہوسکے: ${snapshot.error}'
-                                : 'Could not load reviews: ${snapshot.error}',
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      );
-                    }
-                    if (!snapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    final reviews = snapshot.data!.docs;
-                    if (reviews.isEmpty) {
-                      return Center(
-                        child: Text(
-                          isUrdu ? 'ابھی کوئی ریویو نہیں' : 'No reviews yet',
-                        ),
-                      );
-                    }
-                    return ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: reviews.length,
-                      separatorBuilder: (_, __) => const Divider(),
-                      itemBuilder: (context, index) {
-                        final review = reviews[index].data();
-                        final rating = (review['rating'] as num?)?.toInt() ?? 0;
-                        final comment = (review['comment'] ?? '').toString();
-                        return ListTile(
-                          leading: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                PhosphorIcons.star(PhosphorIconsStyle.fill),
-                                color: AppTheme.verifiedGold,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 4),
-                              Text('$rating'),
-                            ],
-                          ),
-                          title: Text(
-                            comment.isEmpty
-                                ? (isUrdu ? 'صرف ریٹنگ' : 'Rating only')
-                                : comment,
-                          ),
-                          subtitle: Text(
-                            isUrdu
-                                ? 'کمیونٹی ریٹنگ — تصدیق شدہ خریداری نہیں'
-                                : 'Community rating — not a verified purchase',
-                            style: const TextStyle(fontSize: 11),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -360,6 +97,14 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
               final brandVal = (data['brand'] ?? '').toString();
               final modelVal = (data['model'] ?? '').toString();
               final allowReturnVal = data['allowReturn'] == true;
+              final rawImages = data['images'];
+              List<String> imagesList = [];
+              if (rawImages is List) {
+                imagesList = rawImages
+                    .map((e) => e.toString().trim())
+                    .where((e) => e.isNotEmpty && e.length > 4)
+                    .toList();
+              }
               return ShopItem(
                 id: doc.id,
                 stockItemId: doc.id,
@@ -375,6 +120,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                 emoji: '📦',
                 category: (data['category'] ?? 'عام').toString(),
                 imageUrl: (data['imageUrl'] ?? '').toString(),
+                images: imagesList,
                 rating: (data['rating'] as num?)?.toDouble() ?? 0,
                 stock: tracksStock ? (quantity ?? 0) : 1000000000,
                 quantity: _shop.items
@@ -407,7 +153,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   void dispose() {
     _itemsSubscription?.cancel();
     _shopRatingSubscription?.cancel();
-    _myRatingSubscription?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -456,8 +201,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
           children: [
             // Single Unified Tall Dark Header
             _buildTallHeader(context),
-
-            _buildRatingSummary(isUrdu),
 
             // Expandable Search Bar below header
             if (_isSearchVisible)
@@ -610,104 +353,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildRatingSummary(bool isUrdu) {
-    final user = FirebaseAuth.instance.currentUser;
-    final canRate = user != null && user.uid != _shop.id;
-    final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
-    final ratingText = _isLoadingRating
-        ? (isUrdu ? 'لوڈ ہو رہی ہے...' : 'Loading rating...')
-        : _ratingError != null
-            ? (isUrdu ? 'ریٹنگ لوڈ نہیں ہوسکی' : 'Could not load rating')
-            : _communityReviewCount == 0
-                ? (isUrdu ? 'ابھی کوئی ریٹنگ نہیں' : 'No ratings yet')
-                : '${_communityRating.toStringAsFixed(1)} · $_communityReviewCount ${isUrdu ? 'ریٹنگز' : 'ratings'}';
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.backgroundColor),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            PhosphorIcons.star(PhosphorIconsStyle.fill),
-            color: AppTheme.verifiedGold,
-            size: 20,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                UrduAwareText(
-                  ratingText,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.darkColor,
-                    fontFamily: fontFamily,
-                  ),
-                ),
-                if (_communityReviewCount > 0)
-                  UrduAwareText(
-                    isUrdu ? 'کمیونٹی ریٹنگ' : 'Community rating',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: AppTheme.textSecondary,
-                      fontFamily: fontFamily,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          if (_communityReviewCount > 0 || canRate)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_communityReviewCount > 0)
-                  TextButton(
-                    onPressed: () => _showCommunityReviews(isUrdu),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: UrduAwareText(
-                      isUrdu ? 'ریویوز' : 'Reviews',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, fontFamily: fontFamily),
-                    ),
-                  ),
-                if (canRate) ...[
-                  if (_communityReviewCount > 0) const SizedBox(width: 4),
-                  TextButton(
-                    onPressed: _isSavingRating
-                        ? null
-                        : () => _showRatingDialog(isUrdu),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: UrduAwareText(
-                      _myRating == null
-                          ? (isUrdu ? 'ریٹ کریں' : 'Rate')
-                          : (isUrdu
-                              ? '${_myRating!.toInt()}★'
-                              : '${_myRating!.toInt()}★'),
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, fontFamily: fontFamily),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-        ],
       ),
     );
   }
@@ -939,7 +584,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                       Expanded(
                         child: ProfileInfoWidget(
                           name: shop.owner.isNotEmpty ? shop.owner : shop.name,
-                          phone: shop.area.isNotEmpty ? shop.area : shop.name,
+                          phone: '',
+                          address: shop.area,
                           profileImage: shop.profileImageUrl,
                           isLarge: true,
                           customSize: 48,
@@ -949,33 +595,47 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(7),
+                      InkWell(
+                        onTap: () => TrustPopupDialog.show(
+                          context: context,
+                          shopName: shop.name,
+                          ownerName: shop.owner,
+                          area: shop.area,
+                          customerCount: shop.customerCount,
+                          satisfiedCustomerPercent:
+                              shop.satisfiedCustomerPercent,
+                          billCount: shop.billCount,
+                          itemsCount: shop.availableItemCount,
+                          isUrdu: isUrdu,
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              PhosphorIcons.star(PhosphorIconsStyle.fill),
-                              size: 11,
-                              color: AppTheme.verifiedGold,
-                            ),
-                            const SizedBox(width: 3),
-                            UrduAwareText(
-                              _communityReviewCount == 0
-                                  ? '—'
-                                  : _communityRating.toStringAsFixed(1),
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
+                        borderRadius: BorderRadius.circular(7),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(7),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                PhosphorIcons.shieldCheck(
+                                    PhosphorIconsStyle.fill),
+                                size: 11,
+                                color: const Color(0xFF10B981),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 3),
+                              UrduAwareText(
+                                '${shop.satisfiedCustomerPercent}%',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],

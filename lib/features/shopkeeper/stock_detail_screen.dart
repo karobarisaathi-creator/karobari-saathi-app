@@ -9,6 +9,7 @@ import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/models/stock_movement_model.dart';
 import 'package:account_app/core/services/stock_service.dart';
+import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
@@ -100,6 +101,7 @@ class StockDetailScreen extends StatelessWidget {
 
             // ═══ 5. Movement History ═══
             _buildHistorySection(
+              context,
               itemMovements,
               isUrdu,
               fontFamily,
@@ -594,7 +596,7 @@ class StockDetailScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: AppButton(
-                  text: isUrdu ? 'سامان خریدا (+)' : 'Stock In (+)',
+                  text: isUrdu ? 'سامان خریدا' : 'Stock In',
                   icon: PhosphorIcons.plusCircle(),
                   color: AppTheme.incomeColor,
                   size: AppButtonSize.large,
@@ -616,7 +618,7 @@ class StockDetailScreen extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: AppButton(
-                  text: isUrdu ? 'سامان بیچا (−)' : 'Stock Out (−)',
+                  text: isUrdu ? 'سامان بیچا' : 'Stock Out',
                   icon: PhosphorIcons.minusCircle(),
                   color: AppTheme.expenseColor,
                   size: AppButtonSize.large,
@@ -1011,6 +1013,7 @@ class StockDetailScreen extends StatelessWidget {
   // 5. HISTORY SECTION
   // ═════════════════════════════════════════════
   Widget _buildHistorySection(
+    BuildContext context,
     List<StockMovement> movements,
     bool isUrdu,
     String? fontFamily,
@@ -1110,13 +1113,14 @@ class StockDetailScreen extends StatelessWidget {
           )
         else
           ...movements.map(
-            (m) => _buildMovementItem(m, isUrdu, fontFamily),
+            (m) => _buildMovementItem(context, m, isUrdu, fontFamily),
           ),
       ],
     );
   }
 
   Widget _buildMovementItem(
+    BuildContext context,
     StockMovement movement,
     bool isUrdu,
     String? fontFamily,
@@ -1172,9 +1176,68 @@ class StockDetailScreen extends StatelessWidget {
         break;
     }
 
-    final formattedDate =
-        DateFormat('dd MMM, hh:mm a').format(movement.timestamp);
+    final db = Provider.of<DatabaseService>(context, listen: false);
+    final linkedTx = movement.transactionId.isNotEmpty
+        ? db.getTransaction(movement.transactionId)
+        : null;
+
+    final rawRef = linkedTx?.referenceNumber?.trim() ?? '';
+    final fullBillRef = rawRef.isNotEmpty
+        ? (rawRef.toUpperCase().startsWith('QB-')
+            ? rawRef.toUpperCase()
+            : 'QB-$rawRef')
+        : null;
+    final billNo = fullBillRef != null
+        ? (isUrdu
+            ? 'بل #\u2066$fullBillRef\u2069'
+            : 'Bill #$fullBillRef')
+        : null;
+
+    final dateStr = DateFormat('dd MMM', isUrdu ? 'ur' : 'en').format(movement.timestamp);
+    final timeStr = DateFormat('h:mm a', isUrdu ? 'ur' : 'en').format(movement.timestamp);
+    final isolatedTime = '\u2066$timeStr\u2069';
+
     final qtyAbs = movement.quantity.abs();
+
+    String cleanNote = movement.note.trim();
+    if (cleanNote.startsWith('Transaction ') ||
+        cleanNote == movement.transactionId ||
+        cleanNote.startsWith('mov_') ||
+        cleanNote.startsWith('tx_')) {
+      cleanNote = '';
+    }
+    if (billNo != null &&
+        (cleanNote.startsWith('Bill #') || cleanNote.startsWith('بل #'))) {
+      cleanNote = '';
+    }
+
+    String cleanReason = movement.reason.trim();
+    if (cleanReason == 'Transaction sale' ||
+        cleanReason == 'Transaction purchase' ||
+        cleanReason == 'Purchase' ||
+        cleanReason == 'Sale' ||
+        cleanReason == 'خریداری' ||
+        cleanReason == 'فروخت') {
+      cleanReason = '';
+    }
+
+    final metaParts = <String>[
+      if (movement.partyName.isNotEmpty)
+        isUrdu ? 'پارٹی: ${movement.partyName}' : 'Party: ${movement.partyName}',
+      if (billNo != null) billNo,
+      isolatedTime,
+    ];
+
+    final detailTextList = <String>[];
+    if (cleanReason.isNotEmpty) {
+      detailTextList.add(cleanReason);
+    }
+    if (cleanNote.isNotEmpty) {
+      if (!detailTextList.contains(cleanNote)) {
+        detailTextList.add(cleanNote);
+      }
+    }
+    final detailText = detailTextList.join(' • ');
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -1188,6 +1251,7 @@ class StockDetailScreen extends StatelessWidget {
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Icon
           Container(
@@ -1206,27 +1270,37 @@ class StockDetailScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                UrduAwareText(
-                  typeLabel,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.darkColor,
-                    fontFamily: fontFamily,
-                    letterSpacing: -0.1,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Expanded(
+                      child: UrduAwareText(
+                        typeLabel,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.darkColor,
+                          fontFamily: fontFamily,
+                          letterSpacing: -0.1,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    UrduAwareText(
+                      dateStr,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondary,
+                        fontFamily: fontFamily,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 3),
                 UrduAwareText(
-                  [
-                    if (movement.partyName.isNotEmpty)
-                      isUrdu
-                          ? 'پارٹی: ${movement.partyName}'
-                          : 'Party: ${movement.partyName}',
-                    movement.note.isNotEmpty ? movement.note : formattedDate,
-                  ].join(' • '),
+                  metaParts.join(' • '),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
@@ -1236,6 +1310,20 @@ class StockDetailScreen extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (detailText.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  UrduAwareText(
+                    detailText,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.themeColor,
+                      fontFamily: fontFamily,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ],
             ),
           ),

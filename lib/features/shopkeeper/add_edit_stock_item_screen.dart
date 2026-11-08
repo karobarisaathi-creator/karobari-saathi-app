@@ -3,6 +3,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -49,6 +50,7 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
   String _selectedUnit = 'Pieces';
   String _selectedCategory = 'General';
   String? _imagePath;
+  List<String> _imagePaths = [];
   bool _isSaving = false;
 
   // ٹوگلز
@@ -132,7 +134,8 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
     _warrantyController = _createTextController(
       item != null && item.warranty > 0 ? item.warranty.toString() : '',
     );
-    _imagePath = item?.imagePath;
+    _imagePaths = item != null ? [...item.allImages] : [];
+    _imagePath = _imagePaths.isNotEmpty ? _imagePaths.first : item?.imagePath;
     _featured = item?.featured ?? false;
     _trackStock = item?.trackStock ?? true;
     _allowReturn = item?.allowReturn ?? true;
@@ -183,20 +186,26 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
     var imageUploadFailed = false;
 
     try {
-      var imagePath = _imagePath;
-      final imageUri = imagePath == null ? null : Uri.tryParse(imagePath);
-      if (imagePath != null &&
-          (imageUri == null ||
-              (imageUri.scheme != 'https' && imageUri.scheme != 'http'))) {
-        try {
-          imagePath =
-              await stockService.uploadStockImage(File(imagePath), itemId);
-        } catch (error) {
-          debugPrint('Optional stock image upload failed: $error');
-          imageUploadFailed = true;
-          imagePath = widget.initialItem?.imagePath;
+      final finalUrls = <String>[];
+      for (int i = 0; i < _imagePaths.length; i++) {
+        final currentPath = _imagePaths[i];
+        final uri = Uri.tryParse(currentPath);
+        if (uri != null && (uri.scheme == 'https' || uri.scheme == 'http')) {
+          finalUrls.add(currentPath);
+        } else {
+          try {
+            final uploadedUrl = await stockService.uploadStockImage(
+                File(currentPath), '${itemId}_$i');
+            finalUrls.add(uploadedUrl);
+          } catch (error) {
+            debugPrint('Stock image $i upload failed: $error');
+            imageUploadFailed = true;
+          }
         }
       }
+      final mainImage = finalUrls.isNotEmpty
+          ? finalUrls.first
+          : (widget.initialItem?.imagePath);
 
       final item = StockItem(
         id: itemId,
@@ -224,7 +233,8 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
         allowReturn: _allowReturn,
         stopWhenOut: _stopWhenOut,
         isArchived: widget.initialItem?.isArchived ?? false,
-        imagePath: imagePath,
+        imagePath: mainImage,
+        images: finalUrls,
         createdAt: widget.initialItem?.createdAt ?? now,
         updatedAt: now,
       );
@@ -898,76 +908,198 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
   // ═══════════════════════════════════════════
   Widget _buildImageRow(bool isUrdu, String fontFamily, {bool isLast = false}) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: AppTheme.themeColor.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(PhosphorIcons.camera(),
-                    size: 16, color: AppTheme.themeColor),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    UrduAwareText(
-                      _imagePath != null
-                          ? (isUrdu ? 'تصویر تبدیل کریں' : 'Change Image')
-                          : (isUrdu ? 'تصویر اپلوڈ کریں' : 'Upload Image'),
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.darkColor,
-                        fontFamily: fontFamily,
-                      ),
+              Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: AppTheme.themeColor.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    const SizedBox(height: 2),
-                    UrduAwareText(
-                      isUrdu ? 'آئٹم کی واضح تصویر' : 'Clear picture of item',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: Colors.grey[500],
-                        fontFamily: fontFamily,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  _pickImage(isUrdu);
-                },
-                child: Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _imagePath != null
-                          ? AppTheme.themeColor
-                          : Colors.grey[300]!,
-                      width: 2,
+                    child: Icon(PhosphorIcons.camera(),
+                        size: 16, color: AppTheme.themeColor),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        UrduAwareText(
+                          isUrdu ? 'آئٹم کی تصاویر' : 'Item Pictures',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.darkColor,
+                            fontFamily: fontFamily,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        UrduAwareText(
+                          isUrdu
+                              ? 'ایک سے زیادہ تصاویر ڈالیں (زیادہ سے زیادہ 5)'
+                              : 'Select multiple pictures (up to 5)',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: Colors.grey[500],
+                            fontFamily: fontFamily,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: _imagePath != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: _imagePath!.startsWith('http')
-                              ? Image.network(_imagePath!, fit: BoxFit.cover)
-                              : Image.file(File(_imagePath!),
-                                  fit: BoxFit.cover),
-                        )
-                      : Icon(PhosphorIcons.camera(),
-                          size: 22, color: Colors.grey[400]),
+                  if (_imagePaths.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppTheme.themeColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${_imagePaths.length}/5',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.themeColor,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Thumbnail list + Add Button
+              SizedBox(
+                height: 72,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    ..._imagePaths.asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final path = entry.value;
+                      return Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        width: 72,
+                        height: 72,
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: path.startsWith('http')
+                                  ? CachedNetworkImage(
+                                      imageUrl: path,
+                                      width: 72,
+                                      height: 72,
+                                      fit: BoxFit.cover,
+                                      placeholder: (_, __) => Container(
+                                        color: Colors.grey[200],
+                                      ),
+                                    )
+                                  : Image.file(
+                                      File(path),
+                                      width: 72,
+                                      height: 72,
+                                      fit: BoxFit.cover,
+                                    ),
+                            ),
+                            // Delete button
+                            Positioned(
+                              top: 3,
+                              right: 3,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _imagePaths.removeAt(idx);
+                                    _imagePath = _imagePaths.isNotEmpty
+                                        ? _imagePaths.first
+                                        : null;
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xB3000000),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Primary badge on 1st image
+                            if (idx == 0)
+                              Positioned(
+                                bottom: 3,
+                                left: 3,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 4, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.themeColor,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    isUrdu ? 'اصل' : 'Main',
+                                    style: const TextStyle(
+                                      fontSize: 8,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    }),
+
+                    // Add image button if < 5
+                    if (_imagePaths.length < 5)
+                      GestureDetector(
+                        onTap: () => _showImageSourcePicker(isUrdu, fontFamily),
+                        child: Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppTheme.themeColor.withValues(alpha: 0.5),
+                              width: 1.5,
+                              style: BorderStyle.solid,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(PhosphorIcons.cameraPlus(),
+                                  size: 22, color: AppTheme.themeColor),
+                              const SizedBox(height: 3),
+                              Text(
+                                isUrdu ? 'شامل کریں' : 'Add',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.themeColor,
+                                  fontFamily: fontFamily,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
@@ -980,14 +1112,82 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
     );
   }
 
-  Future<void> _pickImage(bool isUrdu) async {
+  void _showImageSourcePicker(bool isUrdu, String fontFamily) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(PhosphorIcons.images(), color: AppTheme.themeColor),
+                title: UrduAwareText(
+                  isUrdu ? 'گیلری سے منتخب کریں (ایک یا زیادہ)' : 'Choose from Gallery (One or more)',
+                  style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickMultipleImages();
+                },
+              ),
+              ListTile(
+                leading: Icon(PhosphorIcons.camera(), color: AppTheme.themeColor),
+                title: UrduAwareText(
+                  isUrdu ? 'کیمرے سے تصویر لیں' : 'Take a Photo',
+                  style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickCameraImage();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickMultipleImages() async {
+    try {
+      final picker = ImagePicker();
+      final images = await picker.pickMultiImage(
+        imageQuality: 80,
+        limit: 5 - _imagePaths.length,
+      );
+      if (images.isNotEmpty && mounted) {
+        setState(() {
+          for (final img in images) {
+            if (_imagePaths.length < 5 && !_imagePaths.contains(img.path)) {
+              _imagePaths.add(img.path);
+            }
+          }
+          _imagePath = _imagePaths.isNotEmpty ? _imagePaths.first : null;
+        });
+      }
+    } catch (e) {
+      if (mounted) AppToast.error(context, 'Error: $e');
+    }
+  }
+
+  Future<void> _pickCameraImage() async {
     try {
       final image = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
+        source: ImageSource.camera,
         imageQuality: 80,
       );
       if (image != null && mounted) {
-        setState(() => _imagePath = image.path);
+        setState(() {
+          if (_imagePaths.length < 5 && !_imagePaths.contains(image.path)) {
+            _imagePaths.add(image.path);
+          }
+          _imagePath = _imagePaths.isNotEmpty ? _imagePaths.first : null;
+        });
       }
     } catch (e) {
       if (mounted) AppToast.error(context, 'Error: $e');

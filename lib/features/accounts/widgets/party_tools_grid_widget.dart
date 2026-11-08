@@ -5,11 +5,10 @@ import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'dart:ui' as ui;
 import 'package:account_app/core/models/account_model.dart';
-import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/pdf_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/utils/account_balance_utils.dart';
+import 'package:account_app/core/utils/quick_bill_trust_metrics.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/features/accounts/add_party_screen.dart';
 import 'package:account_app/features/accounts/bulk_party_transaction_screen.dart';
@@ -49,7 +48,8 @@ class PartyToolsGridWidget extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(PhosphorIcons.gridFour(), size: 14, color: AppTheme.themeColor),
+              Icon(PhosphorIcons.gridFour(),
+                  size: 14, color: AppTheme.themeColor),
               const SizedBox(width: 6),
               UrduAwareText(
                 isUrdu ? 'پارٹی ٹولز اور مینو' : 'Party Tools & Menu',
@@ -89,8 +89,10 @@ class PartyToolsGridWidget extends StatelessWidget {
                 label: isUrdu ? 'PDF رپورٹ' : 'PDF Report',
                 iconColor: AppTheme.incomeColor,
                 onTap: () async {
-                  final pdfService = Provider.of<PdfService>(context, listen: false);
-                  final db = Provider.of<DatabaseService>(context, listen: false);
+                  final pdfService =
+                      Provider.of<PdfService>(context, listen: false);
+                  final db =
+                      Provider.of<DatabaseService>(context, listen: false);
                   final txs = db
                       .getAllTransactions()
                       .where((t) => t.accountId == party.id)
@@ -230,38 +232,92 @@ class PartyToolsGridWidget extends StatelessWidget {
   }
 
   Future<void> _confirmDelete(BuildContext context) async {
+    final db = Provider.of<DatabaseService>(context, listen: false);
+    final transactions =
+        db.getAllTransactions().where((t) => t.accountId == party.id).toList();
+    final hasData = transactions.isNotEmpty || party.balance != 0;
+
+    final nameController = TextEditingController();
+    bool canDelete = !hasData;
+
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: UrduAwareText(
-          isUrdu ? 'پارٹی ختم کریں؟' : 'Delete Party?',
-          style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
-        ),
-        content: UrduAwareText(
-          isUrdu
-              ? 'کیا آپ واقعی اس پارٹی کو ختم کرنا چاہتے ہیں؟ تمام ریکارڈ مٹ جائے گا۔'
-              : 'Are you sure you want to delete this party? All records will be lost.',
-          style: TextStyle(fontFamily: fontFamily),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: UrduAwareText(
-              isUrdu ? 'منسوخ' : 'Cancel',
-              style: TextStyle(
-                  color: AppTheme.textSecondary, fontFamily: fontFamily),
-            ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: UrduAwareText(
+            isUrdu ? 'پارٹی کو مستقل ختم کریں؟' : 'Permanently Delete Party?',
+            style: TextStyle(
+                fontFamily: fontFamily,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.expenseColor),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: UrduAwareText(
-              isUrdu ? 'ختم کریں' : 'Delete',
-              style: TextStyle(
-                  color: AppTheme.expenseColor, fontFamily: fontFamily),
-            ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              UrduAwareText(
+                isUrdu
+                    ? 'وارننگ: اس پارٹی کا ${transactions.length} لین دین اور بیلنس موجود ہے۔ ختم کرنے سے تمام ڈیٹا ہمیشہ کے لیے مٹ جائے گا۔'
+                    : 'Warning: This party has ${transactions.length} transactions and balance. Deletion is irreversible.',
+                style: TextStyle(
+                    fontFamily: fontFamily,
+                    fontSize: 13,
+                    color: Colors.red.shade700),
+              ),
+              if (hasData) ...[
+                const SizedBox(height: 14),
+                UrduAwareText(
+                  isUrdu
+                      ? 'تصدیق کے لیے پارٹی کا نام "${party.name}" درج کریں:'
+                      : 'Type party name "${party.name}" to confirm:',
+                  style: TextStyle(
+                      fontFamily: fontFamily,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    hintText: party.name,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  onChanged: (val) {
+                    setState(() {
+                      canDelete = val.trim() == party.name.trim();
+                    });
+                  },
+                ),
+              ],
+            ],
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: UrduAwareText(
+                isUrdu ? 'منسوخ' : 'Cancel',
+                style: TextStyle(
+                    color: AppTheme.textSecondary, fontFamily: fontFamily),
+              ),
+            ),
+            TextButton(
+              onPressed: canDelete ? () => Navigator.pop(context, true) : null,
+              child: UrduAwareText(
+                isUrdu ? 'ختم کریں' : 'Delete',
+                style: TextStyle(
+                  color: canDelete ? AppTheme.expenseColor : Colors.grey,
+                  fontFamily: fontFamily,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
 
@@ -291,66 +347,30 @@ class _PersonalReviewCard extends StatelessWidget {
         .getAllTransactions()
         .where((t) => t.accountId == party.id && t.partnershipId == null)
         .toList();
-
-    double totalIn = 0, totalOut = 0;
-    int totalDeals = allTx.length;
-    DateTime? firstDeal;
-
-    for (var tx in allTx) {
-      if (tx.isQuickBill) {
-        final subtotal = tx.subtotal > 0 ? tx.subtotal : tx.amount;
-        final billTotal =
-            (subtotal - tx.discountAmount).clamp(0, double.infinity).toDouble();
-        if (tx.type == 'income') {
-          totalIn += billTotal;
-        } else {
-          totalOut += billTotal;
-        }
-      } else if (tx.type == 'income') {
-        totalIn += tx.amount;
-      } else {
-        totalOut += tx.amount;
-      }
-      if (firstDeal == null || tx.date.isBefore(firstDeal)) {
-        firstDeal = tx.date;
-      }
-    }
-
-    final totalVolume = totalIn + totalOut;
-    final openingBalance = party.balanceType.toLowerCase() == 'payable'
-        ? -party.initialBalance
-        : party.initialBalance;
-    final currentBalance = AccountBalanceUtils.ledgerBalance(
-      allTx,
-      initialBalance: openingBalance,
+    final oneYearAgo = DateTime.now().subtract(const Duration(days: 365));
+    final recentBills = allTx
+        .where((transaction) =>
+            transaction.isQuickBill &&
+            transaction.type == 'income' &&
+            !transaction.date.isBefore(oneYearAgo))
+        .toList();
+    final totalBilled = recentBills.fold<double>(
+      0,
+      (total, bill) => total + QuickBillTrustMetrics.billTotal(bill),
     );
-
-    double score = 0;
-    final days = DateTime.now().difference(firstDeal ?? DateTime.now()).inDays;
-    if (days > 180) {
-      score += 1.0;
-    } else if (days > 30) {
-      score += 0.5;
-    }
-    if (totalDeals > 25) {
-      score += 1.0;
-    } else if (totalDeals > 10) {
-      score += 0.5;
-    }
-    if (totalVolume > 100000) {
-      score += 1.0;
-    } else if (totalVolume > 20000) {
-      score += 0.5;
-    }
-    if (totalVolume > 0) {
-      final ratio = 1 - (currentBalance.abs() / totalVolume);
-      if (ratio > 0.9) {
-        score += 1.0;
-      } else if (ratio > 0.7) {
-        score += 0.5;
-      }
-    }
-    final trustScore = score.clamp(1.0, 5.0);
+    final totalReceived = recentBills.fold<double>(
+      0,
+      (total, bill) => total + QuickBillTrustMetrics.amountReceived(bill),
+    );
+    final outstanding = recentBills.fold<double>(
+      0,
+      (total, bill) => total + QuickBillTrustMetrics.outstandingAmount(bill),
+    );
+    final fullyPaidCount =
+        recentBills.where(QuickBillTrustMetrics.isFullyPaid).length;
+    final paymentRatio = totalBilled <= 0
+        ? null
+        : (totalReceived / totalBilled).clamp(0, 1).toDouble();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,41 +413,50 @@ class _PersonalReviewCard extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        Row(
-          children: [
-            _stars(trustScore, 18),
-            const SizedBox(width: 8),
-            UrduAwareText(
-              isUrdu ? 'آخری 12 مہینے' : 'Last 12 months',
-              style: TextStyle(
-                fontFamily: fontFamily,
-                fontSize: 11.5,
-                color: AppTheme.textSecondary,
+        if (paymentRatio != null)
+          Row(
+            children: [
+              _stars(paymentRatio * 5, 18),
+              const SizedBox(width: 8),
+              UrduAwareText(
+                '${(paymentRatio * 100).round()}% ${isUrdu ? 'وصول' : 'collected'}',
+                style: TextStyle(
+                  fontFamily: fontFamily,
+                  fontSize: 11.5,
+                  color: AppTheme.textSecondary,
+                ),
               ),
+            ],
+          )
+        else
+          UrduAwareText(
+            isUrdu
+                ? 'گزشتہ 12 ماہ میں کوئی فوری بل نہیں'
+                : 'No Quick Bills in the last 12 months',
+            style: TextStyle(
+              fontFamily: fontFamily,
+              fontSize: 11.5,
+              color: AppTheme.textSecondary,
             ),
-          ],
-        ),
+          ),
         const SizedBox(height: 12),
         _reviewRow(
-          isUrdu ? 'ادائیگی کی رفتار' : 'Payment speed',
-          isUrdu ? 'اوسط 12 دن دیر' : 'Avg 12 days late',
-          3,
+          isUrdu ? 'پورے ادا شدہ بل' : 'Bills paid in full',
+          '${isUrdu ? _urduNumber(fullyPaidCount) : fullyPaidCount}/${isUrdu ? _urduNumber(recentBills.length) : recentBills.length}',
         ),
         _reviewRow(
-          isUrdu ? 'بقایا رقم' : 'Outstanding',
-          isUrdu ? '16% باقی' : '16% remaining',
-          2,
+          isUrdu ? 'کل بل' : 'Total billed',
+          '${isUrdu ? 'روپے' : 'Rs'} ${totalBilled.toStringAsFixed(0)}',
         ),
         _reviewRow(
-          isUrdu ? 'باقاعدگی' : 'Regularity',
-          isUrdu ? 'ہر 8.8 دن' : 'Every 8.8 days',
-          4,
+          isUrdu ? 'بلوں میں بقایا' : 'Outstanding on bills',
+          '${isUrdu ? 'روپے' : 'Rs'} ${outstanding.toStringAsFixed(0)}',
         ),
         const SizedBox(height: 10),
         UrduAwareText(
           isUrdu
-              ? 'یہ آپ کے اپنے حساب پر اندازہ ہے۔ پارٹی کو نہیں دکھتا۔'
-              : 'Your private estimate. Not visible to the party.',
+              ? 'یہ اعداد آپ کے فوری بلوں سے ہیں؛ پارٹی کو نہیں دکھتے۔'
+              : 'Based on your Quick Bills; not visible to the party.',
           style: TextStyle(
             fontFamily: fontFamily,
             fontSize: 10.5,
@@ -438,7 +467,20 @@ class _PersonalReviewCard extends StatelessWidget {
     );
   }
 
-  Widget _reviewRow(String title, String sub, int stars) {
+  String _urduNumber(int value) => value
+      .toString()
+      .replaceAll('0', '۰')
+      .replaceAll('1', '۱')
+      .replaceAll('2', '۲')
+      .replaceAll('3', '۳')
+      .replaceAll('4', '۴')
+      .replaceAll('5', '۵')
+      .replaceAll('6', '۶')
+      .replaceAll('7', '۷')
+      .replaceAll('8', '۸')
+      .replaceAll('9', '۹');
+
+  Widget _reviewRow(String title, String sub) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -467,7 +509,6 @@ class _PersonalReviewCard extends StatelessWidget {
               ],
             ),
           ),
-          _stars(stars.toDouble(), 14),
         ],
       ),
     );

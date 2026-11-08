@@ -64,6 +64,10 @@ class _AppButtonState extends State<AppButton> {
 
     if (widget.isLoading && !oldWidget.isLoading) {
       _startTextCycle();
+    } else if (widget.isLoading &&
+        (widget.loadingText != oldWidget.loadingText ||
+            widget.loadingTexts != oldWidget.loadingTexts)) {
+      _startTextCycle();
     } else if (!widget.isLoading && oldWidget.isLoading) {
       _stopTextCycle();
     } else if (!widget.isLoading && widget.text != oldWidget.text) {
@@ -84,7 +88,7 @@ class _AppButtonState extends State<AppButton> {
 
     if (!mounted) return;
     setState(() {
-      _previousText = widget.text ?? '';
+      _previousText = '';
       _currentText = texts[0];
       _textKey = UniqueKey();
     });
@@ -132,11 +136,18 @@ class _AppButtonState extends State<AppButton> {
     if (widget.loadingText != null && widget.loadingText!.isNotEmpty) {
       return [widget.loadingText!];
     }
-    if (widget.text != null && widget.text!.isNotEmpty) {
-      return [widget.text!];
-    }
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-    return [isUrdu ? 'انتظار کریں...' : 'Please wait...'];
+    if (isUrdu) {
+      return [
+        'محفوظ ہو رہا ہے...',
+        'عمل جاری ہے...',
+      ];
+    } else {
+      return [
+        'Saving data...',
+        'Processing...',
+      ];
+    }
   }
 
   @override
@@ -160,8 +171,8 @@ class _AppButtonState extends State<AppButton> {
     if (widget.size == AppButtonSize.large) {
       height = 46.0;
       borderRadius = 12.0;
-      fontSize = 15.0;
-      horizontalPadding = 24.0;
+      fontSize = 14.5;
+      horizontalPadding = 12.0;
     } else if (widget.size == AppButtonSize.small) {
       height = 32.0;
       borderRadius = 16.0;
@@ -320,7 +331,12 @@ class _AnimatedButtonTextState extends State<_AnimatedButtonText>
       CurvedAnimation(parent: _controller, curve: Curves.easeIn),
     );
 
-    _controller.forward();
+    // Initial load when screen opens -> Keep text completely static & still!
+    if (widget.previousText.isNotEmpty && widget.previousText != widget.text) {
+      _controller.forward();
+    } else {
+      _controller.value = 1.0;
+    }
   }
 
   @override
@@ -342,7 +358,6 @@ class _AnimatedButtonTextState extends State<_AnimatedButtonText>
   Widget build(BuildContext context) {
     final isChanging = _controller.isAnimating || _controller.value < 1.0;
 
-    Task:
     return ClipRect(
       child: SizedBox(
         height: widget.fontSize * 1.4,
@@ -357,14 +372,16 @@ class _AnimatedButtonTextState extends State<_AnimatedButtonText>
                 ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn)),
                 child: FadeTransition(
                   opacity: _fadeOut,
-                  child: UrduAwareText(
-                    widget.previousText,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: widget.fontSize,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: widget.fontFamily,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: UrduAwareText(
+                      widget.previousText,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: widget.fontSize,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: widget.fontFamily,
+                      ),
                     ),
                   ),
                 ),
@@ -373,14 +390,16 @@ class _AnimatedButtonTextState extends State<_AnimatedButtonText>
               position: _slideIn,
               child: FadeTransition(
                 opacity: _fadeIn,
-                child: UrduAwareText(
-                  widget.text,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: widget.fontSize,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: widget.fontFamily,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: UrduAwareText(
+                    widget.text,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: widget.fontSize,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: widget.fontFamily,
+                    ),
                   ),
                 ),
               ),

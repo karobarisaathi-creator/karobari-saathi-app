@@ -67,6 +67,7 @@ class _AddProjectTransactionScreenState
   DateTime _selectedDate = DateTime.now();
   List<String> _allItemNames = [];
   bool _isLoading = false;
+  String? _activeActionType;
 
   List<File> _billImages = [];
 
@@ -242,12 +243,9 @@ class _AddProjectTransactionScreenState
             ? (isUrdu ? 'ترمیم' : 'Edit')
             : (isUrdu ? 'نیا لین دین' : 'New Transaction'),
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.themeColor))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-              child: Column(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+        child: Column(
                 children: [
                   // 1. Basic Info
                   _buildSectionCard(
@@ -337,22 +335,30 @@ class _AddProjectTransactionScreenState
                       Expanded(
                         child: AppButton(
                           text: isUrdu ? 'آمدن' : 'Income',
+                          isLoading: _isLoading && _activeActionType == 'income',
+                          loadingText: (_isLoading && _activeActionType == 'income')
+                              ? (isUrdu ? 'محفوظ ہو رہا ہے...' : 'Saving...')
+                              : null,
                           icon: PhosphorIcons.arrowDownLeft(
                               PhosphorIconsStyle.bold),
                           color: AppTheme.incomeColor,
                           size: AppButtonSize.large,
-                          onPressed: () => _saveTransaction('income'),
+                          onPressed: _isLoading ? null : () => _saveTransaction('income'),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: AppButton(
                           text: isUrdu ? 'خرچ' : 'Expense',
-                          icon: PhosphorIcons.arrowUpLeft(
+                          isLoading: _isLoading && _activeActionType == 'expense',
+                          loadingText: (_isLoading && _activeActionType == 'expense')
+                              ? (isUrdu ? 'محفوظ ہو رہا ہے...' : 'Saving...')
+                              : null,
+                          icon: PhosphorIcons.arrowUpRight(
                               PhosphorIconsStyle.bold),
                           color: AppTheme.expenseColor,
                           size: AppButtonSize.large,
-                          onPressed: () => _saveTransaction('expense'),
+                          onPressed: _isLoading ? null : () => _saveTransaction('expense'),
                         ),
                       ),
                     ],
@@ -749,7 +755,10 @@ class _AddProjectTransactionScreenState
     double grandTotal = double.tryParse(_amountController.text) ?? 0;
     if (grandTotal <= 0) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _activeActionType = type;
+    });
     try {
       final db = Provider.of<DatabaseService>(context, listen: false);
 

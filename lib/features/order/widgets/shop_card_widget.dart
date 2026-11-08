@@ -9,6 +9,7 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/location_chip_widget.dart';
 import 'package:account_app/core/models/shop_model.dart';
+import 'package:account_app/features/order/widgets/trust_popup_dialog.dart';
 
 class ShopCardWidget extends StatelessWidget {
   final Shop shop;
@@ -134,8 +135,11 @@ class ShopCardWidget extends StatelessWidget {
                               Expanded(
                                 child: UrduAwareText(
                                   shop.name,
-                                  textAlign: isUrdu ? TextAlign.right : TextAlign.left,
-                                  textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
+                                  textAlign:
+                                      isUrdu ? TextAlign.right : TextAlign.left,
+                                  textDirection: isUrdu
+                                      ? TextDirection.rtl
+                                      : TextDirection.ltr,
                                   style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w900,
@@ -146,34 +150,53 @@ class ShopCardWidget extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              if (shop.showRating && shop.reviews > 0) ...[
+                              if (shop.showTrust) ...[
                                 const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                      color: const Color(0xFFFFF7E6),
-                                      borderRadius: BorderRadius.circular(6)),
-                                  child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                            PhosphorIcons.star(
-                                                PhosphorIconsStyle.fill),
-                                            size: 10,
-                                            color: AppTheme.verifiedGold),
-                                        const SizedBox(width: 3),
-                                        UrduAwareText('${shop.rating}',
-                                            style: const TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w900,
-                                                color: Color(0xFFB45309))),
-                                      ]),
+                                InkWell(
+                                  onTap: () => TrustPopupDialog.show(
+                                    context: context,
+                                    shopName: shop.name,
+                                    ownerName: shop.owner,
+                                    area: shop.area,
+                                    customerCount: shop.customerCount,
+                                    satisfiedCustomerPercent:
+                                        shop.satisfiedCustomerPercent,
+                                    billCount: shop.billCount,
+                                    itemsCount: shop.availableItemCount,
+                                    isUrdu: isUrdu,
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                        color: const Color(0xFFECFDF5),
+                                        borderRadius: BorderRadius.circular(6)),
+                                    child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                              PhosphorIcons.shieldCheck(
+                                                  PhosphorIconsStyle.fill),
+                                              size: 11,
+                                              color: const Color(0xFF059669)),
+                                          const SizedBox(width: 3),
+                                          UrduAwareText(
+                                              '${shop.satisfiedCustomerPercent}%',
+                                              style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w900,
+                                                  color:
+                                                      const Color(0xFF047857),
+                                                  fontFamily: fontFamily)),
+                                        ]),
+                                  ),
                                 ),
                               ],
                             ],
                           ),
-                          if (shop.area.isNotEmpty || shop.latitude != null) ...[
+                          if (shop.area.isNotEmpty ||
+                              shop.latitude != null) ...[
                             const SizedBox(height: 4),
                             LocationChipWidget(
                               latitude: shop.latitude,
@@ -229,22 +252,27 @@ class ShopCardWidget extends StatelessWidget {
                             Wrap(
                               spacing: 4,
                               runSpacing: 4,
-                              children: shop.tags.map((tag) => Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.themeColor.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: UrduAwareText(
-                                  tag,
-                                  style: TextStyle(
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.themeColor,
-                                    fontFamily: fontFamily,
-                                  ),
-                                ),
-                              )).toList(),
+                              children: shop.tags
+                                  .map((tag) => Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.themeColor
+                                              .withValues(alpha: 0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: UrduAwareText(
+                                          tag,
+                                          style: TextStyle(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppTheme.themeColor,
+                                            fontFamily: fontFamily,
+                                          ),
+                                        ),
+                                      ))
+                                  .toList(),
                             ),
                           ],
                         ],
@@ -289,8 +317,11 @@ class ShopCardWidget extends StatelessWidget {
                             Expanded(
                               child: UrduAwareText(
                                 shop.owner,
-                                textAlign: isUrdu ? TextAlign.right : TextAlign.left,
-                                textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
+                                textAlign:
+                                    isUrdu ? TextAlign.right : TextAlign.left,
+                                textDirection: isUrdu
+                                    ? TextDirection.rtl
+                                    : TextDirection.ltr,
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,
@@ -303,7 +334,6 @@ class ShopCardWidget extends StatelessWidget {
                             )
                           else
                             const Spacer(),
-
                           if (shop.showItemsCount) ...[
                             if (shop.showOwnerName && shop.owner.isNotEmpty)
                               const SizedBox(width: 6),

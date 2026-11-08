@@ -263,8 +263,10 @@ class ShopOrderService {
       distance: (shopData['distance'] ?? '').toString(),
       distanceVal:
           (shopData['distanceVal'] as num?)?.toDouble() ?? double.infinity,
-      rating: (shopData['rating'] as num?)?.toDouble() ?? 0,
-      reviews: (shopData['reviews'] as num?)?.toInt() ?? 0,
+      customerCount: (shopData['customerCount'] as num?)?.toInt() ?? 0,
+      satisfiedCustomerPercent:
+          (shopData['quickBillSatisfactionPercent'] as num?)?.toInt() ?? 0,
+      billCount: (shopData['quickBillCount'] as num?)?.toInt() ?? 0,
       deliveryTime: (shopData['deliveryTime'] ?? '').toString(),
       timeVal: (shopData['timeVal'] as num?)?.toInt() ?? 0,
       minOrder: (shopData['minOrder'] ?? '').toString(),

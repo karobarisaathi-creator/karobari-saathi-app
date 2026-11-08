@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:account_app/core/models/shop_model.dart';
 import 'package:account_app/core/services/language_service.dart';
@@ -11,6 +12,7 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/widgets/image_gallery_viewer.dart';
 
 void showItemDetailDialog(BuildContext context, ShopItem item,
     {String? shopName}) {
@@ -41,30 +43,28 @@ void showItemDetailDialog(BuildContext context, ShopItem item,
   showDialog(
     context: context,
     builder: (context) => Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       backgroundColor: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
+      clipBehavior: Clip.antiAlias,
+      child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image / Fallback
-            if (item.imageUrl != null &&
-                item.imageUrl!.trim().isNotEmpty &&
-                item.imageUrl!.length > 4)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: SizedBox(
-                  height: 160,
-                  width: double.infinity,
-                  child: _buildNetworkOrFileImage(item.imageUrl!),
-                ),
-              )
-            else
-              _buildPopupFallback(),
+            // Top Wide Image Slider (Photography Aspect Ratio)
+            _ItemPopupGallery(
+              images: item.allImages,
+              fontFamily: fontFamily,
+              isUrdu: isUrdu,
+            ),
 
-            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
 
             // Name + Category
             Row(
@@ -400,6 +400,9 @@ void showItemDetailDialog(BuildContext context, ShopItem item,
                 ),
               ],
             ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -409,16 +412,16 @@ void showItemDetailDialog(BuildContext context, ShopItem item,
 
 Widget _buildPopupFallback() {
   return Container(
-    height: 150,
+    height: 230,
     width: double.infinity,
     decoration: BoxDecoration(
-      color: AppTheme.themeColor.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(16),
+      color: AppTheme.themeColor.withValues(alpha: 0.08),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
     ),
     child: Center(
       child: Icon(
         PhosphorIcons.package(),
-        size: 50,
+        size: 56,
         color: AppTheme.themeColor.withValues(alpha: 0.6),
       ),
     ),
@@ -431,16 +434,281 @@ Widget _buildNetworkOrFileImage(String path) {
       uri != null && (uri.scheme == 'https' || uri.scheme == 'http');
 
   if (isRemote) {
-    return Image.network(
-      path,
+    return CachedNetworkImage(
+      imageUrl: path,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _buildPopupFallback(),
+      width: double.infinity,
+      height: double.infinity,
+      placeholder: (_, __) => Container(
+        color: Colors.grey.shade100,
+        child: const Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      ),
+      errorWidget: (_, __, ___) => _buildPopupFallback(),
     );
   } else {
-    return Image.file(
-      File(path),
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _buildPopupFallback(),
+    final file = File(path);
+    if (file.existsSync()) {
+      return Image.file(
+        file,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => _buildPopupFallback(),
+      );
+    }
+    return _buildPopupFallback();
+  }
+}
+
+class _ItemPopupGallery extends StatefulWidget {
+  final List<String> images;
+  final String? fontFamily;
+  final bool isUrdu;
+
+  const _ItemPopupGallery({
+    required this.images,
+    this.fontFamily,
+    required this.isUrdu,
+  });
+
+  @override
+  State<_ItemPopupGallery> createState() => _ItemPopupGalleryState();
+}
+
+class _ItemPopupGalleryState extends State<_ItemPopupGallery> {
+  late PageController _pageController;
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.images.isEmpty) {
+      return _buildPopupFallback();
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Main Image Slider / Carousel with Tap to Zoom
+        ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          child: Container(
+            height: 230,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+            ),
+            child: Stack(
+              children: [
+                PageView.builder(
+                  controller: _pageController,
+                  itemCount: widget.images.length,
+                  onPageChanged: (index) {
+                    setState(() => _currentIndex = index);
+                  },
+                  itemBuilder: (context, index) {
+                    final path = widget.images[index];
+                    return GestureDetector(
+                      onTap: () => openFullScreenImageGallery(
+                        context,
+                        widget.images,
+                        initialIndex: index,
+                      ),
+                      child: _buildNetworkOrFileImage(path),
+                    );
+                  },
+                ),
+
+                // Top-right: Fullscreen zoom button
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: () => openFullScreenImageGallery(
+                      context,
+                      widget.images,
+                      initialIndex: _currentIndex,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            PhosphorIcons.arrowsOutSimple(),
+                            size: 12,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            widget.isUrdu ? 'بڑا کریں' : 'Zoom',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: widget.fontFamily,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Bottom-right: Image counter (if multiple)
+                if (widget.images.length > 1)
+                  Positioned(
+                    bottom: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${_currentIndex + 1} / ${widget.images.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Left Arrow (if > 1 image and index > 0)
+                if (widget.images.length > 1 && _currentIndex > 0)
+                  Positioned(
+                    left: 6,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: GestureDetector(
+                        onTap: () {
+                          _pageController.previousPage(
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeInOut,
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.chevron_left,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Right Arrow (if > 1 image and index < length - 1)
+                if (widget.images.length > 1 &&
+                    _currentIndex < widget.images.length - 1)
+                  Positioned(
+                    right: 6,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: GestureDetector(
+                        onTap: () {
+                          _pageController.nextPage(
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeInOut,
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.chevron_right,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+
+        // Thumbnail strip (if multiple images)
+        if (widget.images.length > 1) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 38,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              shrinkWrap: true,
+              itemCount: widget.images.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              itemBuilder: (context, idx) {
+                final isSelected = idx == _currentIndex;
+                return GestureDetector(
+                  onTap: () {
+                    _pageController.animateToPage(
+                      idx,
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeInOut,
+                    );
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isSelected
+                            ? AppTheme.themeColor
+                            : Colors.transparent,
+                        width: 2,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: _buildNetworkOrFileImage(widget.images[idx]),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

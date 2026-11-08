@@ -617,58 +617,6 @@ class _CombinedHeader extends StatelessWidget {
       );
       return;
     }
-    ReceiptDialogHelper.showReceiptDialog(
-      context,
-      transaction: txs.first,
-      account: party,
-      isLocalTransaction: true,
-    );
-  }
-
-  Future<void> _confirmDelete(BuildContext context) async {
-    final isUrdu = this.isUrdu;
-    final fontFamily = this.fontFamily;
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: UrduAwareText(
-          isUrdu ? 'پارٹی ختم کریں؟' : 'Delete Party?',
-          style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
-        ),
-        content: UrduAwareText(
-          isUrdu
-              ? 'کیا آپ واقعی اس پارٹی کو ختم کرنا چاہتے ہیں؟ تمام ریکارڈ مٹ جائے گا۔'
-              : 'Are you sure you want to delete this party? All records will be lost.',
-          style: TextStyle(fontFamily: fontFamily),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: UrduAwareText(
-              isUrdu ? 'منسوخ' : 'Cancel',
-              style: TextStyle(
-                  color: AppTheme.textSecondary, fontFamily: fontFamily),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: UrduAwareText(
-              isUrdu ? 'ختم کریں' : 'Delete',
-              style: TextStyle(
-                  color: AppTheme.expenseColor, fontFamily: fontFamily),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true && context.mounted) {
-      await Provider.of<DatabaseService>(context, listen: false)
-          .deleteAccount(party.id);
-      if (context.mounted) Navigator.pop(context);
-    }
   }
 }
 
@@ -1348,8 +1296,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                 alignment: Alignment.centerLeft,
                 child: UrduAwareText(
                   columns.secondColumn > 0
-                      ? Formatters.formatAmount(
-                          columns.secondColumn)
+                      ? Formatters.formatAmount(columns.secondColumn)
                       : "-",
                   style: const TextStyle(
                     color: AppTheme.incomeColor,
@@ -1469,7 +1416,6 @@ class _AnalysisTabState extends State<_AnalysisTab> {
   double _totalIn = 0, _totalOut = 0, _totalVolume = 0;
   int _totalDeals = 0;
   DateTime? _firstDeal;
-  double _trustScore = 0;
 
   String _rateFilter = 'all';
 
@@ -1563,41 +1509,6 @@ class _AnalysisTabState extends State<_AnalysisTab> {
 
     _totalVolume = _totalIn + _totalOut;
     _totalDeals = allTx.length;
-    final openingBalance = widget.party.balanceType.toLowerCase() == 'payable'
-        ? -widget.party.initialBalance
-        : widget.party.initialBalance;
-    final currentBalance = AccountBalanceUtils.ledgerBalance(
-      allTx,
-      initialBalance: openingBalance,
-    );
-
-    double score = 0;
-    final days = DateTime.now().difference(_firstDeal ?? DateTime.now()).inDays;
-    if (days > 180) {
-      score += 1.0;
-    } else if (days > 30) {
-      score += 0.5;
-    }
-    if (_totalDeals > 25) {
-      score += 1.0;
-    } else if (_totalDeals > 10) {
-      score += 0.5;
-    }
-    if (_totalVolume > 100000) {
-      score += 1.0;
-    } else if (_totalVolume > 20000) {
-      score += 0.5;
-    }
-    if (_totalVolume > 0) {
-      final ratio = 1 - (currentBalance.abs() / _totalVolume);
-      if (ratio > 0.9) {
-        score += 1.0;
-      } else if (ratio > 0.7) {
-        score += 0.5;
-      }
-    }
-    _trustScore = score.clamp(1.0, 5.0);
-
     _transactions = List.from(allTx)..sort((a, b) => b.date.compareTo(a.date));
 
     setState(() => _itemHistory = sorted);
@@ -1651,7 +1562,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
     return Container(
       color: AppTheme.backgroundColor,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 30),
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 30),
         child: Column(
           children: [
             PartyToolsGridWidget(
@@ -1660,11 +1571,11 @@ class _AnalysisTabState extends State<_AnalysisTab> {
               fontFamily: widget.fontFamily,
               onRefresh: _loadData,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             _build3Stats(),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
             _buildSubFilter(),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             if (_itemHistory.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 30),
@@ -1711,9 +1622,9 @@ class _AnalysisTabState extends State<_AnalysisTab> {
       children: [
         _statCard(_getRelationshipPeriod(),
             widget.isUrdu ? 'تعلق کو' : 'Relationship'),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         _statCard('$_totalDeals', widget.isUrdu ? 'کل اندراج' : 'Total Deals'),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         _statCard(
             _formatVolume(_totalVolume), widget.isUrdu ? 'حجم' : 'Volume'),
       ],

@@ -31,8 +31,10 @@ class _NearbyShopsCache {
     return DateTime.now().difference(lastShopsFetchTime!) < ttl;
   }
 
-  static bool isItemsCacheValid(String shopId, {Duration ttl = const Duration(minutes: 5)}) {
-    if (!cachedShopItems.containsKey(shopId) || !lastItemsFetchTime.containsKey(shopId)) return false;
+  static bool isItemsCacheValid(String shopId,
+      {Duration ttl = const Duration(minutes: 5)}) {
+    if (!cachedShopItems.containsKey(shopId) ||
+        !lastItemsFetchTime.containsKey(shopId)) return false;
     return DateTime.now().difference(lastItemsFetchTime[shopId]!) < ttl;
   }
 
@@ -148,8 +150,10 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
       distanceVal: (data['distanceVal'] is num)
           ? (data['distanceVal'] as num).toDouble()
           : double.infinity,
-      rating: (data['rating'] is num) ? (data['rating'] as num).toDouble() : 0,
-      reviews: (data['reviews'] is num) ? (data['reviews'] as num).toInt() : 0,
+      customerCount: (data['customerCount'] as num?)?.toInt() ?? 0,
+      satisfiedCustomerPercent:
+          (data['quickBillSatisfactionPercent'] as num?)?.toInt() ?? 0,
+      billCount: (data['quickBillCount'] as num?)?.toInt() ?? 0,
       deliveryTime: (data['deliveryTime'] ?? '').toString(),
       timeVal: (data['timeVal'] is num) ? (data['timeVal'] as num).toInt() : 0,
       minOrder: (data['minOrder'] ?? '').toString(),
@@ -162,7 +166,7 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
       showArea: data['showArea'] != false,
       showDistance: data['showDistance'] != false,
       showDeliveryInfo: data['showDeliveryInfo'] != false,
-      showRating: data['showRating'] != false,
+      showTrust: data['showTrust'] != false,
       showItemsCount: data['showItemsCount'] != false,
       showTags: data['showTags'] == true,
       latitude: (data['latitude'] is num)
@@ -291,7 +295,8 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
     }).toList();
 
     if (_sortBy == 'rating') {
-      filtered.sort((a, b) => b.rating.compareTo(a.rating));
+      filtered.sort((a, b) =>
+          b.satisfiedCustomerPercent.compareTo(a.satisfiedCustomerPercent));
     } else if (_sortBy == 'time') {
       filtered.sort((a, b) => a.timeVal.compareTo(b.timeVal));
     } else if (_sortBy == 'nearest') {
@@ -324,8 +329,8 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
               const SizedBox(width: 8),
               _buildSortChip(
                 'rating',
-                isUrdu ? 'زیادہ ریٹنگ' : 'Top rated',
-                PhosphorIcons.star(),
+                isUrdu ? 'زیادہ دوبارہ گاہک' : 'Most repeat customers',
+                PhosphorIcons.shieldCheck(),
                 fontFamily: fontFamily,
               ),
               const SizedBox(width: 8),
@@ -642,32 +647,44 @@ class _ShopSectionWidgetState extends State<_ShopSectionWidget> {
           .get();
 
       if (!mounted) return;
-      final items = snapshot.docs.map((doc) {
-        final data = doc.data();
-        final quantity = (data['availableQuantity'] as num?)?.toDouble();
-        final tracksStock = data['trackStock'] != false;
-        final brandVal = (data['brand'] ?? '').toString();
-        final modelVal = (data['model'] ?? '').toString();
-        final allowReturnVal = data['allowReturn'] == true;
-        return ShopItem(
-          id: doc.id,
-          stockItemId: doc.id,
-          name: (data['name'] ?? '').toString(),
-          nameUrdu: (data['nameUrdu'] ?? '').toString(),
-          description: (data['description'] ?? '').toString(),
-          brand: brandVal.isNotEmpty ? brandVal : null,
-          model: modelVal.isNotEmpty ? modelVal : null,
-          allowReturn: allowReturnVal,
-          rate: (data['rate'] as num?)?.toDouble() ?? 0,
-          oldRate: (data['oldRate'] as num?)?.toDouble(),
-          unit: (data['unit'] ?? '').toString(),
-          emoji: '📦',
-          category: (data['category'] ?? 'عام').toString(),
-          imageUrl: (data['imageUrl'] ?? '').toString(),
-          rating: (data['rating'] as num?)?.toDouble() ?? 4.5,
-          stock: tracksStock ? (quantity ?? 0) : 1000000000,
-        );
-      }).where((item) => item.name.trim().isNotEmpty).toList();
+      final items = snapshot.docs
+          .map((doc) {
+            final data = doc.data();
+            final quantity = (data['availableQuantity'] as num?)?.toDouble();
+            final tracksStock = data['trackStock'] != false;
+            final brandVal = (data['brand'] ?? '').toString();
+            final modelVal = (data['model'] ?? '').toString();
+            final allowReturnVal = data['allowReturn'] == true;
+            final rawImages = data['images'];
+            List<String> imagesList = [];
+            if (rawImages is List) {
+              imagesList = rawImages
+                  .map((e) => e.toString().trim())
+                  .where((e) => e.isNotEmpty && e.length > 4)
+                  .toList();
+            }
+            return ShopItem(
+              id: doc.id,
+              stockItemId: doc.id,
+              name: (data['name'] ?? '').toString(),
+              nameUrdu: (data['nameUrdu'] ?? '').toString(),
+              description: (data['description'] ?? '').toString(),
+              brand: brandVal.isNotEmpty ? brandVal : null,
+              model: modelVal.isNotEmpty ? modelVal : null,
+              allowReturn: allowReturnVal,
+              rate: (data['rate'] as num?)?.toDouble() ?? 0,
+              oldRate: (data['oldRate'] as num?)?.toDouble(),
+              unit: (data['unit'] ?? '').toString(),
+              emoji: '📦',
+              category: (data['category'] ?? 'عام').toString(),
+              imageUrl: (data['imageUrl'] ?? '').toString(),
+              images: imagesList,
+              rating: (data['rating'] as num?)?.toDouble() ?? 4.5,
+              stock: tracksStock ? (quantity ?? 0) : 1000000000,
+            );
+          })
+          .where((item) => item.name.trim().isNotEmpty)
+          .toList();
 
       _NearbyShopsCache.cachedShopItems[shopId] = items;
       _NearbyShopsCache.lastItemsFetchTime[shopId] = DateTime.now();
@@ -685,7 +702,8 @@ class _ShopSectionWidgetState extends State<_ShopSectionWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final totalCount = _items.isNotEmpty ? _items.length : widget.shop.availableItemCount;
+    final totalCount =
+        _items.isNotEmpty ? _items.length : widget.shop.availableItemCount;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -712,7 +730,7 @@ class _ShopSectionWidgetState extends State<_ShopSectionWidget> {
           SizedBox(
             height: 270,
             child: _isLoadingItems
-                ? const Center(child: CircularProgressIndicator())
+                ? const SizedBox.shrink()
                 : ListView.separated(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -724,14 +742,15 @@ class _ShopSectionWidgetState extends State<_ShopSectionWidget> {
                           width: 290,
                           height: 270,
                           child: ShopCardWidget(
-                            shop: widget.shop.copyWith(items: _items, itemCount: totalCount),
+                            shop: widget.shop
+                                .copyWith(items: _items, itemCount: totalCount),
                             onTap: widget.onTap,
                           ),
                         );
                       }
                       final item = _items[index - 1];
                       return SizedBox(
-                        width: 290,
+                        width: 145,
                         height: 270,
                         child: ShopCatalogItemCard(
                           item: item,

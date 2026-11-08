@@ -23,45 +23,77 @@ class MasterProfileScreen extends StatefulWidget {
 class _MasterProfileScreenState extends State<MasterProfileScreen> {
   late final ProfileController _controller;
   final _formKey = GlobalKey<FormState>();
+  final FocusNode _emailFocusNode = FocusNode();
+  bool _isSavingProfile = false;
+  String? _saveLoadingText;
 
   @override
   void initState() {
     super.initState();
     _controller = ProfileController()..loadExistingProfile();
+    _emailFocusNode.addListener(() {
+      if (_emailFocusNode.hasFocus) {
+        final text = _controller.emailController.text;
+        _controller.emailController.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: text.length,
+        );
+      }
+    });
   }
 
   @override
   void dispose() {
+    _emailFocusNode.dispose();
     _controller.dispose();
     super.dispose();
   }
 
   Future<void> _saveProfile() async {
+    if (_isSavingProfile) return;
     if (!_formKey.currentState!.validate()) return;
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
     final stockService = Provider.of<StockService>(context, listen: false);
-    final success = await _controller.saveProfile();
-    if (!mounted) return;
+    setState(() {
+      _isSavingProfile = true;
+      _saveLoadingText =
+          isUrdu ? 'پروفائل محفوظ ہو رہا ہے...' : 'Saving profile...';
+    });
 
-    if (success) {
-      String? catalogError;
-      if (_controller.isShopkeeper) {
-        try {
-          await stockService.syncPublicCatalog();
-        } catch (error) {
-          catalogError = error.toString();
-        }
-      }
+    try {
+      final success = await _controller.saveProfile();
       if (!mounted) return;
-      if (catalogError != null) {
+
+      if (!success) {
         AppToast.error(
           context,
-          isUrdu
-              ? 'پروفائل محفوظ ہوگیا، مگر دکان کے اشیاء شائع نہیں ہوسکے: $catalogError'
-              : 'Profile saved, but shop items could not be published: $catalogError',
+          _controller.errorMessage ??
+              (isUrdu ? 'پروفائل محفوظ نہیں ہو سکا' : 'Unable to save profile'),
         );
         return;
       }
+
+      if (_controller.isShopkeeper) {
+        setState(() {
+          _saveLoadingText = isUrdu
+              ? 'پروفائل محفوظ؛ مصنوعات شائع ہو رہی ہیں...'
+              : 'Profile saved; publishing products...';
+        });
+        try {
+          await stockService.syncPublicCatalog();
+        } catch (error) {
+          if (!mounted) return;
+          AppToast.error(
+            context,
+            isUrdu
+                ? 'پروفائل محفوظ ہوگیا، مگر دکان کے اشیاء شائع نہیں ہوسکے: $error'
+                : 'Profile saved, but shop items could not be published: $error',
+          );
+          return;
+        }
+      }
+
+      if (!mounted) return;
       AppToast.success(
         context,
         isUrdu
@@ -80,12 +112,21 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
           ),
         );
       }
-    } else {
+    } catch (error) {
+      if (!mounted) return;
       AppToast.error(
         context,
-        _controller.errorMessage ??
-            (isUrdu ? 'پروفائل محفوظ نہیں ہو سکا' : 'Unable to save profile'),
+        isUrdu
+            ? 'پروفائل محفوظ کرنے میں مسئلہ پیش آیا: $error'
+            : 'Could not complete profile save: $error',
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingProfile = false;
+          _saveLoadingText = null;
+        });
+      }
     }
   }
 
@@ -112,7 +153,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
           body: controller.isLoading
               ? const Center(child: CircularProgressIndicator())
               : SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 28),
                   child: Form(
                     key: _formKey,
                     child: Column(
@@ -140,7 +181,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                             },
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 8),
 
                         // Shop Banner Image
                         ImageSelectorField(
@@ -166,7 +207,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                             controller.notifyListeners();
                           },
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 8),
 
                         // Detailed Shop Note
                         Container(
@@ -208,7 +249,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 8),
 
                         // Fields Container
                         Container(
@@ -256,6 +297,15 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                                     : 'Email Address (Optional)',
                                 icon: PhosphorIcons.envelope(),
                                 fontFamily: fontFamily,
+                                focusNode: _emailFocusNode,
+                                onTap: () {
+                                  final text = controller.emailController.text;
+                                  controller.emailController.selection =
+                                      TextSelection(
+                                    baseOffset: 0,
+                                    extentOffset: text.length,
+                                  );
+                                },
                               ),
                               const Divider(height: 1),
                               _buildField(
@@ -280,7 +330,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                         ),
 
                         if (controller.isShopkeeper) ...[
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 8),
                           GestureDetector(
                             onTap: () {
                               Navigator.push(
@@ -357,7 +407,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                           ),
                         ],
 
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 8),
                         AppButton(
                           text: controller.isEditing
                               ? (isUrdu ? 'محفوظ کریں' : 'Save Profile')
@@ -366,8 +416,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                           variant: AppButtonVariant.primary,
                           size: AppButtonSize.large,
                           isFullWidth: true,
-                          isLoading: controller.saveStatus ==
-                              ProfileSaveStatus.loading,
+                          isLoading: _isSavingProfile,
+                          loadingText: _saveLoadingText,
                           onPressed: _saveProfile,
                         ),
                       ],
@@ -385,11 +435,15 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
     required IconData icon,
     String fontFamily = '',
     bool readOnly = false,
+    FocusNode? focusNode,
+    VoidCallback? onTap,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
       readOnly: readOnly,
+      focusNode: focusNode,
+      onTap: onTap,
       validator: validator,
       style: TextStyle(color: readOnly ? Colors.grey : AppTheme.darkColor),
       decoration: InputDecoration(

@@ -301,7 +301,7 @@ class ItemRateHistoryCardWidget extends StatelessWidget {
 
             // Top Dark Summary Header Card
             Container(
-              margin: const EdgeInsets.fromLTRB(0, 4, 0, 4),
+              margin: const EdgeInsets.all(8),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: AppTheme.darkColor,
@@ -407,7 +407,7 @@ class ItemRateHistoryCardWidget extends StatelessWidget {
             // Scrollable Content Body
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
                 child: Column(
                   children: [
                     // Rate Journey Line Chart Card (if >1 prices)
@@ -471,7 +471,7 @@ class ItemRateHistoryCardWidget extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                     ],
 
                     // Per Purchase Container
@@ -518,7 +518,7 @@ class ItemRateHistoryCardWidget extends StatelessWidget {
                       ),
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
 
                     // Action Button (Rename & Unit)
                     SizedBox(

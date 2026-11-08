@@ -14,6 +14,8 @@ import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
+import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/widgets/party_card.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
@@ -204,7 +206,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
             widget.item.sellingPrice > 0)
         ? widget.item.sellingPrice
         : widget.item.purchasePrice;
-    _priceController.text = initialPrice > 0 ? initialPrice.toString() : '';
+    _priceController.text = initialPrice > 0 ? Formatters.formatAmount(initialPrice) : '';
     _qtyController.addListener(_onQtyChanged);
   }
 
@@ -338,7 +340,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
       return;
     }
     final price =
-        double.tryParse(_priceController.text) ?? widget.item.purchasePrice;
+        Formatters.tryParseAmount(_priceController.text) ?? widget.item.purchasePrice;
 
     String reason = _noteController.text.trim();
     if (reason.isEmpty) {
@@ -397,6 +399,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
         );
         final stockSynced =
             await databaseService.updateTransaction(updatedTransaction);
+        await stockService.recordMovement(movement);
 
         if (mounted) {
           Navigator.pop(context, true);
@@ -482,12 +485,8 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                           const SizedBox(height: 20),
                         ],
 
-                        // 3. Unit Price
-                        _buildUnitPrice(isUrdu, fontFamily),
-                        const SizedBox(height: 16),
-
-                        // 4. Note
-                        _buildNote(isUrdu, fontFamily),
+                        // 3. Combined Unit Price & Reason Note Card (With Divider)
+                        _buildCombinedPriceAndNoteCard(isUrdu, fontFamily),
                       ],
                     ),
                   ),
@@ -686,9 +685,11 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
 
   Widget _buildReturnUnifiedCard(bool isUrdu, String? fontFamily, BuildContext context) {
     return Container(
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE1E5EC), width: 1.5),
         boxShadow: [
           BoxShadow(
             color: AppTheme.darkColor.withValues(alpha: 0.08),
@@ -697,45 +698,35 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: const Color(0xFFE1E5EC), width: 1.5),
-            borderRadius: BorderRadius.circular(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Party Selector
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: _buildPartySelector(isUrdu, fontFamily),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Party Selector
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: _buildPartySelector(isUrdu, fontFamily),
+
+          const Divider(height: 1, color: Color(0xFFE1E5EC)),
+
+          // 2. Quantity Box
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFF5F7FA), Color(0xFFFAFCFF)],
               ),
-
-              const Divider(height: 1, color: Color(0xFFE1E5EC)),
-
-              // 2. Quantity Box (Spread with background gradient between upper and lower dividers)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFF5F7FA), Color(0xFFFAFCFF)],
-                  ),
-                ),
-                child: _buildQuantityBoxOnly(isUrdu, fontFamily),
-              ),
-
-              const Divider(height: 1, color: Color(0xFFE1E5EC)),
-
-              // 3. Live Preview styled like Grand Total
-              _buildGrandTotalStylePreview(isUrdu, fontFamily, context),
-            ],
+            ),
+            child: _buildQuantityBoxOnly(isUrdu, fontFamily),
           ),
-        ),
+
+          const Divider(height: 1, color: Color(0xFFE1E5EC)),
+
+          // 3. Live Preview styled like Grand Total
+          _buildGrandTotalStylePreview(isUrdu, fontFamily, context),
+        ],
       ),
     );
   }
@@ -804,6 +795,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: bg,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18.5)),
       ),
       child: Row(
         children: [
@@ -1094,9 +1086,11 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
     BuildContext context,
   ) {
     return Container(
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE1E5EC), width: 1.5),
         boxShadow: [
           BoxShadow(
             color: AppTheme.darkColor.withValues(alpha: 0.08),
@@ -1105,37 +1099,28 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: const Color(0xFFE1E5EC), width: 1.5),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Quantity Box inside gradient container
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFF5F7FA), Color(0xFFFAFCFF)],
-                  ),
-                ),
-                child: _buildQuantityBoxOnly(isUrdu, fontFamily),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Quantity Box inside gradient container with top rounded corners
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFF5F7FA), Color(0xFFFAFCFF)],
               ),
-
-              const Divider(height: 1, color: Color(0xFFE1E5EC)),
-
-              // 2. Live Preview styled like Grand Total
-              _buildGrandTotalStylePreview(isUrdu, fontFamily, context),
-            ],
+              borderRadius: BorderRadius.vertical(top: Radius.circular(18.5)),
+            ),
+            child: _buildQuantityBoxOnly(isUrdu, fontFamily),
           ),
-        ),
+
+          const Divider(height: 1, color: Color(0xFFE1E5EC)),
+
+          // 2. Live Preview styled like Grand Total
+          _buildGrandTotalStylePreview(isUrdu, fontFamily, context),
+        ],
       ),
     );
   }
@@ -1251,17 +1236,17 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
 
 
   // ═════════════════════════════════════════════
-  // 3. Unit Price
+  // 3. Combined Unit Price & Reason Note Card
   // ═════════════════════════════════════════════
-  Widget _buildUnitPrice(bool isUrdu, String? fontFamily) {
+  Widget _buildCombinedPriceAndNoteCard(bool isUrdu, String? fontFamily) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             _buildSectionLabel(
-              icon: PhosphorIcons.money(),
-              text: isUrdu ? 'فی یونٹ قیمت' : 'UNIT PRICE',
+              icon: PhosphorIcons.sliders(),
+              text: isUrdu ? 'اضافی معلومات' : 'ADDITIONAL DETAILS',
               fontFamily: fontFamily,
             ),
             const Spacer(),
@@ -1278,64 +1263,147 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
           ],
         ),
         const SizedBox(height: 8),
-        _buildInputField(
-          controller: _priceController,
-          hintText: '0',
-          icon: PhosphorIcons.money(),
-          suffix: 'Rs.',
-          isNumber: true,
-          fontFamily: fontFamily,
-          isUrdu: isUrdu,
-        ),
-      ],
-    );
-  }
-
-  // ═════════════════════════════════════════════
-  // 4. Note
-  // ═════════════════════════════════════════════
-  Widget _buildNote(bool isUrdu, String? fontFamily) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            _buildSectionLabel(
-              icon: PhosphorIcons.notePencil(),
-              text: isUrdu ? 'وجہ / تفصیل' : 'REASON / NOTE',
-              fontFamily: fontFamily,
-            ),
-            const Spacer(),
-            UrduAwareText(
-              isUrdu ? 'اختیاری' : 'OPTIONAL',
-              style: TextStyle(
-                fontSize: 9.5,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textSecondary,
-                letterSpacing: 0.3,
-                fontFamily: fontFamily,
+        Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE1E5EC), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.darkColor.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        _buildInputField(
-          controller: _noteController,
-          hintText: isUrdu
-              ? 'اس اینٹری کی وجہ لکھیں...'
-              : 'Add a note for this movement...',
-          icon: PhosphorIcons.notePencil(),
-          maxLines: 2,
-          fontFamily: fontFamily,
-          isUrdu: isUrdu,
+            ],
+          ),
+          child: Column(
+            children: [
+              // 1. Unit Price Row (Icon + Label on Right, Amount on Left with Currency Formatter)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                child: Row(
+                  children: [
+                    Icon(
+                      PhosphorIcons.money(),
+                      size: 18,
+                      color: AppTheme.themeColor,
+                    ),
+                    const SizedBox(width: 8),
+                    UrduAwareText(
+                      isUrdu ? 'فی یونٹ قیمت' : 'Unit Price',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.darkColor,
+                        fontFamily: fontFamily,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _priceController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [CurrencyInputFormatter(allowDecimals: true)],
+                        textAlign: TextAlign.left,
+                        textDirection: TextDirection.ltr,
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.darkColor,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: '0',
+                          hintTextDirection: TextDirection.ltr,
+                          hintStyle: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.textSecondary.withValues(alpha: 0.6),
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          isDense: true,
+                          filled: false,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: Color(0xFFE1E5EC)),
+              // 2. Reason / Note Row (Expands 1 to 3 lines)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Icon(
+                        PhosphorIcons.notePencil(),
+                        size: 18,
+                        color: AppTheme.themeColor,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: UrduAwareText(
+                        isUrdu ? 'وجہ / تفصیل' : 'Reason / Note',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkColor,
+                          fontFamily: fontFamily,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _noteController,
+                        minLines: 1,
+                        maxLines: 3,
+                        keyboardType: TextInputType.multiline,
+                        textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
+                        textAlign: isUrdu ? TextAlign.right : TextAlign.left,
+                        style: TextStyle(
+                          fontFamily: fontFamily,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.darkColor,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: isUrdu ? 'درج کریں...' : 'Add a note...',
+                          hintTextDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
+                          hintStyle: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.textSecondary.withValues(alpha: 0.6),
+                            fontFamily: fontFamily,
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          isDense: true,
+                          filled: false,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 
-  // ═════════════════════════════════════════════
-  // Shared: Section Label
-  // ═════════════════════════════════════════════
   Widget _buildSectionLabel({
     required IconData icon,
     required String text,
@@ -1361,115 +1429,21 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
   }
 
   // ═════════════════════════════════════════════
-  // Shared: Input Field
-  // ═════════════════════════════════════════════
-  Widget _buildInputField({
-    required TextEditingController controller,
-    required String hintText,
-    required IconData icon,
-    String? suffix,
-    bool isNumber = false,
-    int maxLines = 1,
-    String? fontFamily,
-    bool isUrdu = false,
-  }) {
-    final effectiveIsLtr = isNumber || !isUrdu;
-    final textDir = effectiveIsLtr ? TextDirection.ltr : TextDirection.rtl;
-    final textAlign = isUrdu ? TextAlign.right : TextAlign.left;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F7FA),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-      child: Row(
-        crossAxisAlignment:
-            maxLines > 1 ? CrossAxisAlignment.start : CrossAxisAlignment.center,
-        children: [
-          Padding(
-            padding: EdgeInsets.only(
-              top: maxLines > 1 ? 14 : 0,
-            ),
-            child: Icon(
-              icon,
-              size: 16,
-              color: AppTheme.textSecondary,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextFormField(
-              controller: controller,
-              maxLines: maxLines,
-              keyboardType: isNumber
-                  ? const TextInputType.numberWithOptions(decimal: true)
-                  : TextInputType.multiline,
-              textDirection: textDir,
-              textAlign: textAlign,
-              style: TextStyle(
-                fontFamily: isNumber ? 'Inter' : fontFamily,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.darkColor,
-              ),
-              decoration: InputDecoration(
-                hintText: hintText,
-                hintTextDirection: textDir,
-                hintStyle: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: AppTheme.textSecondary.withValues(alpha: 0.7),
-                  fontFamily: fontFamily,
-                ),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                isDense: true,
-                filled: false,
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                ),
-              ),
-            ),
-          ),
-          if (suffix != null) ...[
-            const SizedBox(width: 8),
-            UrduAwareText(
-              suffix,
-              style: const TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ═════════════════════════════════════════════
   // Footer
   // ═════════════════════════════════════════════
   Widget _buildFooter(bool isUrdu, String? fontFamily) {
     // Submit button color based on type
     Color submitColor = AppTheme.themeColor;
-    Color submitColor2 = const Color(0xFF4A8FE3);
     if (_selectedType == StockMovementType.adjustment) {
       submitColor = AppTheme.verifiedGold;
-      submitColor2 = const Color(0xFFF59E0B);
     } else if (_isIncrease) {
       submitColor = AppTheme.incomeColor;
-      submitColor2 = const Color(0xFF6B7A1F);
     } else if (_isDecrease) {
       submitColor = AppTheme.expenseColor;
-      submitColor2 = const Color(0xFFE04B36);
     }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: const BoxDecoration(
         border: Border(
           top: BorderSide(color: Color(0xFFE1E5EC), width: 1),
@@ -1477,96 +1451,27 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
       ),
       child: Row(
         children: [
-          // Cancel
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => Navigator.pop(context),
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                decoration: BoxDecoration(
-                  color: AppTheme.backgroundColor,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: UrduAwareText(
-                  isUrdu ? 'کینسل' : 'Cancel',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textSecondary,
-                    fontFamily: fontFamily,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ),
+          Expanded(
+            flex: 1,
+            child: AppButton(
+              text: isUrdu ? 'منسوخ' : 'Cancel',
+              variant: AppButtonVariant.outlined,
+              size: AppButtonSize.large,
+              onPressed: () => Navigator.pop(context),
             ),
           ),
           const SizedBox(width: 10),
-
-          // Submit
           Expanded(
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _isSaving ? null : () => _submit(isUrdu),
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [submitColor, submitColor2],
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: submitColor.withValues(alpha: 0.3),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (_isSaving)
-                        const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      else
-                        const Icon(
-                          Icons.check_rounded,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: UrduAwareText(
-                          _isSaving
-                              ? (isUrdu ? 'محفوظ ہو رہا...' : 'Saving...')
-                              : (isUrdu ? 'محفوظ کریں' : 'Save Entry'),
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            fontFamily: fontFamily,
-                            letterSpacing: 0.2,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            flex: 2,
+            child: AppButton(
+              text: isUrdu ? 'محفوظ کریں' : 'Save Entry',
+              color: submitColor,
+              variant: AppButtonVariant.primary,
+              size: AppButtonSize.large,
+              isLoading: _isSaving,
+              loadingText: isUrdu ? 'محفوظ ہو رہا ہے...' : 'Saving...',
+              icon: Icons.check_rounded,
+              onPressed: _isSaving ? null : () => _submit(isUrdu),
             ),
           ),
         ],

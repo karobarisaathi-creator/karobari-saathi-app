@@ -261,9 +261,12 @@ class StockService with ChangeNotifier {
           quantity: quantity,
           unitPrice: quantity > 0 ? discountedAmount / quantity : 0,
           reason: transaction.type == 'income'
-              ? 'Transaction sale'
-              : 'Transaction purchase',
-          note: 'Transaction ${transaction.id}',
+              ? 'Sale'
+              : 'Purchase',
+          note: (transaction.referenceNumber != null &&
+                  transaction.referenceNumber!.trim().isNotEmpty)
+              ? 'Bill #${transaction.referenceNumber!.trim()}'
+              : '',
           partyId: transaction.accountId,
           partyName: partyName,
           transactionId: transaction.id,
@@ -528,6 +531,7 @@ class StockService with ChangeNotifier {
       'unit': item.unit,
       'category': item.categoryName,
       'imageUrl': item.imagePath ?? '',
+      'images': item.allImages,
       'availableQuantity': availableStock,
       'trackStock': item.trackStock,
       'isAvailable': !item.trackStock || (availableStock ?? 0) > 0,
@@ -616,6 +620,23 @@ class StockService with ChangeNotifier {
         .child('users/${user.uid}/stock_items/$itemId/image.$extension');
     await imageRef.putFile(image);
     return imageRef.getDownloadURL();
+  }
+
+  Future<List<String>> uploadStockImages(List<File> images, String itemId) async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('Sign in to upload stock images.');
+    final urls = <String>[];
+    for (int i = 0; i < images.length; i++) {
+      final image = images[i];
+      if (!await image.exists()) continue;
+      final extension = image.path.split('.').last.toLowerCase();
+      final imageRef = _storage.ref().child(
+          'users/${user.uid}/stock_items/$itemId/image_${DateTime.now().millisecondsSinceEpoch}_$i.$extension');
+      await imageRef.putFile(image);
+      final url = await imageRef.getDownloadURL();
+      urls.add(url);
+    }
+    return urls;
   }
 
   /// 📦 Record Stock Movement (In / Out / Adjustment / Return)

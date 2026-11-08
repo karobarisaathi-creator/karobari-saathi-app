@@ -9,16 +9,14 @@ import 'dart:async';
 import 'base_service.dart';
 import 'account_service.dart';
 import 'profession_service.dart';
+import 'transaction_service.dart';
 
 class SyncService extends BaseService {
   final AccountService _accountService = AccountService();
   final ProfessionService _professionService = ProfessionService();
+  final TransactionService _transactionService = TransactionService();
 
-  StreamSubscription? _accountsSub,
-      _txSub,
-      _proSub,
-      _catSub,
-      _connectivitySub;
+  StreamSubscription? _accountsSub, _txSub, _proSub, _catSub, _connectivitySub;
   bool _hasCompletedInitialFetch = false;
   String? _listeningUserId;
 
@@ -45,17 +43,31 @@ class SyncService extends BaseService {
 
     _txSub =
         userDoc.collection('transactions').snapshots().listen((snap) async {
+      var quickBillMetricsChanged = false;
       for (var c in snap.docChanges) {
+        final existing = transactionsBox?.get(c.doc.id);
+        if (c.type == DocumentChangeType.removed) {
+          if (existing != null) {
+            quickBillMetricsChanged =
+                quickBillMetricsChanged || existing.isQuickBill;
+            await transactionsBox?.delete(existing.id);
+            await _accountService.recalculateAccountBalance(existing.accountId);
+          }
+          continue;
+        }
         if (c.doc.data() == null) continue;
         final t = model.Transaction.fromMap(c.doc.data()!);
-        if (c.type == DocumentChangeType.removed)
-          await transactionsBox?.delete(t.id);
-        else
-          await transactionsBox?.put(t.id, t);
+        quickBillMetricsChanged = quickBillMetricsChanged ||
+            t.isQuickBill ||
+            (existing?.isQuickBill ?? false);
+        await transactionsBox?.put(t.id, t);
         await _accountService.recalculateAccountBalance(t.accountId);
         if (t.professionId != null)
           await _professionService
               .recalculateProfessionFinance(t.professionId!);
+      }
+      if (quickBillMetricsChanged) {
+        await _transactionService.updateQuickBillTrustMetrics();
       }
       notifyListeners();
     });
@@ -121,6 +133,7 @@ class SyncService extends BaseService {
         batch.set(userDoc.collection('categories').doc(c.id), c.toMap());
     }
     await batch.commit();
+    await _transactionService.updateQuickBillTrustMetrics();
   }
 
   Future<void> fetchFromFirebase() async {
@@ -151,6 +164,7 @@ class SyncService extends BaseService {
     for (final profession in professionsBox?.values ?? <Profession>[]) {
       await _professionService.recalculateProfessionFinance(profession.id);
     }
+    await _transactionService.updateQuickBillTrustMetrics();
     _hasCompletedInitialFetch = true;
     notifyListeners();
   }

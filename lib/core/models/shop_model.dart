@@ -10,8 +10,9 @@ class Shop {
   final String area;
   final String distance;
   final double distanceVal;
-  final double rating;
-  final int reviews;
+  final int customerCount;
+  final int satisfiedCustomerPercent;
+  final int billCount;
   final String deliveryTime;
   final int timeVal;
   final String minOrder;
@@ -24,7 +25,7 @@ class Shop {
   final bool showArea;
   final bool showDistance;
   final bool showDeliveryInfo;
-  final bool showRating;
+  final bool showTrust;
   final bool showItemsCount;
   final bool showTags;
   final double? latitude;
@@ -40,8 +41,9 @@ class Shop {
     required this.area,
     required this.distance,
     required this.distanceVal,
-    required this.rating,
-    required this.reviews,
+    this.customerCount = 0,
+    this.satisfiedCustomerPercent = 0,
+    this.billCount = 0,
     required this.deliveryTime,
     required this.timeVal,
     required this.minOrder,
@@ -54,7 +56,7 @@ class Shop {
     this.showArea = true,
     this.showDistance = true,
     this.showDeliveryInfo = true,
-    this.showRating = true,
+    this.showTrust = true,
     this.showItemsCount = true,
     this.showTags = true,
     this.latitude,
@@ -63,7 +65,15 @@ class Shop {
 
   int get availableItemCount => itemCount ?? items.length;
 
-  Shop copyWith({List<ShopItem>? items, int? itemCount}) => Shop(
+  Shop copyWith({
+    List<ShopItem>? items,
+    int? itemCount,
+    bool? showTrust,
+    int? customerCount,
+    int? satisfiedCustomerPercent,
+    int? billCount,
+  }) =>
+      Shop(
         id: id,
         name: name,
         logoEmoji: logoEmoji,
@@ -73,8 +83,10 @@ class Shop {
         area: area,
         distance: distance,
         distanceVal: distanceVal,
-        rating: rating,
-        reviews: reviews,
+        customerCount: customerCount ?? this.customerCount,
+        satisfiedCustomerPercent:
+            satisfiedCustomerPercent ?? this.satisfiedCustomerPercent,
+        billCount: billCount ?? this.billCount,
         deliveryTime: deliveryTime,
         timeVal: timeVal,
         minOrder: minOrder,
@@ -87,7 +99,7 @@ class Shop {
         showArea: showArea,
         showDistance: showDistance,
         showDeliveryInfo: showDeliveryInfo,
-        showRating: showRating,
+        showTrust: showTrust ?? this.showTrust,
         showItemsCount: showItemsCount,
         showTags: showTags,
         latitude: latitude,
@@ -113,6 +125,7 @@ class ShopItem {
   final List<String> highlights;
   final String nameUrdu;
   final String? imageUrl;
+  final List<String> images;
   final String stockItemId;
   double quantity;
 
@@ -134,9 +147,27 @@ class ShopItem {
     this.highlights = const [],
     this.nameUrdu = '',
     this.imageUrl,
+    this.images = const [],
     this.stockItemId = '',
     this.quantity = 0,
   });
+
+  List<String> get allImages {
+    final list = <String>[];
+    for (final img in images) {
+      final trimmed = img.trim();
+      if (trimmed.isNotEmpty && trimmed.length > 4 && !list.contains(trimmed)) {
+        list.add(trimmed);
+      }
+    }
+    if (imageUrl != null) {
+      final trimmed = imageUrl!.trim();
+      if (trimmed.isNotEmpty && trimmed.length > 4 && !list.contains(trimmed)) {
+        list.insert(0, trimmed);
+      }
+    }
+    return list;
+  }
 
   double get total => rate * quantity;
   bool get isOutOfStock => stock <= 0;

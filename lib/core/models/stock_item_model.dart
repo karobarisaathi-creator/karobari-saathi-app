@@ -15,6 +15,7 @@ class StockItem {
   final String unit; // Pieces, Kg, Meter, Liter, Box, Dozen etc.
   final String description;
   final String? imagePath;
+  final List<String> images;
   final String sku;
   final double mrp;
   final String brand;
@@ -45,6 +46,7 @@ class StockItem {
     this.unit = 'Pieces',
     this.description = '',
     this.imagePath,
+    this.images = const [],
     this.sku = '',
     this.mrp = 0.0,
     this.brand = '',
@@ -60,6 +62,23 @@ class StockItem {
     required this.createdAt,
     required this.updatedAt,
   });
+
+  List<String> get allImages {
+    final list = <String>[];
+    for (final img in images) {
+      final trimmed = img.trim();
+      if (trimmed.isNotEmpty && trimmed.length > 4 && !list.contains(trimmed)) {
+        list.add(trimmed);
+      }
+    }
+    if (imagePath != null) {
+      final trimmed = imagePath!.trim();
+      if (trimmed.isNotEmpty && trimmed.length > 4 && !list.contains(trimmed)) {
+        list.insert(0, trimmed);
+      }
+    }
+    return list;
+  }
 
   double get profitMargin => sellingPrice - purchasePrice;
 
@@ -83,7 +102,8 @@ class StockItem {
       'minStockAlert': minStockAlert,
       'unit': unit,
       'description': description,
-      'imagePath': imagePath,
+      'imagePath': imagePath ?? (images.isNotEmpty ? images.first : null),
+      'images': images,
       'sku': sku,
       'mrp': mrp,
       'brand': brand,
@@ -124,6 +144,22 @@ class StockItem {
       return fallback;
     }
 
+    final rawImages = map['images'];
+    List<String> imagesList = [];
+    if (rawImages is List) {
+      imagesList = rawImages
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty && e.length > 4)
+          .toList();
+    }
+    final singlePath = map['imagePath']?.toString();
+    if (imagesList.isEmpty &&
+        singlePath != null &&
+        singlePath.trim().isNotEmpty &&
+        singlePath.length > 4) {
+      imagesList = [singlePath.trim()];
+    }
+
     return StockItem(
       id: map['id'] ?? '',
       name: map['name'] ?? '',
@@ -138,7 +174,8 @@ class StockItem {
       minStockAlert: (map['minStockAlert'] as num?)?.toDouble() ?? 5.0,
       unit: map['unit'] ?? 'Pieces',
       description: map['description'] ?? '',
-      imagePath: map['imagePath'],
+      imagePath: singlePath ?? (imagesList.isNotEmpty ? imagesList.first : null),
+      images: imagesList,
       sku: map['sku']?.toString() ?? '',
       mrp: readDouble('mrp'),
       brand: map['brand']?.toString() ?? '',
@@ -175,6 +212,7 @@ class StockItem {
     String? unit,
     String? description,
     String? imagePath,
+    List<String>? images,
     bool clearImagePath = false,
     String? sku,
     double? mrp,
@@ -206,6 +244,7 @@ class StockItem {
       unit: unit ?? this.unit,
       description: description ?? this.description,
       imagePath: clearImagePath ? null : (imagePath ?? this.imagePath),
+      images: images ?? this.images,
       sku: sku ?? this.sku,
       mrp: mrp ?? this.mrp,
       brand: brand ?? this.brand,

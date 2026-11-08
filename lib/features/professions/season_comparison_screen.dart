@@ -142,7 +142,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             if (!hasTwo)
               _buildCategoryCard(
                 title: isUrdu ? 'آمدن کی تفصیل' : 'Income Breakdown',
-                icon: PhosphorIcons.arrowUpRight(),
+                icon: PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold),
                 iconColor: AppTheme.incomeColor,
                 iconBg: AppTheme.incomeColor.withValues(alpha: 0.10),
                 badge: 'Rs ${_formatMoney(newReport.totalIncome)}',
@@ -157,7 +157,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                 title: isUrdu
                     ? 'آمدن کی زمرہ وار موازنہ'
                     : 'Income Categories',
-                icon: PhosphorIcons.arrowUpRight(),
+                icon: PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold),
                 iconColor: AppTheme.incomeColor,
                 iconBg: AppTheme.incomeColor.withValues(alpha: 0.10),
                 newCategories: newReport.incomeCategories,
@@ -174,7 +174,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             if (!hasTwo)
               _buildCategoryCard(
                 title: isUrdu ? 'اخراجات کی تفصیل' : 'Expense Breakdown',
-                icon: PhosphorIcons.arrowDownLeft(),
+                icon: PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold),
                 iconColor: AppTheme.expenseColor,
                 iconBg: AppTheme.expenseColor.withValues(alpha: 0.10),
                 badge: 'Rs ${_formatMoney(newReport.totalExpense)}',
@@ -189,7 +189,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                 title: isUrdu
                     ? 'اخراجات کی زمرہ وار موازنہ'
                     : 'Expense Categories',
-                icon: PhosphorIcons.arrowDownLeft(),
+                icon: PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold),
                 iconColor: AppTheme.expenseColor,
                 iconBg: AppTheme.expenseColor.withValues(alpha: 0.10),
                 newCategories: newReport.expenseCategories,
@@ -582,7 +582,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               child: _heroCard(
                 label: isUrdu ? 'کل آمدن' : 'Total Income',
                 value: 'Rs ${_formatFull(report.totalIncome)}',
-                icon: PhosphorIcons.arrowUpRight(),
+                icon: PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold),
                 iconColor: AppTheme.incomeColor,
                 iconBg: AppTheme.incomeColor.withValues(alpha: 0.10),
                 borderColor: AppTheme.incomeColor,
@@ -594,7 +594,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               child: _heroCard(
                 label: isUrdu ? 'کل خرچ' : 'Total Expense',
                 value: 'Rs ${_formatFull(report.totalExpense)}',
-                icon: PhosphorIcons.arrowDownLeft(),
+                icon: PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold),
                 iconColor: AppTheme.expenseColor,
                 iconBg: AppTheme.expenseColor.withValues(alpha: 0.10),
                 borderColor: AppTheme.expenseColor,

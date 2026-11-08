@@ -852,99 +852,103 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
 
     return Column(
       children: [
-        ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-          onTap: () => ReceiptDialogHelper.showReceiptDialog(
-            context,
-            transaction: t,
-            isLocalTransaction: true,
-          ),
-          onLongPress: () =>
-              _showDeleteTransactionDialog(context, t, isUrdu, fontFamily, db),
-          title: UrduAwareText(
-              t.description.isNotEmpty ? t.description : primaryTitle,
-              style: TextStyle(
-                  fontFamily: fontFamily,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                  color: AppTheme.darkColor)),
-          subtitle: Row(
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    UrduAwareText(DateFormat('dd MMM').format(t.date),
-                        style: const TextStyle(
-                            fontSize: 11, color: AppTheme.textSecondary)),
-                    if (t.description.isNotEmpty &&
-                        partyName != null &&
-                        partyName.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                          width: 4,
-                          height: 4,
-                          decoration: const BoxDecoration(
-                              color: Colors.grey, shape: BoxShape.circle)),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: UrduAwareText(partyName,
+        Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            onTap: () => ReceiptDialogHelper.showReceiptDialog(
+              context,
+              transaction: t,
+              isLocalTransaction: true,
+            ),
+            onLongPress: () =>
+                _showDeleteTransactionDialog(context, t, isUrdu, fontFamily, db),
+            title: UrduAwareText(
+                t.description.isNotEmpty ? t.description : primaryTitle,
+                style: TextStyle(
+                    fontFamily: fontFamily,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: AppTheme.darkColor)),
+            subtitle: Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      UrduAwareText(DateFormat('dd MMM').format(t.date),
+                          style: const TextStyle(
+                              fontSize: 11, color: AppTheme.textSecondary)),
+                      if (t.description.isNotEmpty &&
+                          partyName != null &&
+                          partyName.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                            width: 4,
+                            height: 4,
+                            decoration: const BoxDecoration(
+                                color: Colors.grey, shape: BoxShape.circle)),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: UrduAwareText(partyName,
+                              style: TextStyle(
+                                  color: AppTheme.themeColor,
+                                  fontWeight: FontWeight.normal,
+                                  fontSize: 11,
+                                  fontFamily: fontFamily),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                      if (cleanCategory.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                            width: 4,
+                            height: 4,
+                            decoration: const BoxDecoration(
+                                color: Colors.grey, shape: BoxShape.circle)),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: UrduAwareText(
+                            cleanCategory,
                             style: TextStyle(
-                                color: AppTheme.themeColor,
-                                fontWeight: FontWeight.normal,
+                                color: AppTheme.purpleColor,
+                                fontWeight: FontWeight.bold,
                                 fontSize: 11,
                                 fontFamily: fontFamily),
                             maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
-                      ),
-                    ],
-                    if (cleanCategory.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                          width: 4,
-                          height: 4,
-                          decoration: const BoxDecoration(
-                              color: Colors.grey, shape: BoxShape.circle)),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: UrduAwareText(
-                          cleanCategory,
-                          style: TextStyle(
-                              color: AppTheme.purpleColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                              fontFamily: fontFamily),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                        isIncome
+                            ? PhosphorIcons.arrowDownLeft()
+                            : PhosphorIcons.arrowUpRight(),
+                        color: isIncome
+                            ? AppTheme.incomeColor
+                            : AppTheme.expenseColor,
+                        size: 12),
+                    const SizedBox(width: 2),
+                    UrduAwareText(
+                        '${Formatters.formatAmountWithCurrency(t.amount)}',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: isIncome
+                                ? AppTheme.incomeColor
+                                : AppTheme.expenseColor)),
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                      isIncome
-                          ? PhosphorIcons.arrowDownLeft()
-                          : PhosphorIcons.arrowUpRight(),
-                      color: isIncome
-                          ? AppTheme.incomeColor
-                          : AppTheme.expenseColor,
-                      size: 12),
-                  const SizedBox(width: 2),
-                  UrduAwareText(
-                      '${Formatters.formatAmountWithCurrency(t.amount)}',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: isIncome
-                              ? AppTheme.incomeColor
-                              : AppTheme.expenseColor)),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         if (!isLast)
@@ -1324,25 +1328,27 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
       context: context,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: UrduAwareText(
-                isBaseRecord
-                    ? (isUrdu
-                        ? 'بنیادی ریکارڈ کے اختیارات'
-                        : 'Base Record Options')
-                    : '${_workNoun(isUrdu)}: ${season.season}',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    fontFamily: fontFamily),
+      builder: (context) => Material(
+        color: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: UrduAwareText(
+                  isBaseRecord
+                      ? (isUrdu
+                          ? 'بنیادی ریکارڈ کے اختیارات'
+                          : 'Base Record Options')
+                      : '${_workNoun(isUrdu)}: ${season.season}',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      fontFamily: fontFamily),
+                ),
               ),
-            ),
             if (!isBaseRecord && (season.isActive ?? true))
               ListTile(
                 leading: Icon(PhosphorIcons.checkCircle(),
@@ -1427,7 +1433,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   void _showClearBaseRecordDialog(BuildContext context, bool isUrdu,

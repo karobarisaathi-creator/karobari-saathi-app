@@ -193,7 +193,14 @@ class Transaction extends HiveObject {
   }
 
   double get totalAmount => quantity * rate;
-  bool get isFullyPaid => receivedAmount >= amount;
+  bool get isFullyPaid {
+    if (!isQuickBill) return receivedAmount >= amount;
+    final billSubtotal = subtotal > 0 ? subtotal : amount;
+    final billTotal =
+        (billSubtotal - discountAmount).clamp(0, billSubtotal).toDouble();
+    return receivedAmount >= billTotal;
+  }
+
   bool get isQuickBill {
     final normalizedDescription = description.trim().toLowerCase();
     final ref = referenceNumber?.trim().toUpperCase() ?? '';

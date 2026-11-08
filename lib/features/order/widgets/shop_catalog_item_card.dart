@@ -4,13 +4,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:account_app/core/models/shop_model.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 
-class ShopCatalogItemCard extends StatelessWidget {
+class ShopCatalogItemCard extends StatefulWidget {
   final ShopItem item;
   final VoidCallback? onTap;
 
@@ -20,12 +21,32 @@ class ShopCatalogItemCard extends StatelessWidget {
     this.onTap,
   });
 
+  @override
+  State<ShopCatalogItemCard> createState() => _ShopCatalogItemCardState();
+}
+
+class _ShopCatalogItemCardState extends State<ShopCatalogItemCard> {
+  late PageController _pageController;
+  int _currentImageIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   static const Map<String, String> _categoryNamesUrdu = {
     'General': 'عمومی',
     'Grocery': 'کریانہ',
     'Food': 'خوراک',
     'Beverages': 'مشروبات',
-    'Clothing': 'kپڑے',
+    'Clothing': 'کپڑے',
     'Electronics': 'الیکٹرانکس',
     'Household': 'گھریلو سامان',
     'Personal Care': 'ذاتی استعمال',
@@ -46,6 +67,8 @@ class ShopCatalogItemCard extends StatelessWidget {
     final isUrdu = Provider.of<LanguageService>(context).isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
 
+    final item = widget.item;
+    final images = item.allImages;
     final isOut = item.stock <= 0;
     final isLow = !isOut && item.stock <= 5;
     final hasDiscount = item.oldRate != null && item.oldRate! > item.rate;
@@ -53,7 +76,7 @@ class ShopCatalogItemCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: widget.onTap,
         borderRadius: BorderRadius.circular(20),
         child: Container(
           decoration: BoxDecoration(
@@ -75,7 +98,7 @@ class ShopCatalogItemCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ═══ بڑی تصویر ═══
+              // ═══ تصاویر کا سلائیڈر بکس ═══
               ClipRRect(
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(20),
@@ -84,23 +107,65 @@ class ShopCatalogItemCard extends StatelessWidget {
                   height: 110,
                   child: Stack(
                     children: [
+                      // تصویروں کا سلائیڈر
                       Container(
                         width: double.infinity,
+                        height: 110,
                         decoration: BoxDecoration(
                           color: isOut
                               ? Colors.grey.shade300
-                              : AppTheme.themeColor.withValues(alpha: 0.25),
+                              : AppTheme.themeColor.withValues(alpha: 0.15),
                         ),
-                        child: _buildImage(item, isOut),
+                        child: images.isEmpty
+                            ? _buildFallbackImage(isOut)
+                            : PageView.builder(
+                                controller: _pageController,
+                                itemCount: images.length,
+                                onPageChanged: (i) {
+                                  setState(() => _currentImageIndex = i);
+                                },
+                                itemBuilder: (context, idx) {
+                                  return GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: widget.onTap,
+                                    child: _buildSingleImage(images[idx], isOut),
+                                  );
+                                },
+                              ),
                       ),
+
+                      // تصویروں کے ڈاٹس (اگر 1 سے زیادہ تصاویر ہوں)
+                      if (images.length > 1)
+                        Positioned(
+                          bottom: 5,
+                          left: 0,
+                          right: 0,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(
+                              images.length,
+                              (idx) => Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                                width: _currentImageIndex == idx ? 10 : 4,
+                                height: 3.5,
+                                decoration: BoxDecoration(
+                                  color: _currentImageIndex == idx
+                                      ? Colors.white
+                                      : Colors.white.withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
 
                     // ⭐ سٹاک بیج (اوپر دائیں)
                     Positioned(
-                      top: 8,
-                      right: 8,
+                      top: 6,
+                      right: 6,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                            horizontal: 5, vertical: 2.5),
                         decoration: BoxDecoration(
                           color: isOut
                               ? AppTheme.expenseColor.withValues(alpha: 0.95)
@@ -126,15 +191,15 @@ class ShopCatalogItemCard extends StatelessWidget {
                             const SizedBox(width: 3),
                             UrduAwareText(
                               isOut
-                                  ? (isUrdu ? 'اسٹاک ختم ہے' : 'Out of stock')
+                                  ? (isUrdu ? 'اسٹاک ختم' : 'Out of stock')
                                   : isLow
-                                      ? (isUrdu ? 'اسٹاک کم ہے' : 'Low stock')
+                                      ? (isUrdu ? 'اسٹاک کم' : 'Low stock')
                                       : (isUrdu
-                                          ? 'اسٹاک موجود ہے'
+                                          ? 'اسٹاک موجود'
                                           : 'In stock'),
                               style: TextStyle(
                                 fontFamily: fontFamily,
-                                fontSize: 8.5,
+                                fontSize: 8,
                                 fontWeight: FontWeight.w900,
                                 color: Colors.white,
                               ),
@@ -147,11 +212,11 @@ class ShopCatalogItemCard extends StatelessWidget {
                     // ⭐ ڈسکاؤنٹ بیج (اوپر بائیں)
                     if (hasDiscount)
                       Positioned(
-                        top: 8,
-                        left: 8,
+                        top: 6,
+                        left: 6,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+                              horizontal: 5, vertical: 2.5),
                           decoration: BoxDecoration(
                             color:
                                 AppTheme.expenseColor.withValues(alpha: 0.95),
@@ -160,7 +225,7 @@ class ShopCatalogItemCard extends StatelessWidget {
                           child: UrduAwareText(
                             '-${item.discountPercent}%',
                             style: const TextStyle(
-                              fontSize: 9.5,
+                              fontSize: 9,
                               fontWeight: FontWeight.w900,
                               color: Colors.white,
                             ),
@@ -175,7 +240,7 @@ class ShopCatalogItemCard extends StatelessWidget {
               // ═══ تفصیل ═══
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -206,16 +271,15 @@ class ShopCatalogItemCard extends StatelessWidget {
                             textBaseline: TextBaseline.alphabetic,
                             children: [
                               Expanded(
-                                child: Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.baseline,
-                                  textBaseline: TextBaseline.alphabetic,
+                                child: Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 4,
                                   children: [
                                     UrduAwareText(
                                       Formatters.formatAmountWithCurrency(
                                           item.rate),
                                       style: TextStyle(
-                                        fontSize: 13,
+                                        fontSize: 12.5,
                                         fontWeight: FontWeight.w900,
                                         color: isOut
                                             ? AppTheme.textSecondary
@@ -223,31 +287,27 @@ class ShopCatalogItemCard extends StatelessWidget {
                                         letterSpacing: -0.3,
                                       ),
                                     ),
-                                    if (hasDiscount) ...[
-                                      const SizedBox(width: 4),
-                                      Flexible(
-                                        child: UrduAwareText(
-                                          Formatters.formatAmountWithCurrency(
-                                              item.oldRate!),
-                                          style: const TextStyle(
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w700,
-                                            color: AppTheme.textSecondary,
-                                            decoration:
-                                                TextDecoration.lineThrough,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                    if (hasDiscount)
+                                      UrduAwareText(
+                                        Formatters.formatAmountWithCurrency(
+                                            item.oldRate!),
+                                        style: const TextStyle(
+                                          fontSize: 8.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppTheme.textSecondary,
+                                          decoration:
+                                              TextDecoration.lineThrough,
                                         ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                    ],
                                   ],
                                 ),
                               ),
                               if (item.unit.isNotEmpty)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
+                                      horizontal: 5, vertical: 1.5),
                                   decoration: BoxDecoration(
                                     color: AppTheme.backgroundColor,
                                     borderRadius: BorderRadius.circular(4),
@@ -256,7 +316,7 @@ class ShopCatalogItemCard extends StatelessWidget {
                                     item.unit,
                                     style: TextStyle(
                                       fontFamily: fontFamily,
-                                      fontSize: 8.5,
+                                      fontSize: 8,
                                       fontWeight: FontWeight.w700,
                                       color: AppTheme.textSecondary,
                                     ),
@@ -311,9 +371,8 @@ class ShopCatalogItemCard extends StatelessWidget {
     );
   }
 
-  Widget _buildImage(ShopItem item, bool isOut) {
-    final path = item.imageUrl?.trim();
-    final fallback = Center(
+  Widget _buildFallbackImage(bool isOut) {
+    return Center(
       child: Icon(
         PhosphorIcons.package(),
         size: 45,
@@ -322,13 +381,12 @@ class ShopCatalogItemCard extends StatelessWidget {
             : AppTheme.themeColor.withValues(alpha: 0.6),
       ),
     );
+  }
 
-    if (path == null ||
-        path.isEmpty ||
-        path == '?' ||
-        path == '؟' ||
-        path.length < 5) {
-      return fallback;
+  Widget _buildSingleImage(String rawPath, bool isOut) {
+    final path = rawPath.trim();
+    if (path.isEmpty || path == '?' || path == '؟' || path.length < 5) {
+      return _buildFallbackImage(isOut);
     }
 
     final uri = Uri.tryParse(path);
@@ -336,19 +394,29 @@ class ShopCatalogItemCard extends StatelessWidget {
         uri != null && (uri.scheme == 'https' || uri.scheme == 'http');
 
     final image = isRemote
-        ? Image.network(
-            path,
+        ? CachedNetworkImage(
+            imageUrl: path,
             width: double.infinity,
             height: double.infinity,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => fallback,
+            placeholder: (_, __) => Container(
+              color: Colors.grey.shade100,
+              child: const Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+            errorWidget: (_, __, ___) => _buildFallbackImage(isOut),
           )
         : Image.file(
             File(path),
             width: double.infinity,
             height: double.infinity,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => fallback,
+            errorBuilder: (_, __, ___) => _buildFallbackImage(isOut),
           );
 
     return isOut

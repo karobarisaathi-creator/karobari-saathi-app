@@ -32,7 +32,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
   bool _showArea = true;
   bool _showDistance = true;
   bool _showDeliveryInfo = true;
-  bool _showRating = true;
+  bool _showTrust = true;
   bool _showItemsCount = true;
   bool _showTags = true;
 
@@ -93,8 +93,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
         _areaCtrl.text =
             (settings['businessAddress'] ?? profile['businessAddress'] ?? '')
                 .toString();
-        _deliveryTimeCtrl.text =
-            (settings['deliveryTime'] ?? '').toString();
+        _deliveryTimeCtrl.text = (settings['deliveryTime'] ?? '').toString();
         _deliveryFeeCtrl.text = (settings['deliveryFee'] ?? '').toString();
         _minOrderCtrl.text = (settings['minOrder'] ?? '').toString();
         _isOpen = settings['isOpen'] != false;
@@ -102,7 +101,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
         _showArea = settings['showArea'] != false;
         _showDistance = settings['showDistance'] == true;
         _showDeliveryInfo = settings['showDeliveryInfo'] == true;
-        _showRating = settings['showRating'] == true;
+        _showTrust = settings['showTrust'] != false;
         _showItemsCount = settings['showItemsCount'] != false;
         _showTags = settings['showTags'] == true;
         final tags = settings['tags'];
@@ -161,8 +160,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
       _availableTags.remove(tag);
       _selectedTags.remove(tag);
     });
-    final isUrdu =
-        Provider.of<LanguageService>(context, listen: false).isUrdu;
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
     AppToast.info(
       context,
       isUrdu ? 'ٹیگ ختم کر دیا گیا' : 'Tag deleted',
@@ -175,22 +173,22 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
         .where((item) => !item.isArchived)
         .map(
           (item) => ShopItem(
-        id: item.id,
-        stockItemId: item.id,
-        name: item.name,
-        nameUrdu: item.nameUrdu,
-        description: item.description,
-        rate: item.sellingPrice,
-        unit: item.unit,
-        emoji: '📦',
-        category: item.categoryName.isEmpty ? 'عام' : item.categoryName,
-        imageUrl: item.imagePath,
-        stock: item.trackStock
-            ? stockService.calculateCurrentStock(item.id)
-            : 1000000000,
-        rating: 0,
-      ),
-    )
+            id: item.id,
+            stockItemId: item.id,
+            name: item.name,
+            nameUrdu: item.nameUrdu,
+            description: item.description,
+            rate: item.sellingPrice,
+            unit: item.unit,
+            emoji: '📦',
+            category: item.categoryName.isEmpty ? 'عام' : item.categoryName,
+            imageUrl: item.imagePath,
+            stock: item.trackStock
+                ? stockService.calculateCurrentStock(item.id)
+                : 1000000000,
+            rating: 0,
+          ),
+        )
         .toList();
 
     return Shop(
@@ -203,15 +201,13 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
       area: _showArea ? _areaCtrl.text.trim() : '',
       distance: '',
       distanceVal: double.infinity,
-      rating: 0,
-      reviews: 0,
       deliveryTime: _showDeliveryInfo ? _deliveryTimeCtrl.text.trim() : '',
       timeVal: int.tryParse(
-        RegExp(r'\d+')
-            .firstMatch(_deliveryTimeCtrl.text.trim())
-            ?.group(0) ??
-            '',
-      ) ??
+            RegExp(r'\d+')
+                    .firstMatch(_deliveryTimeCtrl.text.trim())
+                    ?.group(0) ??
+                '',
+          ) ??
           0,
       minOrder: _showDeliveryInfo ? _minOrderCtrl.text.trim() : '',
       deliveryFee: _showDeliveryInfo ? _deliveryFeeCtrl.text.trim() : '',
@@ -223,7 +219,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
       showArea: _showArea,
       showDistance: _showDistance,
       showDeliveryInfo: _showDeliveryInfo,
-      showRating: _showRating,
+      showTrust: _showTrust,
       showItemsCount: _showItemsCount,
       showTags: _showTags,
     );
@@ -232,8 +228,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
   Future<void> _saveSettings() async {
     if (_isSaving) return;
 
-    final isUrdu =
-        Provider.of<LanguageService>(context, listen: false).isUrdu;
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
     if (_shopNameCtrl.text.trim().isEmpty) {
       AppToast.error(
         context,
@@ -269,23 +264,22 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
           'distance': '',
           'distanceVal': null,
           'deliveryTime':
-          _showDeliveryInfo ? _deliveryTimeCtrl.text.trim() : '',
+              _showDeliveryInfo ? _deliveryTimeCtrl.text.trim() : '',
           'timeVal': int.tryParse(
-            RegExp(r'\d+')
-                .firstMatch(_deliveryTimeCtrl.text.trim())
-                ?.group(0) ??
-                '',
-          ) ??
+                RegExp(r'\d+')
+                        .firstMatch(_deliveryTimeCtrl.text.trim())
+                        ?.group(0) ??
+                    '',
+              ) ??
               0,
           'minOrder': _showDeliveryInfo ? _minOrderCtrl.text.trim() : '',
-          'deliveryFee':
-          _showDeliveryInfo ? _deliveryFeeCtrl.text.trim() : '',
+          'deliveryFee': _showDeliveryInfo ? _deliveryFeeCtrl.text.trim() : '',
           'tags': _showTags ? _selectedTags.toList() : [],
           'showOwnerName': _showOwnerName,
           'showArea': _showArea,
           'showDistance': _showDistance,
           'showDeliveryInfo': _showDeliveryInfo,
-          'showRating': _showRating,
+          'showTrust': _showTrust,
           'showItemsCount': _showItemsCount,
           'showTags': _showTags,
           'updatedAt': FieldValue.serverTimestamp(),
@@ -448,7 +442,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
               const Divider(height: 1),
               _buildSwitchTile(
                 title:
-                isUrdu ? 'علاقہ اور پتہ دکھائیں' : 'Show Area & Location',
+                    isUrdu ? 'علاقہ اور پتہ دکھائیں' : 'Show Area & Location',
                 subtitle: isUrdu
                     ? 'کارڈ پر دکان کا علاقہ دکھائیں'
                     : 'Display shop area and location',
@@ -496,17 +490,14 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
                       const SizedBox(height: 10),
                       _buildTextField(
                         controller: _deliveryFeeCtrl,
-                        label:
-                        isUrdu ? 'ڈیلیوری فیس / چارجز' : 'Delivery Fee',
+                        label: isUrdu ? 'ڈیلیوری فیس / چارجز' : 'Delivery Fee',
                         fontFamily: fontFamily,
                         icon: PhosphorIcons.truck(),
                       ),
                       const SizedBox(height: 10),
                       _buildTextField(
                         controller: _minOrderCtrl,
-                        label: isUrdu
-                            ? 'کم از کم آرڈر رقم'
-                            : 'Minimum Order',
+                        label: isUrdu ? 'کم از کم آرڈر رقم' : 'Minimum Order',
                         fontFamily: fontFamily,
                         icon: PhosphorIcons.money(),
                       ),
@@ -517,15 +508,15 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
               const Divider(height: 1),
               _buildSwitchTile(
                 title: isUrdu
-                    ? 'اسٹار ریٹنگ اور ریویوز دکھائیں'
-                    : 'Show Rating & Reviews',
+                    ? 'اعتماد اور اطمینان دکھائیں'
+                    : 'Show Trust & Satisfaction',
                 subtitle: isUrdu
-                    ? 'کارڈ پر اسٹار ریٹنگ اور ریویوز دکھائیں'
-                    : 'Display star rating and reviews on card',
-                value: _showRating,
-                onChanged: (v) => setState(() => _showRating = v),
+                    ? 'کارڈ پر گاہکوں اور دوبارہ آنے والے خریداروں کے اعداد دکھائیں'
+                    : 'Show customer and repeat-buyer statistics on card',
+                value: _showTrust,
+                onChanged: (v) => setState(() => _showTrust = v),
                 fontFamily: fontFamily,
-                icon: PhosphorIcons.star(),
+                icon: PhosphorIcons.shieldCheck(),
               ),
               const Divider(height: 1),
               _buildSwitchTile(
@@ -542,9 +533,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
               ),
               const Divider(height: 1),
               _buildSwitchTile(
-                title: isUrdu
-                    ? 'خصوصی ٹیگز دکھائیں'
-                    : 'Show Promotional Tags',
+                title: isUrdu ? 'خصوصی ٹیگز دکھائیں' : 'Show Promotional Tags',
                 subtitle: isUrdu
                     ? 'کارڈ پر دکان کی خصوصیات کی فہرست'
                     : 'Display tags on shop card',
@@ -586,8 +575,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
                               elevation: 0,
                             ),
                             onPressed: _addCustomTag,
-                            icon:
-                            const Icon(Icons.add_rounded, size: 18),
+                            icon: const Icon(Icons.add_rounded, size: 18),
                             label: UrduAwareText(
                               isUrdu ? 'شامل کریں' : 'Add',
                               style: TextStyle(
@@ -668,8 +656,6 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
       ),
     );
   }
-
-
 
   Widget _buildSectionHeader({
     required IconData icon,
@@ -778,14 +764,12 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
                 value: value,
                 onChanged: onChanged,
                 activeThumbColor: AppTheme.themeColor,
-                thumbIcon:
-                WidgetStateProperty.resolveWith<Icon?>((states) {
+                thumbIcon: WidgetStateProperty.resolveWith<Icon?>((states) {
                   if (states.contains(WidgetState.selected)) {
                     return const Icon(Icons.check,
                         size: 14, color: Colors.white);
                   }
-                  return const Icon(Icons.close,
-                      size: 14, color: Colors.grey);
+                  return const Icon(Icons.close, size: 14, color: Colors.grey);
                 }),
               ),
             ],
@@ -831,8 +815,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-          const BorderSide(color: AppTheme.themeColor, width: 1.5),
+          borderSide: const BorderSide(color: AppTheme.themeColor, width: 1.5),
         ),
       ),
     );

@@ -6,14 +6,16 @@ Transaction _transaction({
   required double amount,
   required double receivedAmount,
   required double pendingAmount,
+  String type = 'income',
+  String category = 'Sale',
 }) {
   final now = DateTime(2026, 10, 6);
   return Transaction(
     id: 'test',
     accountId: 'party',
     amount: amount,
-    type: 'income',
-    category: 'Sale',
+    type: type,
+    category: category,
     description: description,
     date: now,
     receivedAmount: receivedAmount,
@@ -86,5 +88,43 @@ void main() {
 
       expect(restored.receiptFromCounterparty, isTrue);
     });
+  });
+
+  test('profession side remains independent from account transaction type', () {
+    final transaction = _transaction(
+      description: 'Seed purchase',
+      amount: 500,
+      receivedAmount: 0,
+      pendingAmount: 500,
+      type: 'income',
+      category: 'EXP:Seed',
+    );
+
+    expect(transaction.type, 'income');
+    expect(transaction.professionSide, 'expense');
+  });
+
+  test('identifies quick bills separately from add-transaction entries', () {
+    final quickBill = Transaction(
+      id: 'quick-bill',
+      accountId: 'party',
+      amount: 500,
+      type: 'income',
+      category: 'Sale',
+      description: 'Sale',
+      date: DateTime(2026, 10, 30),
+      referenceNumber: 'QB-12',
+      createdAt: DateTime(2026, 10, 30),
+      updatedAt: DateTime(2026, 10, 30),
+    );
+    final addTransaction = _transaction(
+      description: 'Sale',
+      amount: 500,
+      receivedAmount: 0,
+      pendingAmount: 500,
+    );
+
+    expect(quickBill.isQuickBill, isTrue);
+    expect(addTransaction.isQuickBill, isFalse);
   });
 }
