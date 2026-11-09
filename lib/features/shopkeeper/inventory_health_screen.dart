@@ -117,7 +117,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
         showBackButton: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -180,7 +180,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
             // ═══ Expandable List — منتخب category ═══
             if (_activeList == 'out')
@@ -226,7 +226,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 stockService: stockService,
               ),
 
-            const SizedBox(height: 14),
+            if (_activeList != null) const SizedBox(height: 12),
 
             // ═══ Aging Section ═══
             _buildSectionTitle(
@@ -243,7 +243,8 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
             ),
 
             // ═══ Aging expand list ═══
-            if (_activeAgingBucket != null)
+            if (_activeAgingBucket != null) ...[
+              const SizedBox(height: 12),
               _buildExpandList(
                 isUrdu: isUrdu,
                 fontFamily: fontFamily,
@@ -255,8 +256,9 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 category: 'aging',
                 stockService: stockService,
               ),
+            ],
 
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
 
             // ═══ Dead stock summary card ═══
             if (deadStockItems.isNotEmpty) ...[
@@ -272,7 +274,6 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 count: deadStockItems.length,
                 value: deadStockValue,
               ),
-              const SizedBox(height: 14),
             ],
           ],
         ),
@@ -370,7 +371,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Hero Score Card
+  // Hero Score Card (Border radius 12, Consistent Padding)
   // ═════════════════════════════════════════════════════════════
   Widget _buildHeroScore({
     required bool isUrdu,
@@ -397,26 +398,26 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     final healthyCount = totalItems - outCount - lowCount - deadCount;
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppTheme.themeColor,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
           // Circular progress
           SizedBox(
-            width: 100,
-            height: 100,
+            width: 90,
+            height: 90,
             child: Stack(
               alignment: Alignment.center,
               children: [
                 SizedBox(
-                  width: 100,
-                  height: 100,
+                  width: 90,
+                  height: 90,
                   child: CircularProgressIndicator(
                     value: score / 100,
-                    strokeWidth: 9,
+                    strokeWidth: 8,
                     backgroundColor: Colors.white.withValues(alpha: 0.20),
                     valueColor: AlwaysStoppedAnimation<Color>(scoreColor),
                   ),
@@ -427,7 +428,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     UrduAwareText(
                       '$score',
                       style: TextStyle(
-                        fontSize: 30,
+                        fontSize: 26,
                         fontWeight: FontWeight.w900,
                         color: Colors.white,
                         fontFamily: fontFamily,
@@ -438,7 +439,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     UrduAwareText(
                       isUrdu ? 'اسکور' : 'SCORE',
                       style: TextStyle(
-                        fontSize: 9,
+                        fontSize: 8.5,
                         fontWeight: FontWeight.w700,
                         color: Colors.white.withValues(alpha: 0.85),
                         letterSpacing: 0.5,
@@ -450,7 +451,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -458,7 +459,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 UrduAwareText(
                   '${isUrdu ? 'انوینٹری کی صحت' : 'Inventory Health'} — $statusLabel',
                   style: TextStyle(
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                     fontFamily: fontFamily,
@@ -470,7 +471,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 UrduAwareText(
                   '${isUrdu ? 'کل ویلیو: ' : 'Total value: '}${Formatters.formatAmountWithCurrency(totalValue)}',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w600,
                     color: Colors.white.withValues(alpha: 0.90),
                     fontFamily: fontFamily,
@@ -480,8 +481,8 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 ),
                 const SizedBox(height: 8),
                 Wrap(
-                  spacing: 12,
-                  runSpacing: 6,
+                  spacing: 10,
+                  runSpacing: 4,
                   children: [
                     _buildHeroStat(
                       color: AppTheme.incomeColor,
@@ -521,15 +522,15 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 7,
-          height: 7,
+          width: 6,
+          height: 6,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-        const SizedBox(width: 5),
+        const SizedBox(width: 4),
         UrduAwareText(
           '$count $label',
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 10.5,
             fontWeight: FontWeight.w700,
             color: Colors.white,
             fontFamily: fontFamily,
@@ -540,7 +541,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Traffic Card (Clickable) - No shadow, no border
+  // Traffic Card (Clickable) - Consistent Padding & Spacing
   // ═════════════════════════════════════════════════════════════
   Widget _buildTrafficCard({
     required bool isUrdu,
@@ -562,24 +563,24 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
             _activeAgingBucket = null;
           });
         },
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: isActive ? AppTheme.themeColor.withValues(alpha: 0.05) : Colors.white,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   color: lightBg,
-                  borderRadius: BorderRadius.circular(11),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 alignment: Alignment.center,
-                child: Icon(icon, size: 18, color: lightColor),
+                child: Icon(icon, size: 16, color: lightColor),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -590,7 +591,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     UrduAwareText(
                       '$count',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.w900,
                         color: AppTheme.darkColor,
                         height: 1,
@@ -601,7 +602,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     UrduAwareText(
                       label,
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 9.5,
                         fontWeight: FontWeight.w700,
                         color: AppTheme.textSecondary,
                         fontFamily: fontFamily,
@@ -614,7 +615,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
               ),
               Icon(
                 isActive ? PhosphorIcons.caretUp() : PhosphorIcons.caretDown(),
-                size: 12,
+                size: 11,
                 color: isActive ? AppTheme.themeColor : AppTheme.textSecondary,
               ),
             ],
@@ -625,7 +626,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Expand List - No shadow, no border
+  // Expand List - Consistent Padding
   // ═════════════════════════════════════════════════════════════
   Widget _buildExpandList({
     required bool isUrdu,
@@ -637,121 +638,115 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     required StockService stockService,
   }) {
     if (items.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 10),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: UrduAwareText(
-            isUrdu ? 'کوئی شے نہیں' : 'No items',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textSecondary,
-              fontFamily: fontFamily,
-            ),
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: UrduAwareText(
+          isUrdu ? 'کوئی شے نہیں' : 'No items',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.textSecondary,
+            fontFamily: fontFamily,
           ),
         ),
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        UrduAwareText(
-                          title,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.darkColor,
-                            fontFamily: fontFamily,
-                          ),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      UrduAwareText(
+                        title,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.darkColor,
+                          fontFamily: fontFamily,
                         ),
-                        const SizedBox(height: 2),
-                        UrduAwareText(
-                          subtitle,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textSecondary,
-                            fontFamily: fontFamily,
-                          ),
+                      ),
+                      const SizedBox(height: 2),
+                      UrduAwareText(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textSecondary,
+                          fontFamily: fontFamily,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          _activeList = null;
-                          _activeAgingBucket = null;
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(999),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.verifiedGold.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: UrduAwareText(
-                          isUrdu ? 'بند ✕' : 'Close ✕',
-                          style: TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.verifiedGold,
-                            fontFamily: fontFamily,
-                          ),
+                ),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _activeList = null;
+                        _activeAgingBucket = null;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.verifiedGold.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: UrduAwareText(
+                        isUrdu ? 'بند ✕' : 'Close ✕',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.verifiedGold,
+                          fontFamily: fontFamily,
                         ),
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const Divider(height: 1, color: Color(0xFFF1F5F9)),
-            // Items
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                children: items.map((item) {
-                  return _buildExpandItem(
-                    item: item,
-                    isUrdu: isUrdu,
-                    fontFamily: fontFamily,
-                    category: category,
-                    stockService: stockService,
-                  );
-                }).toList(),
-              ),
+          ),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          // Items
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              children: items.map((item) {
+                return _buildExpandItem(
+                  item: item,
+                  isUrdu: isUrdu,
+                  fontFamily: fontFamily,
+                  category: category,
+                  stockService: stockService,
+                );
+              }).toList(),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -796,27 +791,27 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
           );
           if (result == true && mounted) setState(() {});
         },
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         child: Container(
           margin: const EdgeInsets.only(bottom: 6),
-          padding: const EdgeInsets.all(9),
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: bgColor,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
             children: [
               Container(
-                width: 30,
-                height: 30,
+                width: 28,
+                height: 28,
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 alignment: Alignment.center,
-                child: Icon(iconData, size: 14, color: color),
+                child: Icon(iconData, size: 13, color: color),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -826,7 +821,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w700,
                         color: AppTheme.darkColor,
                         fontFamily: fontFamily,
@@ -838,7 +833,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                           ? 'کم از کم: ${item.minStockAlert.toStringAsFixed(0)} ${item.unit}'
                           : 'Min: ${item.minStockAlert.toStringAsFixed(0)} ${item.unit}',
                       style: TextStyle(
-                        fontSize: 9.5,
+                        fontSize: 9,
                         fontWeight: FontWeight.w600,
                         color: AppTheme.textSecondary,
                         fontFamily: fontFamily,
@@ -850,17 +845,17 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
+                  horizontal: 7,
+                  vertical: 3.5,
                 ),
                 decoration: BoxDecoration(
                   color: color,
-                  borderRadius: BorderRadius.circular(7),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: UrduAwareText(
                   qtyLabel,
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 9.5,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                     fontFamily: fontFamily,
@@ -881,7 +876,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Aging Card - No shadow, no border
+  // Aging Card - Consistent Padding
   // ═════════════════════════════════════════════════════════════
   Widget _buildAgingCard({
     required bool isUrdu,
@@ -896,12 +891,12 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         children: [
           for (int i = 0; i < buckets.length; i++) ...[
-            if (i > 0) const SizedBox(height: 10),
+            if (i > 0) const SizedBox(height: 8),
             _buildAgingBarRow(
               isUrdu: isUrdu,
               fontFamily: fontFamily,
@@ -916,9 +911,9 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
               },
             ),
           ],
-          const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
           const SizedBox(height: 10),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 12,
             runSpacing: 6,
@@ -983,7 +978,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
               ),
               Expanded(
                 child: Container(
-                  height: 8,
+                  height: 7,
                   decoration: BoxDecoration(
                     color: const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(999),
@@ -1036,8 +1031,8 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 7,
-          height: 7,
+          width: 6,
+          height: 6,
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(2),
@@ -1058,7 +1053,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Dead Stock Summary - No shadow, no border
+  // Dead Stock Summary - Consistent Padding
   // ═════════════════════════════════════════════════════════════
   Widget _buildDeadStockSummary({
     required bool isUrdu,
@@ -1070,16 +1065,16 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               color: AppTheme.incomeColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(11),
+              borderRadius: BorderRadius.circular(8),
             ),
             alignment: Alignment.center,
             child: Icon(
@@ -1137,11 +1132,11 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     String? fontFamily,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       child: Row(
         children: [
           Icon(icon, size: 14, color: AppTheme.textSecondary),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Expanded(
             child: UrduAwareText(
               title.toUpperCase(),
@@ -1163,7 +1158,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
 }
 
 // ═════════════════════════════════════════════════════════════
-// Aging Bucket Model
+// Aging Bucket Normal Model
 // ═════════════════════════════════════════════════════════════
 class _AgingBucket {
   final String key;
