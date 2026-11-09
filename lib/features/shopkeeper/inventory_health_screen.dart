@@ -551,7 +551,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Traffic Card (Clickable) - No border, using Phosphor Icons & AppTheme
+  // Traffic Card (Clickable) - No shadow, no border
   // ═════════════════════════════════════════════════════════════
   Widget _buildTrafficCard({
     required bool isUrdu,
@@ -579,15 +579,6 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
           decoration: BoxDecoration(
             color: isActive ? AppTheme.themeColor.withValues(alpha: 0.05) : Colors.white,
             borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: isActive
-                    ? AppTheme.themeColor.withValues(alpha: 0.20)
-                    : Colors.black.withValues(alpha: 0.04),
-                blurRadius: isActive ? 16 : 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
           ),
           child: Row(
             children: [
@@ -645,7 +636,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Expand List - No border
+  // Expand List - No shadow, no border
   // ═════════════════════════════════════════════════════════════
   Widget _buildExpandList({
     required bool isUrdu,
@@ -665,13 +656,6 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
           ),
           child: UrduAwareText(
             isUrdu ? 'کوئی شے نہیں' : 'No items',
@@ -693,13 +677,6 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-          ],
         ),
         child: Column(
           children: [
@@ -915,7 +892,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Aging Card - No border
+  // Aging Card - No shadow, no border
   // ═════════════════════════════════════════════════════════════
   Widget _buildAgingCard({
     required bool isUrdu,
@@ -931,13 +908,6 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         children: [
@@ -1099,7 +1069,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Dead Stock Summary - No border, using Phosphor Icons & AppTheme
+  // Dead Stock Summary - No shadow, no border
   // ═════════════════════════════════════════════════════════════
   Widget _buildDeadStockSummary({
     required bool isUrdu,
@@ -1112,13 +1082,6 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Row(
         children: [
