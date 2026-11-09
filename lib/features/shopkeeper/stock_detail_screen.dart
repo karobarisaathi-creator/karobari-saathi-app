@@ -164,7 +164,7 @@ class StockDetailScreen extends StatelessWidget {
   }
 
   // ═════════════════════════════════════════════
-  // 1. HERO CARD
+  // 1. HERO CARD — Gallery Style
   // ═════════════════════════════════════════════
   Widget _buildHeroCard(
     BuildContext context,
@@ -181,371 +181,413 @@ class StockDetailScreen extends StatelessWidget {
         : item.categoryName;
     final status = _getStatusData(isUrdu, isOutOfStock, isLowStock);
 
-    // Progress (0..1) - dynamic and working properly
-    final maxRef = item.minStockAlert > 0
-        ? (item.minStockAlert * 10.0).clamp(100.0, double.infinity)
+    // ═══ Progress calculation ═══
+    final minAlert = item.minStockAlert;
+    final maxRef = minAlert > 0
+        ? (minAlert * 10.0).clamp(100.0, double.infinity)
         : 100.0;
     final progress =
         item.trackStock ? (computedStock / maxRef).clamp(0.0, 1.0) : 1.0;
+    final minLinePos = minAlert > 0 ? (minAlert / maxRef).clamp(0.0, 1.0) : 0.0;
+
+    final unitValue = avgCost > 0 ? avgCost : item.purchasePrice;
+    final totalValue = computedStock * unitValue;
 
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFFFFFF), Color(0xFFFAFCFF)],
-        ),
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.darkColor.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-          BoxShadow(
-            color: AppTheme.darkColor.withValues(alpha: 0.02),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+            color: AppTheme.darkColor.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(22),
-        child: Stack(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // decorative glow
-            Positioned(
-              top: -80,
-              right: -80,
-              child: Container(
-                width: 220,
-                height: 220,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      status.color.withValues(alpha: 0.08),
-                      Colors.transparent,
+            // ═══════════════════════════════════════
+            // GALLERY SECTION — Full width image
+            // ═══════════════════════════════════════
+            Container(
+              color: const Color(0xFFF8FAFC),
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: AspectRatio(
+                  aspectRatio: 16 / 10,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Gradient background
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              status.color.withValues(alpha: 0.15),
+                              status.color.withValues(alpha: 0.05),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Image
+                      _buildItemImage(item, status.color),
+
+                      // Featured badge (top-right)
+                      if (item.featured)
+                        Positioned(
+                          top: 10,
+                          right: 10,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  AppTheme.verifiedGold,
+                                  Color(0xFFB45309),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(999),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppTheme.verifiedGold
+                                      .withValues(alpha: 0.45),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.star_rounded,
+                                  size: 12,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 4),
+                                UrduAwareText(
+                                  isUrdu ? 'نمایاں' : 'Featured',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    fontFamily: fontFamily,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                      // Image count badge (bottom-right)
+                      // صرف ایک image ہو تو نہ دکھاؤ
+                      Positioned(
+                        bottom: 10,
+                        right: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.darkColor.withValues(alpha: 0.65),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: UrduAwareText(
+                            '1 / 1',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              fontFamily: null,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top: Image + Info
-                Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+
+            // ═══════════════════════════════════════
+            // INFO SECTION — Name centered + Tags
+            // ═══════════════════════════════════════
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+              child: Column(
+                children: [
+                  // Name — centered, big
+                  UrduAwareText(
+                    displayName,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.darkColor,
+                      fontFamily: fontFamily,
+                      letterSpacing: -0.4,
+                      height: 1.3,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Meta row — centered
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      // Image with ring
-                      Stack(
-                        children: [
-                          Container(
-                            width: 84,
-                            height: 84,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  status.color.withValues(alpha: 0.12),
-                                  status.color.withValues(alpha: 0.04),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: status.color.withValues(alpha: 0.25),
-                                width: 2,
-                              ),
-                            ),
-                            child: _buildItemImage(item, status.color),
+                      // Category
+                      if (item.categoryName.isNotEmpty)
+                        _buildTag(
+                          text: categoryName,
+                          color: AppTheme.themeColor,
+                          bg: AppTheme.themeColor.withValues(alpha: 0.10),
+                          fontFamily: fontFamily,
+                        ),
+                      // SKU
+                      if (item.sku.isNotEmpty)
+                        _buildTag(
+                          text: '#${item.sku}',
+                          color: AppTheme.textSecondary,
+                          bg: AppTheme.backgroundColor,
+                          fontFamily: null,
+                          isMono: true,
+                        ),
+                      // Alert (min)
+                      if (item.trackStock && minAlert > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
                           ),
-                          if (item.featured)
-                            Positioned(
-                              top: -6,
-                              right: -6,
-                              child: Container(
-                                width: 28,
-                                height: 28,
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      AppTheme.verifiedGold,
-                                      Color(0xFFB8860B),
-                                    ],
-                                  ),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: Colors.white, width: 2.5),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppTheme.verifiedGold
-                                          .withValues(alpha: 0.4),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.star_rounded,
-                                  size: 14,
-                                  color: Colors.white,
-                                ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                PhosphorIcons.bellRinging(
+                                    PhosphorIconsStyle.fill),
+                                size: 10,
+                                color: const Color(0xFFB45309),
                               ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(width: 14),
-
-                      // Info
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Item Name + Status Badge on the same line
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: UrduAwareText(
-                                    displayName,
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppTheme.darkColor,
-                                      fontFamily: fontFamily,
-                                      letterSpacing: -0.4,
-                                      height: 1.25,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                              const SizedBox(width: 3),
+                              UrduAwareText(
+                                '${isUrdu ? "کم از کم" : "Min"}: ${minAlert.toStringAsFixed(0)} ${item.unit}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFFB45309),
+                                  fontFamily: fontFamily,
                                 ),
-                                const SizedBox(width: 6),
-
-                                // Status badge ("اسٹاک موجود") on the opposite side
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 9, vertical: 5),
-                                  decoration: BoxDecoration(
-                                    color: status.bg,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: status.border,
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(status.icon,
-                                          size: 12, color: status.color),
-                                      const SizedBox(width: 4),
-                                      UrduAwareText(
-                                        status.text,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
-                                          color: status.color,
-                                          fontFamily: fontFamily,
-                                          letterSpacing: 0.2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-
-                            // Tags (Category, SKU)
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: [
-                                if (item.categoryName.isNotEmpty)
-                                  _buildTag(
-                                    text: categoryName,
-                                    color: AppTheme.themeColor,
-                                    bg: AppTheme.themeColor
-                                        .withValues(alpha: 0.10),
-                                    fontFamily: fontFamily,
-                                  ),
-                                if (item.sku.isNotEmpty)
-                                  _buildTag(
-                                    text: '#${item.sku}',
-                                    color: AppTheme.textSecondary,
-                                    bg: AppTheme.backgroundColor,
-                                    fontFamily: null,
-                                    isMono: true,
-                                  ),
-                              ],
-                            ),
-
-                            // Alert tag under Category/SKU (without background box)
-                            if (item.minStockAlert > 0) ...[
-                              const SizedBox(height: 6),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    PhosphorIcons.bellRinging(),
-                                    size: 12,
-                                    color: AppTheme.textSecondary,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  UrduAwareText(
-                                    isUrdu
-                                        ? 'الرٹ: ${item.minStockAlert.toStringAsFixed(0)}'
-                                        : 'Alert: ${item.minStockAlert.toStringAsFixed(0)}',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppTheme.textSecondary,
-                                      fontFamily: fontFamily,
-                                    ),
-                                  ),
-                                ],
                               ),
                             ],
+                          ),
+                        ),
+                      // Status badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: status.bg,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: status.border,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(status.icon, size: 11, color: status.color),
+                            const SizedBox(width: 4),
+                            UrduAwareText(
+                              status.text,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: status.color,
+                                fontFamily: fontFamily,
+                              ),
+                            ),
                           ],
                         ),
                       ),
                     ],
                   ),
-                ),
+                ],
+              ),
+            ),
 
-                // Stock Hero section
-                if (item.trackStock)
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
-                    decoration: BoxDecoration(
-                      color: AppTheme.themeColor.withValues(alpha: 0.02),
-                      border: Border(
-                        top: BorderSide(
-                          color: AppTheme.backgroundColor,
-                          width: 1,
+            // ═══════════════════════════════════════
+            // METRICS SECTION — 4-cell + Progress
+            // ═══════════════════════════════════════
+            if (item.trackStock) ...[
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: AppTheme.backgroundColor,
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Label
+                    Center(
+                      child: UrduAwareText(
+                        (isUrdu ? 'اسٹاک کا جائزہ' : 'STOCK OVERVIEW')
+                            .toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textSecondary,
+                          letterSpacing: 0.6,
+                          fontFamily: fontFamily,
                         ),
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 10),
+
+                    // 4-cell grid
+                    Row(
                       children: [
-                        // Big number + Total Value pill
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            // Big number
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.baseline,
-                              textBaseline: TextBaseline.alphabetic,
-                              children: [
-                                UrduAwareText(
-                                  computedStock.toStringAsFixed(
-                                    computedStock.truncateToDouble() ==
-                                            computedStock
-                                        ? 0
-                                        : 1,
-                                  ),
-                                  style: TextStyle(
-                                    fontSize: 42,
-                                    fontWeight: FontWeight.w900,
-                                    color: status.color,
-                                    letterSpacing: -2,
-                                    height: 1,
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures(),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                UrduAwareText(
-                                  item.unit,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.textSecondary,
-                                    fontFamily: fontFamily,
-                                  ),
-                                ),
-                              ],
+                        // Current
+                        Expanded(
+                          child: _buildStatCell(
+                            value: computedStock.toStringAsFixed(
+                              computedStock.truncateToDouble() == computedStock
+                                  ? 0
+                                  : 1,
                             ),
-                            const Spacer(),
-
-                            // Total value pill
-                            if (item.purchasePrice > 0 || avgCost > 0) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: status.color.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
-                                    color: status.color.withValues(alpha: 0.25),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      PhosphorIcons.money(),
-                                      size: 12,
-                                      color: status.color,
-                                    ),
-                                    const SizedBox(width: 5),
-                                    UrduAwareText(
-                                      '${isUrdu ? "کل مالیت" : "Total"}: ${Formatters.formatAmountWithCurrency((computedStock * (avgCost > 0 ? avgCost : item.purchasePrice)))}',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                        color: status.color,
-                                        fontFamily: fontFamily,
-                                        fontFeatures: const [
-                                          FontFeature.tabularFigures(),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
+                            label: isUrdu ? 'موجودہ' : 'CURRENT',
+                            valueColor: status.color,
+                            bgOverride: status.color.withValues(alpha: 0.08),
+                            borderOverride:
+                                status.color.withValues(alpha: 0.20),
+                            fontFamily: fontFamily,
+                          ),
                         ),
-                        const SizedBox(height: 14),
-
-                        // Progress bar
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(999),
-                          child: Container(
-                            height: 8,
-                            color: AppTheme.backgroundColor,
-                            child: FractionallySizedBox(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: progress,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      status.color,
-                                      status.color.withValues(alpha: 0.6),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                              ),
+                        const SizedBox(width: 6),
+                        // Min alert
+                        Expanded(
+                          child: _buildStatCell(
+                            value: minAlert.toStringAsFixed(0),
+                            label: isUrdu ? 'کم از کم' : 'MIN ALERT',
+                            valueColor: isOutOfStock
+                                ? AppTheme.expenseColor
+                                : (isLowStock
+                                    ? const Color(0xFFD97706)
+                                    : AppTheme.darkColor),
+                            fontFamily: fontFamily,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        // Per unit
+                        Expanded(
+                          child: _buildStatCell(
+                            value: Formatters.formatAmountWithCurrency(
+                              item.sellingPrice,
                             ),
+                            label: isUrdu ? 'فی یونٹ' : 'PER UNIT',
+                            valueColor: AppTheme.darkColor,
+                            fontFamily: fontFamily,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        // Total value
+                        Expanded(
+                          child: _buildStatCell(
+                            value: totalValue > 0
+                                ? Formatters.formatAmountWithCurrency(
+                                    totalValue)
+                                : '—',
+                            label: isUrdu ? 'کل ویلیو' : 'TOTAL',
+                            valueColor: AppTheme.goldColor,
+                            fontFamily: fontFamily,
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 14),
+
+                    // Progress bar with min-line
+                    _buildStockProgress(
+                      progress: progress,
+                      minLinePos: minLinePos,
+                      statusColor: status.color,
+                      minAlert: minAlert,
+                      maxRef: maxRef,
+                      isUrdu: isUrdu,
+                      fontFamily: fontFamily,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // ═══════════════════════════════════════
+            // Not-tracked fallback (اگر trackStock false ہو)
+            // ═══════════════════════════════════════
+            if (!item.trackStock)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: AppTheme.backgroundColor,
+                      width: 1,
+                    ),
                   ),
-              ],
-            ),
+                  color: AppTheme.backgroundColor.withValues(alpha: 0.3),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      PhosphorIcons.infinity(),
+                      size: 16,
+                      color: AppTheme.textSecondary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: UrduAwareText(
+                        isUrdu
+                            ? 'یہ آئٹم اسٹاک ٹریک نہیں کرتا'
+                            : 'Stock is not tracked for this item',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textSecondary,
+                          fontFamily: fontFamily,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
@@ -1428,6 +1470,208 @@ class StockDetailScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  // ═════════════════════════════════════════════
+  // Stat Cell
+  // ═════════════════════════════════════════════
+  Widget _buildStatCell({
+    required String value,
+    required String label,
+    required Color valueColor,
+    String? fontFamily,
+    Color? bgOverride,
+    Color? borderOverride,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+      decoration: BoxDecoration(
+        color: bgOverride ?? Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: borderOverride ?? AppTheme.backgroundColor,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          UrduAwareText(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              color: valueColor,
+              height: 1.1,
+              letterSpacing: -0.3,
+              fontFeatures: const [FontFeature.tabularFigures()],
+              fontFamily: null,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          UrduAwareText(
+            label,
+            style: TextStyle(
+              fontSize: 8,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textSecondary,
+              letterSpacing: 0.2,
+              fontFamily: fontFamily,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═════════════════════════════════════════════
+  // Stock Progress Bar with min-line
+  // ═════════════════════════════════════════════
+  Widget _buildStockProgress({
+    required double progress,
+    required double minLinePos,
+    required Color statusColor,
+    required double minAlert,
+    required double maxRef,
+    required bool isUrdu,
+    required String? fontFamily,
+  }) {
+    return Column(
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            return SizedBox(
+              height: 14,
+              child: Stack(
+                children: [
+                  // Track
+                  Positioned(
+                    top: 3,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: AppTheme.backgroundColor,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: progress,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                statusColor,
+                                statusColor.withValues(alpha: 0.7),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Min line marker
+                  if (minLinePos > 0 && minLinePos < 1)
+                    Positioned(
+                      left: (width * minLinePos) - 4,
+                      top: 0,
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDC2626),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            width: 2,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDC2626),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 4),
+        // Labels
+        SizedBox(
+          height: 12,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              return Stack(
+                children: [
+                  Positioned(
+                    left: 0,
+                    child: UrduAwareText(
+                      '0',
+                      style: TextStyle(
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textSecondary,
+                        fontFamily: null,
+                      ),
+                    ),
+                  ),
+                  if (minLinePos > 0 && minLinePos < 1)
+                    Positioned(
+                      left: (width * minLinePos) - 30,
+                      child: SizedBox(
+                        width: 60,
+                        child: UrduAwareText(
+                          '${isUrdu ? "کم از کم" : "Min"} ${minAlert.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFFDC2626),
+                            fontFamily: fontFamily,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  Positioned(
+                    right: 0,
+                    child: UrduAwareText(
+                      maxRef.toStringAsFixed(0),
+                      style: TextStyle(
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textSecondary,
+                        fontFamily: null,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 

@@ -22,7 +22,7 @@ class InventoryHealthScreen extends StatefulWidget {
 }
 
 class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
-  // کون سی category کھلی ہے — 'out' | 'low' | 'dead' | 'aging' | null
+  // کون سی category کھلی ہے — 'out' | 'low' | 'dead' | null
   String? _activeList;
 
   // Aging bucket منتخب — 0..3 یا null
@@ -60,7 +60,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
           !movement.timestamp.isBefore(thirtyDaysAgo)) {
         recentSalesCounts.update(
           movement.stockItemId,
-          (count) => count + 1,
+              (count) => count + 1,
           ifAbsent: () => 1,
         );
       }
@@ -75,23 +75,23 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     // ═══ Dead stock value ═══
     final deadStockValue = deadStockItems.fold<double>(
       0,
-      (sum, item) =>
-          sum +
+          (sum, item) =>
+      sum +
           (stockService.calculateCurrentStock(item.id) *
               stockService.calculateWeightedAverageCost(item.id)),
     );
 
-    // ═══ Out of stock value (کھویا ہوا) ═══
-    final outStockValue = outOfStockItems.fold<double>(
+    // ═══ Out of stock — Reorder value (کم از کم اسٹاک × خرید قیمت) ═══
+    final outReorderValue = outOfStockItems.fold<double>(
       0,
-      (sum, item) => sum + (item.minStockAlert * item.purchasePrice),
+          (sum, item) => sum + (item.minStockAlert * item.purchasePrice),
     );
 
-    // ═══ Low stock value ═══
-    final lowStockValue = lowStockItems.fold<double>(
+    // ═══ Low stock — Gap value (کمی × خرید قیمت) ═══
+    final lowReorderValue = lowStockItems.fold<double>(
       0,
-      (sum, item) =>
-          sum +
+          (sum, item) =>
+      sum +
           ((item.minStockAlert - stockService.calculateCurrentStock(item.id)) *
               item.purchasePrice),
     );
@@ -191,8 +191,8 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     ? 'ختم شدہ اشیاء (${outOfStockItems.length})'
                     : 'Out of Stock (${outOfStockItems.length})',
                 subtitle: isUrdu
-                    ? 'ویلیو: ${Formatters.formatAmountWithCurrency(outStockValue)}'
-                    : 'Value: ${Formatters.formatAmountWithCurrency(outStockValue)}',
+                    ? 'دوبارہ آرڈر ویلیو: ${Formatters.formatAmountWithCurrency(outReorderValue)}'
+                    : 'Reorder value: ${Formatters.formatAmountWithCurrency(outReorderValue)}',
                 items: outOfStockItems,
                 category: 'out',
                 stockService: stockService,
@@ -205,8 +205,8 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     ? 'کم اسٹاک (${lowStockItems.length})'
                     : 'Low Stock (${lowStockItems.length})',
                 subtitle: isUrdu
-                    ? 'ویلیو: ${Formatters.formatAmountWithCurrency(lowStockValue)}'
-                    : 'Value: ${Formatters.formatAmountWithCurrency(lowStockValue)}',
+                    ? 'کمی کی ویلیو: ${Formatters.formatAmountWithCurrency(lowReorderValue)}'
+                    : 'Gap value: ${Formatters.formatAmountWithCurrency(lowReorderValue)}',
                 items: lowStockItems,
                 category: 'low',
                 stockService: stockService,
@@ -219,8 +219,8 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     ? 'مردہ اسٹاک (${deadStockItems.length})'
                     : 'Dead Stock (${deadStockItems.length})',
                 subtitle: isUrdu
-                    ? 'ویلیو: ${Formatters.formatAmountWithCurrency(deadStockValue)}'
-                    : 'Value: ${Formatters.formatAmountWithCurrency(deadStockValue)}',
+                    ? 'پھنسی ویلیو: ${Formatters.formatAmountWithCurrency(deadStockValue)}'
+                    : 'Stuck value: ${Formatters.formatAmountWithCurrency(deadStockValue)}',
                 items: deadStockItems,
                 category: 'dead',
                 stockService: stockService,
@@ -254,6 +254,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 items: agingBuckets[_activeAgingBucket!].items,
                 category: 'aging',
                 stockService: stockService,
+                agingBucket: agingBuckets[_activeAgingBucket!],
               ),
 
             const SizedBox(height: 14),
@@ -296,7 +297,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Aging Buckets
+  // Aging Buckets — "پرانا" کا رنگ نارنجی
   // ═════════════════════════════════════════════════════════════
   List<_AgingBucket> _buildAgingBuckets({
     required List<StockItem> items,
@@ -311,7 +312,8 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
         labelUr: '0-30 دن',
         minDays: 0,
         maxDays: 30,
-        color: AppTheme.incomeColor,
+        color: AppTheme.incomeColor, // سبز
+        icon: PhosphorIcons.leaf(PhosphorIconsStyle.fill),
       ),
       _AgingBucket(
         key: 'mid',
@@ -319,7 +321,8 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
         labelUr: '31-90 دن',
         minDays: 31,
         maxDays: 90,
-        color: AppTheme.verifiedGold,
+        color: AppTheme.verifiedGold, // پیلا
+        icon: PhosphorIcons.clock(PhosphorIconsStyle.fill),
       ),
       _AgingBucket(
         key: 'old',
@@ -327,7 +330,8 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
         labelUr: '91-180 دن',
         minDays: 91,
         maxDays: 180,
-        color: AppTheme.themeColor,
+        color: const Color(0xFFF97316), // نارنجی — پرانا
+        icon: PhosphorIcons.hourglass(PhosphorIconsStyle.fill),
       ),
       _AgingBucket(
         key: 'dead',
@@ -335,7 +339,8 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
         labelUr: '180+ دن',
         minDays: 181,
         maxDays: 99999,
-        color: AppTheme.expenseColor,
+        color: AppTheme.expenseColor, // سرخ — مردہ
+        icon: PhosphorIcons.skull(PhosphorIconsStyle.fill),
       ),
     ];
 
@@ -370,7 +375,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Hero Score Card (Border radius 18, Original Spacing)
+  // Hero Score Card
   // ═════════════════════════════════════════════════════════════
   Widget _buildHeroScore({
     required bool isUrdu,
@@ -382,17 +387,11 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     required int lowCount,
     required int deadCount,
   }) {
-    final scoreColor = score >= 75
-        ? AppTheme.incomeColor
-        : score >= 50
-            ? AppTheme.verifiedGold
-            : AppTheme.expenseColor;
-
     final statusLabel = score >= 75
         ? (isUrdu ? 'صحت مند' : 'Healthy')
         : score >= 50
-            ? (isUrdu ? 'توجہ چاہیے' : 'Needs Attention')
-            : (isUrdu ? 'تشویشناک' : 'Critical');
+        ? (isUrdu ? 'توجہ چاہیے' : 'Needs Attention')
+        : (isUrdu ? 'تشویشناک' : 'Critical');
 
     final healthyCount = totalItems - outCount - lowCount - deadCount;
 
@@ -404,7 +403,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
       ),
       child: Row(
         children: [
-          // Circular progress
+          // Circular progress — سفید ring (gradient پر واضح)
           SizedBox(
             width: 100,
             height: 100,
@@ -418,7 +417,9 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     value: score / 100,
                     strokeWidth: 9,
                     backgroundColor: Colors.white.withValues(alpha: 0.20),
-                    valueColor: AlwaysStoppedAnimation<Color>(scoreColor),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Colors.white,
+                    ),
                   ),
                 ),
                 Column(
@@ -470,9 +471,9 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 UrduAwareText(
                   '${isUrdu ? 'کل ویلیو: ' : 'Total value: '}${Formatters.formatAmountWithCurrency(totalValue)}',
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.90),
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
                     fontFamily: fontFamily,
                   ),
                   maxLines: 1,
@@ -521,16 +522,16 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 7,
-          height: 7,
+          width: 8.5,
+          height: 8.5,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-        const SizedBox(width: 5),
+        const SizedBox(width: 6),
         UrduAwareText(
           '$count $label',
           style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
             color: Colors.white,
             fontFamily: fontFamily,
           ),
@@ -540,7 +541,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Traffic Card (Clickable) - BorderRadius 18
+  // Traffic Card (Clickable)
   // ═════════════════════════════════════════════════════════════
   Widget _buildTrafficCard({
     required bool isUrdu,
@@ -566,7 +567,9 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isActive ? AppTheme.themeColor.withValues(alpha: 0.05) : Colors.white,
+            color: isActive
+                ? AppTheme.themeColor.withValues(alpha: 0.05)
+                : Colors.white,
             borderRadius: BorderRadius.circular(18),
           ),
           child: Row(
@@ -613,9 +616,13 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 ),
               ),
               Icon(
-                isActive ? PhosphorIcons.caretUp() : PhosphorIcons.caretDown(),
+                isActive
+                    ? PhosphorIcons.caretUp()
+                    : PhosphorIcons.caretDown(),
                 size: 12,
-                color: isActive ? AppTheme.themeColor : AppTheme.textSecondary,
+                color: isActive
+                    ? AppTheme.themeColor
+                    : AppTheme.textSecondary,
               ),
             ],
           ),
@@ -625,7 +632,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Expand List - BorderRadius 18
+  // Expand List
   // ═════════════════════════════════════════════════════════════
   Widget _buildExpandList({
     required bool isUrdu,
@@ -635,6 +642,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     required List<StockItem> items,
     required String category,
     required StockService stockService,
+    _AgingBucket? agingBucket,
   }) {
     if (items.isEmpty) {
       return Padding(
@@ -746,6 +754,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     fontFamily: fontFamily,
                     category: category,
                     stockService: stockService,
+                    agingBucket: agingBucket,
                   );
                 }).toList(),
               ),
@@ -762,27 +771,57 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     required String? fontFamily,
     required String category,
     required StockService stockService,
+    _AgingBucket? agingBucket,
   }) {
     final currentStock = stockService.calculateCurrentStock(item.id);
-    final color = category == 'out'
-        ? AppTheme.expenseColor
-        : category == 'low'
-            ? AppTheme.verifiedGold
-            : AppTheme.incomeColor;
-    final bgColor = category == 'out'
-        ? AppTheme.expenseColor.withValues(alpha: 0.1)
-        : category == 'low'
-            ? AppTheme.verifiedGold.withValues(alpha: 0.1)
-            : AppTheme.incomeColor.withValues(alpha: 0.1);
-    final iconData = category == 'out'
-        ? PhosphorIcons.xCircle(PhosphorIconsStyle.fill)
-        : category == 'low'
-            ? PhosphorIcons.warning(PhosphorIconsStyle.fill)
-            : PhosphorIcons.hourglass(PhosphorIconsStyle.fill);
 
-    final qtyLabel = category == 'out'
-        ? (isUrdu ? 'ختم' : 'OUT')
-        : '${currentStock.toStringAsFixed(0)} ${item.unit}';
+    // ═══ Color + Icon — aging bucket کے مطابق ═══
+    Color color;
+    Color bgColor;
+    IconData iconData;
+
+    if (category == 'aging' && agingBucket != null) {
+      // Aging bucket سے رنگ/icon
+      color = agingBucket.color;
+      bgColor = agingBucket.color.withValues(alpha: 0.1);
+      iconData = agingBucket.icon;
+    } else {
+      // Out / Low / Dead کے لیے
+      color = category == 'out'
+          ? AppTheme.expenseColor
+          : category == 'low'
+          ? AppTheme.verifiedGold
+          : AppTheme.incomeColor;
+      bgColor = color.withValues(alpha: 0.1);
+      iconData = category == 'out'
+          ? PhosphorIcons.xCircle(PhosphorIconsStyle.fill)
+          : category == 'low'
+          ? PhosphorIcons.warning(PhosphorIconsStyle.fill)
+          : PhosphorIcons.hourglass(PhosphorIconsStyle.fill);
+    }
+
+    // ═══ Qty label ═══
+    final String qtyLabel;
+    if (category == 'out') {
+      qtyLabel = isUrdu ? 'ختم' : 'OUT';
+    } else if (category == 'aging') {
+      // Aging میں صرف موجودہ اسٹاک
+      qtyLabel = '${currentStock.toStringAsFixed(0)} ${item.unit}';
+    } else {
+      qtyLabel = '${currentStock.toStringAsFixed(0)} ${item.unit}';
+    }
+
+    // ═══ Subtitle — aging میں "عمر" بھی دکھاو ═══
+    final String subtitle;
+    if (category == 'aging' && agingBucket != null) {
+      subtitle = isUrdu
+          ? 'کم از کم: ${item.minStockAlert.toStringAsFixed(0)} ${item.unit}'
+          : 'Min: ${item.minStockAlert.toStringAsFixed(0)} ${item.unit}';
+    } else {
+      subtitle = isUrdu
+          ? 'کم از کم: ${item.minStockAlert.toStringAsFixed(0)} ${item.unit}'
+          : 'Min: ${item.minStockAlert.toStringAsFixed(0)} ${item.unit}';
+    }
 
     return Material(
       color: Colors.transparent,
@@ -834,9 +873,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     ),
                     const SizedBox(height: 2),
                     UrduAwareText(
-                      isUrdu
-                          ? 'کم از کم: ${item.minStockAlert.toStringAsFixed(0)} ${item.unit}'
-                          : 'Min: ${item.minStockAlert.toStringAsFixed(0)} ${item.unit}',
+                      subtitle,
                       style: TextStyle(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w600,
@@ -881,7 +918,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Aging Card - BorderRadius 18
+  // Aging Card
   // ═════════════════════════════════════════════════════════════
   Widget _buildAgingCard({
     required bool isUrdu,
@@ -923,26 +960,12 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
             spacing: 12,
             runSpacing: 6,
             children: [
-              _buildLegendItem(
-                color: AppTheme.incomeColor,
-                label: isUrdu ? 'تازہ' : 'Fresh',
-                fontFamily: fontFamily,
-              ),
-              _buildLegendItem(
-                color: AppTheme.verifiedGold,
-                label: isUrdu ? 'درمیانہ' : 'Mid',
-                fontFamily: fontFamily,
-              ),
-              _buildLegendItem(
-                color: AppTheme.themeColor,
-                label: isUrdu ? 'پرانا' : 'Old',
-                fontFamily: fontFamily,
-              ),
-              _buildLegendItem(
-                color: AppTheme.expenseColor,
-                label: isUrdu ? 'مردہ' : 'Dead',
-                fontFamily: fontFamily,
-              ),
+              for (final b in buckets)
+                _buildLegendItem(
+                  color: b.color,
+                  label: b.label(isUrdu),
+                  fontFamily: fontFamily,
+                ),
             ],
           ),
         ],
@@ -1016,9 +1039,13 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 ),
               ),
               Icon(
-                isActive ? PhosphorIcons.caretUp() : PhosphorIcons.caretDown(),
+                isActive
+                    ? PhosphorIcons.caretUp()
+                    : PhosphorIcons.caretDown(),
                 size: 11,
-                color: isActive ? AppTheme.themeColor : AppTheme.textSecondary,
+                color: isActive
+                    ? AppTheme.themeColor
+                    : AppTheme.textSecondary,
               ),
             ],
           ),
@@ -1058,7 +1085,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Dead Stock Summary - BorderRadius 18
+  // Dead Stock Summary
   // ═════════════════════════════════════════════════════════════
   Widget _buildDeadStockSummary({
     required bool isUrdu,
@@ -1078,14 +1105,14 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: AppTheme.incomeColor.withValues(alpha: 0.1),
+              color: AppTheme.expenseColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(11),
             ),
             alignment: Alignment.center,
             child: Icon(
               PhosphorIcons.hourglass(PhosphorIconsStyle.fill),
               size: 18,
-              color: AppTheme.incomeColor,
+              color: AppTheme.expenseColor,
             ),
           ),
           const SizedBox(width: 10),
@@ -1109,8 +1136,8 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 const SizedBox(height: 2),
                 UrduAwareText(
                   isUrdu
-                      ? 'ویلیو: ${Formatters.formatAmountWithCurrency(value)} پھنسی ہوئی'
-                      : 'Value: ${Formatters.formatAmountWithCurrency(value)} stuck',
+                      ? 'پھنسی ویلیو: ${Formatters.formatAmountWithCurrency(value)}'
+                      : 'Stuck value: ${Formatters.formatAmountWithCurrency(value)}',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
@@ -1172,6 +1199,7 @@ class _AgingBucket {
   final int minDays;
   final int maxDays;
   final Color color;
+  final IconData icon;
   final List<StockItem> items;
 
   _AgingBucket({
@@ -1181,6 +1209,7 @@ class _AgingBucket {
     required this.minDays,
     required this.maxDays,
     required this.color,
+    required this.icon,
   }) : items = [];
 
   String label(bool isUrdu) => isUrdu ? labelUr : labelEn;
