@@ -484,49 +484,69 @@ class StockDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
 
-                    // 3-cell grid (Current, Per Unit, Total Value)
-                    Row(
+                    // 2x2 grid (Current, Total, Purchase, Selling)
+                    Column(
                       children: [
-                        // Current
-                        Expanded(
-                          child: _buildStatCell(
-                            value: computedStock.toStringAsFixed(
-                              computedStock.truncateToDouble() == computedStock
-                                  ? 0
-                                  : 1,
+                        Row(
+                          children: [
+                            // Current Stock
+                            Expanded(
+                              child: _buildStatCell(
+                                value: computedStock.toStringAsFixed(
+                                  computedStock.truncateToDouble() == computedStock
+                                      ? 0
+                                      : 1,
+                                ),
+                                label: isUrdu ? 'موجودہ' : 'CURRENT',
+                                valueColor: status.color,
+                                bgOverride: status.color.withValues(alpha: 0.08),
+                                borderOverride:
+                                    status.color.withValues(alpha: 0.20),
+                                fontFamily: fontFamily,
+                              ),
                             ),
-                            label: isUrdu ? 'موجودہ' : 'CURRENT',
-                            valueColor: status.color,
-                            bgOverride: status.color.withValues(alpha: 0.08),
-                            borderOverride:
-                                status.color.withValues(alpha: 0.20),
-                            fontFamily: fontFamily,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Per unit
-                        Expanded(
-                          child: _buildStatCell(
-                            value: Formatters.formatAmountWithCurrency(
-                              item.sellingPrice,
+                            const SizedBox(width: 8),
+                            // Total Value
+                            Expanded(
+                              child: _buildStatCell(
+                                value: totalValue > 0
+                                    ? Formatters.formatAmountWithCurrency(
+                                        totalValue)
+                                    : '—',
+                                label: isUrdu ? 'کل ویلیو' : 'TOTAL',
+                                valueColor: AppTheme.goldColor,
+                                fontFamily: fontFamily,
+                              ),
                             ),
-                            label: isUrdu ? 'فی یونٹ' : 'PER UNIT',
-                            valueColor: AppTheme.darkColor,
-                            fontFamily: fontFamily,
-                          ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        // Total value
-                        Expanded(
-                          child: _buildStatCell(
-                            value: totalValue > 0
-                                ? Formatters.formatAmountWithCurrency(
-                                    totalValue)
-                                : '—',
-                            label: isUrdu ? 'کل ویلیو' : 'TOTAL',
-                            valueColor: AppTheme.goldColor,
-                            fontFamily: fontFamily,
-                          ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            // Purchase Price
+                            Expanded(
+                              child: _buildStatCell(
+                                value: Formatters.formatAmountWithCurrency(
+                                  avgCost > 0 ? avgCost : item.purchasePrice,
+                                ),
+                                label: isUrdu ? 'خرید ریٹ' : 'PURCHASE',
+                                valueColor: AppTheme.darkColor,
+                                fontFamily: fontFamily,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Selling Price
+                            Expanded(
+                              child: _buildStatCell(
+                                value: Formatters.formatAmountWithCurrency(
+                                  item.sellingPrice,
+                                ),
+                                label: isUrdu ? 'فروخت ریٹ' : 'SELLING',
+                                valueColor: AppTheme.themeColor,
+                                fontFamily: fontFamily,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
