@@ -151,7 +151,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
           elevation: 0,
           shape: const RoundedRectangleBorder(),
           showBackButton: false,
-          leadingWidth: showBackButton ? 104 : (showTrustTag ? 90 : null),
+          leadingWidth: showBackButton ? 104 : (showTrustTag ? 100 : null),
           leading: showBackButton || showTrustTag
               ? Row(
                   mainAxisSize: MainAxisSize.min,
@@ -164,7 +164,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                       ),
                     if (showTrustTag)
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsetsDirectional.only(start: 16, end: 4),
                         child: InkWell(
                           onTap: () => TrustPopupDialog.show(
                             context: context,
