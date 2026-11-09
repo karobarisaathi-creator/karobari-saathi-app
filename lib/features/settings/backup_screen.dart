@@ -7,13 +7,13 @@ import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/backup_service.dart';
 import 'package:account_app/core/services/database_service.dart';
+import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:hive/hive.dart';
 
-import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/models/category_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/features/settings/master_profile_screen.dart';
@@ -49,20 +49,28 @@ class _BackupScreenState extends State<BackupScreen> {
     if (mounted) setState(() => _isLoading = true);
 
     try {
-      _backupInfo = await _backupService.getBackupInfo();
+      final stockService = Provider.of<StockService>(context, listen: false);
+      _backupInfo = await _backupService.getBackupInfo(
+        stockItemCount: stockService.items.length,
+        stockMovementCount: stockService.movements.length,
+      );
 
       final accounts = _databaseService.getAccounts();
       final transactions = _databaseService.getAllTransactions();
 
-      final stockBox = Hive.isBoxOpen('stock_items') ? Hive.box<StockItem>('stock_items') : await Hive.openBox<StockItem>('stock_items');
-      final categoriesBox = Hive.isBoxOpen('categories') ? Hive.box<Category>('categories') : await Hive.openBox<Category>('categories');
-      final professionsBox = Hive.isBoxOpen('professions') ? Hive.box<Profession>('professions') : await Hive.openBox<Profession>('professions');
+      final categoriesBox = Hive.isBoxOpen('categories')
+          ? Hive.box<Category>('categories')
+          : await Hive.openBox<Category>('categories');
+      final professionsBox = Hive.isBoxOpen('professions')
+          ? Hive.box<Profession>('professions')
+          : await Hive.openBox<Profession>('professions');
 
       _backupInfo['totalAccounts'] = accounts.length;
       _backupInfo['totalTransactions'] = transactions.length;
-      _backupInfo['totalStockItems'] = stockBox.length;
-      _backupInfo['totalCategories'] = categoriesBox.length + professionsBox.length;
-    } catch (_) {
+      _backupInfo['totalCategories'] =
+          categoriesBox.length + professionsBox.length;
+    } catch (e) {
+      debugPrint('BackupScreen._loadBackupInfo failed: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -81,6 +89,7 @@ class _BackupScreenState extends State<BackupScreen> {
   @override
   Widget build(BuildContext context) {
     final languageService = Provider.of<LanguageService>(context);
+    final stockService = Provider.of<StockService>(context);
     final isUrdu = languageService.isUrdu;
 
     return Scaffold(
@@ -99,7 +108,7 @@ class _BackupScreenState extends State<BackupScreen> {
                   const SizedBox(height: 6),
 
                   // Data Statistics
-                  _buildDataStatisticsCard(isUrdu),
+                  _buildDataStatisticsCard(isUrdu, stockService),
                   const SizedBox(height: 6),
 
                   // Backup Actions
@@ -123,7 +132,8 @@ class _BackupScreenState extends State<BackupScreen> {
           Card(
             elevation: 0,
             margin: const EdgeInsets.symmetric(vertical: 2),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             child: const Padding(
               padding: EdgeInsets.all(16),
               child: Column(
@@ -137,11 +147,14 @@ class _BackupScreenState extends State<BackupScreen> {
                     ],
                   ),
                   SizedBox(height: 16),
-                  SkeletonShimmer(width: double.infinity, height: 40, borderRadius: 12),
+                  SkeletonShimmer(
+                      width: double.infinity, height: 40, borderRadius: 12),
                   SizedBox(height: 10),
-                  SkeletonShimmer(width: double.infinity, height: 40, borderRadius: 12),
+                  SkeletonShimmer(
+                      width: double.infinity, height: 40, borderRadius: 12),
                   SizedBox(height: 10),
-                  SkeletonShimmer(width: double.infinity, height: 40, borderRadius: 12),
+                  SkeletonShimmer(
+                      width: double.infinity, height: 40, borderRadius: 12),
                 ],
               ),
             ),
@@ -152,7 +165,8 @@ class _BackupScreenState extends State<BackupScreen> {
           Card(
             elevation: 0,
             margin: const EdgeInsets.symmetric(vertical: 2),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             child: const Padding(
               padding: EdgeInsets.all(16),
               child: Column(
@@ -162,9 +176,17 @@ class _BackupScreenState extends State<BackupScreen> {
                   SizedBox(height: 14),
                   Row(
                     children: [
-                      Expanded(child: SkeletonShimmer(width: double.infinity, height: 60, borderRadius: 14)),
+                      Expanded(
+                          child: SkeletonShimmer(
+                              width: double.infinity,
+                              height: 60,
+                              borderRadius: 14)),
                       SizedBox(width: 10),
-                      Expanded(child: SkeletonShimmer(width: double.infinity, height: 60, borderRadius: 14)),
+                      Expanded(
+                          child: SkeletonShimmer(
+                              width: double.infinity,
+                              height: 60,
+                              borderRadius: 14)),
                     ],
                   ),
                 ],
@@ -177,14 +199,17 @@ class _BackupScreenState extends State<BackupScreen> {
           Card(
             elevation: 0,
             margin: const EdgeInsets.symmetric(vertical: 2),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             child: const Padding(
               padding: EdgeInsets.all(16),
               child: Column(
                 children: [
-                  SkeletonShimmer(width: double.infinity, height: 48, borderRadius: 14),
+                  SkeletonShimmer(
+                      width: double.infinity, height: 48, borderRadius: 14),
                   SizedBox(height: 10),
-                  SkeletonShimmer(width: double.infinity, height: 48, borderRadius: 14),
+                  SkeletonShimmer(
+                      width: double.infinity, height: 48, borderRadius: 14),
                 ],
               ),
             ),
@@ -222,7 +247,8 @@ class _BackupScreenState extends State<BackupScreen> {
                 ),
                 TextButton.icon(
                   onPressed: _navigateToProfile,
-                  icon: Icon(PhosphorIcons.pencilSimple(), size: 16, color: AppTheme.themeColor),
+                  icon: Icon(PhosphorIcons.pencilSimple(),
+                      size: 16, color: AppTheme.themeColor),
                   label: UrduAwareText(
                     isUrdu ? 'ای میل تبدیل کریں' : 'Change Email',
                     style: TextStyle(
@@ -236,43 +262,39 @@ class _BackupScreenState extends State<BackupScreen> {
               ],
             ),
             const SizedBox(height: 16),
-
             _buildStatusItem(
               isUrdu ? 'بیک اپ ای میل:' : 'Backup Email:',
               email.isNotEmpty
                   ? email
                   : isUrdu
-                  ? 'درج نہیں ہے (پروفائل میں جوڑیں)'
-                  : 'Not set (Link in Profile)',
+                      ? 'درج نہیں ہے (پروفائل میں جوڑیں)'
+                      : 'Not set (Link in Profile)',
               PhosphorIcons.envelopeSimple(),
               AppTheme.verifiedGold,
               isUrdu,
             ),
-
             _buildStatusItem(
               isUrdu ? 'آخری بیک اپ:' : 'Last Backup:',
               lastBackup != null
                   ? DateFormat('dd/MM/yyyy hh:mm a').format(lastBackup)
                   : isUrdu
-                  ? 'کبھی نہیں'
-                  : 'Never',
+                      ? 'کبھی نہیں'
+                      : 'Never',
               PhosphorIcons.cloudArrowUp(),
               AppTheme.verifiedGold,
               isUrdu,
             ),
-
             _buildStatusItem(
               isUrdu ? 'آخری بحالی:' : 'Last Restore:',
               lastRestore != null
                   ? DateFormat('dd/MM/yyyy hh:mm a').format(lastRestore)
                   : isUrdu
-                  ? 'کبھی نہیں'
-                  : 'Never',
+                      ? 'کبھی نہیں'
+                      : 'Never',
               PhosphorIcons.cloudArrowDown(),
               AppTheme.verifiedGold,
               isUrdu,
             ),
-
             _buildStatusItem(
               isUrdu ? 'بیک اپ سائز:' : 'Backup Size:',
               _formatFileSize(_backupInfo['backupSize'] ?? 0),
@@ -286,7 +308,7 @@ class _BackupScreenState extends State<BackupScreen> {
     );
   }
 
-  Widget _buildDataStatisticsCard(bool isUrdu) {
+  Widget _buildDataStatisticsCard(bool isUrdu, StockService stockService) {
     return Card(
       elevation: 0,
       margin: const EdgeInsets.symmetric(vertical: 2),
@@ -306,7 +328,6 @@ class _BackupScreenState extends State<BackupScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
             Row(
               children: [
                 Expanded(
@@ -337,7 +358,9 @@ class _BackupScreenState extends State<BackupScreen> {
                 Expanded(
                   child: _buildStatItem(
                     isUrdu ? 'اسٹاک اشیاء' : 'Stock Items',
-                    _backupInfo['totalStockItems']?.toString() ?? '0',
+                    stockService.isLoading
+                        ? '…'
+                        : stockService.items.length.toString(),
                     PhosphorIcons.package(),
                     AppTheme.verifiedGold,
                     isUrdu,
@@ -380,7 +403,6 @@ class _BackupScreenState extends State<BackupScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
             AppButton(
               text: isUrdu ? 'کلاؤڈ پر بیک اپ کریں' : 'Backup to Cloud',
               icon: PhosphorIcons.cloudArrowUp(),
@@ -401,9 +423,7 @@ class _BackupScreenState extends State<BackupScreen> {
                     ],
               onPressed: _createCloudBackup,
             ),
-
             const SizedBox(height: 12),
-
             AppButton(
               text: isUrdu ? 'کلاؤڈ سے بحالی کریں' : 'Restore from Cloud',
               icon: PhosphorIcons.cloudArrowDown(),
@@ -450,7 +470,6 @@ class _BackupScreenState extends State<BackupScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
             Row(
               children: [
                 Expanded(
@@ -470,16 +489,16 @@ class _BackupScreenState extends State<BackupScreen> {
                   onChanged: _toggleAutoBackup,
                   thumbIcon: WidgetStateProperty.resolveWith<Icon?>((states) {
                     if (states.contains(WidgetState.selected)) {
-                      return Icon(PhosphorIcons.check(), size: 14, color: Colors.white);
+                      return Icon(PhosphorIcons.check(),
+                          size: 14, color: Colors.white);
                     }
-                    return Icon(PhosphorIcons.x(), size: 14, color: Colors.grey);
+                    return Icon(PhosphorIcons.x(),
+                        size: 14, color: Colors.grey);
                   }),
                 ),
               ],
             ),
-
             const SizedBox(height: 8),
-
             UrduAwareText(
               isUrdu
                   ? 'خودکار بیک اپ ہر 7 دن بعد کلاؤڈ پر ڈیٹا محفوظ کرے گا'
@@ -594,7 +613,9 @@ class _BackupScreenState extends State<BackupScreen> {
     } catch (e) {
       final err = e.toString().replaceAll('Exception: ', '');
       final message = isUrdu
-          ? (err.toLowerCase().contains('email') || err.toLowerCase().contains('profile') || err.toLowerCase().contains('ای میل')
+          ? (err.toLowerCase().contains('email') ||
+                  err.toLowerCase().contains('profile') ||
+                  err.toLowerCase().contains('ای میل')
               ? 'براہ کرم پہلے پروفائل میں ای میل درج کریں تاکہ بیک اپ جڑ سکے'
               : 'بیک اپ بنانے میں خرابی: $err')
           : err;
@@ -626,7 +647,9 @@ class _BackupScreenState extends State<BackupScreen> {
       );
     } catch (e) {
       final err = e.toString().replaceAll('Exception: ', '');
-      _showSnackBar(isUrdu ? 'ڈیٹا بحال کرنے میں خرابی: $err' : 'Restore error: $err', true);
+      _showSnackBar(
+          isUrdu ? 'ڈیٹا بحال کرنے میں خرابی: $err' : 'Restore error: $err',
+          true);
     } finally {
       setState(() => _isRestoring = false);
     }
@@ -655,7 +678,9 @@ class _BackupScreenState extends State<BackupScreen> {
       await _loadBackupInfo();
       final err = e.toString().replaceAll('Exception: ', '');
       final message = isUrdu
-          ? (err.toLowerCase().contains('email') || err.toLowerCase().contains('profile') || err.toLowerCase().contains('ای میل')
+          ? (err.toLowerCase().contains('email') ||
+                  err.toLowerCase().contains('profile') ||
+                  err.toLowerCase().contains('ای میل')
               ? 'خودکار بیک اپ فعال کرنے کے لیے پہلے پروفائل میں ای میل درج کریں'
               : 'خودکار بیک اپ میں خرابی: $err')
           : err;
@@ -675,7 +700,8 @@ class _BackupScreenState extends State<BackupScreen> {
           context: context,
           builder: (context) => AlertDialog(
             backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: UrduAwareText(
               title,
               style: TextStyle(

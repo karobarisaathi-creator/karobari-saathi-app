@@ -9,16 +9,17 @@ StockItem _item({
   String id = 'item-1',
   double openingQuantity = 10,
   double purchasePrice = 5,
+  DateTime? createdAt,
 }) {
-  final createdAt = DateTime(2025);
+  final itemCreatedAt = createdAt ?? DateTime(2025);
   return StockItem(
     id: id,
     name: 'Product',
     unit: 'Pieces',
     initialQuantity: openingQuantity,
     purchasePrice: purchasePrice,
-    createdAt: createdAt,
-    updatedAt: createdAt,
+    createdAt: itemCreatedAt,
+    updatedAt: itemCreatedAt,
   );
 }
 
@@ -299,6 +300,34 @@ void main() {
       expect(rows.single.salesQuantity, 3);
       expect(rows.single.grossProfit, 17.625);
       expect(rows.single.endingStockQuantity, 13);
+    });
+
+    test('item report includes new items with only opening stock', () {
+      final item = _item(
+        openingQuantity: 12,
+        createdAt: DateTime(2026, 5, 2),
+      );
+
+      final rows = StockAnalyticsService.buildItemStats(
+        items: [item],
+        movements: [
+          _movement(
+            id: 'opening-log',
+            type: StockMovementType.purchase,
+            quantity: 12,
+            unitPrice: 5,
+            timestamp: DateTime(2026, 5, 2),
+            reason: 'Initial Opening Stock',
+          ),
+        ],
+        start: DateTime(2026, 5),
+        endExclusive: DateTime(2026, 6),
+      );
+
+      expect(rows, hasLength(1));
+      expect(rows.single.purchaseQuantity, 0);
+      expect(rows.single.salesQuantity, 0);
+      expect(rows.single.endingStockQuantity, 12);
     });
 
     test('party report groups sales, purchases, returns, and cash sales', () {

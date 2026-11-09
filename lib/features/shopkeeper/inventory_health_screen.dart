@@ -21,28 +21,19 @@ class InventoryHealthScreen extends StatefulWidget {
   State<InventoryHealthScreen> createState() => _InventoryHealthScreenState();
 }
 
-class _InventoryHealthScreenState extends State<InventoryHealthScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
+  // کون سی category کھلی ہے — 'out' | 'low' | 'dead' | 'aging' | null
+  String? _activeList;
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+  // Aging bucket منتخب — 0..3 یا null
+  int? _activeAgingBucket;
 
   @override
   Widget build(BuildContext context) {
     final languageService = Provider.of<LanguageService>(context);
     final stockService = Provider.of<StockService>(context);
     final isUrdu = languageService.isUrdu;
-    final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
 
     // ═══ Metrics ═══
     final summary = stockService.getStockSummary();
@@ -61,6 +52,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
       return stockService.calculateCurrentStock(item.id) <= 0;
     }).toList();
 
+    // ═══ Dead stock (30+ دن میں کوئی فروخت نہیں) ═══
     final recentSalesCounts = <String, int>{};
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
     for (final movement in stockService.movements) {
@@ -74,24 +66,14 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
       }
     }
 
-    final turnover = stockService.calculateInventoryTurnover();
-    final holdingDays = stockService.calculateHoldingDays();
-    final stockoutRate = stockService.calculateStockoutRate();
-    final deadStock = <StockItem>[];
-    final fastItems = <StockItem>[];
-    final slowItems = <StockItem>[];
-    for (final item in activeTrackedItems) {
-      final recentSalesCount = recentSalesCounts[item.id] ?? 0;
-      if (recentSalesCount >= 10) {
-        fastItems.add(item);
-      } else if (recentSalesCount > 0) {
-        slowItems.add(item);
-      } else if (stockService.calculateCurrentStock(item.id) > 0) {
-        deadStock.add(item);
-      }
-    }
+    final deadStockItems = activeTrackedItems.where((item) {
+      final recentSales = recentSalesCounts[item.id] ?? 0;
+      final currentStock = stockService.calculateCurrentStock(item.id);
+      return recentSales == 0 && currentStock > 0;
+    }).toList();
 
-    final deadStockValue = deadStock.fold<double>(
+    // ═══ Dead stock value ═══
+    final deadStockValue = deadStockItems.fold<double>(
       0,
       (sum, item) =>
           sum +
@@ -99,102 +81,438 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
               stockService.calculateWeightedAverageCost(item.id)),
     );
 
+    // ═══ Out of stock value (کھویا ہوا) ═══
+    final outStockValue = outOfStockItems.fold<double>(
+      0,
+      (sum, item) => sum + (item.minStockAlert * item.purchasePrice),
+    );
+
+    // ═══ Low stock value ═══
+    final lowStockValue = lowStockItems.fold<double>(
+      0,
+      (sum, item) =>
+          sum +
+          ((item.minStockAlert - stockService.calculateCurrentStock(item.id)) *
+              item.purchasePrice),
+    );
+
+    // ═══ Health Score ═══
+    final healthScore = _calculateHealthScore(
+      totalItems: totalItems,
+      outCount: outOfStockItems.length,
+      lowCount: lowStockItems.length,
+      deadCount: deadStockItems.length,
+    );
+
+    // ═══ Aging buckets ═══
+    final agingBuckets = _buildAgingBuckets(
+      items: activeTrackedItems,
+      stockService: stockService,
+    );
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
-        title: isUrdu ? 'انوینٹری صحت' : 'Inventory Health',
+        title: isUrdu ? 'انوینٹری تشخیص' : 'Inventory Health',
+        showBackButton: true,
       ),
-      body: Column(
-        children: [
-          // ═══ Tab Bar ═══
-          Container(
-            color: Colors.white,
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: AppTheme.themeColor,
-              labelColor: AppTheme.themeColor,
-              unselectedLabelColor: AppTheme.textSecondary,
-              labelStyle: TextStyle(
-                fontFamily: fontFamily,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-              tabs: [
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(PhosphorIcons.gauge(), size: 14),
-                      const SizedBox(width: 4),
-                      Text(isUrdu ? 'خلاصہ' : 'Summary'),
-                    ],
-                  ),
-                ),
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(PhosphorIcons.lightning(), size: 14),
-                      const SizedBox(width: 4),
-                      Text(isUrdu ? 'رفتار' : 'Velocity'),
-                    ],
-                  ),
-                ),
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(PhosphorIcons.warningCircle(), size: 14),
-                      const SizedBox(width: 4),
-                      Text(isUrdu ? 'خطرات' : 'Alerts'),
-                    ],
-                  ),
-                ),
-              ],
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ═══ Hero Health Score ═══
+            _buildHeroScore(
+              isUrdu: isUrdu,
+              fontFamily: fontFamily,
+              score: healthScore,
+              totalItems: totalItems,
+              totalValue: totalPurchaseValue,
+              outCount: outOfStockItems.length,
+              lowCount: lowStockItems.length,
+              deadCount: deadStockItems.length,
             ),
-          ),
+            const SizedBox(height: 12),
 
-          // ═══ Tab Views ═══
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
+            // ═══ Traffic Lights ═══
+            Row(
               children: [
-                // ═══ Tab 1: Summary ═══
-                _buildSummaryTab(
-                  isUrdu: isUrdu,
-                  fontFamily: fontFamily,
-                  totalItems: totalItems,
-                  outOfStockCount: outOfStockItems.length,
-                  lowStockCount: lowStockItems.length,
-                  totalPurchaseValue: totalPurchaseValue,
-                  turnover: turnover,
-                  holdingDays: holdingDays,
-                  stockoutRate: stockoutRate,
-                  deadStockValue: deadStockValue,
-                  deadStockCount: deadStock.length,
+                Expanded(
+                  child: _buildTrafficCard(
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                    category: 'out',
+                    icon: '🔴',
+                    count: outOfStockItems.length,
+                    label: isUrdu ? 'ختم' : 'Out',
+                    lightColor: AppTheme.expenseColor,
+                    lightBg: const Color(0xFFFEF2F2),
+                    isActive: _activeList == 'out',
+                  ),
                 ),
-
-                // ═══ Tab 2: Velocity ═══
-                _buildVelocityTab(
-                  isUrdu: isUrdu,
-                  fontFamily: fontFamily,
-                  fastCount: fastItems.length,
-                  slowCount: slowItems.length,
-                  deadCount: deadStock.length,
-                  fastItems: fastItems,
-                  slowItems: slowItems,
-                  deadItems: deadStock,
-                  stockService: stockService,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildTrafficCard(
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                    category: 'low',
+                    icon: '🟠',
+                    count: lowStockItems.length,
+                    label: isUrdu ? 'کم' : 'Low',
+                    lightColor: const Color(0xFFF59E0B),
+                    lightBg: const Color(0xFFFFFBEB),
+                    isActive: _activeList == 'low',
+                  ),
                 ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildTrafficCard(
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                    category: 'dead',
+                    icon: '🐌',
+                    count: deadStockItems.length,
+                    label: isUrdu ? 'مردہ' : 'Dead',
+                    lightColor: const Color(0xFF10B981),
+                    lightBg: const Color(0xFFECFDF5),
+                    isActive: _activeList == 'dead',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
 
-                // ═══ Tab 3: Alerts ═══
-                _buildAlertsTab(
-                  isUrdu: isUrdu,
-                  fontFamily: fontFamily,
-                  lowStockItems: lowStockItems,
-                  outOfStockItems: outOfStockItems,
-                  deadStock: deadStock,
-                  stockService: stockService,
+            // ═══ Expandable List — منتخب category ═══
+            if (_activeList == 'out')
+              _buildExpandList(
+                isUrdu: isUrdu,
+                fontFamily: fontFamily,
+                title: isUrdu
+                    ? 'ختم شدہ اشیاء (${outOfStockItems.length})'
+                    : 'Out of Stock (${outOfStockItems.length})',
+                subtitle: isUrdu
+                    ? 'ویلیو: ${Formatters.formatAmountWithCurrency(outStockValue)}'
+                    : 'Value: ${Formatters.formatAmountWithCurrency(outStockValue)}',
+                items: outOfStockItems,
+                category: 'out',
+                stockService: stockService,
+              ),
+            if (_activeList == 'low')
+              _buildExpandList(
+                isUrdu: isUrdu,
+                fontFamily: fontFamily,
+                title: isUrdu
+                    ? 'کم اسٹاک (${lowStockItems.length})'
+                    : 'Low Stock (${lowStockItems.length})',
+                subtitle: isUrdu
+                    ? 'ویلیو: ${Formatters.formatAmountWithCurrency(lowStockValue)}'
+                    : 'Value: ${Formatters.formatAmountWithCurrency(lowStockValue)}',
+                items: lowStockItems,
+                category: 'low',
+                stockService: stockService,
+              ),
+            if (_activeList == 'dead')
+              _buildExpandList(
+                isUrdu: isUrdu,
+                fontFamily: fontFamily,
+                title: isUrdu
+                    ? 'مردہ اسٹاک (${deadStockItems.length})'
+                    : 'Dead Stock (${deadStockItems.length})',
+                subtitle: isUrdu
+                    ? 'ویلیو: ${Formatters.formatAmountWithCurrency(deadStockValue)}'
+                    : 'Value: ${Formatters.formatAmountWithCurrency(deadStockValue)}',
+                items: deadStockItems,
+                category: 'dead',
+                stockService: stockService,
+              ),
+
+            const SizedBox(height: 14),
+
+            // ═══ Aging Section ═══
+            _buildSectionTitle(
+              icon: PhosphorIcons.package(),
+              title: isUrdu ? 'اسٹاک کی عمر' : 'Stock Aging',
+              fontFamily: fontFamily,
+            ),
+            const SizedBox(height: 8),
+            _buildAgingCard(
+              isUrdu: isUrdu,
+              fontFamily: fontFamily,
+              buckets: agingBuckets,
+              stockService: stockService,
+            ),
+
+            // ═══ Aging expand list ═══
+            if (_activeAgingBucket != null)
+              _buildExpandList(
+                isUrdu: isUrdu,
+                fontFamily: fontFamily,
+                title: agingBuckets[_activeAgingBucket!].label(isUrdu),
+                subtitle: isUrdu
+                    ? '${agingBuckets[_activeAgingBucket!].items.length} اشیاء'
+                    : '${agingBuckets[_activeAgingBucket!].items.length} items',
+                items: agingBuckets[_activeAgingBucket!].items,
+                category: 'aging',
+                stockService: stockService,
+              ),
+
+            const SizedBox(height: 14),
+
+            // ═══ Dead stock summary card ═══
+            if (deadStockItems.isNotEmpty) ...[
+              _buildSectionTitle(
+                icon: PhosphorIcons.warning(),
+                title: isUrdu ? 'مردہ اسٹاک' : 'Dead Stock',
+                fontFamily: fontFamily,
+              ),
+              const SizedBox(height: 8),
+              _buildDeadStockSummary(
+                isUrdu: isUrdu,
+                fontFamily: fontFamily,
+                count: deadStockItems.length,
+                value: deadStockValue,
+              ),
+              const SizedBox(height: 14),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═════════════════════════════════════════════════════════════
+  // Health Score
+  // ═════════════════════════════════════════════════════════════
+  int _calculateHealthScore({
+    required int totalItems,
+    required int outCount,
+    required int lowCount,
+    required int deadCount,
+  }) {
+    if (totalItems == 0) return 100;
+    final healthy = totalItems - outCount - lowCount - deadCount;
+    final score = (healthy / totalItems) * 100;
+    return score.clamp(0, 100).round();
+  }
+
+  // ═════════════════════════════════════════════════════════════
+  // Aging Buckets
+  // ═════════════════════════════════════════════════════════════
+  List<_AgingBucket> _buildAgingBuckets({
+    required List<StockItem> items,
+    required StockService stockService,
+  }) {
+    final now = DateTime.now();
+
+    final buckets = <_AgingBucket>[
+      _AgingBucket(
+        key: 'fresh',
+        labelEn: '0-30 days',
+        labelUr: '0-30 دن',
+        minDays: 0,
+        maxDays: 30,
+        color: const Color(0xFF10B981),
+      ),
+      _AgingBucket(
+        key: 'mid',
+        labelEn: '31-90 days',
+        labelUr: '31-90 دن',
+        minDays: 31,
+        maxDays: 90,
+        color: const Color(0xFFF59E0B),
+      ),
+      _AgingBucket(
+        key: 'old',
+        labelEn: '91-180 days',
+        labelUr: '91-180 دن',
+        minDays: 91,
+        maxDays: 180,
+        color: const Color(0xFFF97316),
+      ),
+      _AgingBucket(
+        key: 'dead',
+        labelEn: '180+ days',
+        labelUr: '180+ دن',
+        minDays: 181,
+        maxDays: 99999,
+        color: const Color(0xFFDC2626),
+      ),
+    ];
+
+    for (final item in items) {
+      final currentStock = stockService.calculateCurrentStock(item.id);
+      if (currentStock <= 0) continue;
+
+      // آخری خریداری کی تاریخ (یا item کی تخلیق)
+      DateTime? lastPurchaseDate;
+      for (final m in stockService.movements) {
+        if (m.stockItemId == item.id &&
+            m.type == StockMovementType.purchase) {
+          if (lastPurchaseDate == null ||
+              m.timestamp.isAfter(lastPurchaseDate)) {
+            lastPurchaseDate = m.timestamp;
+          }
+        }
+      }
+
+      final referenceDate = lastPurchaseDate ?? now;
+      final ageDays = now.difference(referenceDate).inDays;
+
+      for (final bucket in buckets) {
+        if (ageDays >= bucket.minDays && ageDays <= bucket.maxDays) {
+          bucket.items.add(item);
+          break;
+        }
+      }
+    }
+
+    return buckets;
+  }
+
+  // ═════════════════════════════════════════════════════════════
+  // Hero Score Card
+  // ═════════════════════════════════════════════════════════════
+  Widget _buildHeroScore({
+    required bool isUrdu,
+    required String? fontFamily,
+    required int score,
+    required int totalItems,
+    required double totalValue,
+    required int outCount,
+    required int lowCount,
+    required int deadCount,
+  }) {
+    final scoreColor = score >= 75
+        ? const Color(0xFF10B981)
+        : score >= 50
+            ? const Color(0xFFF59E0B)
+            : const Color(0xFFDC2626);
+
+    final statusLabel = score >= 75
+        ? (isUrdu ? 'صحت مند' : 'Healthy')
+        : score >= 50
+            ? (isUrdu ? 'توجہ چاہیے' : 'Needs Attention')
+            : (isUrdu ? 'تشویشناک' : 'Critical');
+
+    final healthyCount = totalItems - outCount - lowCount - deadCount;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFF97316), Color(0xFFEA580C)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF97316).withValues(alpha: 0.35),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Circular progress
+          SizedBox(
+            width: 100,
+            height: 100,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 100,
+                  height: 100,
+                  child: CircularProgressIndicator(
+                    value: score / 100,
+                    strokeWidth: 9,
+                    backgroundColor: Colors.white.withValues(alpha: 0.20),
+                    valueColor: AlwaysStoppedAnimation<Color>(scoreColor),
+                  ),
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    UrduAwareText(
+                      '$score',
+                      style: TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        fontFamily: fontFamily,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    UrduAwareText(
+                      isUrdu ? 'اسکور' : 'SCORE',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white.withValues(alpha: 0.85),
+                        letterSpacing: 0.5,
+                        fontFamily: fontFamily,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                UrduAwareText(
+                  '${isUrdu ? 'انوینٹری کی صحت' : 'Inventory Health'} — $statusLabel',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    fontFamily: fontFamily,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                UrduAwareText(
+                  '${isUrdu ? 'کل ویلیو: ' : 'Total value: '}${Formatters.formatAmountWithCurrency(totalValue)}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white.withValues(alpha: 0.90),
+                    fontFamily: fontFamily,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
+                  children: [
+                    _buildHeroStat(
+                      color: const Color(0xFF10B981),
+                      count: healthyCount,
+                      label: isUrdu ? 'صحیح' : 'healthy',
+                      fontFamily: fontFamily,
+                    ),
+                    _buildHeroStat(
+                      color: const Color(0xFFF59E0B),
+                      count: lowCount,
+                      label: isUrdu ? 'کم' : 'low',
+                      fontFamily: fontFamily,
+                    ),
+                    _buildHeroStat(
+                      color: const Color(0xFFDC2626),
+                      count: outCount,
+                      label: isUrdu ? 'ختم' : 'out',
+                      fontFamily: fontFamily,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -204,542 +522,467 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
     );
   }
 
-  Widget _buildSummaryTab({
-    required bool isUrdu,
-    required String fontFamily,
-    required int totalItems,
-    required int outOfStockCount,
-    required int lowStockCount,
-    required double totalPurchaseValue,
-    required double turnover,
-    required double holdingDays,
-    required double stockoutRate,
-    required double deadStockValue,
-    required int deadStockCount,
-  }) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHealthSummaryCard(
-            isUrdu: isUrdu,
-            fontFamily: fontFamily,
-            totalItems: totalItems,
-            outOfStockCount: outOfStockCount,
-            lowStockCount: lowStockCount,
-            totalPurchaseValue: totalPurchaseValue,
-          ),
-          const SizedBox(height: 8),
-          _buildAdvancedMetricsCard(
-            isUrdu: isUrdu,
-            fontFamily: fontFamily,
-            turnover: turnover,
-            holdingDays: holdingDays,
-            stockoutRate: stockoutRate,
-            deadStockValue: deadStockValue,
-            deadStockCount: deadStockCount,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVelocityTab({
-    required bool isUrdu,
-    required String fontFamily,
-    required int fastCount,
-    required int slowCount,
-    required int deadCount,
-    required List<StockItem> fastItems,
-    required List<StockItem> slowItems,
-    required List<StockItem> deadItems,
-    required StockService stockService,
-  }) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildVelocityCard(
-            isUrdu: isUrdu,
-            fontFamily: fontFamily,
-            fastCount: fastCount,
-            slowCount: slowCount,
-            deadCount: deadCount,
-          ),
-          const SizedBox(height: 8),
-          if (fastItems.isNotEmpty) ...[
-            _buildSectionHeader(
-              icon: PhosphorIcons.checkCircle(),
-              title: isUrdu
-                  ? 'تیز فروخت ($fastCount)'
-                  : 'Fast Selling ($fastCount)',
-              color: AppTheme.incomeColor,
-              fontFamily: fontFamily,
-            ),
-            const SizedBox(height: 8),
-            ...fastItems.take(10).map((item) => _buildVelocityItemCard(
-                  item: item,
-                  isUrdu: isUrdu,
-                  fontFamily: fontFamily,
-                  velocity: 'fast',
-                  stockService: stockService,
-                )),
-            const SizedBox(height: 16),
-          ],
-          if (slowItems.isNotEmpty) ...[
-            _buildSectionHeader(
-              icon: PhosphorIcons.clock(),
-              title: isUrdu
-                  ? 'سست فروخت ($slowCount)'
-                  : 'Slow Moving ($slowCount)',
-              color: Colors.orange,
-              fontFamily: fontFamily,
-            ),
-            const SizedBox(height: 8),
-            ...slowItems.take(10).map((item) => _buildVelocityItemCard(
-                  item: item,
-                  isUrdu: isUrdu,
-                  fontFamily: fontFamily,
-                  velocity: 'slow',
-                  stockService: stockService,
-                )),
-            const SizedBox(height: 16),
-          ],
-          if (deadItems.isNotEmpty) ...[
-            _buildSectionHeader(
-              icon: PhosphorIcons.warning(),
-              title: isUrdu
-                  ? 'مردہ اسٹاک ($deadCount)'
-                  : 'Dead Stock ($deadCount)',
-              color: AppTheme.expenseColor,
-              fontFamily: fontFamily,
-            ),
-            const SizedBox(height: 8),
-            ...deadItems.take(10).map((item) => _buildVelocityItemCard(
-                  item: item,
-                  isUrdu: isUrdu,
-                  fontFamily: fontFamily,
-                  velocity: 'dead',
-                  stockService: stockService,
-                )),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAlertsTab({
-    required bool isUrdu,
-    required String fontFamily,
-    required List<StockItem> lowStockItems,
-    required List<StockItem> outOfStockItems,
-    required List<StockItem> deadStock,
-    required StockService stockService,
-  }) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (outOfStockItems.isNotEmpty) ...[
-            _buildSectionHeader(
-              icon: PhosphorIcons.prohibit(),
-              title: isUrdu
-                  ? 'ختم شدہ اسٹاک (${outOfStockItems.length})'
-                  : 'Out of Stock (${outOfStockItems.length})',
-              color: AppTheme.expenseColor,
-              fontFamily: fontFamily,
-            ),
-            const SizedBox(height: 8),
-            ...outOfStockItems.map((item) => _buildAlertItemCard(
-                  item: item,
-                  isUrdu: isUrdu,
-                  fontFamily: fontFamily,
-                  alertType: 'out',
-                  stockService: stockService,
-                )),
-            const SizedBox(height: 16),
-          ],
-          if (lowStockItems.isNotEmpty) ...[
-            _buildSectionHeader(
-              icon: PhosphorIcons.warning(),
-              title: isUrdu
-                  ? 'کم اسٹاک (${lowStockItems.length})'
-                  : 'Low Stock (${lowStockItems.length})',
-              color: Colors.orange,
-              fontFamily: fontFamily,
-            ),
-            const SizedBox(height: 8),
-            ...lowStockItems.map((item) => _buildAlertItemCard(
-                  item: item,
-                  isUrdu: isUrdu,
-                  fontFamily: fontFamily,
-                  alertType: 'low',
-                  stockService: stockService,
-                )),
-            const SizedBox(height: 16),
-          ],
-          if (deadStock.isNotEmpty) ...[
-            _buildSectionHeader(
-              icon: PhosphorIcons.skull(),
-              title: isUrdu
-                  ? 'مردہ اسٹاک (${deadStock.length})'
-                  : 'Dead Stock (${deadStock.length})',
-              color: AppTheme.expenseColor,
-              fontFamily: fontFamily,
-            ),
-            const SizedBox(height: 8),
-            ...deadStock.map((item) => _buildAlertItemCard(
-                  item: item,
-                  isUrdu: isUrdu,
-                  fontFamily: fontFamily,
-                  alertType: 'dead',
-                  stockService: stockService,
-                )),
-          ],
-          if (outOfStockItems.isEmpty &&
-              lowStockItems.isEmpty &&
-              deadStock.isEmpty)
-            _buildEmptyState(isUrdu, fontFamily),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHealthSummaryCard({
-    required bool isUrdu,
-    required String fontFamily,
-    required int totalItems,
-    required int outOfStockCount,
-    required int lowStockCount,
-    required double totalPurchaseValue,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.darkColor.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(PhosphorIcons.chartLineUp(),
-                  color: AppTheme.themeColor, size: 20),
-              const SizedBox(width: 8),
-              UrduAwareText(
-                isUrdu ? 'انوینٹری صحت کا خلاصہ' : 'Inventory Health Summary',
-                style: TextStyle(
-                  fontFamily: fontFamily,
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.darkColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildHealthStat(
-                  title: isUrdu ? 'کل اشیاء' : 'Total Items',
-                  value: totalItems.toString(),
-                  icon: PhosphorIcons.package(),
-                  color: AppTheme.themeColor,
-                  fontFamily: fontFamily,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _buildHealthStat(
-                  title: isUrdu ? 'آؤٹ آف اسٹاک' : 'Out of Stock',
-                  value: outOfStockCount.toString(),
-                  icon: PhosphorIcons.warning(),
-                  color: AppTheme.expenseColor,
-                  fontFamily: fontFamily,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _buildHealthStat(
-                  title: isUrdu ? 'کم اسٹاک الرٹس' : 'Low Stock Alerts',
-                  value: lowStockCount.toString(),
-                  icon: PhosphorIcons.bell(),
-                  color: Colors.orange,
-                  fontFamily: fontFamily,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _buildHealthStat(
-                  title: isUrdu ? 'کل اسٹاک سرمایا' : 'Stock Capital',
-                  value:
-                      Formatters.formatAmountWithCurrency(totalPurchaseValue),
-                  icon: PhosphorIcons.currencyCircleDollar(),
-                  color: AppTheme.incomeColor,
-                  fontFamily: fontFamily,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAdvancedMetricsCard({
-    required bool isUrdu,
-    required String fontFamily,
-    required double turnover,
-    required double holdingDays,
-    required double stockoutRate,
-    required double deadStockValue,
-    required int deadStockCount,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.darkColor.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(PhosphorIcons.chartBar(),
-                  size: 18, color: AppTheme.themeColor),
-              const SizedBox(width: 8),
-              UrduAwareText(
-                isUrdu
-                    ? 'ایڈوانسڈ انوینٹری اشاریے'
-                    : 'Advanced Inventory Metrics',
-                style: TextStyle(
-                  fontFamily: fontFamily,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.darkColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _buildMetricRow(
-            icon: PhosphorIcons.arrowsClockwise(),
-            label: isUrdu ? 'انوینٹری ٹرن اوور ریٹ' : 'Inventory Turnover Rate',
-            value: '${turnover.toStringAsFixed(2)}x',
-            valueColor: AppTheme.themeColor,
-            fontFamily: fontFamily,
-            hint: isUrdu
-                ? 'سالانہ اسٹاک گردش کی رفتار'
-                : 'Annual stock rotation speed',
-          ),
-          const Divider(height: 16),
-          _buildMetricRow(
-            icon: PhosphorIcons.calendar(),
-            label: isUrdu ? 'ہولڈنگ ڈیز (اوسط)' : 'Inventory Holding Days',
-            value: '${holdingDays.toStringAsFixed(0)} دن',
-            valueColor: AppTheme.darkColor,
-            fontFamily: fontFamily,
-            hint: isUrdu ? 'اسٹاک کتنے دن تک چلے گا' : 'Days stock will last',
-          ),
-          const Divider(height: 16),
-          _buildMetricRow(
-            icon: PhosphorIcons.warningOctagon(),
-            label: isUrdu ? 'اسٹاک آؤٹ ریٹ' : 'Stockout Rate',
-            value: '${stockoutRate.toStringAsFixed(1)}%',
-            valueColor: stockoutRate <= 5
-                ? AppTheme.incomeColor
-                : stockoutRate <= 15
-                    ? Colors.orange
-                    : AppTheme.expenseColor,
-            fontFamily: fontFamily,
-            hint: isUrdu
-                ? (stockoutRate <= 5
-                    ? 'بہت اچھا — کم اشیاء ختم'
-                    : 'خراب — بہت سے اشیاء ختم')
-                : (stockoutRate <= 5
-                    ? 'Excellent — few out'
-                    : 'Poor — many out'),
-          ),
-          const Divider(height: 16),
-          _buildMetricRow(
-            icon: PhosphorIcons.skull(),
-            label: isUrdu ? 'مردہ اسٹاک' : 'Dead Stock',
-            value: Formatters.formatAmountWithCurrency(deadStockValue),
-            valueColor: deadStockCount == 0
-                ? AppTheme.incomeColor
-                : AppTheme.expenseColor,
-            fontFamily: fontFamily,
-            hint: isUrdu
-                ? '$deadStockCount اشیاء — نقصان سے بچیں'
-                : '$deadStockCount items — avoid loss',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricRow({
-    required IconData icon,
+  Widget _buildHeroStat({
+    required Color color,
+    required int count,
     required String label,
-    required String value,
-    required Color valueColor,
-    required String fontFamily,
-    required String hint,
+    String? fontFamily,
   }) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: valueColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, size: 16, color: valueColor),
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              UrduAwareText(
-                label,
-                style: TextStyle(
-                  fontFamily: fontFamily,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.darkColor,
-                ),
-              ),
-              const SizedBox(height: 2),
-              UrduAwareText(
-                hint,
-                style: TextStyle(
-                  fontFamily: fontFamily,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                  color: AppTheme.textSecondary,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 5),
         UrduAwareText(
-          value,
+          '$count $label',
           style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-            color: valueColor,
-            letterSpacing: -0.3,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+            fontFamily: fontFamily,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildVelocityCard({
+  // ═════════════════════════════════════════════════════════════
+  // Traffic Card (Clickable) - No border
+  // ═════════════════════════════════════════════════════════════
+  Widget _buildTrafficCard({
     required bool isUrdu,
-    required String fontFamily,
-    required int fastCount,
-    required int slowCount,
-    required int deadCount,
+    required String? fontFamily,
+    required String category,
+    required String icon,
+    required int count,
+    required String label,
+    required Color lightColor,
+    required Color lightBg,
+    required bool isActive,
   }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _activeList = _activeList == category ? null : category;
+            _activeAgingBucket = null;
+          });
+        },
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isActive ? const Color(0xFFFFFBF5) : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: isActive
+                    ? const Color(0xFFF97316).withValues(alpha: 0.20)
+                    : Colors.black.withValues(alpha: 0.04),
+                blurRadius: isActive ? 16 : 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: lightBg,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                alignment: Alignment.center,
+                child: UrduAwareText(icon, style: const TextStyle(fontSize: 16)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    UrduAwareText(
+                      '$count',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.darkColor,
+                        height: 1,
+                        fontFamily: fontFamily,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    UrduAwareText(
+                      label,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textSecondary,
+                        fontFamily: fontFamily,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                isActive ? PhosphorIcons.caretUp() : PhosphorIcons.caretDown(),
+                size: 12,
+                color: isActive ? const Color(0xFFF97316) : AppTheme.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ═════════════════════════════════════════════════════════════
+  // Expand List - No border
+  // ═════════════════════════════════════════════════════════════
+  Widget _buildExpandList({
+    required bool isUrdu,
+    required String? fontFamily,
+    required String title,
+    required String subtitle,
+    required List<StockItem> items,
+    required String category,
+    required StockService stockService,
+  }) {
+    if (items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: UrduAwareText(
+            isUrdu ? 'کوئی شے نہیں' : 'No items',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textSecondary,
+              fontFamily: fontFamily,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        UrduAwareText(
+                          title,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.darkColor,
+                            fontFamily: fontFamily,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        UrduAwareText(
+                          subtitle,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textSecondary,
+                            fontFamily: fontFamily,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          _activeList = null;
+                          _activeAgingBucket = null;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(999),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: UrduAwareText(
+                          isUrdu ? 'بند ✕' : 'Close ✕',
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF92400E),
+                            fontFamily: fontFamily,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            // Items
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                children: items.map((item) {
+                  return _buildExpandItem(
+                    item: item,
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                    category: category,
+                    stockService: stockService,
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandItem({
+    required StockItem item,
+    required bool isUrdu,
+    required String? fontFamily,
+    required String category,
+    required StockService stockService,
+  }) {
+    final currentStock = stockService.calculateCurrentStock(item.id);
+    final color = category == 'out'
+        ? AppTheme.expenseColor
+        : category == 'low'
+            ? const Color(0xFFF59E0B)
+            : const Color(0xFF10B981);
+    final bgColor = category == 'out'
+        ? const Color(0xFFFEF2F2)
+        : category == 'low'
+            ? const Color(0xFFFFFBEB)
+            : const Color(0xFFECFDF5);
+    final icon = category == 'out'
+        ? '🔴'
+        : category == 'low'
+            ? '🟠'
+            : '🐌';
+
+    final qtyLabel = category == 'out'
+        ? (isUrdu ? 'ختم' : 'OUT')
+        : '${currentStock.toStringAsFixed(0)} ${item.unit}';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => StockDetailScreen(item: item),
+            ),
+          );
+          if (result == true && mounted) setState(() {});
+        },
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: UrduAwareText(icon, style: const TextStyle(fontSize: 13)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    UrduAwareText(
+                      item.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.darkColor,
+                        fontFamily: fontFamily,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    UrduAwareText(
+                      isUrdu
+                          ? 'کم از کم: ${item.minStockAlert.toStringAsFixed(0)} ${item.unit}'
+                          : 'Min: ${item.minStockAlert.toStringAsFixed(0)} ${item.unit}',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondary,
+                        fontFamily: fontFamily,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: UrduAwareText(
+                  qtyLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    fontFamily: fontFamily,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                PhosphorIcons.caretRight(),
+                size: 11,
+                color: AppTheme.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ═════════════════════════════════════════════════════════════
+  // Aging Card - No border
+  // ═════════════════════════════════════════════════════════════
+  Widget _buildAgingCard({
+    required bool isUrdu,
+    required String? fontFamily,
+    required List<_AgingBucket> buckets,
+    required StockService stockService,
+  }) {
+    final total = buckets.fold<int>(0, (sum, b) => sum + b.items.length);
+    final totalVal = total == 0 ? 1 : total;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.darkColor.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          for (int i = 0; i < buckets.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            _buildAgingBarRow(
+              isUrdu: isUrdu,
+              fontFamily: fontFamily,
+              bucket: buckets[i],
+              pct: (buckets[i].items.length / totalVal) * 100,
+              isActive: _activeAgingBucket == i,
+              onTap: () {
+                setState(() {
+                  _activeAgingBucket = _activeAgingBucket == i ? null : i;
+                  _activeList = null;
+                });
+              },
+            ),
+          ],
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 12,
+            runSpacing: 6,
             children: [
-              Icon(PhosphorIcons.lightning(),
-                  size: 18, color: AppTheme.themeColor),
-              const SizedBox(width: 8),
-              UrduAwareText(
-                isUrdu ? 'اشیاء کی رفتار' : 'Item Velocity',
-                style: TextStyle(
-                  fontFamily: fontFamily,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.darkColor,
-                ),
+              _buildLegendItem(
+                color: const Color(0xFF10B981),
+                label: isUrdu ? 'تازہ' : 'Fresh',
+                fontFamily: fontFamily,
               ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _buildVelocityStat(
-                  icon: PhosphorIcons.checkCircle(),
-                  label: isUrdu ? 'تیز' : 'Fast',
-                  sublabel: isUrdu ? '10+ / 30 دن' : '10+ / 30d',
-                  count: fastCount,
-                  color: AppTheme.incomeColor,
-                  fontFamily: fontFamily,
-                ),
+              _buildLegendItem(
+                color: const Color(0xFFF59E0B),
+                label: isUrdu ? 'درمیانہ' : 'Mid',
+                fontFamily: fontFamily,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildVelocityStat(
-                  icon: PhosphorIcons.clock(),
-                  label: isUrdu ? 'سست' : 'Slow',
-                  sublabel: isUrdu ? '1-9 / 30 دن' : '1-9 / 30d',
-                  count: slowCount,
-                  color: Colors.orange,
-                  fontFamily: fontFamily,
-                ),
+              _buildLegendItem(
+                color: const Color(0xFFF97316),
+                label: isUrdu ? 'پرانا' : 'Old',
+                fontFamily: fontFamily,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildVelocityStat(
-                  icon: PhosphorIcons.warning(),
-                  label: isUrdu ? 'مردہ' : 'Dead',
-                  sublabel: isUrdu ? '30 دن سے کوئی نہیں' : 'none in 30d',
-                  count: deadCount,
-                  color: AppTheme.expenseColor,
-                  fontFamily: fontFamily,
-                ),
+              _buildLegendItem(
+                color: const Color(0xFFDC2626),
+                label: isUrdu ? 'مردہ' : 'Dead',
+                fontFamily: fontFamily,
               ),
             ],
           ),
@@ -748,363 +991,241 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen>
     );
   }
 
-  Widget _buildVelocityStat({
-    required IconData icon,
-    required String label,
-    required String sublabel,
-    required int count,
-    required Color color,
-    required String fontFamily,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200, width: 1.2),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 20, color: color),
-          const SizedBox(height: 6),
-          UrduAwareText(
-            count.toString(),
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: color,
-              fontFamily: '',
-            ),
-          ),
-          const SizedBox(height: 2),
-          UrduAwareText(
-            label,
-            style: TextStyle(
-              fontFamily: fontFamily,
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.darkColor,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 1),
-          UrduAwareText(
-            sublabel,
-            style: TextStyle(
-              fontFamily: fontFamily,
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textSecondary,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader({
-    required IconData icon,
-    required String title,
-    required Color color,
-    required String fontFamily,
-  }) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 6),
-        UrduAwareText(
-          title,
-          style: TextStyle(
-            fontFamily: fontFamily,
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildVelocityItemCard({
-    required StockItem item,
+  Widget _buildAgingBarRow({
     required bool isUrdu,
-    required String fontFamily,
-    required String velocity,
-    required StockService stockService,
+    required String? fontFamily,
+    required _AgingBucket bucket,
+    required double pct,
+    required bool isActive,
+    required VoidCallback onTap,
   }) {
-    final currentStock = stockService.calculateCurrentStock(item.id);
-    Color color;
-    IconData icon;
-
-    switch (velocity) {
-      case 'fast':
-        color = AppTheme.incomeColor;
-        icon = PhosphorIcons.checkCircle();
-        break;
-      case 'slow':
-        color = Colors.orange;
-        icon = PhosphorIcons.clock();
-        break;
-      default:
-        color = AppTheme.expenseColor;
-        icon = PhosphorIcons.warning();
-    }
-
-    return InkWell(
-      onTap: () async {
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => StockDetailScreen(item: item),
-          ),
-        );
-        if (result == true && mounted) setState(() {});
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.grey.shade200,
-            width: 1.2,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  UrduAwareText(
-                    item.name,
-                    style: TextStyle(
-                      fontFamily: fontFamily,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.darkColor,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  UrduAwareText(
-                    '${currentStock.toStringAsFixed(0)} ${item.unit} · ${Formatters.formatAmountWithCurrency(item.sellingPrice)}',
-                    style: TextStyle(
-                      fontFamily: fontFamily,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              PhosphorIcons.caretRight(),
-              size: 12,
-              color: AppTheme.textSecondary,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAlertItemCard({
-    required StockItem item,
-    required bool isUrdu,
-    required String fontFamily,
-    required String alertType,
-    required StockService stockService,
-  }) {
-    final currentStock = stockService.calculateCurrentStock(item.id);
-    final value = currentStock * item.purchasePrice;
-    Color color;
-    IconData icon;
-    String statusLabel;
-
-    switch (alertType) {
-      case 'out':
-        color = AppTheme.expenseColor;
-        icon = PhosphorIcons.prohibit();
-        statusLabel = isUrdu ? 'ختم' : 'Out';
-        break;
-      case 'low':
-        color = Colors.orange;
-        icon = PhosphorIcons.warning();
-        statusLabel = isUrdu ? 'کم' : 'Low';
-        break;
-      default:
-        color = AppTheme.expenseColor;
-        icon = PhosphorIcons.skull();
-        statusLabel = isUrdu ? 'مردہ' : 'Dead';
-    }
-
-    return InkWell(
-      onTap: () async {
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => StockDetailScreen(item: item),
-          ),
-        );
-        if (result == true && mounted) setState(() {});
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.grey.shade200,
-            width: 1.2,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 18, color: color),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  UrduAwareText(
-                    item.name,
-                    style: TextStyle(
-                      fontFamily: fontFamily,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.darkColor,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  UrduAwareText(
-                    alertType == 'out'
-                        ? (isUrdu ? 'ختم شدہ' : 'Out of stock')
-                        : '${currentStock.toStringAsFixed(0)} ${item.unit} · ${Formatters.formatAmountWithCurrency(value)}',
-                    style: TextStyle(
-                      fontFamily: fontFamily,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                      color: color,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: UrduAwareText(
-                statusLabel,
-                style: TextStyle(
-                  fontFamily: fontFamily,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHealthStat({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-    required String fontFamily,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200, width: 1.2),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
             children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 6),
-              Expanded(
+              SizedBox(
+                width: 80,
                 child: UrduAwareText(
-                  title,
+                  bucket.label(isUrdu),
                   style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: isActive
+                        ? const Color(0xFFF97316)
+                        : AppTheme.textSecondary,
                     fontFamily: fontFamily,
-                    fontSize: 11,
-                    color: AppTheme.textSecondary,
-                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: (pct / 100).clamp(0, 1),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: bucket.color,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 56,
+                child: UrduAwareText(
+                  '${bucket.items.length} · ${pct.toStringAsFixed(0)}%',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.darkColor,
+                    fontFamily: fontFamily,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              Icon(
+                isActive ? PhosphorIcons.caretUp() : PhosphorIcons.caretDown(),
+                size: 11,
+                color: isActive ? const Color(0xFFF97316) : AppTheme.textSecondary,
+              ),
             ],
           ),
-          const SizedBox(height: 6),
-          UrduAwareText(
-            value,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-              color: AppTheme.darkColor,
-              fontFamily: '',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegendItem({
+    required Color color,
+    required String label,
+    String? fontFamily,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 4),
+        UrduAwareText(
+          label,
+          style: TextStyle(
+            fontSize: 9.5,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.textSecondary,
+            fontFamily: fontFamily,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ═════════════════════════════════════════════════════════════
+  // Dead Stock Summary - No border
+  // ═════════════════════════════════════════════════════════════
+  Widget _buildDeadStockSummary({
+    required bool isUrdu,
+    required String? fontFamily,
+    required int count,
+    required double value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: const Color(0xFFECFDF5),
+              borderRadius: BorderRadius.circular(11),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            alignment: Alignment.center,
+            child: const UrduAwareText('🐌', style: TextStyle(fontSize: 18)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                UrduAwareText(
+                  isUrdu
+                      ? '$count اشیاء · 30+ دن سے نہیں بکیں'
+                      : '$count items · No sales in 30+ days',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.darkColor,
+                    fontFamily: fontFamily,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                UrduAwareText(
+                  isUrdu
+                      ? 'ویلیو: ${Formatters.formatAmountWithCurrency(value)} پھنسی ہوئی'
+                      : 'Value: ${Formatters.formatAmountWithCurrency(value)} stuck',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.expenseColor,
+                    fontFamily: fontFamily,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState(bool isUrdu, String fontFamily) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              PhosphorIcons.checkCircle(),
-              size: 64,
-              color: Colors.green[400],
-            ),
-            const SizedBox(height: 16),
-            UrduAwareText(
-              isUrdu
-                  ? 'تمام انوینٹری بہترین حالت میں ہے!'
-                  : 'All inventory health status is optimal!',
+  // ═════════════════════════════════════════════════════════════
+  // Section Title
+  // ═════════════════════════════════════════════════════════════
+  Widget _buildSectionTitle({
+    required IconData icon,
+    required String title,
+    String? fontFamily,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: AppTheme.textSecondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: UrduAwareText(
+              title.toUpperCase(),
               style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.darkColor,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.textSecondary,
+                letterSpacing: 0.5,
                 fontFamily: fontFamily,
               ),
-              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+}
+
+// ═════════════════════════════════════════════════════════════
+// Aging Bucket Model
+// ═════════════════════════════════════════════════════════════
+class _AgingBucket {
+  final String key;
+  final String labelEn;
+  final String labelUr;
+  final int minDays;
+  final int maxDays;
+  final Color color;
+  final List<StockItem> items;
+
+  _AgingBucket({
+    required this.key,
+    required this.labelEn,
+    required this.labelUr,
+    required this.minDays,
+    required this.maxDays,
+    required this.color,
+  }) : items = [];
+
+  String label(bool isUrdu) => isUrdu ? labelUr : labelEn;
 }

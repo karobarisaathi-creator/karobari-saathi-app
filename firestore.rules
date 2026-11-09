@@ -24,6 +24,10 @@ service cloud.firestore {
     // --- صارفین کا ڈیٹا (کھاتہ، ٹرانزیکشنز) ---
     match /backups/{userId} {
       allow read, write: if isOwner(userId);
+
+      match /{backupPath=**} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     match /public_shops/{shopId} {

@@ -48,9 +48,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
   static const String _playStoreUrl =
       'https://play.google.com/store/apps/details?id=com.zalooq.karobari_saathi';
   static const String _supportEmail = 'support@zalooq.com';
-  static const String _supportWhatsApp = '+923001234567';
   static const String _privacyUrl = 'https://zalooq.com/privacy';
-  static const String _termsUrl = 'https://zalooq.com/terms';
 
   @override
   void initState() {
@@ -777,20 +775,6 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                           _launchUrl('mailto:$_supportEmail', context, isUrdu),
                     ),
                     const Divider(),
-                    _buildSupportItem(
-                      context,
-                      isUrdu: isUrdu,
-                      fontFamily: fontFamily,
-                      icon: PhosphorIcons.whatsappLogo(),
-                      title: isUrdu ? 'واٹس ایپ' : 'WhatsApp',
-                      value: _supportWhatsApp,
-                      onTap: () => _launchUrl(
-                        'https://wa.me/$_supportWhatsApp',
-                        context,
-                        isUrdu,
-                      ),
-                    ),
-                    const Divider(),
                     // ⭐ Rate app
                     _buildSupportItem(
                       context,
@@ -802,17 +786,6 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                           ? 'پلے سٹور پر ریٹنگ دیں'
                           : 'Rate on Play Store',
                       onTap: () => _launchUrl(_playStoreUrl, context, isUrdu),
-                    ),
-                    const Divider(),
-                    // ⭐ Terms link
-                    _buildSupportItem(
-                      context,
-                      isUrdu: isUrdu,
-                      fontFamily: fontFamily,
-                      icon: PhosphorIcons.fileText(),
-                      title: isUrdu ? 'شرائط و ضوابط' : 'Terms of Service',
-                      value: _termsUrl,
-                      onTap: () => _launchUrl(_termsUrl, context, isUrdu),
                     ),
                   ],
                 ),

@@ -329,7 +329,7 @@ class StockAnalyticsService {
         continue;
       }
       final state = states[item.id]!;
-      
+
       final inTargetMonth = movement.timestamp.year == year && movement.timestamp.month == month;
       final dayIndex = inTargetMonth ? movement.timestamp.day - 1 : -1;
 
@@ -417,7 +417,7 @@ class StockAnalyticsService {
 
     return accumulators.values
         .map((stats) {
-          if (!endExclusive.isBefore(stats.item.createdAt)) {
+          if (stats.item.createdAt.isBefore(endExclusive)) {
             stats.endingStockQuantity = states[stats.item.id]!.quantity;
           }
           return stats.toStats();
@@ -426,7 +426,8 @@ class StockAnalyticsService {
             stats.purchaseQuantity != 0 ||
             stats.salesQuantity != 0 ||
             stats.purchaseValue != 0 ||
-            stats.salesRevenue != 0)
+            stats.salesRevenue != 0 ||
+            stats.endingStockQuantity != 0)
         .toList()
       ..sort((a, b) => b.salesRevenue.compareTo(a.salesRevenue));
   }
