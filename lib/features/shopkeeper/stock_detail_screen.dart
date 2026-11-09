@@ -17,6 +17,7 @@ import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'add_edit_stock_item_screen.dart';
 import 'stock_adjustment_dialog.dart';
+import 'package:account_app/core/widgets/image_gallery_viewer.dart';
 
 class StockDetailScreen extends StatelessWidget {
   static const Map<String, String> _categoryNamesUrdu = {
@@ -237,8 +238,19 @@ class StockDetailScreen extends StatelessWidget {
                           ),
                         ),
                       ),
-                      // Image
-                      _buildItemImage(item, status.color),
+                      // Image with tap to zoom
+                      GestureDetector(
+                        onTap: () {
+                          if (item.allImages.isNotEmpty) {
+                            openFullScreenImageGallery(
+                              context,
+                              item.allImages,
+                              initialIndex: 0,
+                            );
+                          }
+                        },
+                        child: _buildItemImage(item, status.color),
+                      ),
 
                       // Featured badge (top-right)
                       if (item.featured)
@@ -291,30 +303,29 @@ class StockDetailScreen extends StatelessWidget {
                         ),
 
                       // Image count badge (bottom-right)
-                      // صرف ایک image ہو تو نہ دکھاؤ
-                      Positioned(
-                        bottom: 10,
-                        right: 10,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.darkColor.withValues(alpha: 0.65),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: UrduAwareText(
-                            '1 / 1',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              fontFamily: null,
+                      if (item.allImages.length > 1)
+                        Positioned(
+                          bottom: 10,
+                          right: 10,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.darkColor.withValues(alpha: 0.65),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: UrduAwareText(
+                              '1 / ${item.allImages.length}',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -322,16 +333,17 @@ class StockDetailScreen extends StatelessWidget {
             ),
 
             // ═══════════════════════════════════════
-            // INFO SECTION — Name centered + Tags
+            // INFO SECTION — Name start-aligned + Tags
             // ═══════════════════════════════════════
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Name — centered, big
+                  // Name — start-aligned, big
                   UrduAwareText(
                     displayName,
-                    textAlign: TextAlign.center,
+                    textAlign: isUrdu ? TextAlign.right : TextAlign.left,
                     style: TextStyle(
                       fontSize: 21,
                       fontWeight: FontWeight.w900,
@@ -345,11 +357,11 @@ class StockDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
 
-                  // Meta row — centered
+                  // Meta row — start-aligned
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
-                    alignment: WrapAlignment.center,
+                    alignment: WrapAlignment.start,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       // Category
@@ -440,7 +452,7 @@ class StockDetailScreen extends StatelessWidget {
             ),
 
             // ═══════════════════════════════════════
-            // METRICS SECTION — 4-cell + Progress
+            // METRICS SECTION — 3-cell + Progress
             // ═══════════════════════════════════════
             if (item.trackStock) ...[
               Container(
@@ -472,7 +484,7 @@ class StockDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
 
-                    // 4-cell grid
+                    // 3-cell grid (Current, Per Unit, Total Value)
                     Row(
                       children: [
                         // Current
@@ -491,21 +503,7 @@ class StockDetailScreen extends StatelessWidget {
                             fontFamily: fontFamily,
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        // Min alert
-                        Expanded(
-                          child: _buildStatCell(
-                            value: minAlert.toStringAsFixed(0),
-                            label: isUrdu ? 'کم از کم' : 'MIN ALERT',
-                            valueColor: isOutOfStock
-                                ? AppTheme.expenseColor
-                                : (isLowStock
-                                    ? const Color(0xFFD97706)
-                                    : AppTheme.darkColor),
-                            fontFamily: fontFamily,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 8),
                         // Per unit
                         Expanded(
                           child: _buildStatCell(
@@ -517,7 +515,7 @@ class StockDetailScreen extends StatelessWidget {
                             fontFamily: fontFamily,
                           ),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 8),
                         // Total value
                         Expanded(
                           child: _buildStatCell(
