@@ -86,12 +86,12 @@ class TrustPopupDialog extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 420),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.darkColor.withValues(alpha: 0.3),
-                blurRadius: 40,
-                offset: const Offset(0, 20),
+                color: AppTheme.darkColor.withValues(alpha: 0.2),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
@@ -99,186 +99,251 @@ class TrustPopupDialog extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-            // ─── Header (Green gradient) ───
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF059669), Color(0xFF10B981)],
+              // ─── Header (Green gradient) ───
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF059669), Color(0xFF10B981)],
+                  ),
                 ),
-              ),
-              child: Stack(
-                children: [
-                  Positioned(
-                    top: 0,
-                    right: isUrdu ? null : 0,
-                    left: isUrdu ? 0 : null,
-                    child: InkWell(
-                      onTap: () => Navigator.of(context).pop(),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          PhosphorIcons.x(PhosphorIconsStyle.bold),
-                          size: 14,
-                          color: Colors.white,
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: 0,
+                      right: isUrdu ? null : 0,
+                      left: isUrdu ? 0 : null,
+                      child: InkWell(
+                        onTap: () => Navigator.of(context).pop(),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            PhosphorIcons.x(PhosphorIconsStyle.bold),
+                            size: 14,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.only(
-                      right: isUrdu ? 0 : 36,
-                      left: isUrdu ? 36 : 0,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: isUrdu
-                          ? CrossAxisAlignment.end
-                          : CrossAxisAlignment.start,
-                      children: [
-                        UrduAwareText(
-                          shopName,
-                          textAlign: isUrdu ? TextAlign.right : TextAlign.left,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            fontFamily: fontFamily,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        UrduAwareText(
-                          '${isUrdu ? 'از' : 'by'} $ownerName · $area',
-                          textAlign: isUrdu ? TextAlign.right : TextAlign.left,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontFamily: fontFamily,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: isUrdu
-                              ? MainAxisAlignment.end
-                              : MainAxisAlignment.start,
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            UrduAwareText(
-                              _fmt(customerCount),
-                              style: TextStyle(
-                                fontSize: 30,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                fontFamily: fontFamily,
-                                height: 1,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            UrduAwareText(
-                              isUrdu ? 'کل خریدار' : 'total buyers',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white.withValues(alpha: 0.92),
-                                fontFamily: fontFamily,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // ─── Body ───
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                child: Column(
-                  crossAxisAlignment: isUrdu
-                      ? CrossAxisAlignment.end
-                      : CrossAxisAlignment.start,
-                  children: [
-                    _sectionTitle(
-                      isUrdu ? 'مطمئن خریدار' : 'Satisfied buyers',
-                      fontFamily,
-                    ),
-                    const SizedBox(height: 7),
-                    Row(
-                      textDirection:
-                          isUrdu ? TextDirection.rtl : TextDirection.ltr,
-                      children: [
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(999),
-                            child: LinearProgressIndicator(
-                              value: customerCount == 0
-                                  ? 0
-                                  : satisfactionPercent / 100,
-                              minHeight: 8,
-                              backgroundColor: const Color(0xFFE2E8F0),
-                              valueColor: const AlwaysStoppedAnimation(
-                                Color(0xFF10B981),
-                              ),
+                    Padding(
+                      padding: EdgeInsets.only(
+                        right: isUrdu ? 0 : 36,
+                        left: isUrdu ? 36 : 0,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: isUrdu
+                            ? CrossAxisAlignment.end
+                            : CrossAxisAlignment.start,
+                        children: [
+                          UrduAwareText(
+                            shopName,
+                            textAlign: isUrdu ? TextAlign.right : TextAlign.left,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              fontFamily: fontFamily,
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        UrduAwareText(
-                          customerCount == 0 ? '—' : '$satisfactionPercent%',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF047857),
-                            fontFamily: fontFamily,
+                          const SizedBox(height: 3),
+                          UrduAwareText(
+                            isUrdu
+                                ? '$area · $ownerName از'
+                                : 'by $ownerName · $area',
+                            textAlign: isUrdu ? TextAlign.right : TextAlign.left,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontFamily: fontFamily,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    _sectionTitle(
-                        isUrdu ? 'کاروباری سرگرمی' : 'Business activity',
-                        fontFamily),
-                    const SizedBox(height: 7),
-                    GridView.count(
-                      crossAxisCount: 2,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      mainAxisSpacing: 6,
-                      crossAxisSpacing: 6,
-                      childAspectRatio: 2.4,
-                      children: [
-                        _statCard(_fmt(customerCount),
-                            isUrdu ? 'کل خریدار' : 'Total buyers', fontFamily),
-                        _statCard(
-                            '$itemsCount',
-                            isUrdu ? 'دستیاب اشیاء' : 'Items available',
-                            fontFamily),
-                        _statCard('$billCount',
-                            isUrdu ? 'فوری بل' : 'Quick Bills', fontFamily),
-                      ],
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: isUrdu
+                                ? MainAxisAlignment.end
+                                : MainAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: isUrdu
+                                ? [
+                                    UrduAwareText(
+                                      'کل خریدار',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white
+                                            .withValues(alpha: 0.92),
+                                        fontFamily: fontFamily,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    UrduAwareText(
+                                      _fmt(customerCount),
+                                      style: TextStyle(
+                                        fontSize: 30,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                        fontFamily: fontFamily,
+                                        height: 1,
+                                      ),
+                                    ),
+                                  ]
+                                : [
+                                    UrduAwareText(
+                                      _fmt(customerCount),
+                                      style: TextStyle(
+                                        fontSize: 30,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                        fontFamily: fontFamily,
+                                        height: 1,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    UrduAwareText(
+                                      'total buyers',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white
+                                            .withValues(alpha: 0.92),
+                                        fontFamily: fontFamily,
+                                      ),
+                                    ),
+                                  ],
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
+
+              // ─── Body ───
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: isUrdu
+                        ? CrossAxisAlignment.end
+                        : CrossAxisAlignment.start,
+                    children: [
+                      _sectionTitle(
+                        isUrdu ? 'مطمئن خریدار' : 'Satisfied buyers',
+                        fontFamily,
+                      ),
+                      const SizedBox(height: 7),
+                      Row(
+                        children: isUrdu
+                            ? [
+                                UrduAwareText(
+                                  customerCount == 0
+                                      ? '—'
+                                      : '$satisfactionPercent%',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppTheme.incomeColor,
+                                    fontFamily: fontFamily,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(999),
+                                    child: LinearProgressIndicator(
+                                      value: customerCount == 0
+                                          ? 0
+                                          : satisfactionPercent / 100,
+                                      minHeight: 8,
+                                      backgroundColor: AppTheme.backgroundColor,
+                                      valueColor: AlwaysStoppedAnimation(
+                                        AppTheme.incomeColor,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ]
+                            : [
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(999),
+                                    child: LinearProgressIndicator(
+                                      value: customerCount == 0
+                                          ? 0
+                                          : satisfactionPercent / 100,
+                                      minHeight: 8,
+                                      backgroundColor: AppTheme.backgroundColor,
+                                      valueColor: AlwaysStoppedAnimation(
+                                        AppTheme.incomeColor,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                UrduAwareText(
+                                  customerCount == 0
+                                      ? '—'
+                                      : '$satisfactionPercent%',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppTheme.incomeColor,
+                                    fontFamily: fontFamily,
+                                  ),
+                                ),
+                              ],
+                      ),
+                      const SizedBox(height: 14),
+                      _sectionTitle(
+                        isUrdu ? 'کاروباری سرگرمی' : 'Business activity',
+                        fontFamily,
+                      ),
+                      const SizedBox(height: 7),
+                      GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 6,
+                        crossAxisSpacing: 6,
+                        childAspectRatio: 2.4,
+                        children: [
+                          _statCard(
+                            _fmt(customerCount),
+                            isUrdu ? 'کل خریدار' : 'Total buyers',
+                            fontFamily,
+                          ),
+                          _statCard(
+                            '$itemsCount',
+                            isUrdu ? 'دستیاب اشیاء' : 'Items available',
+                            fontFamily,
+                          ),
+                          _statCard(
+                            '$billCount',
+                            isUrdu ? 'فوری بل' : 'Quick Bills',
+                            fontFamily,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
   }
 
   Widget _sectionTitle(String text, String? fontFamily) {
@@ -287,7 +352,7 @@ class TrustPopupDialog extends StatelessWidget {
       style: TextStyle(
         fontSize: 9.5,
         fontWeight: FontWeight.w800,
-        color: const Color(0xFF94A3B8),
+        color: AppTheme.textSecondary,
         letterSpacing: 0.5,
         fontFamily: fontFamily,
       ),
@@ -298,9 +363,8 @@ class TrustPopupDialog extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFEEF2F6)),
+        color: AppTheme.backgroundColor.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment:
@@ -324,7 +388,7 @@ class TrustPopupDialog extends StatelessWidget {
             style: TextStyle(
               fontSize: 8.5,
               fontWeight: FontWeight.w600,
-              color: const Color(0xFF94A3B8),
+              color: AppTheme.textSecondary,
               fontFamily: fontFamily,
             ),
           ),
