@@ -113,7 +113,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: CustomAppBar(
-        title: isUrdu ? 'انوینٹری تشخیص' : 'Inventory Health',
+        title: isUrdu ? 'انوینٹری صحت' : 'Inventory Health',
         showBackButton: true,
       ),
       body: SingleChildScrollView(
@@ -142,11 +142,11 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     isUrdu: isUrdu,
                     fontFamily: fontFamily,
                     category: 'out',
-                    icon: '🔴',
+                    icon: PhosphorIcons.xCircle(PhosphorIconsStyle.fill),
                     count: outOfStockItems.length,
                     label: isUrdu ? 'ختم' : 'Out',
                     lightColor: AppTheme.expenseColor,
-                    lightBg: const Color(0xFFFEF2F2),
+                    lightBg: AppTheme.expenseColor.withValues(alpha: 0.1),
                     isActive: _activeList == 'out',
                   ),
                 ),
@@ -156,11 +156,11 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     isUrdu: isUrdu,
                     fontFamily: fontFamily,
                     category: 'low',
-                    icon: '🟠',
+                    icon: PhosphorIcons.warning(PhosphorIconsStyle.fill),
                     count: lowStockItems.length,
                     label: isUrdu ? 'کم' : 'Low',
-                    lightColor: const Color(0xFFF59E0B),
-                    lightBg: const Color(0xFFFFFBEB),
+                    lightColor: AppTheme.verifiedGold,
+                    lightBg: AppTheme.verifiedGold.withValues(alpha: 0.1),
                     isActive: _activeList == 'low',
                   ),
                 ),
@@ -170,11 +170,11 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     isUrdu: isUrdu,
                     fontFamily: fontFamily,
                     category: 'dead',
-                    icon: '🐌',
+                    icon: PhosphorIcons.hourglass(PhosphorIconsStyle.fill),
                     count: deadStockItems.length,
                     label: isUrdu ? 'مردہ' : 'Dead',
-                    lightColor: const Color(0xFF10B981),
-                    lightBg: const Color(0xFFECFDF5),
+                    lightColor: AppTheme.incomeColor,
+                    lightBg: AppTheme.incomeColor.withValues(alpha: 0.1),
                     isActive: _activeList == 'dead',
                   ),
                 ),
@@ -311,7 +311,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
         labelUr: '0-30 دن',
         minDays: 0,
         maxDays: 30,
-        color: const Color(0xFF10B981),
+        color: AppTheme.incomeColor,
       ),
       _AgingBucket(
         key: 'mid',
@@ -319,7 +319,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
         labelUr: '31-90 دن',
         minDays: 31,
         maxDays: 90,
-        color: const Color(0xFFF59E0B),
+        color: AppTheme.verifiedGold,
       ),
       _AgingBucket(
         key: 'old',
@@ -327,7 +327,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
         labelUr: '91-180 دن',
         minDays: 91,
         maxDays: 180,
-        color: const Color(0xFFF97316),
+        color: AppTheme.themeColor,
       ),
       _AgingBucket(
         key: 'dead',
@@ -335,7 +335,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
         labelUr: '180+ دن',
         minDays: 181,
         maxDays: 99999,
-        color: const Color(0xFFDC2626),
+        color: AppTheme.expenseColor,
       ),
     ];
 
@@ -383,10 +383,10 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     required int deadCount,
   }) {
     final scoreColor = score >= 75
-        ? const Color(0xFF10B981)
+        ? AppTheme.incomeColor
         : score >= 50
-            ? const Color(0xFFF59E0B)
-            : const Color(0xFFDC2626);
+            ? AppTheme.verifiedGold
+            : AppTheme.expenseColor;
 
     final statusLabel = score >= 75
         ? (isUrdu ? 'صحت مند' : 'Healthy')
@@ -399,15 +399,15 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFF97316), Color(0xFFEA580C)],
+          colors: [AppTheme.themeColor, AppTheme.darkColor],
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFF97316).withValues(alpha: 0.35),
+            color: AppTheme.themeColor.withValues(alpha: 0.35),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -495,19 +495,19 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                   runSpacing: 6,
                   children: [
                     _buildHeroStat(
-                      color: const Color(0xFF10B981),
+                      color: AppTheme.incomeColor,
                       count: healthyCount,
                       label: isUrdu ? 'صحیح' : 'healthy',
                       fontFamily: fontFamily,
                     ),
                     _buildHeroStat(
-                      color: const Color(0xFFF59E0B),
+                      color: AppTheme.verifiedGold,
                       count: lowCount,
                       label: isUrdu ? 'کم' : 'low',
                       fontFamily: fontFamily,
                     ),
                     _buildHeroStat(
-                      color: const Color(0xFFDC2626),
+                      color: AppTheme.expenseColor,
                       count: outCount,
                       label: isUrdu ? 'ختم' : 'out',
                       fontFamily: fontFamily,
@@ -551,13 +551,13 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Traffic Card (Clickable) - No border
+  // Traffic Card (Clickable) - No border, using Phosphor Icons & AppTheme
   // ═════════════════════════════════════════════════════════════
   Widget _buildTrafficCard({
     required bool isUrdu,
     required String? fontFamily,
     required String category,
-    required String icon,
+    required IconData icon,
     required int count,
     required String label,
     required Color lightColor,
@@ -577,12 +577,12 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isActive ? const Color(0xFFFFFBF5) : Colors.white,
+            color: isActive ? AppTheme.themeColor.withValues(alpha: 0.05) : Colors.white,
             borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
                 color: isActive
-                    ? const Color(0xFFF97316).withValues(alpha: 0.20)
+                    ? AppTheme.themeColor.withValues(alpha: 0.20)
                     : Colors.black.withValues(alpha: 0.04),
                 blurRadius: isActive ? 16 : 8,
                 offset: const Offset(0, 3),
@@ -599,7 +599,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                   borderRadius: BorderRadius.circular(11),
                 ),
                 alignment: Alignment.center,
-                child: UrduAwareText(icon, style: const TextStyle(fontSize: 16)),
+                child: Icon(icon, size: 18, color: lightColor),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -635,7 +635,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
               Icon(
                 isActive ? PhosphorIcons.caretUp() : PhosphorIcons.caretDown(),
                 size: 12,
-                color: isActive ? const Color(0xFFF97316) : AppTheme.textSecondary,
+                color: isActive ? AppTheme.themeColor : AppTheme.textSecondary,
               ),
             ],
           ),
@@ -750,7 +750,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                           vertical: 5,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7),
+                          color: AppTheme.verifiedGold.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: UrduAwareText(
@@ -758,7 +758,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                           style: TextStyle(
                             fontSize: 9.5,
                             fontWeight: FontWeight.w800,
-                            color: const Color(0xFF92400E),
+                            color: AppTheme.verifiedGold,
                             fontFamily: fontFamily,
                           ),
                         ),
@@ -801,18 +801,18 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     final color = category == 'out'
         ? AppTheme.expenseColor
         : category == 'low'
-            ? const Color(0xFFF59E0B)
-            : const Color(0xFF10B981);
+            ? AppTheme.verifiedGold
+            : AppTheme.incomeColor;
     final bgColor = category == 'out'
-        ? const Color(0xFFFEF2F2)
+        ? AppTheme.expenseColor.withValues(alpha: 0.1)
         : category == 'low'
-            ? const Color(0xFFFFFBEB)
-            : const Color(0xFFECFDF5);
-    final icon = category == 'out'
-        ? '🔴'
+            ? AppTheme.verifiedGold.withValues(alpha: 0.1)
+            : AppTheme.incomeColor.withValues(alpha: 0.1);
+    final iconData = category == 'out'
+        ? PhosphorIcons.xCircle(PhosphorIconsStyle.fill)
         : category == 'low'
-            ? '🟠'
-            : '🐌';
+            ? PhosphorIcons.warning(PhosphorIconsStyle.fill)
+            : PhosphorIcons.hourglass(PhosphorIconsStyle.fill);
 
     final qtyLabel = category == 'out'
         ? (isUrdu ? 'ختم' : 'OUT')
@@ -848,7 +848,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 alignment: Alignment.center,
-                child: UrduAwareText(icon, style: const TextStyle(fontSize: 13)),
+                child: Icon(iconData, size: 14, color: color),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -965,22 +965,22 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
             runSpacing: 6,
             children: [
               _buildLegendItem(
-                color: const Color(0xFF10B981),
+                color: AppTheme.incomeColor,
                 label: isUrdu ? 'تازہ' : 'Fresh',
                 fontFamily: fontFamily,
               ),
               _buildLegendItem(
-                color: const Color(0xFFF59E0B),
+                color: AppTheme.verifiedGold,
                 label: isUrdu ? 'درمیانہ' : 'Mid',
                 fontFamily: fontFamily,
               ),
               _buildLegendItem(
-                color: const Color(0xFFF97316),
+                color: AppTheme.themeColor,
                 label: isUrdu ? 'پرانا' : 'Old',
                 fontFamily: fontFamily,
               ),
               _buildLegendItem(
-                color: const Color(0xFFDC2626),
+                color: AppTheme.expenseColor,
                 label: isUrdu ? 'مردہ' : 'Dead',
                 fontFamily: fontFamily,
               ),
@@ -1016,7 +1016,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     color: isActive
-                        ? const Color(0xFFF97316)
+                        ? AppTheme.themeColor
                         : AppTheme.textSecondary,
                     fontFamily: fontFamily,
                   ),
@@ -1059,7 +1059,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
               Icon(
                 isActive ? PhosphorIcons.caretUp() : PhosphorIcons.caretDown(),
                 size: 11,
-                color: isActive ? const Color(0xFFF97316) : AppTheme.textSecondary,
+                color: isActive ? AppTheme.themeColor : AppTheme.textSecondary,
               ),
             ],
           ),
@@ -1099,7 +1099,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Dead Stock Summary - No border
+  // Dead Stock Summary - No border, using Phosphor Icons & AppTheme
   // ═════════════════════════════════════════════════════════════
   Widget _buildDeadStockSummary({
     required bool isUrdu,
@@ -1126,11 +1126,15 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: const Color(0xFFECFDF5),
+              color: AppTheme.incomeColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(11),
             ),
             alignment: Alignment.center,
-            child: const UrduAwareText('🐌', style: TextStyle(fontSize: 18)),
+            child: Icon(
+              PhosphorIcons.hourglass(PhosphorIconsStyle.fill),
+              size: 18,
+              color: AppTheme.incomeColor,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
