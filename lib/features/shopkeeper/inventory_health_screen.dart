@@ -1171,7 +1171,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 child: UrduAwareText(
                   bucket.label(isUrdu),
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color:
                         isActive ? AppTheme.themeColor : AppTheme.textSecondary,
@@ -1204,7 +1204,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 child: UrduAwareText(
                   '${bucket.items.length} · ${pct.toStringAsFixed(0)}%',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: AppTheme.darkColor,
                     fontFamily: fontFamily,
@@ -1245,7 +1245,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
         UrduAwareText(
           label,
           style: TextStyle(
-            fontSize: 9.5,
+            fontSize: 12,
             fontWeight: FontWeight.w700,
             color: AppTheme.textSecondary,
             fontFamily: fontFamily,
