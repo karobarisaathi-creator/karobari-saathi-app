@@ -140,13 +140,11 @@ class TrustPopupDialog extends StatelessWidget {
                         left: isUrdu ? 36 : 0,
                       ),
                       child: Column(
-                        crossAxisAlignment: isUrdu
-                            ? CrossAxisAlignment.end
-                            : CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           UrduAwareText(
                             shopName,
-                            textAlign: isUrdu ? TextAlign.right : TextAlign.left,
+                            textAlign: TextAlign.start,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
@@ -157,9 +155,9 @@ class TrustPopupDialog extends StatelessWidget {
                           const SizedBox(height: 3),
                           UrduAwareText(
                             isUrdu
-                                ? '$area · $ownerName از'
+                                ? 'از $ownerName · $area'
                                 : 'by $ownerName · $area',
-                            textAlign: isUrdu ? TextAlign.right : TextAlign.left,
+                            textAlign: TextAlign.start,
                             style: TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w600,
@@ -169,9 +167,7 @@ class TrustPopupDialog extends StatelessWidget {
                           ),
                           const SizedBox(height: 12),
                           Row(
-                            mainAxisAlignment: isUrdu
-                                ? MainAxisAlignment.end
-                                : MainAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.start,
                             crossAxisAlignment: CrossAxisAlignment.baseline,
                             textBaseline: TextBaseline.alphabetic,
                             children: isUrdu
@@ -234,9 +230,7 @@ class TrustPopupDialog extends StatelessWidget {
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
                   child: Column(
-                    crossAxisAlignment: isUrdu
-                        ? CrossAxisAlignment.end
-                        : CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _sectionTitle(
                         isUrdu ? 'مطمئن خریدار' : 'Satisfied buyers',
@@ -367,8 +361,7 @@ class TrustPopupDialog extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
-        crossAxisAlignment:
-            isUrdu ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           UrduAwareText(

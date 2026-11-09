@@ -1,6 +1,7 @@
 // lib/features/shopkeeper/inventory_health_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
@@ -22,6 +23,26 @@ class InventoryHealthScreen extends StatefulWidget {
 }
 
 class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
+  static final NumberFormat _quantityFormat =
+      NumberFormat('0.##########', 'en_US');
+
+  static const Map<String, String> _unitLabelsUrdu = {
+    'Pieces': 'عدد',
+    'Kg': 'کلو',
+    'Gram': 'گرام',
+    'Liter': 'لیٹر',
+    'Meter': 'میٹر',
+    'Sqft': 'مربع فٹ',
+    'Dozen': 'درجن',
+    'Box': 'ڈبہ',
+    'Bag': 'بوری',
+    'Maund': 'من',
+    'Bottle': 'بوتل',
+    'Packet': 'پیکٹ',
+    'Tola': 'تولہ',
+    'Other': 'دیگر',
+  };
+
   // کون سی category کھلی ہے — 'out' | 'low' | 'dead' | null
   String? _activeList;
 
@@ -35,79 +56,139 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
 
+    if (stockService.isLoading) {
+      return Scaffold(
+        backgroundColor: AppTheme.backgroundColor,
+        appBar: CustomAppBar(
+          title: isUrdu ? 'انوینٹری صحت' : 'Inventory Health',
+          showBackButton: true,
+        ),
+        body: Center(
+          child: CircularProgressIndicator(color: AppTheme.themeColor),
+        ),
+      );
+    }
+
     // ═══ Metrics ═══
-    final summary = stockService.getStockSummary();
-    final totalPurchaseValue = summary['totalPurchaseValue'] as double? ?? 0.0;
     final activeTrackedItems = stockService.items
         .where((item) => !item.isArchived && item.trackStock)
         .toList();
     final totalItems = activeTrackedItems.length;
+    final now = DateTime.now();
+    final stockByItem = <String, double>{
+      for (final item in activeTrackedItems)
+        item.id: stockService.calculateCurrentStock(item.id),
+    };
+    final validStockItems = activeTrackedItems
+        .where((item) => stockByItem[item.id]!.isFinite)
+        .toList();
+    final invalidStockItems = activeTrackedItems
+        .where((item) => !stockByItem[item.id]!.isFinite)
+        .toList();
+    final movementsByItem = <String, List<StockMovement>>{};
 
-    final lowStockItems = activeTrackedItems.where((item) {
-      final currentStock = stockService.calculateCurrentStock(item.id);
-      return currentStock > 0 && currentStock <= item.minStockAlert;
+    final lowStockItems = validStockItems.where((item) {
+      final currentStock = stockByItem[item.id]!;
+      final minStockAlert = item.minStockAlert;
+      return minStockAlert.isFinite &&
+          minStockAlert > 0 &&
+          currentStock > 0 &&
+          currentStock <= minStockAlert;
     }).toList();
 
-    final outOfStockItems = activeTrackedItems.where((item) {
-      return stockService.calculateCurrentStock(item.id) <= 0;
+    final outOfStockItems = validStockItems.where((item) {
+      return stockByItem[item.id]! <= 0;
     }).toList();
 
     // ═══ Dead stock (30+ دن میں کوئی فروخت نہیں) ═══
     final recentSalesCounts = <String, int>{};
-    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+    final thirtyDaysAgo = now.subtract(const Duration(days: 30));
     for (final movement in stockService.movements) {
+      movementsByItem.putIfAbsent(movement.stockItemId, () => []).add(movement);
       if (movement.type == StockMovementType.sale &&
-          !movement.timestamp.isBefore(thirtyDaysAgo)) {
+          !movement.timestamp.isBefore(thirtyDaysAgo) &&
+          !movement.timestamp.isAfter(now)) {
         recentSalesCounts.update(
           movement.stockItemId,
-              (count) => count + 1,
+          (count) => count + 1,
           ifAbsent: () => 1,
         );
       }
     }
 
-    final deadStockItems = activeTrackedItems.where((item) {
+    final deadStockItems = validStockItems.where((item) {
       final recentSales = recentSalesCounts[item.id] ?? 0;
-      final currentStock = stockService.calculateCurrentStock(item.id);
-      return recentSales == 0 && currentStock > 0;
+      final activeDays = now.difference(item.createdAt).inDays;
+      return recentSales == 0 && activeDays >= 30 && stockByItem[item.id]! > 0;
     }).toList();
 
     // ═══ Dead stock value ═══
     final deadStockValue = deadStockItems.fold<double>(
       0,
-          (sum, item) =>
-      sum +
-          (stockService.calculateCurrentStock(item.id) *
-              stockService.calculateWeightedAverageCost(item.id)),
+      (sum, item) {
+        final averageCost = stockService.calculateWeightedAverageCost(item.id);
+        final itemValue = stockByItem[item.id]! * averageCost;
+        return sum + (itemValue.isFinite && itemValue > 0 ? itemValue : 0);
+      },
     );
+
+    final totalPurchaseValue = validStockItems.fold<double>(0, (sum, item) {
+      final quantity = stockByItem[item.id]!;
+      final averageCost = stockService.calculateWeightedAverageCost(item.id);
+      if (quantity <= 0 || !averageCost.isFinite || averageCost <= 0) {
+        return sum;
+      }
+      final itemValue = quantity * averageCost;
+      return sum + (itemValue.isFinite ? itemValue : 0);
+    });
 
     // ═══ Out of stock — Reorder value (کم از کم اسٹاک × خرید قیمت) ═══
     final outReorderValue = outOfStockItems.fold<double>(
       0,
-          (sum, item) => sum + (item.minStockAlert * item.purchasePrice),
+      (sum, item) {
+        final minStock = item.minStockAlert.isFinite && item.minStockAlert > 0
+            ? item.minStockAlert
+            : 0.0;
+        final purchasePrice =
+            item.purchasePrice.isFinite && item.purchasePrice > 0
+                ? item.purchasePrice
+                : 0.0;
+        return sum + (minStock * purchasePrice);
+      },
     );
 
     // ═══ Low stock — Gap value (کمی × خرید قیمت) ═══
     final lowReorderValue = lowStockItems.fold<double>(
       0,
-          (sum, item) =>
-      sum +
-          ((item.minStockAlert - stockService.calculateCurrentStock(item.id)) *
-              item.purchasePrice),
+      (sum, item) {
+        final purchasePrice =
+            item.purchasePrice.isFinite && item.purchasePrice > 0
+                ? item.purchasePrice
+                : 0.0;
+        return sum +
+            ((item.minStockAlert - stockByItem[item.id]!) * purchasePrice);
+      },
     );
 
     // ═══ Health Score ═══
+    final unhealthyItemIds = <String>{
+      ...outOfStockItems.map((item) => item.id),
+      ...lowStockItems.map((item) => item.id),
+      ...deadStockItems.map((item) => item.id),
+      ...invalidStockItems.map((item) => item.id),
+    };
     final healthScore = _calculateHealthScore(
       totalItems: totalItems,
-      outCount: outOfStockItems.length,
-      lowCount: lowStockItems.length,
-      deadCount: deadStockItems.length,
+      unhealthyItemIds: unhealthyItemIds,
     );
+    final healthyCount = totalItems - unhealthyItemIds.length;
 
     // ═══ Aging buckets ═══
     final agingBuckets = _buildAgingBuckets(
-      items: activeTrackedItems,
-      stockService: stockService,
+      items: validStockItems,
+      stockByItem: stockByItem,
+      movementsByItem: movementsByItem,
+      now: now,
     );
 
     return Scaffold(
@@ -126,11 +207,10 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
               isUrdu: isUrdu,
               fontFamily: fontFamily,
               score: healthScore,
-              totalItems: totalItems,
+              healthyCount: healthyCount,
               totalValue: totalPurchaseValue,
-              outCount: outOfStockItems.length,
               lowCount: lowStockItems.length,
-              deadCount: deadStockItems.length,
+              outCount: outOfStockItems.length,
             ),
             const SizedBox(height: 12),
 
@@ -164,7 +244,11 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     isActive: _activeList == 'low',
                   ),
                 ),
-                const SizedBox(width: 8),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
                 Expanded(
                   child: _buildTrafficCard(
                     isUrdu: isUrdu,
@@ -176,6 +260,20 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     lightColor: AppTheme.incomeColor,
                     lightBg: AppTheme.incomeColor.withValues(alpha: 0.1),
                     isActive: _activeList == 'dead',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildTrafficCard(
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                    category: 'invalid',
+                    icon: PhosphorIcons.warning(PhosphorIconsStyle.fill),
+                    count: invalidStockItems.length,
+                    label: isUrdu ? 'غلط ڈیٹا' : 'Invalid',
+                    lightColor: const Color(0xFFD97706),
+                    lightBg: const Color(0xFFD97706).withValues(alpha: 0.1),
+                    isActive: _activeList == 'invalid',
                   ),
                 ),
               ],
@@ -225,6 +323,20 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 category: 'dead',
                 stockService: stockService,
               ),
+            if (_activeList == 'invalid')
+              _buildExpandList(
+                isUrdu: isUrdu,
+                fontFamily: fontFamily,
+                title: isUrdu
+                    ? 'غلط اسٹاک مقدار (${invalidStockItems.length})'
+                    : 'Invalid Stock Quantity (${invalidStockItems.length})',
+                subtitle: isUrdu
+                    ? 'ان اشیاء کی مقدار درست کریں'
+                    : 'Correct the stock quantity for these items',
+                items: invalidStockItems,
+                category: 'invalid',
+                stockService: stockService,
+              ),
 
             const SizedBox(height: 14),
 
@@ -235,11 +347,24 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
               fontFamily: fontFamily,
             ),
             const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: UrduAwareText(
+                isUrdu
+                    ? 'عمر کا اندازہ خریداری، واپسی اور اسٹاک موومنٹس سے FIFO طریقے پر ہے'
+                    : 'Estimated by FIFO from purchases, returns, and stock movements',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: AppTheme.textSecondary,
+                  fontFamily: fontFamily,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
             _buildAgingCard(
               isUrdu: isUrdu,
               fontFamily: fontFamily,
               buckets: agingBuckets,
-              stockService: stockService,
             ),
 
             // ═══ Aging expand list ═══
@@ -281,17 +406,20 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     );
   }
 
+  String _formatQuantity(double value) {
+    if (!value.isFinite) return '—';
+    return _quantityFormat.format(value);
+  }
+
   // ═════════════════════════════════════════════════════════════
   // Health Score
   // ═════════════════════════════════════════════════════════════
   int _calculateHealthScore({
     required int totalItems,
-    required int outCount,
-    required int lowCount,
-    required int deadCount,
+    required Set<String> unhealthyItemIds,
   }) {
     if (totalItems == 0) return 100;
-    final healthy = totalItems - outCount - lowCount - deadCount;
+    final healthy = totalItems - unhealthyItemIds.length;
     final score = (healthy / totalItems) * 100;
     return score.clamp(0, 100).round();
   }
@@ -301,10 +429,10 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
   // ═════════════════════════════════════════════════════════════
   List<_AgingBucket> _buildAgingBuckets({
     required List<StockItem> items,
-    required StockService stockService,
+    required Map<String, double> stockByItem,
+    required Map<String, List<StockMovement>> movementsByItem,
+    required DateTime now,
   }) {
-    final now = DateTime.now();
-
     final buckets = <_AgingBucket>[
       _AgingBucket(
         key: 'fresh',
@@ -326,10 +454,10 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
       ),
       _AgingBucket(
         key: 'old',
-        labelEn: '91-180 days',
-        labelUr: '91-180 دن',
+        labelEn: '91-179 days',
+        labelUr: '91-179 دن',
         minDays: 91,
-        maxDays: 180,
+        maxDays: 179,
         color: const Color(0xFFF97316), // نارنجی — پرانا
         icon: PhosphorIcons.hourglass(PhosphorIconsStyle.fill),
       ),
@@ -337,7 +465,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
         key: 'dead',
         labelEn: '180+ days',
         labelUr: '180+ دن',
-        minDays: 181,
+        minDays: 180,
         maxDays: 99999,
         color: AppTheme.expenseColor, // سرخ — مردہ
         icon: PhosphorIcons.skull(PhosphorIconsStyle.fill),
@@ -345,23 +473,16 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     ];
 
     for (final item in items) {
-      final currentStock = stockService.calculateCurrentStock(item.id);
+      final currentStock = stockByItem[item.id]!;
       if (currentStock <= 0) continue;
 
-      // آخری خریداری کی تاریخ (یا item کی تخلیق)
-      DateTime? lastPurchaseDate;
-      for (final m in stockService.movements) {
-        if (m.stockItemId == item.id &&
-            m.type == StockMovementType.purchase) {
-          if (lastPurchaseDate == null ||
-              m.timestamp.isAfter(lastPurchaseDate)) {
-            lastPurchaseDate = m.timestamp;
-          }
-        }
-      }
-
-      final referenceDate = lastPurchaseDate ?? now;
-      final ageDays = now.difference(referenceDate).inDays;
+      final stockDate = _oldestRemainingStockDate(
+        item: item,
+        currentStock: currentStock,
+        movements: movementsByItem[item.id] ?? const [],
+      );
+      if (stockDate == null) continue;
+      final ageDays = now.difference(stockDate).inDays.clamp(0, 99999);
 
       for (final bucket in buckets) {
         if (ageDays >= bucket.minDays && ageDays <= bucket.maxDays) {
@@ -374,6 +495,62 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     return buckets;
   }
 
+  DateTime? _oldestRemainingStockDate({
+    required StockItem item,
+    required double currentStock,
+    required List<StockMovement> movements,
+  }) {
+    final lots = <_StockLot>[];
+    final initialQuantity = item.initialQuantity;
+    if (initialQuantity.isFinite && initialQuantity > 0) {
+      lots.add(_StockLot(item.createdAt, initialQuantity));
+    }
+
+    final orderedMovements = movements
+        .where((movement) =>
+            movement.reason != 'Initial Opening Stock' &&
+            movement.stockDelta.isFinite)
+        .toList()
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    for (final movement in orderedMovements) {
+      final delta = movement.stockDelta;
+      if (delta > 0) {
+        lots.add(_StockLot(movement.timestamp, delta));
+      } else if (delta < 0) {
+        var quantityToRemove = -delta;
+        for (final lot in lots) {
+          if (quantityToRemove <= 0) break;
+          final removed =
+              lot.quantity < quantityToRemove ? lot.quantity : quantityToRemove;
+          lot.quantity -= removed;
+          quantityToRemove -= removed;
+        }
+        lots.removeWhere((lot) => lot.quantity <= 0.00000001);
+      }
+    }
+
+    var lotQuantity = lots.fold<double>(0, (sum, lot) => sum + lot.quantity);
+    final discrepancy = currentStock - lotQuantity;
+    if (discrepancy > 0.00000001) {
+      lots.add(_StockLot(item.updatedAt, discrepancy));
+    } else if (discrepancy < -0.00000001) {
+      var quantityToRemove = -discrepancy;
+      for (final lot in lots) {
+        if (quantityToRemove <= 0) break;
+        final removed =
+            lot.quantity < quantityToRemove ? lot.quantity : quantityToRemove;
+        lot.quantity -= removed;
+        quantityToRemove -= removed;
+      }
+      lots.removeWhere((lot) => lot.quantity <= 0.00000001);
+    }
+
+    if (lots.isEmpty) return item.createdAt;
+    lots.sort((a, b) => a.receivedAt.compareTo(b.receivedAt));
+    return lots.first.receivedAt;
+  }
+
   // ═════════════════════════════════════════════════════════════
   // Hero Score Card
   // ═════════════════════════════════════════════════════════════
@@ -381,19 +558,16 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     required bool isUrdu,
     required String? fontFamily,
     required int score,
-    required int totalItems,
+    required int healthyCount,
     required double totalValue,
-    required int outCount,
     required int lowCount,
-    required int deadCount,
+    required int outCount,
   }) {
     final statusLabel = score >= 75
         ? (isUrdu ? 'صحت مند' : 'Healthy')
         : score >= 50
-        ? (isUrdu ? 'توجہ چاہیے' : 'Needs Attention')
-        : (isUrdu ? 'تشویشناک' : 'Critical');
-
-    final healthyCount = totalItems - outCount - lowCount - deadCount;
+            ? (isUrdu ? 'توجہ چاہیے' : 'Needs Attention')
+            : (isUrdu ? 'تشویشناک' : 'Critical');
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -616,13 +790,9 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 ),
               ),
               Icon(
-                isActive
-                    ? PhosphorIcons.caretUp()
-                    : PhosphorIcons.caretDown(),
+                isActive ? PhosphorIcons.caretUp() : PhosphorIcons.caretDown(),
                 size: 12,
-                color: isActive
-                    ? AppTheme.themeColor
-                    : AppTheme.textSecondary,
+                color: isActive ? AppTheme.themeColor : AppTheme.textSecondary,
               ),
             ],
           ),
@@ -774,6 +944,11 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     _AgingBucket? agingBucket,
   }) {
     final currentStock = stockService.calculateCurrentStock(item.id);
+    final unitLabel =
+        isUrdu ? _unitLabelsUrdu[item.unit] ?? item.unit : item.unit;
+    final minStockAlert = item.minStockAlert.isFinite && item.minStockAlert > 0
+        ? item.minStockAlert
+        : 0.0;
 
     // ═══ Color + Icon — aging bucket کے مطابق ═══
     Color color;
@@ -785,42 +960,44 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
       color = agingBucket.color;
       bgColor = agingBucket.color.withValues(alpha: 0.1);
       iconData = agingBucket.icon;
+    } else if (category == 'invalid') {
+      color = const Color(0xFFD97706);
+      bgColor = color.withValues(alpha: 0.1);
+      iconData = PhosphorIcons.warning(PhosphorIconsStyle.fill);
     } else {
       // Out / Low / Dead کے لیے
       color = category == 'out'
           ? AppTheme.expenseColor
           : category == 'low'
-          ? AppTheme.verifiedGold
-          : AppTheme.incomeColor;
+              ? AppTheme.verifiedGold
+              : AppTheme.incomeColor;
       bgColor = color.withValues(alpha: 0.1);
       iconData = category == 'out'
           ? PhosphorIcons.xCircle(PhosphorIconsStyle.fill)
           : category == 'low'
-          ? PhosphorIcons.warning(PhosphorIconsStyle.fill)
-          : PhosphorIcons.hourglass(PhosphorIconsStyle.fill);
+              ? PhosphorIcons.warning(PhosphorIconsStyle.fill)
+              : PhosphorIcons.hourglass(PhosphorIconsStyle.fill);
     }
 
     // ═══ Qty label ═══
     final String qtyLabel;
     if (category == 'out') {
       qtyLabel = isUrdu ? 'ختم' : 'OUT';
-    } else if (category == 'aging') {
-      // Aging میں صرف موجودہ اسٹاک
-      qtyLabel = '${currentStock.toStringAsFixed(0)} ${item.unit}';
+    } else if (category == 'invalid' || !currentStock.isFinite) {
+      qtyLabel = isUrdu ? 'درست کریں' : 'Check';
     } else {
-      qtyLabel = '${currentStock.toStringAsFixed(0)} ${item.unit}';
+      qtyLabel = '${_formatQuantity(currentStock)} $unitLabel';
     }
 
     // ═══ Subtitle — aging میں "عمر" بھی دکھاو ═══
     final String subtitle;
-    if (category == 'aging' && agingBucket != null) {
-      subtitle = isUrdu
-          ? 'کم از کم: ${item.minStockAlert.toStringAsFixed(0)} ${item.unit}'
-          : 'Min: ${item.minStockAlert.toStringAsFixed(0)} ${item.unit}';
+    if (category == 'invalid') {
+      subtitle =
+          isUrdu ? 'اسٹاک کی مقدار درست نہیں' : 'Stock quantity is not valid';
     } else {
       subtitle = isUrdu
-          ? 'کم از کم: ${item.minStockAlert.toStringAsFixed(0)} ${item.unit}'
-          : 'Min: ${item.minStockAlert.toStringAsFixed(0)} ${item.unit}';
+          ? 'کم از کم: ${_formatQuantity(minStockAlert)} $unitLabel'
+          : 'Min: ${_formatQuantity(minStockAlert)} $unitLabel';
     }
 
     return Material(
@@ -924,7 +1101,6 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     required bool isUrdu,
     required String? fontFamily,
     required List<_AgingBucket> buckets,
-    required StockService stockService,
   }) {
     final total = buckets.fold<int>(0, (sum, b) => sum + b.items.length);
     final totalVal = total == 0 ? 1 : total;
@@ -997,9 +1173,8 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: isActive
-                        ? AppTheme.themeColor
-                        : AppTheme.textSecondary,
+                    color:
+                        isActive ? AppTheme.themeColor : AppTheme.textSecondary,
                     fontFamily: fontFamily,
                   ),
                 ),
@@ -1039,13 +1214,9 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 ),
               ),
               Icon(
-                isActive
-                    ? PhosphorIcons.caretUp()
-                    : PhosphorIcons.caretDown(),
+                isActive ? PhosphorIcons.caretUp() : PhosphorIcons.caretDown(),
                 size: 11,
-                color: isActive
-                    ? AppTheme.themeColor
-                    : AppTheme.textSecondary,
+                color: isActive ? AppTheme.themeColor : AppTheme.textSecondary,
               ),
             ],
           ),
@@ -1192,6 +1363,13 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
 // ═════════════════════════════════════════════════════════════
 // Aging Bucket Model
 // ═════════════════════════════════════════════════════════════
+class _StockLot {
+  final DateTime receivedAt;
+  double quantity;
+
+  _StockLot(this.receivedAt, this.quantity);
+}
+
 class _AgingBucket {
   final String key;
   final String labelEn;
