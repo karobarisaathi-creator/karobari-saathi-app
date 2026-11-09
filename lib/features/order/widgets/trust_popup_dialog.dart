@@ -57,14 +57,17 @@ class TrustPopupDialog extends StatelessWidget {
 
   String _fmt(int n) {
     if (isUrdu) {
-      if (n >= 100000)
+      if (n >= 100000) {
         return '${(n / 100000).toStringAsFixed(1).replaceAll('.0', '')} لاکھ';
-      if (n >= 1000)
+      }
+      if (n >= 1000) {
         return '${(n / 1000).toStringAsFixed(1).replaceAll('.0', '')} ہزار';
+      }
       return '$n';
     } else {
-      if (n >= 1000)
+      if (n >= 1000) {
         return '${(n / 1000).toStringAsFixed(1).replaceAll('.0', '')}k';
+      }
       return '$n';
     }
   }
@@ -77,23 +80,25 @@ class TrustPopupDialog extends StatelessWidget {
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 420),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.darkColor.withValues(alpha: 0.3),
-              blurRadius: 40,
-              offset: const Offset(0, 20),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      child: Directionality(
+        textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 420),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.darkColor.withValues(alpha: 0.3),
+                blurRadius: 40,
+                offset: const Offset(0, 20),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             // ─── Header (Green gradient) ───
             Container(
               width: double.infinity,
@@ -272,7 +277,8 @@ class TrustPopupDialog extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _sectionTitle(String text, String? fontFamily) {
