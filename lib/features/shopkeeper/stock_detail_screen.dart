@@ -90,8 +90,7 @@ class StockDetailScreen extends StatelessWidget {
               const SizedBox(height: 8),
             ],
 
-            // ═══ 3. Pricing Card ═══
-            _buildPricingCard(avgCost, isUrdu, fontFamily),
+            // ═══ 3. Pricing Card removed (now in top boxes) ═══
 
             // ═══ 4. Details Card ═══
             if (_hasDetails()) ...[
@@ -484,12 +483,12 @@ class StockDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
 
-                    // 2x2 grid (Current, Total, Purchase, Selling)
+                    // 2 rows of 3 boxes each (Current, Total, Purchase, Selling, MRP, Wholesale)
                     Column(
                       children: [
                         Row(
                           children: [
-                            // Current Stock
+                            // 1. Current Stock
                             Expanded(
                               child: _buildStatCell(
                                 value: computedStock.toStringAsFixed(
@@ -505,8 +504,8 @@ class StockDetailScreen extends StatelessWidget {
                                 fontFamily: fontFamily,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            // Total Value
+                            const SizedBox(width: 6),
+                            // 2. Total Value
                             Expanded(
                               child: _buildStatCell(
                                 value: totalValue > 0
@@ -518,12 +517,8 @@ class StockDetailScreen extends StatelessWidget {
                                 fontFamily: fontFamily,
                               ),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            // Purchase Price
+                            const SizedBox(width: 6),
+                            // 3. Purchase Price
                             Expanded(
                               child: _buildStatCell(
                                 value: Formatters.formatAmountWithCurrency(
@@ -534,8 +529,12 @@ class StockDetailScreen extends StatelessWidget {
                                 fontFamily: fontFamily,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            // Selling Price
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            // 4. Selling Price
                             Expanded(
                               child: _buildStatCell(
                                 value: Formatters.formatAmountWithCurrency(
@@ -543,6 +542,31 @@ class StockDetailScreen extends StatelessWidget {
                                 ),
                                 label: isUrdu ? 'فروخت ریٹ' : 'SELLING',
                                 valueColor: AppTheme.themeColor,
+                                fontFamily: fontFamily,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            // 5. MRP
+                            Expanded(
+                              child: _buildStatCell(
+                                value: item.mrp > 0
+                                    ? Formatters.formatAmountWithCurrency(item.mrp)
+                                    : '—',
+                                label: isUrdu ? 'ایم آر پی' : 'MRP',
+                                valueColor: AppTheme.darkColor,
+                                fontFamily: fontFamily,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            // 6. Wholesale Price
+                            Expanded(
+                              child: _buildStatCell(
+                                value: item.wholesalePrice > 0
+                                    ? Formatters.formatAmountWithCurrency(
+                                        item.wholesalePrice)
+                                    : '—',
+                                label: isUrdu ? 'تھوک ریٹ' : 'WHOLESALE',
+                                valueColor: AppTheme.darkColor,
                                 fontFamily: fontFamily,
                               ),
                             ),
