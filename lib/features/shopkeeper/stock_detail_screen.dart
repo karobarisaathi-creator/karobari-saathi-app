@@ -20,6 +20,26 @@ import 'stock_adjustment_dialog.dart';
 import 'package:account_app/core/widgets/image_gallery_viewer.dart';
 
 class StockDetailScreen extends StatelessWidget {
+  static final NumberFormat _quantityFormat =
+      NumberFormat('0.##########', 'en_US');
+
+  static const Map<String, String> _unitLabelsUrdu = {
+    'Pieces': 'عدد',
+    'Kg': 'کلو',
+    'Gram': 'گرام',
+    'Liter': 'لیٹر',
+    'Meter': 'میٹر',
+    'Sqft': 'مربع فٹ',
+    'Dozen': 'درجن',
+    'Box': 'ڈبہ',
+    'Bag': 'بوری',
+    'Maund': 'من',
+    'Bottle': 'بوتل',
+    'Packet': 'پیکٹ',
+    'Tola': 'تولہ',
+    'Other': 'دیگر',
+  };
+
   static const Map<String, String> _categoryNamesUrdu = {
     'General': 'عمومی',
     'عام (General)': 'عمومی',
@@ -46,10 +66,23 @@ class StockDetailScreen extends StatelessWidget {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
 
     final computedStock = stockService.calculateCurrentStock(item.id);
-    final avgCost = stockService.calculateWeightedAverageCost(item.id);
-    final isOutOfStock = item.trackStock && computedStock <= 0;
-    final isLowStock =
-        item.trackStock && computedStock <= item.minStockAlert && !isOutOfStock;
+    final hasValidStock = computedStock.isFinite;
+    final minAlert = item.minStockAlert.isFinite && item.minStockAlert > 0
+        ? item.minStockAlert
+        : 0.0;
+    final rawAverageCost = stockService.calculateWeightedAverageCost(item.id);
+    final avgCost = rawAverageCost.isFinite && rawAverageCost > 0
+        ? rawAverageCost
+        : item.purchasePrice.isFinite && item.purchasePrice > 0
+            ? item.purchasePrice
+            : 0.0;
+    final isInvalidStock = item.trackStock && !hasValidStock;
+    final isOutOfStock = item.trackStock && hasValidStock && computedStock <= 0;
+    final isLowStock = item.trackStock &&
+        hasValidStock &&
+        minAlert > 0 &&
+        computedStock <= minAlert &&
+        !isOutOfStock;
 
     final movementMap = <String, StockMovement>{};
     for (final movement
@@ -79,18 +112,15 @@ class StockDetailScreen extends StatelessWidget {
               avgCost,
               isOutOfStock,
               isLowStock,
+              isInvalidStock,
               isUrdu,
               fontFamily,
             ),
 
             // ═══ 2. Quick Actions ═══
-            if (item.trackStock) ...[
-              const SizedBox(height: 8),
-              _buildActionButtons(context, isUrdu, fontFamily),
-              const SizedBox(height: 8),
-            ],
-
-            // ═══ 3. Pricing Card removed (now in top boxes) ═══
+            const SizedBox(height: 8),
+            _buildActionButtons(context, isUrdu, fontFamily),
+            const SizedBox(height: 8),
 
             // ═══ 4. Details Card ═══
             if (_hasDetails()) ...[
@@ -105,7 +135,6 @@ class StockDetailScreen extends StatelessWidget {
               itemMovements,
               isUrdu,
               fontFamily,
-              computedStock,
             ),
 
             const SizedBox(height: 30),
@@ -124,10 +153,24 @@ class StockDetailScreen extends StatelessWidget {
         item.warranty > 0;
   }
 
+  String _formatQuantity(double value) {
+    if (!value.isFinite) return '—';
+    return _quantityFormat.format(value);
+  }
+
+  String _unitLabel(bool isUrdu) {
+    return isUrdu ? _unitLabelsUrdu[item.unit] ?? item.unit : item.unit;
+  }
+
   // ═════════════════════════════════════════════
   // Status Helper
   // ═════════════════════════════════════════════
-  _StatusData _getStatusData(bool isUrdu, bool isOutOfStock, bool isLowStock) {
+  _StatusData _getStatusData(
+    bool isUrdu,
+    bool isOutOfStock,
+    bool isLowStock,
+    bool isInvalidStock,
+  ) {
     if (!item.trackStock) {
       return _StatusData(
         color: AppTheme.goldColor,
@@ -135,6 +178,14 @@ class StockDetailScreen extends StatelessWidget {
         border: AppTheme.goldColor.withValues(alpha: 0.20),
         text: isUrdu ? 'ٹریک نہیں' : 'Not Tracked',
         icon: PhosphorIcons.infinity(),
+      );
+    } else if (isInvalidStock) {
+      return _StatusData(
+        color: AppTheme.verifiedGold,
+        bg: AppTheme.verifiedGold.withValues(alpha: 0.12),
+        border: AppTheme.verifiedGold.withValues(alpha: 0.30),
+        text: isUrdu ? 'غلط مقدار' : 'Invalid Stock',
+        icon: PhosphorIcons.warning(PhosphorIconsStyle.fill),
       );
     } else if (isOutOfStock) {
       return _StatusData(
@@ -146,9 +197,9 @@ class StockDetailScreen extends StatelessWidget {
       );
     } else if (isLowStock) {
       return _StatusData(
-        color: const Color(0xFFD97706),
-        bg: const Color(0xFFD97706).withValues(alpha: 0.12),
-        border: const Color(0xFFD97706).withValues(alpha: 0.30),
+        color: AppTheme.verifiedGold,
+        bg: AppTheme.verifiedGold.withValues(alpha: 0.12),
+        border: AppTheme.verifiedGold.withValues(alpha: 0.30),
         text: isUrdu ? 'کم اسٹاک' : 'Low Stock',
         icon: PhosphorIcons.warning(PhosphorIconsStyle.fill),
       );
@@ -172,6 +223,7 @@ class StockDetailScreen extends StatelessWidget {
     double avgCost,
     bool isOutOfStock,
     bool isLowStock,
+    bool isInvalidStock,
     bool isUrdu,
     String? fontFamily,
   ) {
@@ -179,19 +231,31 @@ class StockDetailScreen extends StatelessWidget {
     final categoryName = isUrdu
         ? _categoryNamesUrdu[item.categoryName.trim()] ?? item.categoryName
         : item.categoryName;
-    final status = _getStatusData(isUrdu, isOutOfStock, isLowStock);
+    final status =
+        _getStatusData(isUrdu, isOutOfStock, isLowStock, isInvalidStock);
 
     // ═══ Progress calculation ═══
-    final minAlert = item.minStockAlert;
-    final maxRef = minAlert > 0
-        ? (minAlert * 10.0).clamp(100.0, double.infinity)
-        : 100.0;
-    final progress =
-        item.trackStock ? (computedStock / maxRef).clamp(0.0, 1.0) : 1.0;
+    final minAlert = item.minStockAlert.isFinite && item.minStockAlert > 0
+        ? item.minStockAlert
+        : 0.0;
+    final maxRef =
+        minAlert > 0 ? (minAlert * 10.0).clamp(100.0, double.infinity) : 100.0;
+    final progress = item.trackStock && computedStock.isFinite
+        ? (computedStock / maxRef).clamp(0.0, 1.0)
+        : 0.0;
     final minLinePos = minAlert > 0 ? (minAlert / maxRef).clamp(0.0, 1.0) : 0.0;
 
-    final unitValue = avgCost > 0 ? avgCost : item.purchasePrice;
-    final totalValue = computedStock * unitValue;
+    final unitLabel = _unitLabel(isUrdu);
+    final calculatedStockCost = item.trackStock &&
+            computedStock.isFinite &&
+            computedStock >= 0 &&
+            avgCost > 0
+        ? computedStock * avgCost
+        : null;
+    final totalStockCost =
+        calculatedStockCost != null && calculatedStockCost.isFinite
+            ? calculatedStockCost
+            : null;
 
     return Container(
       decoration: BoxDecoration(
@@ -215,7 +279,7 @@ class StockDetailScreen extends StatelessWidget {
             // GALLERY SECTION — Full width image
             // ═══════════════════════════════════════
             Container(
-              color: const Color(0xFFF8FAFC),
+              color: AppTheme.backgroundColor,
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
@@ -265,7 +329,7 @@ class StockDetailScreen extends StatelessWidget {
                               gradient: const LinearGradient(
                                 colors: [
                                   AppTheme.verifiedGold,
-                                  Color(0xFFB45309),
+                                  AppTheme.verifiedGold,
                                 ],
                               ),
                               borderRadius: BorderRadius.circular(999),
@@ -388,7 +452,7 @@ class StockDetailScreen extends StatelessWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFEF3C7),
+                            color: AppTheme.verifiedGold.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Row(
@@ -398,15 +462,15 @@ class StockDetailScreen extends StatelessWidget {
                                 PhosphorIcons.bellRinging(
                                     PhosphorIconsStyle.fill),
                                 size: 10,
-                                color: const Color(0xFFB45309),
+                                color: AppTheme.verifiedGold,
                               ),
                               const SizedBox(width: 3),
                               UrduAwareText(
-                                '${isUrdu ? "کم از کم" : "Min"}: ${minAlert.toStringAsFixed(0)} ${item.unit}',
+                                '${isUrdu ? "کم از کم" : "Min"}: ${_formatQuantity(minAlert)} $unitLabel',
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
-                                  color: const Color(0xFFB45309),
+                                  color: AppTheme.verifiedGold,
                                   fontFamily: fontFamily,
                                 ),
                               ),
@@ -451,145 +515,165 @@ class StockDetailScreen extends StatelessWidget {
             ),
 
             // ═══════════════════════════════════════
-            // METRICS SECTION — 3-cell + Progress
+            // STOCK AND PRICE METRICS
             // ═══════════════════════════════════════
-            if (item.trackStock) ...[
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
-                decoration: BoxDecoration(
-                  border: Border(
-                    top: BorderSide(
-                      color: AppTheme.backgroundColor,
-                      width: 1,
-                    ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: AppTheme.backgroundColor,
+                    width: 1,
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Label
-                    Center(
-                      child: UrduAwareText(
-                        (isUrdu ? 'اسٹاک کا جائزہ' : 'STOCK OVERVIEW')
-                            .toUpperCase(),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Label
+                  Center(
+                    child: UrduAwareText(
+                      (isUrdu
+                              ? 'اسٹاک اور قیمت کا جائزہ'
+                              : 'STOCK & PRICE OVERVIEW')
+                          .toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textSecondary,
+                        letterSpacing: 0.6,
+                        fontFamily: fontFamily,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // 2 rows of 3 boxes each (Current, Total, Purchase, Selling, MRP, Wholesale)
+                  Column(
+                    children: [
+                      Row(
+                        children: [
+                          // 1. Current Stock
+                          Expanded(
+                            child: _buildStatCell(
+                              value: item.trackStock && computedStock.isFinite
+                                  ? '${_formatQuantity(computedStock)} $unitLabel'
+                                  : '—',
+                              label: item.trackStock
+                                  ? (isUrdu ? 'موجودہ اسٹاک' : 'STOCK')
+                                  : (isUrdu ? 'ٹریک نہیں' : 'NOT TRACKED'),
+                              valueColor: status.color,
+                              bgOverride: status.color.withValues(alpha: 0.08),
+                              borderOverride:
+                                  status.color.withValues(alpha: 0.20),
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          // 2. Total Value
+                          Expanded(
+                            child: _buildStatCell(
+                              value: totalStockCost != null
+                                  ? Formatters.formatAmountWithCurrency(
+                                      totalStockCost)
+                                  : '—',
+                              label: isUrdu ? 'اسٹاک لاگت' : 'STOCK COST',
+                              valueColor: AppTheme.goldColor,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          // 3. Purchase Price
+                          Expanded(
+                            child: _buildStatCell(
+                              value: avgCost > 0
+                                  ? Formatters.formatAmountWithCurrency(
+                                      avgCost,
+                                    )
+                                  : '—',
+                              label: isUrdu ? 'خرید ریٹ' : 'PURCHASE',
+                              valueColor: AppTheme.darkColor,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          // 4. Selling Price
+                          Expanded(
+                            child: _buildStatCell(
+                              value: item.sellingPrice.isFinite &&
+                                      item.sellingPrice >= 0
+                                  ? Formatters.formatAmountWithCurrency(
+                                      item.sellingPrice,
+                                    )
+                                  : '—',
+                              label: isUrdu ? 'فروخت ریٹ' : 'SELLING',
+                              valueColor: AppTheme.themeColor,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          // 5. MRP
+                          Expanded(
+                            child: _buildStatCell(
+                              value: item.mrp.isFinite && item.mrp > 0
+                                  ? Formatters.formatAmountWithCurrency(
+                                      item.mrp)
+                                  : '—',
+                              label: isUrdu ? 'ایم آر پی' : 'MRP',
+                              valueColor: AppTheme.darkColor,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          // 6. Wholesale Price
+                          Expanded(
+                            child: _buildStatCell(
+                              value: item.wholesalePrice.isFinite &&
+                                      item.wholesalePrice > 0
+                                  ? Formatters.formatAmountWithCurrency(
+                                      item.wholesalePrice)
+                                  : '—',
+                              label: isUrdu ? 'تھوک ریٹ' : 'WHOLESALE',
+                              valueColor: AppTheme.darkColor,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  if (item.trackStock) ...[
+                    const SizedBox(height: 14),
+                    if (computedStock.isFinite)
+                      _buildStockProgress(
+                        progress: progress,
+                        minLinePos: minLinePos,
+                        statusColor: status.color,
+                        minAlert: minAlert,
+                        maxRef: maxRef,
+                        isUrdu: isUrdu,
+                        fontFamily: fontFamily,
+                      )
+                    else
+                      UrduAwareText(
+                        isUrdu
+                            ? 'موجودہ مقدار درست نہیں؛ اسے ایڈجسٹ کریں۔'
+                            : 'Current quantity is invalid. Adjust the stock.',
                         style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w800,
-                          color: AppTheme.textSecondary,
-                          letterSpacing: 0.6,
+                          color: status.color,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
                           fontFamily: fontFamily,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // 2 rows of 3 boxes each (Current, Total, Purchase, Selling, MRP, Wholesale)
-                    Column(
-                      children: [
-                        Row(
-                          children: [
-                            // 1. Current Stock
-                            Expanded(
-                              child: _buildStatCell(
-                                value: computedStock.toStringAsFixed(
-                                  computedStock.truncateToDouble() == computedStock
-                                      ? 0
-                                      : 1,
-                                ),
-                                label: isUrdu ? 'موجودہ' : 'CURRENT',
-                                valueColor: status.color,
-                                bgOverride: status.color.withValues(alpha: 0.08),
-                                borderOverride:
-                                    status.color.withValues(alpha: 0.20),
-                                fontFamily: fontFamily,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            // 2. Total Value
-                            Expanded(
-                              child: _buildStatCell(
-                                value: totalValue > 0
-                                    ? Formatters.formatAmountWithCurrency(
-                                        totalValue)
-                                    : '—',
-                                label: isUrdu ? 'کل ویلیو' : 'TOTAL',
-                                valueColor: AppTheme.goldColor,
-                                fontFamily: fontFamily,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            // 3. Purchase Price
-                            Expanded(
-                              child: _buildStatCell(
-                                value: Formatters.formatAmountWithCurrency(
-                                  avgCost > 0 ? avgCost : item.purchasePrice,
-                                ),
-                                label: isUrdu ? 'خرید ریٹ' : 'PURCHASE',
-                                valueColor: AppTheme.darkColor,
-                                fontFamily: fontFamily,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            // 4. Selling Price
-                            Expanded(
-                              child: _buildStatCell(
-                                value: Formatters.formatAmountWithCurrency(
-                                  item.sellingPrice,
-                                ),
-                                label: isUrdu ? 'فروخت ریٹ' : 'SELLING',
-                                valueColor: AppTheme.themeColor,
-                                fontFamily: fontFamily,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            // 5. MRP
-                            Expanded(
-                              child: _buildStatCell(
-                                value: item.mrp > 0
-                                    ? Formatters.formatAmountWithCurrency(item.mrp)
-                                    : '—',
-                                label: isUrdu ? 'ایم آر پی' : 'MRP',
-                                valueColor: AppTheme.darkColor,
-                                fontFamily: fontFamily,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            // 6. Wholesale Price
-                            Expanded(
-                              child: _buildStatCell(
-                                value: item.wholesalePrice > 0
-                                    ? Formatters.formatAmountWithCurrency(
-                                        item.wholesalePrice)
-                                    : '—',
-                                label: isUrdu ? 'تھوک ریٹ' : 'WHOLESALE',
-                                valueColor: AppTheme.darkColor,
-                                fontFamily: fontFamily,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Progress bar with min-line
-                    _buildStockProgress(
-                      progress: progress,
-                      minLinePos: minLinePos,
-                      statusColor: status.color,
-                      minAlert: minAlert,
-                      maxRef: maxRef,
-                      isUrdu: isUrdu,
-                      fontFamily: fontFamily,
-                    ),
                   ],
-                ),
+                ],
               ),
-            ],
+            ),
 
             // ═══════════════════════════════════════
             // Not-tracked fallback (اگر trackStock false ہو)
@@ -780,7 +864,7 @@ class StockDetailScreen extends StatelessWidget {
               child: AppButton(
                 text: isUrdu ? 'آئٹم میں ترمیم کریں' : 'Edit Item',
                 icon: PhosphorIcons.pencilSimple(),
-                color: const Color(0xFF7C3AED),
+                color: AppTheme.purpleColor,
                 size: AppButtonSize.large,
                 isFullWidth: true,
                 onPressed: () async {
@@ -800,155 +884,6 @@ class StockDetailScreen extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-
-  // ═════════════════════════════════════════════
-  // 3. PRICING CARD
-  // ═════════════════════════════════════════════
-  Widget _buildPricingCard(
-    double avgCost,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
-    return _buildCard(
-      title: isUrdu ? 'قیمت اور ریٹ' : 'Pricing & Rates',
-      icon: PhosphorIcons.money(),
-      fontFamily: fontFamily,
-      child: Column(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(color: AppTheme.backgroundColor, width: 1),
-              ),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    _buildPriceStat(
-                      label: isUrdu ? 'اوسط لاگت' : 'AVG COST',
-                      value: '${Formatters.formatAmountWithCurrency(avgCost)}',
-                      icon: PhosphorIcons.money(),
-                      fontFamily: fontFamily,
-                    ),
-                    Container(
-                        width: 1, height: 60, color: AppTheme.backgroundColor),
-                    _buildPriceStat(
-                      label: isUrdu ? 'فروخت قیمت' : 'SALE PRICE',
-                      value:
-                          '${Formatters.formatAmountWithCurrency(item.sellingPrice)}',
-                      icon: PhosphorIcons.tag(),
-                      fontFamily: fontFamily,
-                      isHighlight: true,
-                      profitPercent: item.purchasePrice > 0
-                          ? item.profitMarginPercent
-                          : null,
-                    ),
-                  ],
-                ),
-                Container(height: 1, color: AppTheme.backgroundColor),
-                Row(
-                  children: [
-                    _buildPriceStat(
-                      label: isUrdu ? 'تھوک قیمت' : 'WHOLESALE',
-                      value: item.wholesalePrice > 0
-                          ? '${Formatters.formatAmountWithCurrency(item.wholesalePrice)}'
-                          : '—',
-                      icon: PhosphorIcons.buildings(),
-                      fontFamily: fontFamily,
-                    ),
-                    Container(
-                        width: 1, height: 60, color: AppTheme.backgroundColor),
-                    _buildPriceStat(
-                      label: isUrdu ? 'ایم آر پی' : 'MRP',
-                      value: item.mrp > 0
-                          ? '${Formatters.formatAmountWithCurrency(item.mrp)}'
-                          : '—',
-                      icon: PhosphorIcons.clipboard(),
-                      fontFamily: fontFamily,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPriceStat({
-    required String label,
-    required String value,
-    required IconData icon,
-    String? fontFamily,
-    bool isHighlight = false,
-    double? profitPercent,
-  }) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon,
-                    size: 11,
-                    color: AppTheme.textSecondary.withValues(alpha: 0.7)),
-                const SizedBox(width: 5),
-                Expanded(
-                  child: UrduAwareText(
-                    label,
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textSecondary,
-                      letterSpacing: 0.3,
-                      fontFamily: fontFamily,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            UrduAwareText(
-              value,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: isHighlight ? AppTheme.themeColor : AppTheme.darkColor,
-                letterSpacing: -0.4,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (profitPercent != null) ...[
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppTheme.goldColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: UrduAwareText(
-                  '+${profitPercent.toStringAsFixed(0)}% ${fontFamily != null ? 'منافع' : 'profit'}',
-                  style: TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.goldColor,
-                    fontFamily: fontFamily,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 
@@ -1101,7 +1036,6 @@ class StockDetailScreen extends StatelessWidget {
     List<StockMovement> movements,
     bool isUrdu,
     String? fontFamily,
-    double computedStock,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1255,7 +1189,11 @@ class StockDetailScreen extends StatelessWidget {
         iconBg = AppTheme.verifiedGold.withValues(alpha: 0.10);
         icon = PhosphorIcons.sliders();
         typeLabel = isUrdu ? 'ایڈجسٹمنٹ' : 'Adjustment';
-        sign = movement.quantity >= 0 ? '+' : '−';
+        sign = !movement.quantity.isFinite
+            ? ''
+            : movement.quantity >= 0
+                ? '+'
+                : '−';
         isPlus = movement.quantity >= 0;
         break;
     }
@@ -1272,16 +1210,17 @@ class StockDetailScreen extends StatelessWidget {
             : 'QB-$rawRef')
         : null;
     final billNo = fullBillRef != null
-        ? (isUrdu
-            ? 'بل #\u2066$fullBillRef\u2069'
-            : 'Bill #$fullBillRef')
+        ? (isUrdu ? 'بل #\u2066$fullBillRef\u2069' : 'Bill #$fullBillRef')
         : null;
 
-    final dateStr = DateFormat('dd MMM', isUrdu ? 'ur' : 'en').format(movement.timestamp);
-    final timeStr = DateFormat('h:mm a', isUrdu ? 'ur' : 'en').format(movement.timestamp);
+    final dateStr =
+        DateFormat('dd MMM', isUrdu ? 'ur' : 'en').format(movement.timestamp);
+    final timeStr =
+        DateFormat('h:mm a', isUrdu ? 'ur' : 'en').format(movement.timestamp);
     final isolatedTime = '\u2066$timeStr\u2069';
 
     final qtyAbs = movement.quantity.abs();
+    final unitLabel = _unitLabel(isUrdu);
 
     String cleanNote = movement.note.trim();
     if (cleanNote.startsWith('Transaction ') ||
@@ -1307,7 +1246,9 @@ class StockDetailScreen extends StatelessWidget {
 
     final metaParts = <String>[
       if (movement.partyName.isNotEmpty)
-        isUrdu ? 'پارٹی: ${movement.partyName}' : 'Party: ${movement.partyName}',
+        isUrdu
+            ? 'پارٹی: ${movement.partyName}'
+            : 'Party: ${movement.partyName}',
       if (billNo != null) billNo,
       isolatedTime,
     ];
@@ -1418,7 +1359,7 @@ class StockDetailScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               UrduAwareText(
-                '$sign${qtyAbs.toStringAsFixed(qtyAbs.truncateToDouble() == qtyAbs ? 0 : 1)} ${item.unit}',
+                '$sign${_formatQuantity(qtyAbs)} $unitLabel',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w900,
@@ -1428,10 +1369,10 @@ class StockDetailScreen extends StatelessWidget {
                   fontFamily: fontFamily,
                 ),
               ),
-              if (movement.unitPrice > 0) ...[
+              if (movement.unitPrice.isFinite && movement.unitPrice > 0) ...[
                 const SizedBox(height: 2),
                 UrduAwareText(
-                  '${Formatters.formatAmountWithCurrency(movement.unitPrice)}',
+                  Formatters.formatAmountWithCurrency(movement.unitPrice),
                   style: const TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,
@@ -1557,7 +1498,7 @@ class StockDetailScreen extends StatelessWidget {
           UrduAwareText(
             label,
             style: TextStyle(
-              fontSize: 8,
+              fontSize: 10.5,
               fontWeight: FontWeight.w700,
               color: AppTheme.textSecondary,
               letterSpacing: 0.2,
@@ -1632,7 +1573,7 @@ class StockDetailScreen extends StatelessWidget {
                             width: 8,
                             height: 8,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFDC2626),
+                              color: AppTheme.expenseColor,
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: Colors.white,
@@ -1644,7 +1585,7 @@ class StockDetailScreen extends StatelessWidget {
                             width: 2,
                             height: 8,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFDC2626),
+                              color: AppTheme.expenseColor,
                               borderRadius: BorderRadius.circular(2),
                             ),
                           ),
@@ -1683,11 +1624,11 @@ class StockDetailScreen extends StatelessWidget {
                       child: SizedBox(
                         width: 60,
                         child: UrduAwareText(
-                          '${isUrdu ? "کم از کم" : "Min"} ${minAlert.toStringAsFixed(0)}',
+                          '${isUrdu ? "کم از کم" : "Min"} ${_formatQuantity(minAlert)}',
                           style: TextStyle(
                             fontSize: 8.5,
                             fontWeight: FontWeight.w800,
-                            color: const Color(0xFFDC2626),
+                            color: AppTheme.expenseColor,
                             fontFamily: fontFamily,
                           ),
                           textAlign: TextAlign.center,
@@ -1699,7 +1640,7 @@ class StockDetailScreen extends StatelessWidget {
                   Positioned(
                     right: 0,
                     child: UrduAwareText(
-                      maxRef.toStringAsFixed(0),
+                      _formatQuantity(maxRef),
                       style: TextStyle(
                         fontSize: 8.5,
                         fontWeight: FontWeight.w700,
@@ -1721,7 +1662,8 @@ class StockDetailScreen extends StatelessWidget {
   // Item Image
   // ═════════════════════════════════════════════
   Widget _buildItemImage(StockItem item, Color statusColor) {
-    final path = item.imagePath;
+    final images = item.allImages;
+    final path = images.isNotEmpty ? images.first : item.imagePath;
     final fallback = Icon(
       PhosphorIcons.package(PhosphorIconsStyle.duotone),
       size: 38,

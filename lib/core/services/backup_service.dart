@@ -12,6 +12,7 @@ import 'package:account_app/core/models/profession_model.dart';
 class BackupService with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  bool _autoBackupInProgress = false;
 
   static const String _stockSnapshotsCollection = 'stockSnapshots';
   static const String _stockItemsCollection = 'stock_items';
@@ -345,8 +346,10 @@ class BackupService with ChangeNotifier {
     final profileEmail = await _getUserEmail();
 
     return {
-      'lastBackup': lastBackup != null ? DateTime.parse(lastBackup) : null,
-      'lastRestore': lastRestore != null ? DateTime.parse(lastRestore) : null,
+      'lastBackup': lastBackup == null ? null : DateTime.tryParse(lastBackup),
+      'lastRestore':
+          lastRestore == null ? null : DateTime.tryParse(lastRestore),
+      'autoBackupEnabled': prefs.getBool('auto_backup') ?? false,
       'totalAccounts': accountsBox.length,
       'totalTransactions': transactionsBox.length,
       'totalStockItems': stockItemCount,
@@ -558,23 +561,37 @@ class BackupService with ChangeNotifier {
 
   // Auto backup if needed
   Future<void> autoBackupIfNeeded() async {
-    final prefs = await SharedPreferences.getInstance();
-    final lastBackup = prefs.getString('last_backup');
-    final autoBackupEnabled = prefs.getBool('auto_backup') ?? false;
+    if (_autoBackupInProgress) return;
+    _autoBackupInProgress = true;
 
-    if (!autoBackupEnabled) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!(prefs.getBool('auto_backup') ?? false)) return;
 
-    // Check email before auto backup
-    final profileEmail = await _getUserEmail();
-    if (profileEmail == null || profileEmail.isEmpty) return;
+      final profileEmail = await _getUserEmail();
+      if (profileEmail == null || profileEmail.isEmpty) {
+        debugPrint(
+          'BackupService: Auto backup skipped because the profile email is missing.',
+        );
+        return;
+      }
 
-    final now = DateTime.now();
-    final lastBackupDate =
-        lastBackup != null ? DateTime.parse(lastBackup) : DateTime(2000);
+      final lastBackup = prefs.getString('last_backup');
+      final lastBackupDate =
+          lastBackup == null ? null : DateTime.tryParse(lastBackup);
+      if (lastBackup != null && lastBackupDate == null) {
+        debugPrint(
+          'BackupService: Invalid last backup timestamp; a new backup will be created.',
+        );
+      }
 
-    // Backup if more than 7 days have passed
-    if (now.difference(lastBackupDate).inDays > 7) {
-      await createBackup(isUrdu: false);
+      final isDue = lastBackupDate == null ||
+          DateTime.now().difference(lastBackupDate) >= const Duration(days: 7);
+      if (isDue) {
+        await createBackup(isUrdu: false);
+      }
+    } finally {
+      _autoBackupInProgress = false;
     }
   }
 

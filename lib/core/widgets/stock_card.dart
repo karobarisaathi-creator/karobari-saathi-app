@@ -117,9 +117,9 @@ class StockCard extends StatelessWidget {
       statusText = isUrdu ? 'کم' : 'Low Stock';
       statusIcon = PhosphorIcons.warning(PhosphorIconsStyle.fill);
     } else {
-      statusColor = AppTheme.incomeColor;
-      statusBg = AppTheme.incomeColor.withValues(alpha: 0.10);
-      statusBorder = AppTheme.incomeColor.withValues(alpha: 0.25);
+      statusColor = AppTheme.goldColor;
+      statusBg = AppTheme.goldColor.withValues(alpha: 0.10);
+      statusBorder = AppTheme.goldColor.withValues(alpha: 0.25);
       statusText = isUrdu ? 'موجود' : 'In Stock';
       statusIcon = PhosphorIcons.checkCircle(PhosphorIconsStyle.fill);
     }

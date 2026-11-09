@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -102,7 +104,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => StockService()),
         ChangeNotifierProvider(create: (_) => SecurityService()),
         ChangeNotifierProvider(create: (_) => OfflineQueueService()),
-        ChangeNotifierProvider(create: (_) => SettingsService()..loadSettings()),
+        ChangeNotifierProvider(
+            create: (_) => SettingsService()..loadSettings()),
       ],
       child: Consumer2<LanguageService, ThemeService>(
         builder: (context, languageService, themeService, child) {
@@ -192,6 +195,18 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
       setState(() {
         _isAppUnlocked = false;
       });
+    } else if (state == AppLifecycleState.resumed &&
+        FirebaseAuth.instance.currentUser != null) {
+      unawaited(_checkAutoBackup());
+    }
+  }
+
+  Future<void> _checkAutoBackup() async {
+    try {
+      await Provider.of<BackupService>(context, listen: false)
+          .autoBackupIfNeeded();
+    } catch (e) {
+      debugPrint('Automatic backup failed: $e');
     }
   }
 
@@ -215,6 +230,7 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
             user.displayName != null && user.displayName!.isNotEmpty;
 
         _needsProfileSetup = !hasProfileData && !hasDisplayName;
+        unawaited(_checkAutoBackup());
       }
 
       if (mounted) {

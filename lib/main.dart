@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -201,7 +203,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => StockService()),
         ChangeNotifierProvider(create: (_) => SecurityService()),
         ChangeNotifierProvider(create: (_) => OfflineQueueService()),
-        ChangeNotifierProvider(create: (_) => SettingsService()..loadSettings()),
+        ChangeNotifierProvider(
+            create: (_) => SettingsService()..loadSettings()),
       ],
       child: Consumer2<LanguageService, ThemeService>(
         child: AppWrapper(),
@@ -301,7 +304,19 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Presence updates removed
+    if (state == AppLifecycleState.resumed &&
+        FirebaseAuth.instance.currentUser != null) {
+      unawaited(_checkAutoBackup());
+    }
+  }
+
+  Future<void> _checkAutoBackup() async {
+    try {
+      await Provider.of<BackupService>(context, listen: false)
+          .autoBackupIfNeeded();
+    } catch (e) {
+      debugPrint('Automatic backup failed: $e');
+    }
   }
 
   Future<void> _initializeApp() async {
@@ -324,6 +339,9 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
           setState(() {
             _needsLogin = user == null;
           });
+          if (user != null) {
+            unawaited(_checkAutoBackup());
+          }
         }
       });
 
@@ -364,6 +382,10 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
       }
     } catch (e) {
       print("Initialization Error: $e");
+    }
+
+    if (FirebaseAuth.instance.currentUser != null) {
+      unawaited(_checkAutoBackup());
     }
 
     if (mounted && !isTimedOut) {

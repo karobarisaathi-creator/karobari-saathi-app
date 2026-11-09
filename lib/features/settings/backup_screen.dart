@@ -27,8 +27,10 @@ class BackupScreen extends StatefulWidget {
 }
 
 class _BackupScreenState extends State<BackupScreen> {
-  final BackupService _backupService = BackupService();
   final DatabaseService _databaseService = DatabaseService();
+
+  BackupService get _backupService =>
+      Provider.of<BackupService>(context, listen: false);
 
   Map<String, dynamic> _backupInfo = {};
   bool _isLoading = true;
@@ -485,7 +487,7 @@ class _BackupScreenState extends State<BackupScreen> {
                 ),
                 Switch.adaptive(
                   activeThumbColor: AppTheme.themeColor,
-                  value: _backupInfo['autoBackupEnabled'] ?? false,
+                  value: _backupInfo['autoBackupEnabled'] as bool? ?? false,
                   onChanged: _toggleAutoBackup,
                   thumbIcon: WidgetStateProperty.resolveWith<Icon?>((states) {
                     if (states.contains(WidgetState.selected)) {
@@ -501,8 +503,8 @@ class _BackupScreenState extends State<BackupScreen> {
             const SizedBox(height: 8),
             UrduAwareText(
               isUrdu
-                  ? 'خودکار بیک اپ ہر 7 دن بعد کلاؤڈ پر ڈیٹا محفوظ کرے گا'
-                  : 'Auto backup will save data to cloud every 7 days',
+                  ? 'ایپ کھلنے پر، اگر آخری بیک اپ کو 7 دن ہو جائیں تو ڈیٹا کلاؤڈ پر محفوظ ہوگا'
+                  : 'When the app opens, a cloud backup runs if 7 days have passed',
               style: TextStyle(
                 fontSize: 12,
                 color: AppTheme.textSecondary,
