@@ -11,6 +11,7 @@ class AppTheme {
   static const Color expenseColor = Color(0xFFC83120); // گہرا سرخ رنگ (Cinnabar Red)
   static const Color verifiedGold = Color(0xFFD97706); // Richer Darker Gold
   static const Color purpleColor = Color(0xFF8B5CF6); // جامنی رنگ (Purple Accent)
+  static const Color greenColor = Color(0xFF10B981); // سبز رنگ (Green Accent)
   static const Color scaffoldBackground = Color(0xFFFFFFFF);
   static const Color backgroundColor = Color(0xFFE8EAF0); // ہلکا سرمئی بیک گراؤنڈ
 

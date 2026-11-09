@@ -247,7 +247,7 @@ class TrustPopupDialog extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w800,
-                                    color: const Color(0xFF10B981),
+                                    color: AppTheme.greenColor,
                                     fontFamily: fontFamily,
                                   ),
                                 ),
@@ -262,7 +262,7 @@ class TrustPopupDialog extends StatelessWidget {
                                       minHeight: 8,
                                       backgroundColor: AppTheme.backgroundColor,
                                       valueColor: AlwaysStoppedAnimation(
-                                        Color(0xFF10B981),
+                                        AppTheme.greenColor,
                                       ),
                                     ),
                                   ),
@@ -279,7 +279,7 @@ class TrustPopupDialog extends StatelessWidget {
                                       minHeight: 8,
                                       backgroundColor: AppTheme.backgroundColor,
                                       valueColor: AlwaysStoppedAnimation(
-                                        Color(0xFF10B981),
+                                        AppTheme.greenColor,
                                       ),
                                     ),
                                   ),
@@ -292,7 +292,7 @@ class TrustPopupDialog extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w800,
-                                    color: const Color(0xFF10B981),
+                                    color: AppTheme.greenColor,
                                     fontFamily: fontFamily,
                                   ),
                                 ),
