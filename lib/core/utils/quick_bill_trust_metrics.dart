@@ -5,11 +5,15 @@ class QuickBillTrustMetrics {
 
   final int billCount;
   final int customerCount;
+  final int returningCustomerCount;
+  final int repeatProductCustomerCount;
   final int satisfiedCustomerPercent;
 
   const QuickBillTrustMetrics({
     required this.billCount,
     required this.customerCount,
+    this.returningCustomerCount = 0,
+    this.repeatProductCustomerCount = 0,
     required this.satisfiedCustomerPercent,
   });
 
@@ -21,24 +25,41 @@ class QuickBillTrustMetrics {
             transaction.isQuickBill && transaction.type == 'income')
         .toList();
     final billCountByCustomer = <String, int>{};
+    final billsByCustomerAndItem = <String, Map<String, Set<String>>>{};
 
     for (final bill in bills) {
-      if (bill.accountId != cashCustomerAccountId) {
-        billCountByCustomer.update(
-          bill.accountId,
-          (count) => count + 1,
-          ifAbsent: () => 1,
-        );
+      final customerId = bill.accountId.trim();
+      if (customerId.isEmpty || customerId == cashCustomerAccountId) continue;
+
+      billCountByCustomer.update(
+        customerId,
+        (count) => count + 1,
+        ifAbsent: () => 1,
+      );
+
+      final itemBills = billsByCustomerAndItem.putIfAbsent(
+        customerId,
+        () => <String, Set<String>>{},
+      );
+      for (final item in bill.items) {
+        final stockItemId = item.stockItemId?.trim();
+        if (stockItemId == null || stockItemId.isEmpty) continue;
+        itemBills.putIfAbsent(stockItemId, () => <String>{}).add(bill.id);
       }
     }
 
     final customerCount = billCountByCustomer.length;
     final returningCustomerCount =
         billCountByCustomer.values.where((count) => count > 1).length;
+    final repeatProductCustomerCount = billsByCustomerAndItem.values
+        .where((items) => items.values.any((billIds) => billIds.length > 1))
+        .length;
 
     return QuickBillTrustMetrics(
       billCount: bills.length,
       customerCount: customerCount,
+      returningCustomerCount: returningCustomerCount,
+      repeatProductCustomerCount: repeatProductCustomerCount,
       satisfiedCustomerPercent: customerCount == 0
           ? 0
           : (returningCustomerCount * 100 / customerCount).round(),

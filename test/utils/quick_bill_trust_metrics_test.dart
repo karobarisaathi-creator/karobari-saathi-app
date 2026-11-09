@@ -1,4 +1,5 @@
 import 'package:account_app/core/models/transaction_model.dart';
+import 'package:account_app/core/models/transaction_item_model.dart';
 import 'package:account_app/core/utils/quick_bill_trust_metrics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -9,6 +10,7 @@ Transaction _bill({
   required double received,
   required double pending,
   String type = 'income',
+  List<TransactionItem> items = const [],
 }) {
   final date = DateTime(2026, 11, 1);
   return Transaction(
@@ -24,6 +26,7 @@ Transaction _bill({
     pendingAmount: pending,
     isPending: pending > 0,
     subtotal: total,
+    items: items,
     createdAt: date,
     updatedAt: date,
   );
@@ -65,6 +68,8 @@ void main() {
 
       expect(metrics.billCount, 4);
       expect(metrics.customerCount, 2);
+      expect(metrics.returningCustomerCount, 1);
+      expect(metrics.repeatProductCustomerCount, 0);
       expect(metrics.satisfiedCustomerPercent, 50);
       expect(
         QuickBillTrustMetrics.isFullyPaid(
@@ -93,6 +98,63 @@ void main() {
 
       expect(metrics.customerCount, 0);
       expect(metrics.satisfiedCustomerPercent, 0);
+    });
+
+    test('counts customers who bought the same stock item on separate bills',
+        () {
+      TransactionItem item(String id) => TransactionItem(
+            description: 'Item $id',
+            quantity: 1,
+            rate: 10,
+            total: 10,
+            stockItemId: id,
+          );
+
+      final metrics = QuickBillTrustMetrics.fromTransactions([
+        _bill(
+          id: 'customer-1-first',
+          accountId: 'customer-1',
+          total: 10,
+          received: 10,
+          pending: 0,
+          items: [item('item-a'), item('item-a')],
+        ),
+        _bill(
+          id: 'customer-1-second',
+          accountId: 'customer-1',
+          total: 10,
+          received: 10,
+          pending: 0,
+          items: [item('item-a')],
+        ),
+        _bill(
+          id: 'customer-2',
+          accountId: 'customer-2',
+          total: 10,
+          received: 10,
+          pending: 0,
+          items: [item('item-a')],
+        ),
+        _bill(
+          id: 'cash-first',
+          accountId: QuickBillTrustMetrics.cashCustomerAccountId,
+          total: 10,
+          received: 10,
+          pending: 0,
+          items: [item('item-a')],
+        ),
+        _bill(
+          id: 'cash-second',
+          accountId: QuickBillTrustMetrics.cashCustomerAccountId,
+          total: 10,
+          received: 10,
+          pending: 0,
+          items: [item('item-a')],
+        ),
+      ]);
+
+      expect(metrics.returningCustomerCount, 1);
+      expect(metrics.repeatProductCustomerCount, 1);
     });
 
     test('ignores expenses and returns zero metrics when there are no sales',

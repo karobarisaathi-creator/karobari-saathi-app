@@ -181,7 +181,6 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
       totalItems: totalItems,
       unhealthyItemIds: unhealthyItemIds,
     );
-    final healthyCount = totalItems - unhealthyItemIds.length;
 
     // ═══ Aging buckets ═══
     final agingBuckets = _buildAgingBuckets(
@@ -207,10 +206,8 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
               isUrdu: isUrdu,
               fontFamily: fontFamily,
               score: healthScore,
-              healthyCount: healthyCount,
+              hasItems: totalItems > 0,
               totalValue: totalPurchaseValue,
-              lowCount: lowStockItems.length,
-              outCount: outOfStockItems.length,
             ),
             const SizedBox(height: 12),
 
@@ -558,21 +555,28 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     required bool isUrdu,
     required String? fontFamily,
     required int score,
-    required int healthyCount,
+    required bool hasItems,
     required double totalValue,
-    required int lowCount,
-    required int outCount,
   }) {
-    final statusLabel = score >= 75
-        ? (isUrdu ? 'صحت مند' : 'Healthy')
-        : score >= 50
-            ? (isUrdu ? 'توجہ چاہیے' : 'Needs Attention')
-            : (isUrdu ? 'تشویشناک' : 'Critical');
+    final statusLabel = !hasItems
+        ? (isUrdu ? 'کوئی آئٹم نہیں' : 'No items')
+        : score >= 75
+            ? (isUrdu ? 'صحت مند' : 'Healthy')
+            : score >= 50
+                ? (isUrdu ? 'توجہ چاہیے' : 'Needs Attention')
+                : (isUrdu ? 'تشویشناک' : 'Critical');
+    final statusColor = !hasItems
+        ? AppTheme.themeColor
+        : score >= 75
+            ? AppTheme.greenColor
+            : score >= 50
+                ? AppTheme.verifiedGold
+                : AppTheme.expenseColor;
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppTheme.themeColor,
+        color: statusColor,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
@@ -588,7 +592,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                   width: 100,
                   height: 100,
                   child: CircularProgressIndicator(
-                    value: score / 100,
+                    value: hasItems ? score / 100 : null,
                     strokeWidth: 9,
                     backgroundColor: Colors.white.withValues(alpha: 0.20),
                     valueColor: const AlwaysStoppedAnimation<Color>(
@@ -600,7 +604,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     UrduAwareText(
-                      '$score',
+                      hasItems ? '$score%' : '—',
                       style: TextStyle(
                         fontSize: 30,
                         fontWeight: FontWeight.w900,
@@ -611,7 +615,9 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                     ),
                     const SizedBox(height: 2),
                     UrduAwareText(
-                      isUrdu ? 'اسکور' : 'SCORE',
+                      hasItems
+                          ? (isUrdu ? 'صحت' : 'HEALTH')
+                          : (isUrdu ? 'آئٹم نہیں' : 'NO ITEMS'),
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
@@ -643,74 +649,33 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
                 ),
                 const SizedBox(height: 4),
                 UrduAwareText(
-                  '${isUrdu ? 'کل ویلیو: ' : 'Total value: '}${Formatters.formatAmountWithCurrency(totalValue)}',
+                  isUrdu ? 'کل ویلیو' : 'Total Value',
                   style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontFamily: fontFamily,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                UrduAwareText(
+                  hasItems
+                      ? Formatters.formatAmountWithCurrency(totalValue)
+                      : '—',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
                     color: Colors.white,
                     fontFamily: fontFamily,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 6,
-                  children: [
-                    _buildHeroStat(
-                      color: AppTheme.incomeColor,
-                      count: healthyCount,
-                      label: isUrdu ? 'صحیح' : 'healthy',
-                      fontFamily: fontFamily,
-                    ),
-                    _buildHeroStat(
-                      color: AppTheme.verifiedGold,
-                      count: lowCount,
-                      label: isUrdu ? 'کم' : 'low',
-                      fontFamily: fontFamily,
-                    ),
-                    _buildHeroStat(
-                      color: AppTheme.expenseColor,
-                      count: outCount,
-                      label: isUrdu ? 'ختم' : 'out',
-                      fontFamily: fontFamily,
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildHeroStat({
-    required Color color,
-    required int count,
-    required String label,
-    String? fontFamily,
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8.5,
-          height: 8.5,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        UrduAwareText(
-          '$count $label',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-            fontFamily: fontFamily,
-          ),
-        ),
-      ],
     );
   }
 

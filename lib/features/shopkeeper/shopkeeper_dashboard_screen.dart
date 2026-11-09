@@ -13,6 +13,7 @@ import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'package:intl/intl.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/core/utils/quick_bill_trust_metrics.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
@@ -25,6 +26,7 @@ import 'package:account_app/features/shopkeeper/add_edit_stock_item_screen.dart'
 import 'package:account_app/features/shopkeeper/sales_analytics_screen.dart';
 import 'package:account_app/features/shopkeeper/stock_detail_screen.dart';
 import 'package:account_app/features/order/nearby_shops_screen.dart';
+import 'package:account_app/features/order/widgets/trust_popup_dialog.dart';
 import 'widgets/shopkeeper_tools_grid.dart';
 
 // ═══════════════════════════════════════════
@@ -118,6 +120,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
     final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
     final stockService = Provider.of<StockService>(context);
+    final databaseService = Provider.of<DatabaseService>(context);
     final summary = stockService.getStockSummary();
 
     final totalPurchaseValue = summary['totalPurchaseValue'] as double? ?? 0.0;
@@ -125,10 +128,18 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
         summary['totalSalesPotentialValue'] as double? ?? 0.0;
     final totalItems = summary['totalItems'] as int? ?? 0;
     final lowStockCount = summary['lowStockCount'] as int? ?? 0;
+    final inventoryHealthScore = stockService.isLoading
+        ? null
+        : _calculateInventoryHealthScore(stockService);
+    final trustMetrics = QuickBillTrustMetrics.fromTransactions(
+      databaseService.getAllTransactions(),
+    );
 
     final appBarTitle = _shopName.isNotEmpty
         ? _shopName
         : (isUrdu ? 'شاپ کیپر ڈیش بورڈ' : 'Shopkeeper Dashboard');
+    final showBackButton = !widget.isEmbedded && Navigator.canPop(context);
+    final showTrustTag = databaseService.isInitialized;
 
     return Directionality(
       textDirection: languageService.textDirection,
@@ -139,7 +150,81 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
           backgroundColor: AppTheme.darkColor,
           elevation: 0,
           shape: const RoundedRectangleBorder(),
-          showBackButton: !widget.isEmbedded && Navigator.canPop(context),
+          showBackButton: false,
+          leadingWidth: showBackButton ? 104 : (showTrustTag ? 74 : null),
+          leading: showBackButton || showTrustTag
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (showBackButton)
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        tooltip: isUrdu ? 'پیچھے جائیں' : 'Back',
+                      ),
+                    if (showTrustTag)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8, right: 4),
+                        child: InkWell(
+                          onTap: () => TrustPopupDialog.show(
+                            context: context,
+                            shopName: _shopName.isNotEmpty
+                                ? _shopName
+                                : (isUrdu ? 'میری دکان' : 'My Shop'),
+                            ownerName: _userName,
+                            area: _address,
+                            customerCount: trustMetrics.customerCount,
+                            satisfiedCustomerPercent:
+                                trustMetrics.satisfiedCustomerPercent,
+                            billCount: trustMetrics.billCount,
+                            itemsCount: stockService.items
+                                .where((item) => !item.isArchived)
+                                .length,
+                            repeatProductCustomerCount:
+                                trustMetrics.repeatProductCustomerCount,
+                            showRepeatProductCustomerCount: true,
+                            isUrdu: isUrdu,
+                          ),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.greenColor.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  PhosphorIcons.shieldCheck(
+                                    PhosphorIconsStyle.fill,
+                                  ),
+                                  size: 13,
+                                  color: AppTheme.greenColor,
+                                ),
+                                const SizedBox(width: 3),
+                                UrduAwareText(
+                                  trustMetrics.customerCount == 0
+                                      ? '—'
+                                      : '${trustMetrics.satisfiedCustomerPercent}%',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppTheme.greenColor,
+                                    fontFamily: fontFamily,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                )
+              : null,
           actions: [
             IconButton(
               icon: Icon(
@@ -172,14 +257,14 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-
                     _buildQuickActions(
                       context,
                       isUrdu,
                       fontFamily,
                       totalItems,
-                      lowStockCount + (summary['outOfStockCount'] as int? ?? 0),
                       _nearbyShopsCount,
+                      inventoryHealthScore,
+                      stockService.isLoading,
                     ),
                     const SizedBox(height: 20),
                     _buildSectionHead(
@@ -199,6 +284,53 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
         ),
       ),
     );
+  }
+
+  int? _calculateInventoryHealthScore(StockService stockService) {
+    final items = stockService.items
+        .where((item) => !item.isArchived && item.trackStock)
+        .toList();
+    if (items.isEmpty) return null;
+
+    final now = DateTime.now();
+    final thirtyDaysAgo = now.subtract(const Duration(days: 30));
+    final recentSaleItemIds = stockService.movements
+        .where((movement) =>
+            movement.type == StockMovementType.sale &&
+            !movement.timestamp.isBefore(thirtyDaysAgo) &&
+            !movement.timestamp.isAfter(now))
+        .map((movement) => movement.stockItemId)
+        .toSet();
+    final unhealthyItemIds = <String>{};
+
+    for (final item in items) {
+      final currentStock = stockService.calculateCurrentStock(item.id);
+      if (!currentStock.isFinite) {
+        unhealthyItemIds.add(item.id);
+        continue;
+      }
+
+      if (currentStock <= 0 ||
+          (item.minStockAlert.isFinite &&
+              item.minStockAlert > 0 &&
+              currentStock <= item.minStockAlert) ||
+          (now.difference(item.createdAt).inDays >= 30 &&
+              currentStock > 0 &&
+              !recentSaleItemIds.contains(item.id))) {
+        unhealthyItemIds.add(item.id);
+      }
+    }
+
+    return (((items.length - unhealthyItemIds.length) / items.length) * 100)
+        .round()
+        .clamp(0, 100);
+  }
+
+  Color _inventoryHealthColor(int? score) {
+    if (score == null) return AppTheme.themeColor;
+    if (score >= 75) return AppTheme.greenColor;
+    if (score >= 50) return AppTheme.verifiedGold;
+    return AppTheme.expenseColor;
   }
 
   // ═══ HEADER (Solid background, no gradient) ═══
@@ -478,8 +610,9 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
     bool isUrdu,
     String fontFamily,
     int totalItems,
-    int lowStockCount,
     int nearbyShopsCount,
+    int? inventoryHealthScore,
+    bool isInventoryLoading,
   ) {
     return Column(
       children: [
@@ -561,8 +694,13 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                     ? 'کم اسٹاک، رفتار اور اشاریے'
                     : 'Low stock, velocity & metrics',
                 icon: Icons.monitor_heart_rounded,
-                color: AppTheme.themeColor,
-                badge: lowStockCount > 0 ? '$lowStockCount' : null,
+                color: _inventoryHealthColor(inventoryHealthScore),
+                badge: isInventoryLoading
+                    ? '…'
+                    : inventoryHealthScore == null
+                        ? '—'
+                        : '$inventoryHealthScore%',
+                badgeColor: _inventoryHealthColor(inventoryHealthScore),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -648,6 +786,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
     required IconData icon,
     required Color color,
     String? badge,
+    Color? badgeColor,
     VoidCallback? onTap,
   }) {
     return GestureDetector(
@@ -697,7 +836,7 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                         fontFamily: fontFamily,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.themeColor,
+                        color: badgeColor ?? AppTheme.themeColor,
                       ),
                     ),
                   ),

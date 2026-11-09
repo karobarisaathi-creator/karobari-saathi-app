@@ -13,6 +13,8 @@ class TrustPopupDialog extends StatelessWidget {
   final int satisfiedCustomerPercent;
   final int billCount;
   final int itemsCount;
+  final int repeatProductCustomerCount;
+  final bool showRepeatProductCustomerCount;
   final bool isUrdu;
 
   const TrustPopupDialog({
@@ -24,6 +26,8 @@ class TrustPopupDialog extends StatelessWidget {
     required this.satisfiedCustomerPercent,
     required this.billCount,
     required this.itemsCount,
+    this.repeatProductCustomerCount = 0,
+    this.showRepeatProductCustomerCount = false,
     required this.isUrdu,
   });
 
@@ -36,6 +40,8 @@ class TrustPopupDialog extends StatelessWidget {
     required int satisfiedCustomerPercent,
     required int billCount,
     required int itemsCount,
+    int repeatProductCustomerCount = 0,
+    bool showRepeatProductCustomerCount = false,
     required bool isUrdu,
   }) {
     return showDialog(
@@ -50,6 +56,8 @@ class TrustPopupDialog extends StatelessWidget {
         satisfiedCustomerPercent: satisfiedCustomerPercent,
         billCount: billCount,
         itemsCount: itemsCount,
+        repeatProductCustomerCount: repeatProductCustomerCount,
+        showRepeatProductCustomerCount: showRepeatProductCustomerCount,
         isUrdu: isUrdu,
       ),
     );
@@ -327,6 +335,14 @@ class TrustPopupDialog extends StatelessWidget {
                             isUrdu ? 'فوری بل' : 'Quick Bills',
                             fontFamily,
                           ),
+                          if (showRepeatProductCustomerCount)
+                            _statCard(
+                              '$repeatProductCustomerCount',
+                              isUrdu
+                                  ? 'وہی آئٹم دوبارہ'
+                                  : 'Repurchased same item',
+                              fontFamily,
+                            ),
                         ],
                       ),
                     ],
