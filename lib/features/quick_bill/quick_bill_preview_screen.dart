@@ -765,23 +765,25 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
           ),
           const SizedBox(width: 10),
 
-          // Read-only Bill Number Badge (Larger size)
+          // Read-only Bill Number Badge (Wider box for long bill numbers)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            constraints: const BoxConstraints(minWidth: 100),
             decoration: BoxDecoration(
               color: AppTheme.themeColor.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: AppTheme.themeColor.withValues(alpha: 0.25),
-                width: 1.5,
+                width: 1,
               ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   PhosphorIcons.receipt(),
-                  size: 16,
+                  size: 14,
                   color: AppTheme.themeColor,
                 ),
                 const SizedBox(width: 6),
@@ -791,10 +793,10 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                       : 'QB-1',
                   style: const TextStyle(
                     fontFamily: 'monospace',
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
                     color: AppTheme.themeColor,
-                    letterSpacing: 0.4,
+                    letterSpacing: 0.3,
                   ),
                 ),
               ],
