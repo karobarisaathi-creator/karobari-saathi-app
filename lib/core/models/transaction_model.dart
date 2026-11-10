@@ -88,6 +88,9 @@ class Transaction extends HiveObject {
   @HiveField(26, defaultValue: false)
   final bool receiptFromCounterparty;
 
+  @HiveField(27)
+  final String? customerPhone;
+
   Transaction({
     required this.id,
     required this.accountId,
@@ -116,6 +119,7 @@ class Transaction extends HiveObject {
     this.discountPercent,
     this.discountReason,
     this.receiptFromCounterparty = false,
+    this.customerPhone,
   }) : subtotal = subtotal ?? amount;
 
   Map<String, dynamic> toMap() {
@@ -147,6 +151,7 @@ class Transaction extends HiveObject {
       'discountPercent': discountPercent,
       'discountReason': discountReason,
       'receiptFromCounterparty': receiptFromCounterparty,
+      'customerPhone': customerPhone,
     };
   }
 
@@ -189,6 +194,7 @@ class Transaction extends HiveObject {
       discountPercent: map['discountPercent']?.toDouble(),
       discountReason: map['discountReason'],
       receiptFromCounterparty: map['receiptFromCounterparty'] == true,
+      customerPhone: map['customerPhone']?.toString(),
     );
   }
 

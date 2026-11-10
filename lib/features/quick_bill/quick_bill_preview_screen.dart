@@ -46,6 +46,8 @@ class QuickBillPreviewScreen extends StatefulWidget {
 class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
   late final String _transactionId;
   late final TextEditingController _billNumberController;
+  final TextEditingController _customerPhoneController =
+      TextEditingController();
   final TextEditingController _partialController = TextEditingController();
   final TextEditingController _discountController = TextEditingController();
   final TextEditingController _discountReasonController =
@@ -77,6 +79,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
             : 'QB-$existingBillNumber')
         : 'QB-1';
     _billNumberController = TextEditingController(text: billNum);
+    _customerPhoneController.text = original?.customerPhone ?? '';
 
     // Initialize discount from existing transaction
     if (original != null && original.discountAmount > 0) {
@@ -152,6 +155,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
   void dispose() {
     _partialController.dispose();
     _billNumberController.dispose();
+    _customerPhoneController.dispose();
     _discountController.dispose();
     _discountReasonController.dispose();
     super.dispose();
@@ -178,6 +182,10 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
     _selectedAccount = _isCashCustomer
         ? null
         : databaseService.getAccount(transaction.accountId);
+    if (_customerPhoneController.text.trim().isEmpty &&
+        _selectedAccount != null) {
+      _customerPhoneController.text = _selectedAccount!.phone;
+    }
 
     if (transaction.pendingAmount <= 0) {
       _mode = _PayMode.full;
@@ -233,8 +241,17 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
     }
     if (!result.isCashCustomer && result.account == null) return;
     setState(() {
+      final previousAccountPhone = _selectedAccount?.phone.trim() ?? '';
       _isCashCustomer = result.isCashCustomer;
       _selectedAccount = result.account;
+      final accountPhone = result.account?.phone.trim() ?? '';
+      if (accountPhone.isNotEmpty) {
+        _customerPhoneController.text = accountPhone;
+      } else if (result.isCashCustomer &&
+          previousAccountPhone.isNotEmpty &&
+          _customerPhoneController.text.trim() == previousAccountPhone) {
+        _customerPhoneController.clear();
+      }
     });
   }
 
@@ -259,6 +276,17 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
       AppToast.warning(
         context,
         isUrdu ? 'بل نمبر درج کریں۔' : 'Enter a bill number.',
+      );
+      return;
+    }
+    final enteredPhone = _customerPhoneController.text.trim();
+    final normalizedCustomerPhone = enteredPhone.isEmpty
+        ? null
+        : Formatters.normalizePhoneNumber(enteredPhone);
+    if (enteredPhone.isNotEmpty && normalizedCustomerPhone == null) {
+      AppToast.warning(
+        context,
+        isUrdu ? 'درست فون نمبر درج کریں۔' : 'Enter a valid phone number.',
       );
       return;
     }
@@ -408,6 +436,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
         voiceNote: originalTransaction?.voiceNote,
         receiptFromCounterparty:
             originalTransaction?.receiptFromCounterparty ?? false,
+        customerPhone: normalizedCustomerPhone,
         items: items,
       );
 
@@ -700,33 +729,76 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
   }
 
   // ═════════════════════════════════════════════════════════
-  // Bill Number Card
+  // Bill Number & Customer Phone Section
   // ═════════════════════════════════════════════════════════
   Widget _buildBillNumberCard(bool isUrdu, String? fontFamily) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(
-            PhosphorIcons.receipt(),
-            size: 14,
-            color: AppTheme.textSecondary,
-          ),
-          const SizedBox(width: 6),
-          UrduAwareText(
-            isUrdu ? 'بل نمبر' : 'Bill number',
-            style: TextStyle(
-              fontFamily: fontFamily,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textSecondary,
+          // Customer Phone Input (Slightly smaller, UrduAware label)
+          Expanded(
+            child: TextField(
+              controller: _customerPhoneController,
+              keyboardType: TextInputType.phone,
+              textDirection: TextDirection.ltr,
+              style: const TextStyle(fontSize: 12.5),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                prefixIcon: const Icon(Icons.phone_outlined, size: 16),
+                label: UrduAwareText(
+                  isUrdu ? 'فون نمبر (اختیاری)' : 'Customer phone (optional)',
+                  style: TextStyle(
+                    fontFamily: fontFamily,
+                    fontSize: 11.5,
+                  ),
+                ),
+                hintText: '03XX XXXXXXX',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
             ),
           ),
-          const Spacer(),
-          _BillNumberFieldWidget(
-            controller: _billNumberController,
-            isUrdu: isUrdu,
-            fontFamily: fontFamily,
+          const SizedBox(width: 10),
+
+          // Read-only Bill Number Badge (Larger size)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppTheme.themeColor.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppTheme.themeColor.withValues(alpha: 0.25),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  PhosphorIcons.receipt(),
+                  size: 16,
+                  color: AppTheme.themeColor,
+                ),
+                const SizedBox(width: 6),
+                UrduAwareText(
+                  _billNumberController.text.isNotEmpty
+                      ? _billNumberController.text
+                      : 'QB-1',
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.themeColor,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

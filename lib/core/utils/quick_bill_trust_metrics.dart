@@ -1,4 +1,5 @@
 import 'package:account_app/core/models/transaction_model.dart';
+import 'package:account_app/core/utils/formatters.dart';
 
 class QuickBillTrustMetrics {
   static const String cashCustomerAccountId = 'quick_bill_cash_customer';
@@ -24,12 +25,54 @@ class QuickBillTrustMetrics {
         .where((transaction) =>
             transaction.isQuickBill && transaction.type == 'income')
         .toList();
+    final parents = <String, String>{};
+
+    String find(String key) {
+      final parent = parents.putIfAbsent(key, () => key);
+      if (parent == key) return key;
+      return parents[key] = find(parent);
+    }
+
+    void union(String first, String second) {
+      final firstRoot = find(first);
+      final secondRoot = find(second);
+      if (firstRoot != secondRoot) parents[secondRoot] = firstRoot;
+    }
+
+    final accountKeyByBillId = <String, String>{};
+    final phoneKeyByBillId = <String, String>{};
+    final identifiedBills = <Transaction>[];
+
+    for (final bill in bills) {
+      final accountId = bill.accountId.trim();
+      final accountKey = accountId.isEmpty || accountId == cashCustomerAccountId
+          ? null
+          : 'account:$accountId';
+      final normalizedPhone =
+          Formatters.normalizePhoneNumber(bill.customerPhone ?? '');
+      final phoneKey =
+          normalizedPhone == null ? null : 'phone:$normalizedPhone';
+
+      if (accountKey == null && phoneKey == null) continue;
+      identifiedBills.add(bill);
+      if (accountKey != null) {
+        accountKeyByBillId[bill.id] = accountKey;
+      }
+      if (phoneKey != null) {
+        phoneKeyByBillId[bill.id] = phoneKey;
+      }
+      if (accountKey != null && phoneKey != null) {
+        union(accountKey, phoneKey);
+      }
+    }
+
     final billCountByCustomer = <String, int>{};
     final billsByCustomerAndItem = <String, Map<String, Set<String>>>{};
 
-    for (final bill in bills) {
-      final customerId = bill.accountId.trim();
-      if (customerId.isEmpty || customerId == cashCustomerAccountId) continue;
+    for (final bill in identifiedBills) {
+      final identityKey =
+          accountKeyByBillId[bill.id] ?? phoneKeyByBillId[bill.id]!;
+      final customerId = find(identityKey);
 
       billCountByCustomer.update(
         customerId,

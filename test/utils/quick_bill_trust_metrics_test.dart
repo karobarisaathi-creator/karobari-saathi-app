@@ -11,6 +11,7 @@ Transaction _bill({
   required double pending,
   String type = 'income',
   List<TransactionItem> items = const [],
+  String? customerPhone,
 }) {
   final date = DateTime(2026, 11, 1);
   return Transaction(
@@ -27,6 +28,7 @@ Transaction _bill({
     isPending: pending > 0,
     subtotal: total,
     items: items,
+    customerPhone: customerPhone,
     createdAt: date,
     updatedAt: date,
   );
@@ -98,6 +100,62 @@ void main() {
 
       expect(metrics.customerCount, 0);
       expect(metrics.satisfiedCustomerPercent, 0);
+    });
+
+    test('counts phone-identified cash buyers and merges account aliases', () {
+      final metrics = QuickBillTrustMetrics.fromTransactions([
+        _bill(
+          id: 'named-customer-old',
+          accountId: 'customer-1',
+          total: 100,
+          received: 100,
+          pending: 0,
+        ),
+        _bill(
+          id: 'named-customer-with-phone',
+          accountId: 'customer-1',
+          total: 100,
+          received: 100,
+          pending: 0,
+          customerPhone: '0300 1234567',
+        ),
+        _bill(
+          id: 'cash-phone-first',
+          accountId: QuickBillTrustMetrics.cashCustomerAccountId,
+          total: 50,
+          received: 50,
+          pending: 0,
+          customerPhone: '+923001234567',
+        ),
+        _bill(
+          id: 'cash-phone-second',
+          accountId: QuickBillTrustMetrics.cashCustomerAccountId,
+          total: 50,
+          received: 50,
+          pending: 0,
+          customerPhone: '0300-7654321',
+        ),
+        _bill(
+          id: 'cash-phone-second-repeat',
+          accountId: QuickBillTrustMetrics.cashCustomerAccountId,
+          total: 50,
+          received: 50,
+          pending: 0,
+          customerPhone: '+923007654321',
+        ),
+        _bill(
+          id: 'anonymous-cash',
+          accountId: QuickBillTrustMetrics.cashCustomerAccountId,
+          total: 50,
+          received: 50,
+          pending: 0,
+        ),
+      ]);
+
+      expect(metrics.billCount, 6);
+      expect(metrics.customerCount, 2);
+      expect(metrics.returningCustomerCount, 2);
+      expect(metrics.satisfiedCustomerPercent, 100);
     });
 
     test('counts customers who bought the same stock item on separate bills',
