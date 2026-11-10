@@ -729,80 +729,101 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
   }
 
   // ═════════════════════════════════════════════════════════
-  // Bill Number & Customer Phone Section
+  // Bill Number & Customer Phone Section (Equal Height)
   // ═════════════════════════════════════════════════════════
   Widget _buildBillNumberCard(bool isUrdu, String? fontFamily) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Customer Phone Input (Slightly smaller, UrduAware label)
-          Expanded(
-            child: TextField(
-              controller: _customerPhoneController,
-              keyboardType: TextInputType.phone,
-              textDirection: TextDirection.ltr,
-              style: const TextStyle(fontSize: 12.5),
-              decoration: InputDecoration(
-                isDense: true,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                prefixIcon: const Icon(Icons.phone_outlined, size: 16),
-                label: UrduAwareText(
-                  isUrdu ? 'فون نمبر (اختیاری)' : 'Customer phone (optional)',
-                  style: TextStyle(
-                    fontFamily: fontFamily,
-                    fontSize: 11.5,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Customer Phone Input (Lighter border, UrduAware label)
+            Expanded(
+              child: TextField(
+                controller: _customerPhoneController,
+                keyboardType: TextInputType.phone,
+                textDirection: TextDirection.ltr,
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  prefixIcon: const Icon(Icons.phone_outlined, size: 18),
+                  label: UrduAwareText(
+                    isUrdu ? 'فون نمبر (اختیاری)' : 'Customer phone (optional)',
+                    style: TextStyle(
+                      fontFamily: fontFamily,
+                      fontSize: 13,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
-                ),
-                hintText: '03XX XXXXXXX',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  hintText: '03XX XXXXXXX',
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: AppTheme.textSecondary.withValues(alpha: 0.25),
+                      width: 1,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(
+                      color: AppTheme.themeColor,
+                      width: 1.5,
+                    ),
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: AppTheme.textSecondary.withValues(alpha: 0.25),
+                      width: 1,
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
+            const SizedBox(width: 10),
 
-          // Read-only Bill Number Badge (Wider box for long bill numbers)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            constraints: const BoxConstraints(minWidth: 100),
-            decoration: BoxDecoration(
-              color: AppTheme.themeColor.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: AppTheme.themeColor.withValues(alpha: 0.25),
-                width: 1,
+            // Read-only Bill Number Badge (Same height via IntrinsicHeight)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              constraints: const BoxConstraints(minWidth: 100),
+              decoration: BoxDecoration(
+                color: AppTheme.themeColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppTheme.themeColor.withValues(alpha: 0.20),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    PhosphorIcons.receipt(),
+                    size: 15,
+                    color: AppTheme.themeColor,
+                  ),
+                  const SizedBox(width: 6),
+                  UrduAwareText(
+                    _billNumberController.text.isNotEmpty
+                        ? _billNumberController.text
+                        : 'QB-1',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.themeColor,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  PhosphorIcons.receipt(),
-                  size: 14,
-                  color: AppTheme.themeColor,
-                ),
-                const SizedBox(width: 6),
-                UrduAwareText(
-                  _billNumberController.text.isNotEmpty
-                      ? _billNumberController.text
-                      : 'QB-1',
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.themeColor,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
