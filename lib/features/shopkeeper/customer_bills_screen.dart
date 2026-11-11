@@ -13,7 +13,9 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/utils/receipt_dialog_helper.dart';
+import 'package:account_app/core/utils/party_ledger_metrics.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
+import 'package:account_app/core/utils/quick_bill_trust_metrics.dart';
 
 class CustomerBillsScreen extends StatefulWidget {
   const CustomerBillsScreen({super.key});
@@ -40,12 +42,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
 
   double _getTxDisplayAmount(Transaction tx) {
     if (tx.isQuickBill) {
-      if (tx.subtotal > 0) {
-        return (tx.subtotal - tx.discountAmount).clamp(0, double.infinity);
-      }
-      if ((tx.receivedAmount + tx.pendingAmount) > 0) {
-        return tx.receivedAmount + tx.pendingAmount;
-      }
+      return QuickBillTrustMetrics.billTotal(tx);
     }
     return tx.amount > 0 ? tx.amount : (tx.receivedAmount + tx.pendingAmount);
   }
@@ -70,8 +67,16 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
     return profit;
   }
 
-  Widget _buildBillsList(BuildContext context, List<Transaction> bills,
-      bool isUrdu, String? fontFamily, StockService stockService, DatabaseService databaseService) {
+  Widget _buildBillsList(
+    BuildContext context,
+    List<Transaction> bills,
+    bool isUrdu,
+    String? fontFamily,
+    StockService stockService,
+    DatabaseService databaseService, {
+    bool showOutstanding = false,
+    Map<String, double> outstandingByBill = const {},
+  }) {
     if (bills.isEmpty) {
       return Center(
         child: Column(
@@ -108,8 +113,28 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-      itemCount: dateKeys.length,
-      itemBuilder: (context, dateIndex) {
+      itemCount: dateKeys.length + (showOutstanding ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (showOutstanding && index == 0) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF7ED),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: UrduAwareText(
+              isUrdu
+                  ? 'جو وصولی کسی بل سے منسلک نہیں، اسے پہلے پرانے بل میں شمار کیا گیا ہے۔'
+                  : 'Receipts not linked to a bill are applied to the oldest bill first.',
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+          );
+        }
+        final dateIndex = index - (showOutstanding ? 1 : 0);
         final dateKey = dateKeys[dateIndex];
         final dayBills = groupedBills[dateKey]!;
         final parsedDate = DateTime.parse(dateKey);
@@ -119,7 +144,9 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
         double dayTotalAmount = 0;
         double dayTotalProfit = 0;
         for (final tx in dayBills) {
-          dayTotalAmount += _getTxDisplayAmount(tx);
+          dayTotalAmount += showOutstanding
+              ? (outstandingByBill[tx.id] ?? 0)
+              : _getTxDisplayAmount(tx);
           dayTotalProfit += _calculateTxProfit(tx, stockService);
         }
 
@@ -128,7 +155,8 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: AppTheme.themeColor.withValues(alpha: 0.2), width: 1.2),
+            side: BorderSide(
+                color: AppTheme.themeColor.withValues(alpha: 0.2), width: 1.2),
           ),
           color: Colors.white,
           child: Column(
@@ -139,7 +167,8 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                 decoration: BoxDecoration(
                   color: AppTheme.themeColor.withValues(alpha: 0.08),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(20)),
                 ),
                 child: Row(
                   children: [
@@ -185,11 +214,19 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
                 final tx = entry.value;
                 final billNo = tx.referenceNumber?.trim().isNotEmpty == true
                     ? tx.referenceNumber!
-                    : tx.id.substring(tx.id.length - 4);
-                final partyAccount = (tx.accountId != QuickBillConstants.cashCustomerAccountId)
-                    ? databaseService.getAccount(tx.accountId)
-                    : null;
+                    : tx.id.length <= 4
+                        ? tx.id
+                        : tx.id.substring(tx.id.length - 4);
+                final partyAccount =
+                    (tx.accountId != QuickBillConstants.cashCustomerAccountId)
+                        ? databaseService.getAccount(tx.accountId)
+                        : null;
                 final partyName = partyAccount?.name.trim();
+                final partyPhone = tx.customerPhone?.trim().isNotEmpty == true
+                    ? tx.customerPhone!.trim()
+                    : partyAccount?.phone.trim();
+                final partyLabel =
+                    partyName?.isNotEmpty == true ? partyName : partyPhone;
                 final displayAmount = _getTxDisplayAmount(tx);
                 final txProfit = _calculateTxProfit(tx, stockService);
 
@@ -239,11 +276,12 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
                                           color: AppTheme.darkColor,
                                         ),
                                       ),
-                                      if (partyName != null && partyName.isNotEmpty) ...[
+                                      if (partyLabel != null &&
+                                          partyLabel.isNotEmpty) ...[
                                         const SizedBox(width: 5),
                                         Flexible(
                                           child: UrduAwareText(
-                                            '- $partyName',
+                                            '- $partyLabel',
                                             style: TextStyle(
                                               fontWeight: FontWeight.w600,
                                               fontSize: 13,
@@ -299,6 +337,17 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
                                     color: AppTheme.incomeColor,
                                   ),
                                 ),
+                                if (showOutstanding) ...[
+                                  const SizedBox(height: 2),
+                                  UrduAwareText(
+                                    '${isUrdu ? 'بقایا:' : 'Due:'} ${Formatters.formatAmountWithCurrency(outstandingByBill[tx.id] ?? 0)}',
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.expenseColor,
+                                    ),
+                                  ),
+                                ],
                                 const SizedBox(height: 2),
                                 UrduAwareText(
                                   '${isUrdu ? 'نفع:' : 'Profit:'} ${Formatters.formatAmountWithCurrency(txProfit)}',
@@ -327,12 +376,15 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                 decoration: BoxDecoration(
                   color: AppTheme.themeColor.withValues(alpha: 0.06),
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+                  borderRadius:
+                      const BorderRadius.vertical(bottom: Radius.circular(20)),
                 ),
                 child: Row(
                   children: [
                     UrduAwareText(
-                      isUrdu ? 'اس دن کا کل ٹوٹل:' : 'Day Total:',
+                      showOutstanding
+                          ? (isUrdu ? 'اس دن کا بقایا:' : 'Pending Total:')
+                          : (isUrdu ? 'اس دن کا کل ٹوٹل:' : 'Day Total:'),
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.bold,
@@ -384,18 +436,33 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
 
-    // Tab 1: Cash Sales (فوری بل جو نقد کسٹمر کے ہوں یا جن کاaccountId == cashCustomerAccountId)
+    final outstandingByBill = <String, double>{};
+    final customerAccountIds = quickBillTransactions
+        .map((transaction) => transaction.accountId)
+        .toSet();
+    final transactionsByAccount = <String, List<Transaction>>{};
+    for (final transaction in allTransactions) {
+      transactionsByAccount
+          .putIfAbsent(transaction.accountId, () => [])
+          .add(transaction);
+    }
+    for (final accountId in customerAccountIds) {
+      final account = databaseService.getAccount(accountId);
+      final ledger = PartyLedgerMetrics.calculate(
+        transactions: transactionsByAccount[accountId] ?? const [],
+        openingBalance: account?.initialBalance ?? 0,
+        balanceType: account?.balanceType ?? 'receivable',
+        partyCategory: 'customer',
+      );
+      outstandingByBill.addAll(ledger.outstandingQuickBills);
+    }
+
     final cashSales = quickBillTransactions
-        .where((t) =>
-            t.accountId == QuickBillConstants.cashCustomerAccountId ||
-            t.pendingAmount <= 0)
+        .where((t) => (outstandingByBill[t.id] ?? 0) <= 0.01)
         .toList();
 
-    // Tab 2: Credit Sales (فوری بل جو ادھار کسٹمرز کے ہوں یعنی accountId != cashCustomerAccountId اور pendingAmount > 0)
     final creditSales = quickBillTransactions
-        .where((t) =>
-            t.accountId != QuickBillConstants.cashCustomerAccountId &&
-            t.pendingAmount > 0)
+        .where((t) => (outstandingByBill[t.id] ?? 0) > 0.01)
         .toList();
 
     return Scaffold(
@@ -445,10 +512,12 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildBillsList(
-                    context, cashSales, isUrdu, fontFamily, stockService, databaseService),
-                _buildBillsList(
-                    context, creditSales, isUrdu, fontFamily, stockService, databaseService),
+                _buildBillsList(context, cashSales, isUrdu, fontFamily,
+                    stockService, databaseService),
+                _buildBillsList(context, creditSales, isUrdu, fontFamily,
+                    stockService, databaseService,
+                    showOutstanding: true,
+                    outstandingByBill: outstandingByBill),
               ],
             ),
           ),

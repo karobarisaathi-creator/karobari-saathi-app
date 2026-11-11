@@ -10,6 +10,7 @@ import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
+import 'package:account_app/core/utils/account_balance_utils.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
 import 'package:account_app/core/utils/receipt_dialog_helper.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
@@ -377,19 +378,26 @@ class _NotificationListTabState extends State<_NotificationListTab>
             .toList() ??
         <TransactionItem>[];
     final amount = double.tryParse(data['amount']?.toString() ?? '') ?? 0;
+    final pendingAmount =
+        double.tryParse(data['pendingAmount']?.toString() ?? '') ?? amount;
+    final category = data['category']?.toString() ?? 'فروخت';
+    final isPartySettlement =
+        category == AccountBalanceUtils.partySettlementCategory;
 
     return Transaction(
       id: data['transactionId']?.toString() ?? notification.id,
       accountId: data['senderUid']?.toString() ?? 'remote_user',
-      amount: amount,
+      amount: isPartySettlement ? amount : pendingAmount,
       subtotal: double.tryParse(data['subtotal']?.toString() ?? '') ?? amount,
       discountAmount:
           double.tryParse(data['discountAmount']?.toString() ?? '') ?? 0,
       discountPercent:
           double.tryParse(data['discountPercent']?.toString() ?? ''),
       discountReason: data['discountReason']?.toString(),
-      type: data['transactionType']?.toString() ?? 'income',
-      category: data['category']?.toString() ?? 'فروخت',
+      type: data['transactionType']?.toString() == 'income'
+          ? 'expense'
+          : 'income',
+      category: category,
       paymentMethod: data['paymentMethod']?.toString() ?? 'cash',
       description: data['description']?.toString() ?? '',
       date: DateTime.tryParse(data['transactionDate']?.toString() ?? '') ??
@@ -406,6 +414,7 @@ class _NotificationListTabState extends State<_NotificationListTab>
       referenceNumber: data['referenceNumber']?.toString(),
       createdAt: notification.timestamp,
       updatedAt: notification.timestamp,
+      receiptFromCounterparty: true,
     );
   }
 
@@ -466,11 +475,16 @@ class _NotificationListTabState extends State<_NotificationListTab>
       _processAddition(n, target);
   }
 
-  void _processAddition(AppNotification n, Account account) async {
+  Future<void> _processAddition(AppNotification n, Account account) async {
     final data = n.data!;
     final db = Provider.of<DatabaseService>(context, listen: false);
+    final notificationService =
+        Provider.of<NotificationService>(context, listen: false);
     final type = data['transactionType'] == 'income' ? 'expense' : 'income';
     final amount = double.tryParse(data['amount']?.toString() ?? '0') ?? 0;
+    final category = data['category']?.toString() ?? 'دیگر';
+    final isPartySettlement =
+        category == AccountBalanceUtils.partySettlementCategory;
     final receivedAmount =
         double.tryParse(data['receivedAmount']?.toString() ?? '0') ?? 0;
     final pendingAmount =
@@ -490,7 +504,7 @@ class _NotificationListTabState extends State<_NotificationListTab>
       id: data['transactionId'] ??
           DateTime.now().millisecondsSinceEpoch.toString(),
       accountId: account.id,
-      amount: pendingAmount,
+      amount: isPartySettlement ? amount : pendingAmount,
       subtotal: double.tryParse(data['subtotal']?.toString() ?? '') ?? amount,
       discountAmount:
           double.tryParse(data['discountAmount']?.toString() ?? '') ?? 0,
@@ -498,7 +512,7 @@ class _NotificationListTabState extends State<_NotificationListTab>
           double.tryParse(data['discountPercent']?.toString() ?? ''),
       discountReason: data['discountReason']?.toString(),
       type: type,
-      category: data['category']?.toString() ?? 'دیگر',
+      category: category,
       description: data['description'] ?? '',
       date: transactionDate,
       createdAt: DateTime.now(),
@@ -517,14 +531,15 @@ class _NotificationListTabState extends State<_NotificationListTab>
 
     await db.addTransaction(tx);
     await db.recalculateAccountBalance(account.id);
-    Provider.of<NotificationService>(context, listen: false)
-        .updateNotificationData(n.id, {'isAdded': true});
-    if (mounted)
-      Navigator.pushReplacement(
+    notificationService.updateNotificationData(n.id, {'isAdded': true});
+    if (mounted) {
+      Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (context) =>
-                  PartyDetailScreen(party: db.getAccount(account.id)!)));
+              builder: (context) => PartyDetailScreen(
+                    party: db.getAccount(account.id) ?? account,
+                  )));
+    }
   }
 
   void _showCreateAccountDialog(AppNotification n, String phone, String name) {

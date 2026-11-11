@@ -37,12 +37,42 @@ class AccountTransactionColumns {
 }
 
 class AccountBalanceUtils {
+  static const String partySettlementCategory = 'party_settlement';
+
+  static bool receiptSubtotalIsDebit(
+    Transaction transaction, {
+    required bool isIncomingReceipt,
+  }) {
+    if (transaction.category == partySettlementCategory) {
+      return transaction.type == 'expense';
+    }
+
+    if (!isIncomingReceipt) {
+      return transaction.isQuickBill || transaction.type == 'expense';
+    }
+
+    return transaction.receiptFromCounterparty
+        ? transaction.type == 'expense'
+        : transaction.type == 'income';
+  }
+
   static AccountTransactionColumns transactionColumns(Transaction transaction) {
     final isIncome = transaction.type == 'income';
     final subtotal =
         transaction.subtotal > 0 ? transaction.subtotal : transaction.amount;
     final netTotal =
         (subtotal - transaction.discountAmount).clamp(0, subtotal).toDouble();
+
+    if (transaction.category == partySettlementCategory) {
+      final settlementAmount = transaction.amount > 0
+          ? transaction.amount
+          : transaction.receivedAmount;
+      final isDebit = !isIncome;
+      return AccountTransactionColumns(
+        firstColumn: isDebit ? settlementAmount : 0,
+        secondColumn: isDebit ? 0 : settlementAmount,
+      );
+    }
 
     if (transaction.receiptFromCounterparty && !transaction.isQuickBill) {
       return AccountTransactionColumns(
@@ -152,6 +182,7 @@ class AccountBalanceUtils {
     required Iterable<Transaction> transactions,
     required Transaction receipt,
     double initialBalance = 0,
+    String? partyBalanceType,
   }) {
     final precedingTransactions = transactions.where((transaction) {
       if (transaction.id == receipt.id ||
@@ -166,8 +197,30 @@ class AccountBalanceUtils {
     var openingBalance = initialBalance;
     for (final transaction in precedingTransactions) {
       final columns = transactionColumns(transaction);
-      openingBalance += columns.firstColumn - columns.secondColumn;
+      final isPayableParty =
+          partyBalanceType?.trim().toLowerCase() == 'payable';
+      if (isPayableParty && transaction.category == partySettlementCategory) {
+        openingBalance += transaction.type == 'expense'
+            ? transaction.amount
+            : -transaction.amount;
+      } else {
+        openingBalance += isPayableParty
+            ? columns.secondColumn - columns.firstColumn
+            : columns.firstColumn - columns.secondColumn;
+      }
       if (openingBalance.abs() < 0.01) openingBalance = 0;
+    }
+
+    if (receipt.category == partySettlementCategory) {
+      final settlementDirection = receipt.type == 'income' ? -1.0 : 1.0;
+      final finalBalance =
+          openingBalance + settlementDirection * receipt.amount;
+      return ReceiptBalanceBreakdown(
+        openingBalance: openingBalance,
+        balanceBeforeDiscount: openingBalance,
+        balanceAfterDiscount: openingBalance,
+        finalBalance: finalBalance,
+      );
     }
 
     final direction = receipt.type == 'income' ? 1.0 : -1.0;

@@ -13,6 +13,7 @@ Transaction _transaction({
   double receivedAmount = 0,
   double pendingAmount = 0,
   bool receiptFromCounterparty = false,
+  String category = 'Sale',
   String description = 'Transaction',
 }) {
   return Transaction(
@@ -20,7 +21,7 @@ Transaction _transaction({
     accountId: 'party',
     amount: amount,
     type: type,
-    category: 'Sale',
+    category: category,
     description: description,
     date: date,
     createdAt: createdAt ?? date,
@@ -35,6 +36,150 @@ Transaction _transaction({
 
 void main() {
   group('AccountBalanceUtils.transactionColumns', () {
+    test('mirrors both directions of ordinary transactions', () {
+      final localIncome = _transaction(
+        id: 'local-income',
+        type: 'income',
+        amount: 100,
+        date: DateTime(2026, 1, 1),
+      );
+      final incomingExpense = _transaction(
+        id: 'incoming-expense',
+        type: 'expense',
+        amount: 100,
+        subtotal: 100,
+        receiptFromCounterparty: true,
+        date: DateTime(2026, 1, 1),
+      );
+      final localExpense = _transaction(
+        id: 'local-expense',
+        type: 'expense',
+        amount: 100,
+        date: DateTime(2026, 1, 1),
+      );
+      final incomingIncome = _transaction(
+        id: 'incoming-income',
+        type: 'income',
+        amount: 100,
+        subtotal: 100,
+        receiptFromCounterparty: true,
+        date: DateTime(2026, 1, 1),
+      );
+
+      final localIncomeColumns =
+          AccountBalanceUtils.transactionColumns(localIncome);
+      final incomingExpenseColumns =
+          AccountBalanceUtils.transactionColumns(incomingExpense);
+      final localExpenseColumns =
+          AccountBalanceUtils.transactionColumns(localExpense);
+      final incomingIncomeColumns =
+          AccountBalanceUtils.transactionColumns(incomingIncome);
+
+      expect(
+          localIncomeColumns.firstColumn, incomingExpenseColumns.secondColumn);
+      expect(
+          localIncomeColumns.secondColumn, incomingExpenseColumns.firstColumn);
+      expect(
+          localExpenseColumns.firstColumn, incomingIncomeColumns.secondColumn);
+      expect(
+          localExpenseColumns.secondColumn, incomingIncomeColumns.firstColumn);
+    });
+
+    test('mirrors Quick Bill columns, including partial payment', () {
+      final localBill = _transaction(
+        id: 'local-bill',
+        type: 'income',
+        amount: 700,
+        subtotal: 1000,
+        receivedAmount: 300,
+        pendingAmount: 700,
+        description: 'Quick Bill',
+        date: DateTime(2026, 1, 1),
+      );
+      final incomingBill = _transaction(
+        id: 'incoming-bill',
+        type: 'expense',
+        amount: 700,
+        subtotal: 1000,
+        receivedAmount: 300,
+        pendingAmount: 700,
+        receiptFromCounterparty: true,
+        description: 'Quick Bill',
+        date: DateTime(2026, 1, 1),
+      );
+
+      final localColumns = AccountBalanceUtils.transactionColumns(localBill);
+      final incomingColumns =
+          AccountBalanceUtils.transactionColumns(incomingBill);
+
+      expect(localColumns.firstColumn, incomingColumns.secondColumn);
+      expect(localColumns.secondColumn, incomingColumns.firstColumn);
+      expect(AccountBalanceUtils.currentCycleBalance([localBill]), -700);
+      expect(AccountBalanceUtils.currentCycleBalance([incomingBill]), 700);
+    });
+
+    test('places a local settlement in exactly one ledger column', () {
+      final settlement = _transaction(
+        id: 'local-receipt',
+        type: 'income',
+        amount: 100,
+        receivedAmount: 100,
+        category: AccountBalanceUtils.partySettlementCategory,
+        date: DateTime(2026, 1, 1),
+      );
+
+      final columns = AccountBalanceUtils.transactionColumns(settlement);
+
+      expect(columns.firstColumn, 0);
+      expect(columns.secondColumn, 100);
+      expect(AccountBalanceUtils.currentCycleBalance([settlement]), 100);
+    });
+
+    test('places an incoming payment settlement in the debit column', () {
+      final settlement = _transaction(
+        id: 'incoming-receipt',
+        type: 'expense',
+        amount: 100,
+        receivedAmount: 100,
+        receiptFromCounterparty: true,
+        category: AccountBalanceUtils.partySettlementCategory,
+        date: DateTime(2026, 1, 1),
+      );
+
+      final columns = AccountBalanceUtils.transactionColumns(settlement);
+
+      expect(columns.firstColumn, 100);
+      expect(columns.secondColumn, 0);
+      expect(AccountBalanceUtils.currentCycleBalance([settlement]), -100);
+    });
+
+    test('mirrors payment settlements into opposite ledger columns', () {
+      final localPayment = _transaction(
+        id: 'local-payment',
+        type: 'expense',
+        amount: 100,
+        receivedAmount: 100,
+        category: AccountBalanceUtils.partySettlementCategory,
+        date: DateTime(2026, 1, 1),
+      );
+      final incomingPayment = _transaction(
+        id: 'incoming-payment',
+        type: 'income',
+        amount: 100,
+        receivedAmount: 100,
+        receiptFromCounterparty: true,
+        category: AccountBalanceUtils.partySettlementCategory,
+        date: DateTime(2026, 1, 1),
+      );
+
+      final localColumns = AccountBalanceUtils.transactionColumns(localPayment);
+      final incomingColumns =
+          AccountBalanceUtils.transactionColumns(incomingPayment);
+
+      expect(localColumns.firstColumn, incomingColumns.secondColumn);
+      expect(localColumns.secondColumn, incomingColumns.firstColumn);
+    });
+
     test('shows imported received income in debit, like incoming receipt', () {
       final transaction = _transaction(
         id: 'imported-income',
@@ -86,6 +231,113 @@ void main() {
 
       expect(columns.firstColumn, 300);
       expect(columns.secondColumn, 900);
+    });
+  });
+
+  group('AccountBalanceUtils.receiptSubtotalIsDebit', () {
+    test(
+        'outgoing settlement receipts put collection in credit and payment in debit',
+        () {
+      final receipt = _transaction(
+        id: 'outgoing-receipt',
+        type: 'income',
+        amount: 100,
+        receivedAmount: 100,
+        category: AccountBalanceUtils.partySettlementCategory,
+        date: DateTime(2026, 1, 1),
+      );
+      final payment = _transaction(
+        id: 'outgoing-payment',
+        type: 'expense',
+        amount: 100,
+        receivedAmount: 100,
+        category: AccountBalanceUtils.partySettlementCategory,
+        date: DateTime(2026, 1, 1),
+      );
+
+      expect(
+        AccountBalanceUtils.receiptSubtotalIsDebit(
+          receipt,
+          isIncomingReceipt: false,
+        ),
+        isFalse,
+      );
+      expect(
+        AccountBalanceUtils.receiptSubtotalIsDebit(
+          payment,
+          isIncomingReceipt: false,
+        ),
+        isTrue,
+      );
+    });
+
+    test('matches the saved side for both incoming Quick Bill directions', () {
+      final counterpartyIncome = _transaction(
+        id: 'counterparty-income',
+        type: 'expense',
+        amount: 70,
+        subtotal: 100,
+        receivedAmount: 30,
+        receiptFromCounterparty: true,
+        description: 'Quick Bill',
+        date: DateTime(2026, 1, 1),
+      );
+      final counterpartyExpense = _transaction(
+        id: 'counterparty-expense',
+        type: 'income',
+        amount: 70,
+        subtotal: 100,
+        receivedAmount: 30,
+        receiptFromCounterparty: true,
+        description: 'Quick Bill',
+        date: DateTime(2026, 1, 1),
+      );
+
+      expect(
+        AccountBalanceUtils.receiptSubtotalIsDebit(
+          counterpartyIncome,
+          isIncomingReceipt: true,
+        ),
+        isTrue,
+      );
+      expect(
+        AccountBalanceUtils.receiptSubtotalIsDebit(
+          counterpartyExpense,
+          isIncomingReceipt: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('preserves the existing outgoing receipt sides', () {
+      final sale = _transaction(
+        id: 'sale',
+        type: 'income',
+        amount: 100,
+        description: 'Quick Bill',
+        date: DateTime(2026, 1, 1),
+      );
+      final expense = _transaction(
+        id: 'expense',
+        type: 'expense',
+        amount: 100,
+        date: DateTime(2026, 1, 1),
+      );
+
+      expect(
+        AccountBalanceUtils.receiptSubtotalIsDebit(
+          sale,
+          isIncomingReceipt: false,
+        ),
+        isTrue,
+      );
+      expect(
+        AccountBalanceUtils.receiptSubtotalIsDebit(
+          expense,
+          isIncomingReceipt: false,
+        ),
+        isTrue,
+      );
     });
   });
 
@@ -286,6 +538,86 @@ void main() {
 
       expect(result.openingBalance, 800);
       expect(result.finalBalance, 550);
+    });
+
+    test('reduces supplier payable once for a settlement', () {
+      final receipt = _transaction(
+        id: 'supplier-payment',
+        type: 'expense',
+        amount: 100,
+        receivedAmount: 100,
+        category: AccountBalanceUtils.partySettlementCategory,
+        date: DateTime(2026, 1, 2),
+      );
+      final result = AccountBalanceUtils.receiptBreakdown(
+        transactions: [receipt],
+        receipt: receipt,
+        initialBalance: -500,
+      );
+
+      expect(result.openingBalance, -500);
+      expect(result.finalBalance, -400);
+    });
+
+    test('reduces customer receivable once for a settlement', () {
+      final receipt = _transaction(
+        id: 'customer-receipt',
+        type: 'income',
+        amount: 100,
+        receivedAmount: 100,
+        category: AccountBalanceUtils.partySettlementCategory,
+        date: DateTime(2026, 1, 2),
+      );
+      final result = AccountBalanceUtils.receiptBreakdown(
+        transactions: [receipt],
+        receipt: receipt,
+        initialBalance: 500,
+      );
+
+      expect(result.openingBalance, 500);
+      expect(result.finalBalance, 400);
+    });
+
+    test('keeps new supplier charges on the payable side of a receipt', () {
+      final purchase = _transaction(
+        id: 'supplier-purchase',
+        type: 'expense',
+        amount: 10000,
+        date: DateTime(2026, 1, 2),
+      );
+      final result = AccountBalanceUtils.receiptBreakdown(
+        transactions: [purchase],
+        receipt: purchase,
+        initialBalance: -7000,
+        partyBalanceType: 'payable',
+      );
+
+      expect(result.openingBalance, -7000);
+      expect(result.finalBalance, -17000);
+    });
+
+    test('applies preceding supplier charges in the payable direction', () {
+      final previousPurchase = _transaction(
+        id: 'previous-purchase',
+        type: 'expense',
+        amount: 10000,
+        date: DateTime(2026, 1, 1),
+      );
+      final purchase = _transaction(
+        id: 'supplier-purchase',
+        type: 'expense',
+        amount: 0,
+        date: DateTime(2026, 1, 2),
+      );
+      final result = AccountBalanceUtils.receiptBreakdown(
+        transactions: [previousPurchase, purchase],
+        receipt: purchase,
+        initialBalance: -7000,
+        partyBalanceType: 'payable',
+      );
+
+      expect(result.openingBalance, -17000);
+      expect(result.finalBalance, -17000);
     });
 
     test('orders same-day transactions by creation time', () {

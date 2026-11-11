@@ -79,6 +79,7 @@ class BaseLedgerWidget extends StatelessWidget {
       initialBalance: account!.balanceType.toLowerCase() == 'payable'
           ? -account!.initialBalance
           : account!.initialBalance,
+      partyBalanceType: account!.balanceType,
     );
   }
 
@@ -93,18 +94,15 @@ class BaseLedgerWidget extends StatelessWidget {
     return Directionality(
       textDirection: isUrdu ? ui.TextDirection.rtl : ui.TextDirection.ltr,
       child: Container(
+        width: double.infinity,
         clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFD9E0E5)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.07),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
+          borderRadius: BorderRadius.zero,
+          border: Border(
+            top: BorderSide(color: Color(0xFFD9E0E5)),
+            bottom: BorderSide(color: Color(0xFFD9E0E5)),
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -513,46 +511,52 @@ class BaseLedgerWidget extends StatelessWidget {
     final debitLines = <_LedgerLine>[];
     final creditLines = <_LedgerLine>[];
 
-    // Imported counterparty entries store the sender's type inverted.
-    final bool subtotalIsDebit = transaction.isQuickBill
-        ? !isIncomingReceipt
-        : isIncomingReceipt
-            ? transaction.receiptFromCounterparty
-                ? transaction.type == 'expense'
-                : transaction.type == 'income'
-            : transaction.type == 'expense';
+    final isSettlement =
+        transaction.category == AccountBalanceUtils.partySettlementCategory;
+
+    final subtotalIsDebit = AccountBalanceUtils.receiptSubtotalIsDebit(
+      transaction,
+      isIncomingReceipt: isIncomingReceipt,
+    );
 
     final subtotalLines = subtotalIsDebit ? debitLines : creditLines;
     final paymentLines = subtotalIsDebit ? creditLines : debitLines;
 
-    // 1. کل رقم
-    subtotalLines.add(_LedgerLine(
-      label: isUrdu ? 'کل رقم' : 'Total Amount',
-      amount: subtotal,
-      color: subtotalIsDebit ? AppTheme.expenseColor : AppTheme.incomeColor,
-    ));
-
-    // 2. رعایت
-    if (discount > 0) {
+    if (transaction.category == AccountBalanceUtils.partySettlementCategory) {
       subtotalLines.add(_LedgerLine(
         label: isUrdu
-            ? 'رعایت${_discountPercentLabel()}'
-            : 'Discount${_discountPercentLabel()}',
-        amount: discount,
-        color: AppTheme.verifiedGold,
-        prefix: '− ',
+            ? (transaction.type == 'income' ? 'وصولی' : 'ادائیگی')
+            : (transaction.type == 'income' ? 'Received' : 'Paid'),
+        amount: transaction.amount,
+        color: subtotalIsDebit ? AppTheme.expenseColor : AppTheme.incomeColor,
       ));
-    }
+    } else {
+      subtotalLines.add(_LedgerLine(
+        label: isUrdu ? 'کل رقم' : 'Total Amount',
+        amount: subtotal,
+        color: subtotalIsDebit ? AppTheme.expenseColor : AppTheme.incomeColor,
+      ));
 
-    // 3. وصول / ادا شدہ
-    if (received > 0) {
-      paymentLines.add(_LedgerLine(
-        label: isUrdu
-            ? (subtotalIsDebit ? 'وصول' : 'ادا شدہ')
-            : (subtotalIsDebit ? 'Received' : 'Paid'),
-        amount: received,
-        color: subtotalIsDebit ? AppTheme.incomeColor : AppTheme.expenseColor,
-      ));
+      if (discount > 0) {
+        subtotalLines.add(_LedgerLine(
+          label: isUrdu
+              ? 'رعایت${_discountPercentLabel()}'
+              : 'Discount${_discountPercentLabel()}',
+          amount: discount,
+          color: AppTheme.verifiedGold,
+          prefix: '− ',
+        ));
+      }
+
+      if (received > 0) {
+        paymentLines.add(_LedgerLine(
+          label: isUrdu
+              ? (subtotalIsDebit ? 'وصول' : 'ادا شدہ')
+              : (subtotalIsDebit ? 'Received' : 'Paid'),
+          amount: received,
+          color: subtotalIsDebit ? AppTheme.incomeColor : AppTheme.expenseColor,
+        ));
+      }
     }
 
     // 4. پرانا بقایا

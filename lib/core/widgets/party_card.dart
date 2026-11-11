@@ -8,7 +8,6 @@ import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/models/account_model.dart';
-import 'package:account_app/core/models/notification_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/utils/account_balance_utils.dart';
@@ -22,6 +21,9 @@ class PartyCard extends StatefulWidget {
   final bool showActions;
   final EdgeInsetsGeometry? margin;
 
+  /// false ہو تو shadow/border والا باہری باکس نہیں بنتا — مین کارڈ کے اندر embed کرنے کے لیے
+  final bool showCard;
+
   const PartyCard({
     super.key,
     required this.party,
@@ -29,6 +31,7 @@ class PartyCard extends StatefulWidget {
     required this.onMessage,
     this.showActions = true,
     this.margin,
+    this.showCard = true,
   });
 
   @override
@@ -141,6 +144,268 @@ class _PartyCardState extends State<PartyCard> {
                 remoteProf != localProf) ||
             (remoteAddress.isNotEmpty && remoteAddress != localAddress));
 
+    // ─── مین کارڈ کا مشترکہ content ───
+    final content = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: widget.onView,
+        borderRadius: BorderRadius.circular(widget.showCard ? 20 : 8),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      ProfileInfoWidget(
+                        name: widget.party.name,
+                        phone: widget.party.phone,
+                        profileImage: widget.party.profileImage,
+                        showText: false,
+                        customSize: 42,
+                        borderRadius: 6,
+                        hasUpdate: hasUpdate,
+                        onAvatarTap: (hasUpdate && _remoteProfileMap != null)
+                            ? () {
+                                ProfileUpdateDialog.show(
+                                  context,
+                                  party: widget.party,
+                                  remoteProfile: _remoteProfileMap!,
+                                  onUpdated: _checkForUpdate,
+                                );
+                              }
+                            : null,
+                      ),
+                      Consumer<NotificationService>(
+                        builder: (context, notificationService, _) {
+                          final unreadCount =
+                              notificationService.notifications.where((n) {
+                            if (n.isRead) return false;
+                            if (n.relatedAccountId == widget.party.id)
+                              return true;
+                            final data = n.data;
+                            if (data != null) {
+                              if (data['accountId'] == widget.party.id)
+                                return true;
+                              final senderPhone = data['senderPhone']
+                                  ?.toString()
+                                  .replaceAll(RegExp(r'\D'), '');
+                              final partyPhone = widget.party.phone
+                                  .replaceAll(RegExp(r'\D'), '');
+                              if (senderPhone != null &&
+                                  senderPhone.isNotEmpty &&
+                                  partyPhone.isNotEmpty) {
+                                if (senderPhone.endsWith(
+                                    partyPhone.length > 10
+                                        ? partyPhone
+                                            .substring(partyPhone.length - 10)
+                                        : partyPhone)) {
+                                  return true;
+                                }
+                              }
+                            }
+                            return false;
+                          }).length;
+
+                          if (unreadCount == 0) return const SizedBox.shrink();
+
+                          return Positioned(
+                            left: 28,
+                            top: 26,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: AppTheme.expenseColor,
+                                borderRadius: BorderRadius.circular(10),
+                                border:
+                                    Border.all(color: Colors.white, width: 1.5),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.2),
+                                      blurRadius: 4),
+                                ],
+                              ),
+                              child: UrduAwareText(
+                                unreadCount.toString(),
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: ''),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: UrduAwareText(
+                                displayName,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: fontWeight,
+                                  color: AppTheme.darkColor,
+                                  fontFamily: fontFamily,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: UrduAwareText(
+                                displayCategory,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppTheme.themeColor,
+                                  fontFamily: fontFamily,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                UrduAwareText(
+                                  balanceText,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: balanceColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: fontFamily,
+                                  ),
+                                ),
+                                if (!isSettled) ...[
+                                  const SizedBox(width: 4),
+                                  Icon(balanceIcon,
+                                      size: 14, color: balanceColor),
+                                ],
+                                const SizedBox(width: 6),
+                                UrduAwareText(
+                                  Formatters.formatAmountWithCurrency(
+                                      displayBalance.abs()),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    color: balanceColor,
+                                    fontFamily: '',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (widget.showActions) ...[
+              Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: AppTheme.darkColor.withValues(alpha: 0.08)),
+
+              // Bottom Section: Actions
+              Container(
+                decoration: const BoxDecoration(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(12),
+                    bottomRight: Radius.circular(12),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    // Call Action
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => _makePhoneCall(widget.party.phone),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(PhosphorIcons.phone(),
+                                  size: 20, color: AppTheme.greenColor),
+                              const SizedBox(width: 8),
+                              UrduAwareText(
+                                isUrdu ? 'کال کریں' : 'Call Party',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: fontWeight,
+                                  color: AppTheme.darkColor,
+                                  fontFamily: fontFamily,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    Container(
+                        height: 24,
+                        width: 1,
+                        color: Colors.grey.withValues(alpha: 0.3)),
+
+                    // Reminder Action
+                    Expanded(
+                      child: InkWell(
+                        onTap: widget.onMessage,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              UrduAwareText(
+                                isUrdu ? 'یاددہانی بھیجیں' : 'Send Reminder',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: fontWeight,
+                                  color: AppTheme.themeColor,
+                                  fontFamily: fontFamily,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(PhosphorIcons.bell(),
+                                  size: 20, color: AppTheme.themeColor),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+
+    // showCard: false ہو تو صرف content — کوئی باہری باکس نہیں
+    if (!widget.showCard) return content;
+
     return Container(
       margin: widget.margin ?? const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
@@ -154,266 +419,7 @@ class _PartyCardState extends State<PartyCard> {
           ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: widget.onView,
-          borderRadius: BorderRadius.circular(20),
-          child: Column(
-            children: [
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        ProfileInfoWidget(
-                          name: widget.party.name,
-                          phone: widget.party.phone,
-                          profileImage: widget.party.profileImage,
-                          showText: false,
-                          customSize: 42,
-                          borderRadius: 6,
-                          hasUpdate: hasUpdate,
-                          onAvatarTap: (hasUpdate && _remoteProfileMap != null)
-                              ? () {
-                                  ProfileUpdateDialog.show(
-                                    context,
-                                    party: widget.party,
-                                    remoteProfile: _remoteProfileMap!,
-                                    onUpdated: _checkForUpdate,
-                                  );
-                                }
-                              : null,
-                        ),
-                        Consumer<NotificationService>(
-                          builder: (context, notificationService, _) {
-                            final unreadCount =
-                                notificationService.notifications.where((n) {
-                              if (n.isRead) return false;
-                              if (n.relatedAccountId == widget.party.id)
-                                return true;
-                              final data = n.data;
-                              if (data != null) {
-                                if (data['accountId'] == widget.party.id)
-                                  return true;
-                                final senderPhone = data['senderPhone']
-                                    ?.toString()
-                                    .replaceAll(RegExp(r'\D'), '');
-                                final partyPhone = widget.party.phone
-                                    .replaceAll(RegExp(r'\D'), '');
-                                if (senderPhone != null &&
-                                    senderPhone.isNotEmpty &&
-                                    partyPhone.isNotEmpty) {
-                                  if (senderPhone.endsWith(
-                                      partyPhone.length > 10
-                                          ? partyPhone
-                                              .substring(partyPhone.length - 10)
-                                          : partyPhone)) {
-                                    return true;
-                                  }
-                                }
-                              }
-                              return false;
-                            }).length;
-
-                            if (unreadCount == 0)
-                              return const SizedBox.shrink();
-
-                            return Positioned(
-                              left: 28,
-                              top: 26,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 5, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.expenseColor,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                      color: Colors.white, width: 1.5),
-                                  boxShadow: [
-                                    BoxShadow(
-                                        color:
-                                            Colors.black.withValues(alpha: 0.2),
-                                        blurRadius: 4),
-                                  ],
-                                ),
-                                child: UrduAwareText(
-                                  unreadCount.toString(),
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: ''),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: UrduAwareText(
-                                  displayName,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: fontWeight,
-                                    color: AppTheme.darkColor,
-                                    fontFamily: fontFamily,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: UrduAwareText(
-                                  displayCategory,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: AppTheme.themeColor,
-                                    fontFamily: fontFamily,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  UrduAwareText(
-                                    balanceText,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: balanceColor,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: fontFamily,
-                                    ),
-                                  ),
-                                  if (!isSettled) ...[
-                                    const SizedBox(width: 4),
-                                    Icon(balanceIcon,
-                                        size: 14, color: balanceColor),
-                                  ],
-                                  const SizedBox(width: 6),
-                                  UrduAwareText(
-                                    Formatters.formatAmountWithCurrency(displayBalance.abs()),
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w900,
-                                      color: balanceColor,
-                                      fontFamily: '',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (widget.showActions) ...[
-                Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: AppTheme.darkColor.withValues(alpha: 0.08)),
-
-                // Bottom Section: Actions
-                Container(
-                  decoration: const BoxDecoration(
-                    color: Colors
-                        .transparent, // پور کارڈ پر رنگ دکھانے کے لیے اسے ٹرانسپیرنٹ کر دیا
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(12),
-                      bottomRight: Radius.circular(12),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      // Call Action
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => _makePhoneCall(widget.party.phone),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(PhosphorIcons.phone(),
-                                    size: 20, color: Colors.green),
-                                const SizedBox(width: 8),
-                                UrduAwareText(
-                                  isUrdu ? 'کال کریں' : 'Call Party',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: fontWeight,
-                                    color: AppTheme.darkColor,
-                                    fontFamily: fontFamily,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      Container(
-                          height: 24,
-                          width: 1,
-                          color: Colors.grey.withValues(alpha: 0.3)),
-
-                      // Reminder Action
-                      Expanded(
-                        child: InkWell(
-                          onTap: widget.onMessage,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                UrduAwareText(
-                                  isUrdu ? 'یاددہانی بھیجیں' : 'Send Reminder',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: fontWeight,
-                                    color: AppTheme.themeColor,
-                                    fontFamily: fontFamily,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Icon(PhosphorIcons.bell(),
-                                    size: 20, color: AppTheme.themeColor),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
+      child: content,
     );
   }
 }

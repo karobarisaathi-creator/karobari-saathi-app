@@ -162,7 +162,8 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
   }
 
   Transaction? _savedCounterpartyTransaction(DatabaseService db) {
-    if (widget.transaction.receiptFromCounterparty) {
+    if (widget.isLocalTransaction &&
+        widget.transaction.receiptFromCounterparty) {
       return widget.transaction;
     }
     final saved = db.getTransaction(widget.transaction.id);
@@ -333,7 +334,7 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: Container(
@@ -353,7 +354,7 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
             children: [
               // ═══ Header — لیبل + "کھاتے میں شامل کریں" ایک لائن میں ═══
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
                 child: Row(
                   children: [
                     Expanded(
@@ -395,7 +396,7 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
               // ═══ رسید ═══
               Flexible(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+                  padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Screenshot(
                     controller: _screenshotController,
                     child: savedEntry == null

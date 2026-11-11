@@ -111,7 +111,10 @@ class QuickBillTrustMetrics {
 
   static double billTotal(Transaction bill) {
     final subtotal = bill.subtotal > 0 ? bill.subtotal : bill.amount;
-    return (subtotal - bill.discountAmount).clamp(0, subtotal).toDouble();
+    final netSubtotal =
+        (subtotal - bill.discountAmount).clamp(0, subtotal).toDouble();
+    final recordedTotal = bill.receivedAmount + bill.pendingAmount;
+    return netSubtotal > recordedTotal ? netSubtotal : recordedTotal;
   }
 
   static double amountReceived(Transaction bill) =>

@@ -22,6 +22,7 @@ import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'package:account_app/core/utils/bill_numbering.dart';
+import 'package:account_app/core/utils/account_balance_utils.dart';
 import 'package:account_app/core/utils/formatters.dart';
 
 class AddTransactionScreen extends StatefulWidget {
@@ -30,6 +31,8 @@ class AddTransactionScreen extends StatefulWidget {
   final String? initialDescription;
   final double? initialAmount;
   final Profession? forcedProfession;
+  final String? fixedTransactionType;
+  final bool isPartySettlement;
 
   const AddTransactionScreen({
     this.account,
@@ -37,6 +40,8 @@ class AddTransactionScreen extends StatefulWidget {
     this.initialDescription,
     this.initialAmount,
     this.forcedProfession,
+    this.fixedTransactionType,
+    this.isPartySettlement = false,
   });
 
   @override
@@ -81,6 +86,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   String? _selectedCategory;
   String? _professionSyncType; // 'income' or 'expense'
   DateTime _selectedDate = DateTime.now();
+  String _selectedPaymentMethod = 'cash';
   List<Account> _accounts = [];
   List<Profession> _professions = [];
   List<String> _allItemNames = [];
@@ -369,6 +375,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
 
     for (final entry in _itemEntries) {
+      if (widget.isPartySettlement) continue;
       final stockItem = _stockItemsByName[
           entry.descriptionController.text.trim().toLowerCase()];
       if (stockItem != null) {
@@ -402,6 +409,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             ? (isUrdu ? 'لین دین میں ترمیم' : 'Edit Transaction')
             : (isUrdu ? 'نیا لین دین' : 'New Transaction'),
       ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(color: AppTheme.darkColor.withValues(alpha: 0.1)),
+            ),
+          ),
+          child: _buildSaveActions(isUrdu),
+        ),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
         child: Column(
@@ -433,7 +453,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     ),
                   ],
                 ),
-                if (widget.forcedProfession == null &&
+                if (!widget.isPartySettlement &&
+                    widget.forcedProfession == null &&
                     _professions.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   _buildProfessionSelectionArea(isUrdu, fontFamily, fontWeight),
@@ -468,6 +489,52 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   fontFamily: fontFamily,
                   fontWeight: FontWeight.bold,
                 ),
+                if (widget.isPartySettlement) ...[
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: UrduAwareText(
+                      isUrdu ? 'ادائیگی کا طریقہ' : 'Payment Method',
+                      style: TextStyle(
+                        fontFamily: fontFamily,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildPaymentMethodChip(
+                        value: 'cash',
+                        label: isUrdu ? 'نقد' : 'Cash',
+                        icon: PhosphorIcons.money(),
+                        fontFamily: fontFamily,
+                      ),
+                      _buildPaymentMethodChip(
+                        value: 'bank_transfer',
+                        label: isUrdu ? 'بینک ٹرانسفر' : 'Bank transfer',
+                        icon: PhosphorIcons.bank(),
+                        fontFamily: fontFamily,
+                      ),
+                      _buildPaymentMethodChip(
+                        value: 'mobile_wallet',
+                        label: isUrdu ? 'موبائل والٹ' : 'Mobile wallet',
+                        icon: PhosphorIcons.deviceMobile(),
+                        fontFamily: fontFamily,
+                      ),
+                      _buildPaymentMethodChip(
+                        value: 'cheque',
+                        label: isUrdu ? 'چیک' : 'Cheque',
+                        icon: PhosphorIcons.note(),
+                        fontFamily: fontFamily,
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 4),
@@ -489,49 +556,119 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-
-            // Dual Action Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: AppButton(
-                    key: ValueKey('income_save_$_saveStage'),
-                    text: isUrdu ? 'رقم لی / جمع' : 'Received',
-                    isLoading: _isLoading && _activeActionType == 'income',
-                    loadingText: (_isLoading && _activeActionType == 'income')
-                        ? _saveStageText(isUrdu)
-                        : null,
-                    icon: PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold),
-                    color: AppTheme.incomeColor,
-                    variant: AppButtonVariant.primary,
-                    size: AppButtonSize.large,
-                    onPressed:
-                        _isLoading ? null : () => _saveTransaction('income'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppButton(
-                    key: ValueKey('expense_save_$_saveStage'),
-                    text: isUrdu ? 'رقم دی / بنام' : 'Paid',
-                    isLoading: _isLoading && _activeActionType == 'expense',
-                    loadingText: (_isLoading && _activeActionType == 'expense')
-                        ? _saveStageText(isUrdu)
-                        : null,
-                    icon: PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold),
-                    color: AppTheme.expenseColor,
-                    variant: AppButtonVariant.primary,
-                    size: AppButtonSize.large,
-                    onPressed:
-                        _isLoading ? null : () => _saveTransaction('expense'),
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSaveActions(bool isUrdu) {
+    final fixedType = widget.fixedTransactionType;
+    if (fixedType != null) {
+      return AppButton(
+        key: ValueKey('${fixedType}_save_$_saveStage'),
+        text: widget.isPartySettlement
+            ? (isUrdu
+                ? (fixedType == 'income'
+                    ? 'وصولی محفوظ کریں'
+                    : 'ادائیگی محفوظ کریں')
+                : (fixedType == 'income' ? 'Save Receipt' : 'Save Payment'))
+            : (fixedType == 'income'
+                ? (isUrdu ? 'رقم لی / جمع' : 'Received')
+                : (isUrdu ? 'رقم دی / بنام' : 'Paid')),
+        isLoading: _isLoading && _activeActionType == fixedType,
+        loadingText: (_isLoading && _activeActionType == fixedType)
+            ? _saveStageText(isUrdu)
+            : null,
+        icon: fixedType == 'income'
+            ? PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold)
+            : PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold),
+        color: fixedType == 'income'
+            ? AppTheme.incomeColor
+            : AppTheme.expenseColor,
+        variant: AppButtonVariant.primary,
+        size: AppButtonSize.large,
+        isFullWidth: true,
+        onPressed: _isLoading ? null : () => _saveTransaction(fixedType),
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: AppButton(
+            key: ValueKey('income_save_$_saveStage'),
+            text: isUrdu ? 'رقم لی / جمع' : 'Received',
+            isLoading: _isLoading && _activeActionType == 'income',
+            loadingText: (_isLoading && _activeActionType == 'income')
+                ? _saveStageText(isUrdu)
+                : null,
+            icon: PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold),
+            color: AppTheme.incomeColor,
+            variant: AppButtonVariant.primary,
+            size: AppButtonSize.large,
+            isFullWidth: true,
+            onPressed: _isLoading ? null : () => _saveTransaction('income'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: AppButton(
+            key: ValueKey('expense_save_$_saveStage'),
+            text: isUrdu ? 'رقم دی / بنام' : 'Paid',
+            isLoading: _isLoading && _activeActionType == 'expense',
+            loadingText: (_isLoading && _activeActionType == 'expense')
+                ? _saveStageText(isUrdu)
+                : null,
+            icon: PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold),
+            color: AppTheme.expenseColor,
+            variant: AppButtonVariant.primary,
+            size: AppButtonSize.large,
+            isFullWidth: true,
+            onPressed: _isLoading ? null : () => _saveTransaction('expense'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentMethodChip({
+    required String value,
+    required String label,
+    required IconData icon,
+    required String fontFamily,
+  }) {
+    final isSelected = _selectedPaymentMethod == value;
+
+    return ChoiceChip(
+      avatar: Icon(
+        icon,
+        size: 16,
+        color: isSelected ? Colors.white : AppTheme.themeColor,
+      ),
+      label: UrduAwareText(
+        label,
+        style: TextStyle(
+          fontFamily: fontFamily,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: isSelected ? Colors.white : AppTheme.darkColor,
+        ),
+      ),
+      selected: isSelected,
+      showCheckmark: false,
+      selectedColor: AppTheme.themeColor,
+      backgroundColor: Colors.white,
+      side: BorderSide(
+        color: isSelected
+            ? AppTheme.themeColor
+            : AppTheme.darkColor.withValues(alpha: 0.15),
+      ),
+      onSelected: (selected) {
+        if (selected) {
+          setState(() => _selectedPaymentMethod = value);
+        }
+      },
     );
   }
 
@@ -1440,10 +1577,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   Future<void> _saveTransaction(String type) async {
     if (_isLoading) return;
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    if (widget.fixedTransactionType != null &&
+        widget.fixedTransactionType != type) {
+      _showSnackBar(
+        isUrdu ? 'اس کارروائی کی اجازت نہیں' : 'This action is not available',
+        true,
+      );
+      return;
+    }
 
     final stockService = Provider.of<StockService>(context, listen: false);
     final requestedStockById = <String, double>{};
     for (final entry in _itemEntries) {
+      if (widget.isPartySettlement) continue;
       final stockItemId = entry.stockItemId;
       if (stockItemId == null) continue;
       final stockItem = stockService.items.firstWhere(
@@ -1529,7 +1675,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             rate: Formatters.tryParseAmount(entry.rateController.text) ?? total,
             total: total,
             unit: entry.unit,
-            stockItemId: entry.stockItemId,
+            stockItemId: widget.isPartySettlement ? null : entry.stockItemId,
           ));
           if (desc.isNotEmpty)
             mainDescription += (mainDescription.isEmpty ? "" : ", ") + desc;
@@ -1565,23 +1711,32 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       }
 
       final existingTransaction = widget.transactionToEdit;
+      final isPartySettlement = widget.isPartySettlement;
       final transaction = Transaction(
         id: widget.transactionToEdit?.id ??
             DateTime.now().millisecondsSinceEpoch.toString(),
         accountId: _selectedAccountId ?? 'default_account',
         amount: grandTotal,
-        receivedAmount: existingTransaction?.receivedAmount ?? 0,
-        pendingAmount: existingTransaction == null
+        receivedAmount: isPartySettlement
             ? grandTotal
-            : (existingTransaction.pendingAmount +
-                    grandTotal -
-                    existingTransaction.amount)
-                .clamp(0.0, double.infinity)
-                .toDouble(),
+            : existingTransaction?.receivedAmount ?? 0,
+        pendingAmount: isPartySettlement
+            ? 0
+            : existingTransaction == null
+                ? grandTotal
+                : (existingTransaction.pendingAmount +
+                        grandTotal -
+                        existingTransaction.amount)
+                    .clamp(0.0, double.infinity)
+                    .toDouble(),
         type: type,
-        category: (_selectedProfessionId != null && _professionSyncType != null)
-            ? '${_professionSyncType == 'income' ? 'INC:' : 'EXP:'}${_selectedCategory ?? 'دیگر'}'
-            : (_selectedCategory ?? type),
+        category: widget.isPartySettlement
+            ? AccountBalanceUtils.partySettlementCategory
+            : (_selectedProfessionId != null && _professionSyncType != null)
+                ? '${_professionSyncType == 'income' ? 'INC:' : 'EXP:'}${_selectedCategory ?? 'دیگر'}'
+                : (_selectedCategory ?? type),
+        paymentMethod:
+            widget.isPartySettlement ? _selectedPaymentMethod : 'cash',
         description: mainDescription.isEmpty ? 'دیگر' : mainDescription,
         date: _selectedDate,
         quantity: 1,
@@ -1737,7 +1892,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       } else {
         AppToast.success(context, toastTitle, subtitle: toastSubtitle);
       }
-      Navigator.pop(context);
+      Navigator.pop(context, transaction);
     } catch (e) {
       if (mounted) {
         setState(() {

@@ -102,6 +102,20 @@ void main() {
       expect(metrics.satisfiedCustomerPercent, 0);
     });
 
+    test('reconstructs the bill total from received and pending legacy data',
+        () {
+      final bill = _bill(
+        id: 'legacy',
+        accountId: 'customer-1',
+        total: 0,
+        received: 30,
+        pending: 70,
+      );
+
+      expect(QuickBillTrustMetrics.billTotal(bill), 100);
+      expect(QuickBillTrustMetrics.outstandingAmount(bill), 70);
+    });
+
     test('counts phone-identified cash buyers and merges account aliases', () {
       final metrics = QuickBillTrustMetrics.fromTransactions([
         _bill(

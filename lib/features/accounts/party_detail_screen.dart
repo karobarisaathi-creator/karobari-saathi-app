@@ -311,6 +311,11 @@ class _CombinedHeader extends StatelessWidget {
         double currentBalance = totalExpense - totalIncome;
         final bool isReceivable = currentBalance > 0;
         final bool isSettled = currentBalance.abs() < 0.01;
+        final settlementType = isSettled
+            ? (party.category.toLowerCase() == 'supplier'
+                ? 'expense'
+                : 'income')
+            : (isReceivable ? 'income' : 'expense');
 
         final remoteName = remoteProfileMap?['name']?.trim() ?? '';
         final localName = party.name.trim();
@@ -457,7 +462,7 @@ class _CombinedHeader extends StatelessWidget {
 
                       const SizedBox(height: 8),
 
-                      // ═══ Action Buttons (Call | Remind | Bill) ═══
+                      // ═══ Action Buttons (Call | Remind | Settle) ═══
                       Row(
                         children: [
                           _buildActionButton(
@@ -471,12 +476,22 @@ class _CombinedHeader extends StatelessWidget {
                             label: isUrdu ? 'یاد دہانی' : 'Remind',
                             onTap: () => _onRemind(context),
                           ),
-                          const SizedBox(width: 6),
-                          _buildActionButton(
-                            icon: PhosphorIcons.receipt(),
-                            label: isUrdu ? 'رسید' : 'Bill',
-                            onTap: () => _onReceipt(context, allTx),
-                          ),
+                          if (!isReadOnly) ...[
+                            const SizedBox(width: 6),
+                            _buildActionButton(
+                              icon: settlementType == 'income'
+                                  ? PhosphorIcons.arrowDownLeft()
+                                  : PhosphorIcons.arrowUpRight(),
+                              label: settlementType == 'income'
+                                  ? (isUrdu ? 'وصولی' : 'Receive')
+                                  : (isUrdu ? 'ادائیگی' : 'Pay'),
+                              onTap: () => _onSettlement(
+                                context,
+                                settlementType,
+                                currentBalance.abs(),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ],
@@ -609,14 +624,40 @@ class _CombinedHeader extends StatelessWidget {
     BalanceAlertDialog.show(context, party: party);
   }
 
-  void _onReceipt(BuildContext context, List<model.Transaction> txs) {
-    if (txs.isEmpty) {
-      AppToast.info(
-        context,
-        isUrdu ? 'کوئی لین دین نہیں' : 'No transactions',
-      );
-      return;
-    }
+  Future<void> _onSettlement(
+    BuildContext context,
+    String transactionType,
+    double outstandingAmount,
+  ) async {
+    final isReceipt = transactionType == 'income';
+    final description = isReceipt
+        ? (isUrdu
+            ? 'پارٹی سے وصولی - ${party.name}'
+            : 'Receipt from ${party.name}')
+        : (isUrdu
+            ? 'پارٹی کو ادائیگی - ${party.name}'
+            : 'Payment to ${party.name}');
+
+    final transaction = await Navigator.push<model.Transaction>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddTransactionScreen(
+          account: party,
+          initialDescription: description,
+          initialAmount: outstandingAmount > 0.01 ? outstandingAmount : null,
+          fixedTransactionType: transactionType,
+          isPartySettlement: true,
+        ),
+      ),
+    );
+
+    if (!context.mounted || transaction == null) return;
+    onRefresh();
+    await ReceiptDialogHelper.showReceiptDialog(
+      context,
+      transaction: transaction,
+      account: party,
+    );
   }
 }
 

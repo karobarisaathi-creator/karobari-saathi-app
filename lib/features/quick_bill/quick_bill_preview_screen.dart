@@ -688,26 +688,23 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                           // 2. PARTY SELECTION SECTION (if _mode != _PayMode.full)
                           if (_mode != _PayMode.full) ...[
                             const Divider(height: 1, color: Color(0xFFE1E5EC)),
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (_selectedAccount != null &&
-                                      !_isCashCustomer)
-                                    PartyCard(
-                                      party: _selectedAccount!,
-                                      onView: _pickCustomer,
-                                      onMessage: () {},
-                                      showActions: false,
-                                      margin: EdgeInsets.zero,
-                                    )
-                                  else
-                                    _buildPickPartyPlaceholder(
-                                        isUrdu, fontFamily),
-                                ],
+                            if (_selectedAccount != null && !_isCashCustomer)
+                              PartyCard(
+                                party: _selectedAccount!,
+                                onView: _pickCustomer,
+                                onMessage: () {},
+                                showActions: false,
+                                margin: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 10),
+                                showCard: false,
+                              )
+                            else
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 10),
+                                child: _buildPickPartyPlaceholder(
+                                    isUrdu, fontFamily),
                               ),
-                            ),
                           ],
 
                           // 3. MAIN ITEMS SECTION
@@ -770,7 +767,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(
                       color: AppTheme.themeColor,
-                      width: 1.5,
+                      width: 1,
                     ),
                   ),
                   border: OutlineInputBorder(
