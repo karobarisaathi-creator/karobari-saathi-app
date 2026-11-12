@@ -1,15 +1,15 @@
 import 'package:account_app/core/models/transaction_model.dart';
 
 class AccountCycleBalance {
-  final double income;
-  final double expense;
+  final double credit;
+  final double debit;
 
   const AccountCycleBalance({
-    required this.income,
-    required this.expense,
+    required this.credit,
+    required this.debit,
   });
 
-  double get balance => income - expense;
+  double get balance => debit - credit;
 }
 
 class ReceiptBalanceBreakdown {
@@ -27,33 +27,48 @@ class ReceiptBalanceBreakdown {
 }
 
 class AccountTransactionColumns {
-  final double firstColumn;
-  final double secondColumn;
+  final double debit;
+  final double credit;
 
   const AccountTransactionColumns({
-    required this.firstColumn,
-    required this.secondColumn,
+    required this.debit,
+    required this.credit,
   });
 }
 
 class AccountBalanceUtils {
   static const String partySettlementCategory = 'party_settlement';
 
-  static bool receiptSubtotalIsDebit(
-    Transaction transaction, {
-    required bool isIncomingReceipt,
+  static String partySettlementDescription({
+    required String type,
+    required String paymentMethod,
+    required bool isUrdu,
   }) {
-    if (transaction.category == partySettlementCategory) {
-      return transaction.type == 'expense';
-    }
+    final normalizedMethod = paymentMethod.trim().toLowerCase();
+    final methodLabel = switch (normalizedMethod) {
+      'cash' || 'نقد' => isUrdu ? 'نقد' : 'Cash',
+      'bank_transfer' || 'bank' || 'بینک' => isUrdu ? 'بینک' : 'Bank',
+      'mobile_wallet' ||
+      'wallet' ||
+      'موبائل والٹ' =>
+        isUrdu ? 'موبائل والٹ' : 'Mobile wallet',
+      'cheque' || 'check' || 'چیک' => isUrdu ? 'چیک' : 'Cheque',
+      '' => isUrdu ? 'دیگر' : 'Other',
+      _ => paymentMethod.trim(),
+    };
+    final isReceipt = type == 'income';
 
-    if (!isIncomingReceipt) {
-      return transaction.isQuickBill || transaction.type == 'expense';
+    if (isUrdu) {
+      return '${isReceipt ? 'پارٹی سے وصولی' : 'پارٹی کو ادائیگی'} - $methodLabel';
     }
+    return '${isReceipt ? 'Receipt from party' : 'Payment to party'} - $methodLabel';
+  }
 
-    return transaction.receiptFromCounterparty
-        ? transaction.type == 'expense'
-        : transaction.type == 'income';
+  static bool receiptSubtotalIsDebit(Transaction transaction) {
+    if (transaction.isQuickBill) {
+      return transaction.type == 'income';
+    }
+    return transaction.type == 'expense';
   }
 
   static AccountTransactionColumns transactionColumns(Transaction transaction) {
@@ -69,31 +84,30 @@ class AccountBalanceUtils {
           : transaction.receivedAmount;
       final isDebit = !isIncome;
       return AccountTransactionColumns(
-        firstColumn: isDebit ? settlementAmount : 0,
-        secondColumn: isDebit ? 0 : settlementAmount,
+        debit: isDebit ? settlementAmount : 0,
+        credit: isDebit ? 0 : settlementAmount,
       );
     }
 
     if (transaction.receiptFromCounterparty && !transaction.isQuickBill) {
       return AccountTransactionColumns(
-        firstColumn: isIncome ? transaction.receivedAmount : netTotal,
-        secondColumn: isIncome ? netTotal : transaction.receivedAmount,
+        debit: isIncome ? transaction.receivedAmount : netTotal,
+        credit: isIncome ? netTotal : transaction.receivedAmount,
       );
     }
 
     if (transaction.isQuickBill) {
-      // ⭐ کھاتہ اور رسید کو ۱۰۰٪ برابر رکھنا:
-      // بنام (First Column) = نیٹ اشیاء ٹوٹل (Sale) یا ادا شدہ رقم (Purchase)
-      // جمع (Second Column) = موصول شدہ رقم (Sale) یا نیٹ اشیاء ٹوٹل (Purchase)
+      // Sales debit the net bill; purchases credit it. Payments go on the
+      // opposite side in both cases.
       return AccountTransactionColumns(
-        firstColumn: isIncome ? netTotal : transaction.receivedAmount,
-        secondColumn: isIncome ? transaction.receivedAmount : netTotal,
+        debit: isIncome ? netTotal : transaction.receivedAmount,
+        credit: isIncome ? transaction.receivedAmount : netTotal,
       );
     }
 
     return AccountTransactionColumns(
-      firstColumn: isIncome ? 0 : transaction.amount,
-      secondColumn: isIncome ? transaction.amount : 0,
+      debit: isIncome ? 0 : transaction.amount,
+      credit: isIncome ? transaction.amount : 0,
     );
   }
 
@@ -103,11 +117,10 @@ class AccountBalanceUtils {
   }) {
     return transactions.fold(
       initialBalance,
-      (balance, transaction) =>
-          balance +
-          (transaction.type == 'income'
-              ? transaction.accountBalanceAmount
-              : -transaction.accountBalanceAmount),
+      (balance, transaction) {
+        final columns = transactionColumns(transaction);
+        return balance + columns.debit - columns.credit;
+      },
     );
   }
 
@@ -121,7 +134,7 @@ class AccountBalanceUtils {
 
     for (final transaction in sortedTransactions) {
       final columns = transactionColumns(transaction);
-      balance += columns.firstColumn - columns.secondColumn;
+      balance += columns.debit - columns.credit;
       if (balance.abs() < 0.01) balance = 0;
       balances[transaction.id] = balance;
     }
@@ -132,46 +145,46 @@ class AccountBalanceUtils {
   static AccountCycleBalance currentCycle(Iterable<Transaction> transactions) {
     final sortedTransactions = transactions.toList()..sort(_compareOrder);
 
-    double currentCycleIn = 0;
-    double currentCycleOut = 0;
-    double totalRunningIn = 0;
-    double totalRunningOut = 0;
+    double currentCycleCredit = 0;
+    double currentCycleDebit = 0;
+    double totalRunningCredit = 0;
+    double totalRunningDebit = 0;
 
     for (final transaction in sortedTransactions) {
       final columns = transactionColumns(transaction);
-      totalRunningOut += columns.firstColumn;
-      currentCycleOut += columns.firstColumn;
-      totalRunningIn += columns.secondColumn;
-      currentCycleIn += columns.secondColumn;
+      totalRunningDebit += columns.debit;
+      currentCycleDebit += columns.debit;
+      totalRunningCredit += columns.credit;
+      currentCycleCredit += columns.credit;
 
-      if ((totalRunningIn - totalRunningOut).abs() < 0.01) {
-        currentCycleIn = 0;
-        currentCycleOut = 0;
+      if ((totalRunningCredit - totalRunningDebit).abs() < 0.01) {
+        currentCycleCredit = 0;
+        currentCycleDebit = 0;
       }
     }
 
-    if (currentCycleIn == 0 &&
-        currentCycleOut == 0 &&
+    if (currentCycleCredit == 0 &&
+        currentCycleDebit == 0 &&
         sortedTransactions.isNotEmpty) {
-      double lastCycleIn = 0;
-      double lastCycleOut = 0;
+      double lastCycleCredit = 0;
+      double lastCycleDebit = 0;
       for (final transaction in sortedTransactions) {
         final columns = transactionColumns(transaction);
-        lastCycleOut += columns.firstColumn;
-        lastCycleIn += columns.secondColumn;
+        lastCycleDebit += columns.debit;
+        lastCycleCredit += columns.credit;
 
-        if ((lastCycleIn - lastCycleOut).abs() < 0.01) {
-          currentCycleIn = lastCycleIn;
-          currentCycleOut = lastCycleOut;
-          lastCycleIn = 0;
-          lastCycleOut = 0;
+        if ((lastCycleCredit - lastCycleDebit).abs() < 0.01) {
+          currentCycleCredit = lastCycleCredit;
+          currentCycleDebit = lastCycleDebit;
+          lastCycleCredit = 0;
+          lastCycleDebit = 0;
         }
       }
     }
 
     return AccountCycleBalance(
-      income: currentCycleIn,
-      expense: currentCycleOut,
+      credit: currentCycleCredit,
+      debit: currentCycleDebit,
     );
   }
 
@@ -182,7 +195,6 @@ class AccountBalanceUtils {
     required Iterable<Transaction> transactions,
     required Transaction receipt,
     double initialBalance = 0,
-    String? partyBalanceType,
   }) {
     final precedingTransactions = transactions.where((transaction) {
       if (transaction.id == receipt.id ||
@@ -197,24 +209,13 @@ class AccountBalanceUtils {
     var openingBalance = initialBalance;
     for (final transaction in precedingTransactions) {
       final columns = transactionColumns(transaction);
-      final isPayableParty =
-          partyBalanceType?.trim().toLowerCase() == 'payable';
-      if (isPayableParty && transaction.category == partySettlementCategory) {
-        openingBalance += transaction.type == 'expense'
-            ? transaction.amount
-            : -transaction.amount;
-      } else {
-        openingBalance += isPayableParty
-            ? columns.secondColumn - columns.firstColumn
-            : columns.firstColumn - columns.secondColumn;
-      }
+      openingBalance += columns.debit - columns.credit;
       if (openingBalance.abs() < 0.01) openingBalance = 0;
     }
 
+    final columns = transactionColumns(receipt);
+    final finalBalance = openingBalance + columns.debit - columns.credit;
     if (receipt.category == partySettlementCategory) {
-      final settlementDirection = receipt.type == 'income' ? -1.0 : 1.0;
-      final finalBalance =
-          openingBalance + settlementDirection * receipt.amount;
       return ReceiptBalanceBreakdown(
         openingBalance: openingBalance,
         balanceBeforeDiscount: openingBalance,
@@ -223,14 +224,11 @@ class AccountBalanceUtils {
       );
     }
 
-    final direction = receipt.type == 'income' ? 1.0 : -1.0;
+    final direction = receiptSubtotalIsDebit(receipt) ? 1.0 : -1.0;
     final subtotal = receipt.subtotal > 0 ? receipt.subtotal : receipt.amount;
     final discount = receipt.discountAmount.clamp(0, subtotal).toDouble();
-    final received =
-        receipt.receivedAmount.clamp(0, subtotal - discount).toDouble();
     final beforeDiscount = openingBalance + direction * subtotal;
     final afterDiscount = beforeDiscount - direction * discount;
-    final finalBalance = afterDiscount - direction * received;
 
     return ReceiptBalanceBreakdown(
       openingBalance: openingBalance,

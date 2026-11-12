@@ -99,7 +99,7 @@ class _PartyCardState extends State<PartyCard> {
     final cycleBalance = AccountBalanceUtils.currentCycle(transactions);
     final double displayBalance = cycleBalance.balance;
 
-    final bool isReceivable = displayBalance <= 0;
+    final bool isReceivable = displayBalance >= 0;
     final bool isSettled = displayBalance.abs() < 0.01;
 
     final Color balanceColor = isSettled

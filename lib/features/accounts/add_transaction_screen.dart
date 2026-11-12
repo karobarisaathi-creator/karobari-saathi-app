@@ -108,6 +108,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     if (widget.transactionToEdit != null) {
       final t = widget.transactionToEdit!;
+      if (widget.isPartySettlement) {
+        _selectedPaymentMethod = t.paymentMethod;
+      }
       _amountController.text = Formatters.formatAmountWithoutCurrency(t.amount);
       _selectedDate = t.date;
       _selectedAccountId = t.accountId;
@@ -1712,6 +1715,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
       final existingTransaction = widget.transactionToEdit;
       final isPartySettlement = widget.isPartySettlement;
+      final paymentMethod = isPartySettlement ? _selectedPaymentMethod : 'cash';
       final transaction = Transaction(
         id: widget.transactionToEdit?.id ??
             DateTime.now().millisecondsSinceEpoch.toString(),
@@ -1735,9 +1739,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             : (_selectedProfessionId != null && _professionSyncType != null)
                 ? '${_professionSyncType == 'income' ? 'INC:' : 'EXP:'}${_selectedCategory ?? 'دیگر'}'
                 : (_selectedCategory ?? type),
-        paymentMethod:
-            widget.isPartySettlement ? _selectedPaymentMethod : 'cash',
-        description: mainDescription.isEmpty ? 'دیگر' : mainDescription,
+        paymentMethod: paymentMethod,
+        description: isPartySettlement
+            ? AccountBalanceUtils.partySettlementDescription(
+                type: type,
+                paymentMethod: paymentMethod,
+                isUrdu: isUrdu,
+              )
+            : mainDescription.isEmpty
+                ? 'دیگر'
+                : mainDescription,
         date: _selectedDate,
         quantity: 1,
         rate: grandTotal,

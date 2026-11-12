@@ -116,10 +116,10 @@ class _PartyListScreenState extends State<PartyListScreen> {
                       AccountBalanceUtils.currentCycle(transactions);
                   final liveBalance = cycleBalance.balance;
 
-                  if (liveBalance > 0) {
-                    totalPayable += liveBalance;
-                  } else if (liveBalance < 0) {
-                    totalReceivable += liveBalance.abs();
+                  if (liveBalance < 0) {
+                    totalPayable += liveBalance.abs();
+                  } else if (liveBalance > 0) {
+                    totalReceivable += liveBalance;
                   }
                 }
 

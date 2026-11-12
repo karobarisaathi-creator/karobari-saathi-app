@@ -16,6 +16,7 @@ import 'package:account_app/core/utils/receipt_dialog_helper.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/transaction_card.dart';
 import 'package:account_app/core/widgets/app_button.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:account_app/core/theme/app_theme.dart';
@@ -236,6 +237,10 @@ class _NotificationListTabState extends State<_NotificationListTab>
             final transaction = _transactionFromNotification(n);
 
             final isAdded = data['isAdded'] == true;
+            final pendingFromSender = _pendingTransactionNotificationsFor(n);
+            final showAddAll = pendingFromSender.length > 1 &&
+                pendingFromSender.first.id == n.id &&
+                !isAdded;
 
             return Container(
               margin: const EdgeInsets.symmetric(vertical: 4),
@@ -304,6 +309,22 @@ class _NotificationListTabState extends State<_NotificationListTab>
                       ),
                     ],
                   ),
+                  if (showAddAll) ...[
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: AppButton(
+                        text: widget.isUrdu
+                            ? 'اس پارٹی کے تمام ${pendingFromSender.length} لین دین شامل کریں'
+                            : 'Add all ${pendingFromSender.length} transactions from this party',
+                        variant: AppButtonVariant.outlined,
+                        size: AppButtonSize.small,
+                        color: AppTheme.themeColor,
+                        onPressed: () =>
+                            _addNotificationsToLedger(pendingFromSender),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             );
@@ -326,9 +347,12 @@ class _NotificationListTabState extends State<_NotificationListTab>
   }
 
   void _confirmDelete(AppNotification n) {
+    final parentContext = context;
+    final notificationService =
+        Provider.of<NotificationService>(parentContext, listen: false);
     showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
+      context: parentContext,
+      builder: (dialogContext) => AlertDialog(
         title: UrduAwareText(
             widget.isUrdu ? 'نوٹیفیکیشن حذف کریں؟' : 'Delete Notification?'),
         content: UrduAwareText(
@@ -339,14 +363,26 @@ class _NotificationListTabState extends State<_NotificationListTab>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: UrduAwareText(widget.isUrdu ? 'منسوخ' : 'Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Provider.of<NotificationService>(context, listen: false)
-                  .deleteNotification(n.id);
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                if (!n.isRead) notificationService.markAsRead(n.id);
+                await notificationService.deleteNotification(n.id);
+              } catch (error) {
+                if (parentContext.mounted) {
+                  AppToast.error(
+                    parentContext,
+                    widget.isUrdu
+                        ? 'نوٹیفیکیشن حذف نہیں ہو سکا'
+                        : 'Could not delete notification',
+                    subtitle: error.toString(),
+                  );
+                }
+              }
             },
             child: UrduAwareText(
               widget.isUrdu ? 'حذف کریں' : 'Delete',
@@ -449,37 +485,187 @@ class _NotificationListTabState extends State<_NotificationListTab>
     }
   }
 
-  Future<void> _addToLedger(AppNotification n) async {
-    final data = n.data;
-    if (data == null) return;
-    final db = Provider.of<DatabaseService>(context, listen: false);
-    final phone = data['senderPhone'] ?? '';
-    if (phone.isEmpty) return;
+  List<AppNotification> _pendingTransactionNotificationsFor(
+    AppNotification notification,
+  ) {
+    final phone = notification.data?['senderPhone']?.toString() ?? '';
+    if (phone.isEmpty || notification.type != NotificationType.transaction) {
+      return [notification];
+    }
 
-    final accounts = await db.getAccounts();
-    String normalize(String p) => p.replaceAll(RegExp(r'\D'), '').length >= 10
-        ? p
-            .replaceAll(RegExp(r'\D'), '')
-            .substring(p.replaceAll(RegExp(r'\D'), '').length - 10)
-        : p;
-
-    final lookup = normalize(phone);
-    Account? target;
-    try {
-      target = accounts.firstWhere((a) => normalize(a.phone) == lookup);
-    } catch (_) {}
-
-    if (target == null)
-      _showCreateAccountDialog(n, phone, data['senderName'] ?? 'Unknown');
-    else
-      _processAddition(n, target);
+    final senderPhone = _normalizePhone(phone);
+    return widget.notifications.where((candidate) {
+      if (candidate.type != NotificationType.transaction ||
+          candidate.data?['isAdded'] == true) {
+        return false;
+      }
+      final candidatePhone = candidate.data?['senderPhone']?.toString() ?? '';
+      return candidatePhone.isNotEmpty &&
+          _normalizePhone(candidatePhone) == senderPhone;
+    }).toList();
   }
 
-  Future<void> _processAddition(AppNotification n, Account account) async {
-    final data = n.data!;
+  String _normalizePhone(String phone) {
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    return digits.length >= 10 ? digits.substring(digits.length - 10) : digits;
+  }
+
+  Future<void> _addToLedger(AppNotification n) =>
+      _addNotificationsToLedger([n]);
+
+  Future<void> _addNotificationsToLedger(
+    List<AppNotification> notifications,
+  ) async {
+    final notificationService =
+        Provider.of<NotificationService>(context, listen: false);
+    for (final notification in notifications) {
+      if (!notification.isRead) {
+        notificationService.markAsRead(notification.id);
+      }
+    }
+
+    final pending = notifications
+        .where((notification) =>
+            notification.type == NotificationType.transaction &&
+            notification.data != null &&
+            notification.data?['isAdded'] != true)
+        .toList();
+    if (pending.isEmpty) return;
+
+    final data = pending.first.data!;
+    final db = Provider.of<DatabaseService>(context, listen: false);
+    final phone = data['senderPhone']?.toString() ?? '';
+    if (phone.isEmpty) {
+      AppToast.warning(
+        context,
+        widget.isUrdu
+            ? 'پارٹی کا فون نمبر موجود نہیں'
+            : 'This party has no phone number',
+      );
+      return;
+    }
+
+    final accounts = db.getAccounts();
+    final lookup = _normalizePhone(phone);
+    Account? target;
+    try {
+      target = accounts.firstWhere(
+        (account) =>
+            account.phone.isNotEmpty &&
+            _normalizePhone(account.phone) == lookup,
+      );
+    } catch (_) {}
+
+    if (target == null) {
+      _showCreateAccountDialog(
+        pending,
+        phone,
+        data['senderName']?.toString() ?? 'Unknown',
+      );
+      return;
+    }
+    await _processAdditions(pending, target);
+  }
+
+  Future<void> _processAdditions(
+    List<AppNotification> notifications,
+    Account account,
+  ) async {
     final db = Provider.of<DatabaseService>(context, listen: false);
     final notificationService =
         Provider.of<NotificationService>(context, listen: false);
+    var addedCount = 0;
+    var failedCount = 0;
+    var failedDeletionCount = 0;
+    final existingIds = db
+        .getAllTransactions()
+        .where((transaction) => transaction.accountId == account.id)
+        .map((transaction) => transaction.id)
+        .toSet();
+
+    for (final notification in notifications) {
+      final data = notification.data;
+      if (data == null || data['isAdded'] == true) continue;
+
+      final transactionId =
+          data['transactionId']?.toString() ?? notification.id;
+      try {
+        if (!existingIds.contains(transactionId)) {
+          final transaction = _transactionForLedger(
+            notification,
+            accountId: account.id,
+            transactionId: transactionId,
+          );
+          await db.addTransaction(transaction);
+          existingIds.add(transactionId);
+        }
+        addedCount++;
+      } catch (error, stackTrace) {
+        failedCount++;
+        debugPrint(
+          'Unable to add notification ${notification.id} to party ledger: $error',
+        );
+        debugPrintStack(stackTrace: stackTrace);
+        continue;
+      }
+
+      try {
+        await notificationService.deleteNotification(notification.id);
+      } catch (error, stackTrace) {
+        failedDeletionCount++;
+        notificationService
+            .updateNotificationData(notification.id, {'isAdded': true});
+        debugPrint(
+          'Transaction was added, but notification ${notification.id} could not be deleted: $error',
+        );
+        debugPrintStack(stackTrace: stackTrace);
+      }
+    }
+
+    if (!mounted) return;
+    if (addedCount > 0) {
+      await db.recalculateAccountBalance(account.id);
+      if (!mounted) return;
+      if (failedDeletionCount == 0) {
+        AppToast.success(
+          context,
+          widget.isUrdu
+              ? '$addedCount لین دین کھاتے میں شامل ہو گئے'
+              : '$addedCount transaction(s) added to the ledger',
+        );
+      } else {
+        AppToast.warning(
+          context,
+          widget.isUrdu
+              ? '$addedCount لین دین شامل ہوئے، مگر $failedDeletionCount نوٹیفیکیشن حذف نہ ہو سکے'
+              : '$addedCount added; $failedDeletionCount notification(s) could not be deleted',
+        );
+      }
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PartyDetailScreen(
+            party: db.getAccount(account.id) ?? account,
+          ),
+        ),
+      );
+    }
+    if (failedCount > 0 && mounted) {
+      AppToast.error(
+        context,
+        widget.isUrdu
+            ? '$failedCount لین دین شامل نہیں ہو سکے'
+            : '$failedCount transaction(s) could not be added',
+      );
+    }
+  }
+
+  Transaction _transactionForLedger(
+    AppNotification notification, {
+    required String accountId,
+    required String transactionId,
+  }) {
+    final data = notification.data!;
     final type = data['transactionType'] == 'income' ? 'expense' : 'income';
     final amount = double.tryParse(data['amount']?.toString() ?? '0') ?? 0;
     final category = data['category']?.toString() ?? 'دیگر';
@@ -489,21 +675,24 @@ class _NotificationListTabState extends State<_NotificationListTab>
         double.tryParse(data['receivedAmount']?.toString() ?? '0') ?? 0;
     final pendingAmount =
         double.tryParse(data['pendingAmount']?.toString() ?? '') ?? amount;
+    final paymentMethod = data['paymentMethod']?.toString() ??
+        (pendingAmount > 0
+            ? (receivedAmount > 0 ? 'mixed' : 'credit')
+            : 'cash');
     final transactionDate =
         DateTime.tryParse(data['transactionDate']?.toString() ?? '') ??
-            n.timestamp;
+            notification.timestamp;
+    final rawItems = data['items'];
+    final items = rawItems is List
+        ? rawItems
+            .map((item) =>
+                TransactionItem.fromMap(Map<String, dynamic>.from(item as Map)))
+            .toList()
+        : <TransactionItem>[];
 
-    List<TransactionItem> items = [];
-    if (data['items'] != null && data['items'] is List) {
-      for (var itemMap in (data['items'] as List)) {
-        items.add(TransactionItem.fromMap(Map<String, dynamic>.from(itemMap)));
-      }
-    }
-
-    final tx = Transaction(
-      id: data['transactionId'] ??
-          DateTime.now().millisecondsSinceEpoch.toString(),
-      accountId: account.id,
+    return Transaction(
+      id: transactionId,
+      accountId: accountId,
       amount: isPartySettlement ? amount : pendingAmount,
       subtotal: double.tryParse(data['subtotal']?.toString() ?? '') ?? amount,
       discountAmount:
@@ -513,7 +702,13 @@ class _NotificationListTabState extends State<_NotificationListTab>
       discountReason: data['discountReason']?.toString(),
       type: type,
       category: category,
-      description: data['description'] ?? '',
+      description: isPartySettlement
+          ? AccountBalanceUtils.partySettlementDescription(
+              type: type,
+              paymentMethod: paymentMethod,
+              isUrdu: widget.isUrdu,
+            )
+          : data['description']?.toString() ?? '',
       date: transactionDate,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
@@ -521,28 +716,17 @@ class _NotificationListTabState extends State<_NotificationListTab>
       receivedAmount: receivedAmount,
       pendingAmount: pendingAmount,
       referenceNumber: data['referenceNumber']?.toString(),
-      paymentMethod: data['paymentMethod']?.toString() ??
-          (pendingAmount > 0
-              ? (receivedAmount > 0 ? 'mixed' : 'credit')
-              : 'cash'),
+      paymentMethod: paymentMethod,
       isPending: pendingAmount > 0,
       receiptFromCounterparty: true,
     );
-
-    await db.addTransaction(tx);
-    await db.recalculateAccountBalance(account.id);
-    notificationService.updateNotificationData(n.id, {'isAdded': true});
-    if (mounted) {
-      Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (context) => PartyDetailScreen(
-                    party: db.getAccount(account.id) ?? account,
-                  )));
-    }
   }
 
-  void _showCreateAccountDialog(AppNotification n, String phone, String name) {
+  void _showCreateAccountDialog(
+    List<AppNotification> notifications,
+    String phone,
+    String name,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -567,11 +751,11 @@ class _NotificationListTabState extends State<_NotificationListTab>
                   initialBalance: 0,
                   balanceType: 'none',
                   balance: 0,
-                  profileImage: n.data?['senderPhotoUrl'],
+                  profileImage: notifications.first.data?['senderPhotoUrl'],
                   createdAt: DateTime.now(),
                   updatedAt: DateTime.now());
               await db.addAccount(acc);
-              _processAddition(n, acc);
+              await _processAdditions(notifications, acc);
             },
             child: UrduAwareText(widget.isUrdu ? 'بنائیں' : 'Create'),
           )

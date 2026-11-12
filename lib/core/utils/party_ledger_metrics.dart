@@ -71,8 +71,7 @@ class PartyLedgerMetrics {
 
       if (transaction.receiptFromCounterparty && !transaction.isQuickBill) {
         final columns = AccountBalanceUtils.transactionColumns(transaction);
-        final dueChange =
-            (columns.firstColumn - columns.secondColumn) * partyDirection;
+        final dueChange = (columns.debit - columns.credit) * partyDirection;
         if (dueChange > 0) {
           totalBilled += dueChange;
           var due = dueChange;

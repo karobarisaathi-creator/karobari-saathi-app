@@ -296,19 +296,18 @@ class _CombinedHeader extends StatelessWidget {
             : party.initialBalance;
 
         final cycle = AccountBalanceUtils.currentCycle(allTx);
-        double totalIncome = cycle.income; // 🟢 جمع (Credit) Total
-        double totalExpense = cycle.expense; // 🔴 بنام (Debit) Total
+        double totalCredit = cycle.credit;
+        double totalDebit = cycle.debit;
 
         if (allTx.isEmpty) {
           if (openingBalance > 0) {
-            totalExpense += openingBalance; // پرانا بقایا (لینے ہیں) -> بنام 🔴
+            totalDebit += openingBalance;
           } else if (openingBalance < 0) {
-            totalIncome +=
-                openingBalance.abs(); // پرانا بقایا (دینے ہیں) -> جمع 🟢
+            totalCredit += openingBalance.abs();
           }
         }
 
-        double currentBalance = totalExpense - totalIncome;
+        double currentBalance = totalDebit - totalCredit;
         final bool isReceivable = currentBalance > 0;
         final bool isSettled = currentBalance.abs() < 0.01;
         final settlementType = isSettled
@@ -421,19 +420,19 @@ class _CombinedHeader extends StatelessWidget {
 
                       const SizedBox(height: 8),
 
-                      // ═══ Stats Row (جمع | بنام | لینا/دینا) ═══
+                      // ═══ Stats Row (Credit | Debit | Balance) ═══
                       Row(
                         children: [
                           _buildStatItem(
-                            isUrdu ? 'جمع' : 'In',
-                            totalIncome,
+                            isUrdu ? 'جمع' : 'Credit',
+                            totalCredit,
                             AppTheme.incomeColor,
                             PhosphorIcons.arrowDownLeft(),
                           ),
                           _buildStatDivider(),
                           _buildStatItem(
-                            isUrdu ? 'بنام' : 'Out',
-                            totalExpense,
+                            isUrdu ? 'بنام' : 'Debit',
+                            totalDebit,
                             AppTheme.expenseColor,
                             PhosphorIcons.arrowUpRight(),
                           ),
@@ -631,12 +630,8 @@ class _CombinedHeader extends StatelessWidget {
   ) async {
     final isReceipt = transactionType == 'income';
     final description = isReceipt
-        ? (isUrdu
-            ? 'پارٹی سے وصولی - ${party.name}'
-            : 'Receipt from ${party.name}')
-        : (isUrdu
-            ? 'پارٹی کو ادائیگی - ${party.name}'
-            : 'Payment to ${party.name}');
+        ? (isUrdu ? 'پارٹی سے وصولی - نقد' : 'Receipt from party - Cash')
+        : (isUrdu ? 'پارٹی کو ادائیگی - نقد' : 'Payment to party - Cash');
 
     final transaction = await Navigator.push<model.Transaction>(
       context,
@@ -897,7 +892,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: _labelWithIcon(
-                widget.isUrdu ? 'دیا / بنام' : 'Credits',
+                widget.isUrdu ? 'دیا / بنام' : 'Debit',
                 PhosphorIcons.arrowUpRight(),
               ),
             ),
@@ -907,7 +902,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: _labelWithIcon(
-                widget.isUrdu ? 'لیا / جمع' : 'Debits',
+                widget.isUrdu ? 'لیا / جمع' : 'Credit',
                 PhosphorIcons.arrowDownLeft(),
               ),
             ),
@@ -964,7 +959,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
 
     final cycles = <Map<String, dynamic>>[];
     var currentCycleTxs = <model.Transaction>[];
-    double cycleIn = 0, cycleOut = 0;
+    double cycleCredit = 0, cycleDebit = 0;
     double cycleBalance = openingBalance;
     DateTime? cycleStart;
 
@@ -972,24 +967,24 @@ class _TransactionsTabState extends State<_TransactionsTab> {
       cycleStart ??= tx.date;
       currentCycleTxs.add(tx);
       final columns = AccountBalanceUtils.transactionColumns(tx);
-      cycleOut += columns.firstColumn;
-      cycleIn += columns.secondColumn;
-      cycleBalance += columns.firstColumn - columns.secondColumn;
+      cycleDebit += columns.debit;
+      cycleCredit += columns.credit;
+      cycleBalance += columns.debit - columns.credit;
 
       if (cycleBalance.abs() < 0.01) {
         cycles.add({
           'id': tx.id,
           'transactions': List<model.Transaction>.from(currentCycleTxs),
           'isSettled': true,
-          'totalIn': cycleIn,
-          'totalOut': cycleOut,
+          'totalCredit': cycleCredit,
+          'totalDebit': cycleDebit,
           'startDate': cycleStart,
           'endDate': tx.date,
           'days': tx.date.difference(cycleStart).inDays,
         });
         currentCycleTxs.clear();
-        cycleIn = 0;
-        cycleOut = 0;
+        cycleCredit = 0;
+        cycleDebit = 0;
         cycleBalance = 0;
         cycleStart = null;
       }
@@ -999,8 +994,8 @@ class _TransactionsTabState extends State<_TransactionsTab> {
         'id': 'active',
         'transactions': List<model.Transaction>.from(currentCycleTxs),
         'isSettled': false,
-        'totalIn': cycleIn,
-        'totalOut': cycleOut,
+        'totalCredit': cycleCredit,
+        'totalDebit': cycleDebit,
       });
     }
 
@@ -1079,8 +1074,8 @@ class _TransactionsTabState extends State<_TransactionsTab> {
     final end = df.format(data['endDate']);
     final days = data['days'];
     final id = data['id'];
-    final totalIn = (data['totalIn'] as num?)?.toDouble() ?? 0;
-    final totalOut = (data['totalOut'] as num?)?.toDouble() ?? 0;
+    final totalCredit = (data['totalCredit'] as num?)?.toDouble() ?? 0;
+    final totalDebit = (data['totalDebit'] as num?)?.toDouble() ?? 0;
 
     return InkWell(
       onTap: () {
@@ -1093,8 +1088,8 @@ class _TransactionsTabState extends State<_TransactionsTab> {
         });
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        padding: const EdgeInsets.all(14),
+        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
@@ -1102,18 +1097,17 @@ class _TransactionsTabState extends State<_TransactionsTab> {
               AppTheme.themeColor.withValues(alpha: expanded ? 0.06 : 0.03),
             ],
           ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: AppTheme.themeColor.withValues(alpha: expanded ? 0.35 : 0.2),
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.themeColor.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+          borderRadius: BorderRadius.zero,
+          border: Border(
+            top: BorderSide(
+              color: AppTheme.themeColor.withValues(alpha: expanded ? 0.35 : 0.2),
+              width: 1.5,
             ),
-          ],
+            bottom: BorderSide(
+              color: AppTheme.themeColor.withValues(alpha: expanded ? 0.35 : 0.2),
+              width: 1.5,
+            ),
+          ),
         ),
         child: Column(
           children: [
@@ -1185,20 +1179,20 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                           fontWeight: FontWeight.w600)),
                   Row(
                     children: [
-                      if (totalOut > 0)
+                      if (totalDebit > 0)
                         UrduAwareText(
-                          '${widget.isUrdu ? "بنام:" : "Out:"} ${Formatters.formatAmountWithCurrency(totalOut)}',
+                          '${widget.isUrdu ? "بنام:" : "Debit:"} ${Formatters.formatAmountWithCurrency(totalDebit)}',
                           style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
                             color: AppTheme.expenseColor,
                           ),
                         ),
-                      if (totalOut > 0 && totalIn > 0)
+                      if (totalDebit > 0 && totalCredit > 0)
                         const SizedBox(width: 10),
-                      if (totalIn > 0)
+                      if (totalCredit > 0)
                         UrduAwareText(
-                          '${widget.isUrdu ? "جمع:" : "In:"} ${Formatters.formatAmountWithCurrency(totalIn)}',
+                          '${widget.isUrdu ? "جمع:" : "Credit:"} ${Formatters.formatAmountWithCurrency(totalCredit)}',
                           style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
@@ -1319,8 +1313,8 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: UrduAwareText(
-                  columns.firstColumn > 0
-                      ? Formatters.formatAmount(columns.firstColumn)
+                  columns.debit > 0
+                      ? Formatters.formatAmount(columns.debit)
                       : "-",
                   style: const TextStyle(
                     color: AppTheme.expenseColor,
@@ -1336,8 +1330,8 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: UrduAwareText(
-                  columns.secondColumn > 0
-                      ? Formatters.formatAmount(columns.secondColumn)
+                  columns.credit > 0
+                      ? Formatters.formatAmount(columns.credit)
                       : "-",
                   style: const TextStyle(
                     color: AppTheme.incomeColor,

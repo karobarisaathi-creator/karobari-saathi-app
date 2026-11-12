@@ -79,7 +79,6 @@ class BaseLedgerWidget extends StatelessWidget {
       initialBalance: account!.balanceType.toLowerCase() == 'payable'
           ? -account!.initialBalance
           : account!.initialBalance,
-      partyBalanceType: account!.balanceType,
     );
   }
 
@@ -488,15 +487,9 @@ class BaseLedgerWidget extends StatelessWidget {
   // ═════════════════════════════════════════════════════════════
   // ⭐ T-ACCOUNT — ٹرانزیکشن کی قسم اور رسید کی سمت
   //
-  // اصول: "جمع = لیا، بنام = دیا"
+  // Receipt lines follow the same Debit/Credit sides as Party Details.
   //
   // isIncomingReceipt = false → Outgoing (میری طرف)
-  //   اشیاء → بنام 🔴
-  //   وصول → جمع 🟢
-  //
-  // isIncomingReceipt = true → Incoming (پارٹی کی طرف)
-  //   اشیاء → جمع 🟢
-  //   ادا شدہ → بنام 🔴
   // ═════════════════════════════════════════════════════════════
   Widget _buildTAccount(
     bool isUrdu,
@@ -504,33 +497,32 @@ class BaseLedgerWidget extends StatelessWidget {
     ReceiptBalanceBreakdown? breakdown,
   ) {
     final opening = breakdown?.openingBalance ?? 0;
-    final subtotal = _subtotal;
-    final discount = transaction.discountAmount;
-    final received = transaction.receivedAmount;
-
     final debitLines = <_LedgerLine>[];
     final creditLines = <_LedgerLine>[];
 
     final isSettlement =
         transaction.category == AccountBalanceUtils.partySettlementCategory;
 
-    final subtotalIsDebit = AccountBalanceUtils.receiptSubtotalIsDebit(
-      transaction,
-      isIncomingReceipt: isIncomingReceipt,
-    );
+    final columns = AccountBalanceUtils.transactionColumns(transaction);
+    final subtotalIsDebit = isSettlement
+        ? columns.debit > 0
+        : AccountBalanceUtils.receiptSubtotalIsDebit(transaction);
 
-    final subtotalLines = subtotalIsDebit ? debitLines : creditLines;
-    final paymentLines = subtotalIsDebit ? creditLines : debitLines;
-
-    if (transaction.category == AccountBalanceUtils.partySettlementCategory) {
-      subtotalLines.add(_LedgerLine(
+    if (isSettlement) {
+      final settlementAmount = columns.debit + columns.credit;
+      (columns.debit > 0 ? debitLines : creditLines).add(_LedgerLine(
         label: isUrdu
-            ? (transaction.type == 'income' ? 'وصولی' : 'ادائیگی')
-            : (transaction.type == 'income' ? 'Received' : 'Paid'),
-        amount: transaction.amount,
+            ? (columns.debit > 0 ? 'ادائیگی' : 'وصولی')
+            : (columns.debit > 0 ? 'Paid' : 'Received'),
+        amount: settlementAmount,
         color: subtotalIsDebit ? AppTheme.expenseColor : AppTheme.incomeColor,
       ));
-    } else {
+    } else if (transaction.isQuickBill) {
+      final subtotalLines = subtotalIsDebit ? debitLines : creditLines;
+      final paymentLines = subtotalIsDebit ? creditLines : debitLines;
+      final subtotal = _subtotal;
+      final discount = transaction.discountAmount.clamp(0, subtotal).toDouble();
+
       subtotalLines.add(_LedgerLine(
         label: isUrdu ? 'کل رقم' : 'Total Amount',
         amount: subtotal,
@@ -548,54 +540,48 @@ class BaseLedgerWidget extends StatelessWidget {
         ));
       }
 
-      if (received > 0) {
+      if (transaction.receivedAmount > 0) {
         paymentLines.add(_LedgerLine(
           label: isUrdu
               ? (subtotalIsDebit ? 'وصول' : 'ادا شدہ')
               : (subtotalIsDebit ? 'Received' : 'Paid'),
-          amount: received,
+          amount: transaction.receivedAmount,
           color: subtotalIsDebit ? AppTheme.incomeColor : AppTheme.expenseColor,
+        ));
+      }
+    } else {
+      if (columns.debit > 0) {
+        debitLines.add(_LedgerLine(
+          label: isUrdu ? 'ادائیگی' : 'Paid',
+          amount: columns.debit,
+          color: AppTheme.expenseColor,
+        ));
+      }
+      if (columns.credit > 0) {
+        creditLines.add(_LedgerLine(
+          label: isUrdu ? 'وصولی' : 'Received',
+          amount: columns.credit,
+          color: AppTheme.incomeColor,
         ));
       }
     }
 
     // 4. پرانا بقایا
-    if (!isIncomingReceipt) {
-      // Outgoing (میری طرف)
-      if (opening > 0) {
-        debitLines.add(_LedgerLine(
-          label: isUrdu ? 'پرانا بقایا' : 'Opening',
-          amount: opening,
-          color: AppTheme.expenseColor,
-          prefix: '+ ',
-        ));
-      }
-      if (opening < 0) {
-        creditLines.add(_LedgerLine(
-          label: isUrdu ? 'پرانا بقایا' : 'Opening',
-          amount: opening.abs(),
-          color: AppTheme.incomeColor,
-          prefix: '+ ',
-        ));
-      }
-    } else {
-      // Incoming view shows a receivable opening balance on the debit side.
-      if (opening > 0) {
-        debitLines.add(_LedgerLine(
-          label: isUrdu ? 'پرانا بقایا' : 'Opening',
-          amount: opening,
-          color: AppTheme.expenseColor,
-          prefix: '+ ',
-        ));
-      }
-      if (opening < 0) {
-        creditLines.add(_LedgerLine(
-          label: isUrdu ? 'پرانا بقایا' : 'Opening',
-          amount: opening.abs(),
-          color: AppTheme.incomeColor,
-          prefix: '+ ',
-        ));
-      }
+    if (opening > 0) {
+      debitLines.add(_LedgerLine(
+        label: isUrdu ? 'پرانا بقایا' : 'Opening',
+        amount: opening,
+        color: AppTheme.expenseColor,
+        prefix: '+ ',
+      ));
+    }
+    if (opening < 0) {
+      creditLines.add(_LedgerLine(
+        label: isUrdu ? 'پرانا بقایا' : 'Opening',
+        amount: opening.abs(),
+        color: AppTheme.incomeColor,
+        prefix: '+ ',
+      ));
     }
 
     // ═══ Totals ═══
@@ -608,7 +594,8 @@ class BaseLedgerWidget extends StatelessWidget {
     }
 
     // A larger debit means the counterparty still owes the business.
-    final double balanceDifference = totalDebit - totalCredit;
+    final double balanceDifference =
+        breakdown?.finalBalance ?? totalDebit - totalCredit;
     final double absAmount = balanceDifference.abs();
     final bool isSettled = absAmount < 0.01;
 
@@ -698,8 +685,8 @@ class BaseLedgerWidget extends StatelessWidget {
                             vertical: 8,
                           ),
                           decoration: const BoxDecoration(
-                            border: Border(
-                              left: BorderSide(color: Color(0xFFE5E7EB)),
+                            border: BorderDirectional(
+                              end: BorderSide(color: Color(0xFFE5E7EB)),
                             ),
                           ),
                           child: debitLines.isEmpty
@@ -765,8 +752,8 @@ class BaseLedgerWidget extends StatelessWidget {
                             vertical: 9,
                           ),
                           decoration: const BoxDecoration(
-                            border: Border(
-                              left: BorderSide(color: Color(0xFFE5E7EB)),
+                            border: BorderDirectional(
+                              end: BorderSide(color: Color(0xFFE5E7EB)),
                             ),
                           ),
                           child: Row(

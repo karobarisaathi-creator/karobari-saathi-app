@@ -7,6 +7,7 @@ import 'package:account_app/core/utils/receipt_dialog_helper.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/core/utils/account_balance_utils.dart';
 
 class TransactionCard extends StatelessWidget {
   final Transaction transaction;
@@ -26,15 +27,18 @@ class TransactionCard extends StatelessWidget {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
     final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
 
-    final bool isIncome = transaction.type == 'income';
-    final Color color = isIncome ? AppTheme.incomeColor : AppTheme.expenseColor;
-    final Color bgColor = isIncome ? Colors.green.shade50 : Colors.red.shade50;
+    final columns = AccountBalanceUtils.transactionColumns(transaction);
+    final bool debitLeads = columns.debit >= columns.credit;
+    final Color color =
+        debitLeads ? AppTheme.expenseColor : AppTheme.incomeColor;
+    final Color bgColor =
+        debitLeads ? Colors.red.shade50 : Colors.green.shade50;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    return Material(
+      color: Colors.transparent,
       child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        visualDensity: const VisualDensity(vertical: -2),
         leading: Container(
           width: 40,
           height: 40,
@@ -43,7 +47,9 @@ class TransactionCard extends StatelessWidget {
             shape: BoxShape.circle,
           ),
           child: Icon(
-            isIncome ? PhosphorIcons.arrowDownLeft() : PhosphorIcons.arrowUpRight(),
+            debitLeads
+                ? PhosphorIcons.arrowUpRight()
+                : PhosphorIcons.arrowDownLeft(),
             color: color,
             size: 20,
           ),
@@ -60,7 +66,8 @@ class TransactionCard extends StatelessWidget {
           children: [
             UrduAwareText(
               '${transaction.date.day}/${transaction.date.month}/${transaction.date.year}',
-              style: const TextStyle(fontFamily: '', fontWeight: FontWeight.bold),
+              style:
+                  const TextStyle(fontFamily: '', fontWeight: FontWeight.bold),
             ),
             if (transaction.professionName != null)
               UrduAwareText(
@@ -77,20 +84,23 @@ class TransactionCard extends StatelessWidget {
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            UrduAwareText(
-              '${Formatters.formatAmountWithCurrency(transaction.amount)}',
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                fontFamily: '',
+            if (columns.debit > 0)
+              _buildSideAmount(
+                isUrdu ? 'بنام' : 'Debit',
+                columns.debit,
+                AppTheme.expenseColor,
               ),
-            ),
+            if (columns.credit > 0)
+              _buildSideAmount(
+                isUrdu ? 'جمع' : 'Credit',
+                columns.credit,
+                AppTheme.incomeColor,
+              ),
           ],
         ),
         onTap: () {
-          // اگر باہر سے کوئی خاص فنکشن دیا گیا ہے تو وہ چلے، ورنہ رسید کا پوپ اپ کھلے
           if (onTap != null) {
             onTap!();
           } else {
@@ -101,6 +111,18 @@ class TransactionCard extends StatelessWidget {
             );
           }
         },
+      ),
+    );
+  }
+
+  Widget _buildSideAmount(String label, double amount, Color color) {
+    return UrduAwareText(
+      '$label: ${Formatters.formatAmountWithCurrency(amount)}',
+      style: TextStyle(
+        color: color,
+        fontWeight: FontWeight.bold,
+        fontSize: 13,
+        fontFamily: '',
       ),
     );
   }

@@ -33,6 +33,7 @@ class NotificationService with ChangeNotifier {
 
   List<AppNotification> _notifications = [];
   int _unreadCount = 0;
+  final Set<String> _pendingDeletionIds = {};
   StreamSubscription<QuerySnapshot>? _firestoreSubscription;
   StreamSubscription<User?>? _authStateSubscription;
   StreamSubscription<String>? _tokenRefreshSubscription;
@@ -47,8 +48,7 @@ class NotificationService with ChangeNotifier {
   GlobalKey<NavigatorState>? _navigatorKey;
 
   List<AppNotification> get notifications => _notifications;
-  int get unreadCount =>
-      _notifications.where((notification) => !notification.isRead).length;
+  int get unreadCount => _unreadCount;
 
   NotificationService() {
     _initNotifications();
@@ -213,6 +213,7 @@ class NotificationService with ChangeNotifier {
           'Notification snapshot received with ${snapshot.docs.length} docs');
       List<AppNotification> newNotifications = [];
       for (var doc in snapshot.docs) {
+        if (_pendingDeletionIds.contains('${user.uid}/${doc.id}')) continue;
         try {
           var data = doc.data();
           data['id'] = doc.id;
@@ -578,19 +579,45 @@ class NotificationService with ChangeNotifier {
     unawaited(_writeNotificationBatch(notificationsToUpdate, delete: false));
   }
 
-  void deleteNotification(String notificationId) {
-    _notifications.removeWhere((n) => n.id == notificationId);
+  Future<void> deleteNotification(String notificationId) async {
+    final index = _notifications.indexWhere((n) => n.id == notificationId);
+    if (index == -1) return;
+    final removedNotification = _notifications.removeAt(index);
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      _updateUnreadCount();
+      notifyListeners();
+      return;
+    }
+
+    final deletionKey = '$userId/$notificationId';
+    _pendingDeletionIds.add(deletionKey);
     _updateUnreadCount();
     notifyListeners();
 
-    if (_auth.currentUser != null) {
-      _firestore
+    try {
+      await _firestore
           .collection('users')
-          .doc(_auth.currentUser!.uid)
+          .doc(userId)
           .collection('notifications')
           .doc(notificationId)
-          .delete()
-          .catchError((e) => debugPrint("Error deleting notification: $e"));
+          .delete();
+    } catch (error, stackTrace) {
+      _pendingDeletionIds.remove(deletionKey);
+      if (!_notifications
+          .any((notification) => notification.id == notificationId)) {
+        _notifications.insert(
+          index > _notifications.length ? _notifications.length : index,
+          removedNotification,
+        );
+        _updateUnreadCount();
+        notifyListeners();
+      }
+      debugPrint('Error deleting notification $notificationId: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    } finally {
+      _pendingDeletionIds.remove(deletionKey);
     }
   }
 
