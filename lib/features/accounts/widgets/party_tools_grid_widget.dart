@@ -396,8 +396,12 @@ class PartyTrustMetrics {
     );
     final qbMetrics = QuickBillTrustMetrics.fromTransactions(transactions);
     final txCount = transactions.length;
-    final quickBills =
-        transactions.where((transaction) => transaction.isQuickBill).toList();
+    final quickBills = transactions.where((transaction) {
+      final isPartyCharge = isSupplier
+          ? transaction.type == 'expense'
+          : transaction.type == 'income';
+      return transaction.isQuickBill && isPartyCharge;
+    }).toList();
     final qbFullyPaidCount = quickBills
         .where((bill) => (ledger.outstandingQuickBills[bill.id] ?? 0) <= 0.01)
         .length;

@@ -12,6 +12,7 @@ import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/core/utils/account_balance_utils.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'balance_service.dart';
 
@@ -823,6 +824,19 @@ class PdfService with ChangeNotifier {
   }) async {
     await _loadFonts();
     final pdf = pw.Document();
+    final accountTransactions = transactions
+        .where((transaction) =>
+            transaction.accountId == account.id &&
+            transaction.partnershipId == null)
+        .toList()
+      ..sort((first, second) {
+        final dateOrder = first.date.compareTo(second.date);
+        if (dateOrder != 0) return dateOrder;
+        final createdOrder = first.createdAt.compareTo(second.createdAt);
+        if (createdOrder != 0) return createdOrder;
+        return first.id.compareTo(second.id);
+      });
+    final closingBalance = _closingBalance(account, accountTransactions);
 
     pdf.addPage(
       pw.MultiPage(
@@ -833,11 +847,11 @@ class PdfService with ChangeNotifier {
           bold: isUrdu ? _urduFontBold! : _englishFont!,
         ),
         build: (context) => [
-          _buildAccountHeader(account, isUrdu),
+          _buildAccountHeader(account, closingBalance, isUrdu),
           pw.SizedBox(height: 20),
-          _buildTransactionTable(transactions, isUrdu),
+          _buildAccountStatementTable(accountTransactions, isUrdu),
           pw.SizedBox(height: 20),
-          _buildAccountSummary(account, transactions, isUrdu),
+          _buildAccountSummary(account, accountTransactions, isUrdu),
         ],
       ),
     );
@@ -976,7 +990,16 @@ class PdfService with ChangeNotifier {
     );
   }
 
-  pw.Widget _buildAccountHeader(Account account, bool isUrdu) {
+  pw.Widget _buildAccountHeader(
+    Account account,
+    double closingBalance,
+    bool isUrdu,
+  ) {
+    final balanceLabel = closingBalance.abs() < 0.01
+        ? (isUrdu ? 'کل بیلنس:' : 'Closing balance:')
+        : closingBalance > 0
+            ? (isUrdu ? 'وصول طلب (بنام):' : 'Receivable (Debit):')
+            : (isUrdu ? 'قابلِ ادائیگی (جمع):' : 'Payable (Credit):');
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -985,8 +1008,11 @@ class PdfService with ChangeNotifier {
         pw.SizedBox(height: 15),
         _buildDetailRow(isUrdu ? 'نام:' : 'Name:', account.name, isUrdu),
         _buildDetailRow(isUrdu ? 'فون:' : 'Phone:', account.phone, isUrdu),
-        _buildDetailRow(isUrdu ? 'کل بیلنس:' : 'Total Balance:',
-            Formatters.formatAmountWithCurrency(account.balance), isUrdu),
+        _buildDetailRow(
+          balanceLabel,
+          _formatSignedBalance(closingBalance),
+          isUrdu,
+        ),
         pw.SizedBox(height: 10),
         _buildText(
           '${DateFormat('dd/MM/yyyy').format(DateTime.now())} ${DateFormat('hh:mm a').format(DateTime.now())}',
@@ -1001,8 +1027,23 @@ class PdfService with ChangeNotifier {
 
   pw.Widget _buildAccountSummary(
       Account account, List<Transaction> transactions, bool isUrdu) {
-    final accountIncome = _balanceService.calculateAccountIncome(account.id);
-    final accountExpense = _balanceService.calculateAccountExpense(account.id);
+    final openingBalance = _openingBalance(account);
+    final totalDebit = transactions.fold<double>(
+      0,
+      (sum, transaction) =>
+          sum + AccountBalanceUtils.transactionColumns(transaction).debit,
+    );
+    final totalCredit = transactions.fold<double>(
+      0,
+      (sum, transaction) =>
+          sum + AccountBalanceUtils.transactionColumns(transaction).credit,
+    );
+    final closingBalance = openingBalance + totalDebit - totalCredit;
+    final closingLabel = closingBalance.abs() < 0.01
+        ? (isUrdu ? 'باقی بیلنس:' : 'Closing balance:')
+        : closingBalance > 0
+            ? (isUrdu ? 'وصول طلب (بنام):' : 'Receivable (Debit):')
+            : (isUrdu ? 'قابلِ ادائیگی (جمع):' : 'Payable (Credit):');
 
     return pw.Container(
       margin: const pw.EdgeInsets.only(top: 20),
@@ -1012,25 +1053,137 @@ class PdfService with ChangeNotifier {
           _buildText(
               isUrdu ? 'اکاؤنٹ خلاصہ' : 'Account Summary', isUrdu, true, 16),
           pw.SizedBox(height: 15),
-          _buildSummaryRow(
-              isUrdu ? 'ابتدائی بیلنس:' : 'Initial Balance:',
-              Formatters.formatAmountWithCurrency(account.initialBalance),
-              isUrdu),
-          _buildSummaryRow(isUrdu ? 'کل جمع:' : 'Total Received:',
-              Formatters.formatAmountWithCurrency(accountIncome), isUrdu),
-          _buildSummaryRow(isUrdu ? 'کل بنام:' : 'Total Paid:',
-              Formatters.formatAmountWithCurrency(accountExpense), isUrdu),
+          _buildSummaryRow(isUrdu ? 'ابتدائی بیلنس:' : 'Initial Balance:',
+              _formatSignedBalance(openingBalance), isUrdu),
+          _buildSummaryRow(isUrdu ? 'کل بنام (ڈیبٹ):' : 'Total Debit:',
+              Formatters.formatAmountWithCurrency(totalDebit), isUrdu),
+          _buildSummaryRow(isUrdu ? 'کل جمع (کریڈٹ):' : 'Total Credit:',
+              Formatters.formatAmountWithCurrency(totalCredit), isUrdu),
           pw.Divider(),
           _buildSummaryRow(
-            isUrdu ? 'کل بیلنس:' : 'Total Balance:',
-            Formatters.formatAmountWithCurrency(account.balance),
+            closingLabel,
+            _formatSignedBalance(closingBalance),
             isUrdu,
             isBold: true,
-            color: account.balance >= 0 ? PdfColors.green : PdfColors.red,
+            color: closingBalance >= 0 ? PdfColors.green : PdfColors.red,
           ),
         ],
       ),
     );
+  }
+
+  pw.Widget _buildAccountStatementTable(
+    List<Transaction> transactions,
+    bool isUrdu,
+  ) {
+    final openingBalance = _openingBalance(account);
+    var runningBalance = openingBalance;
+    final rows = <pw.TableRow>[
+      pw.TableRow(
+        decoration: pw.BoxDecoration(color: PdfColors.grey300),
+        children: [
+          _buildTableCell(isUrdu ? 'تاریخ' : 'Date', isUrdu, true, 9),
+          _buildTableCell(isUrdu ? 'تفصیل' : 'Description', isUrdu, true, 9),
+          _buildTableCell(isUrdu ? 'بنام' : 'Debit', isUrdu, true, 9),
+          _buildTableCell(isUrdu ? 'جمع' : 'Credit', isUrdu, true, 9),
+          _buildTableCell(
+              isUrdu ? 'چلتا بیلنس' : 'Running Balance', isUrdu, true, 9),
+        ],
+      ),
+    ];
+
+    final openingDebit = openingBalance > 0 ? openingBalance : 0.0;
+    final openingCredit = openingBalance < 0 ? -openingBalance : 0.0;
+    rows.add(_accountStatementRow(
+      date: '',
+      description: isUrdu ? 'ابتدائی بیلنس' : 'Opening balance',
+      debit: openingDebit,
+      credit: openingCredit,
+      balance: runningBalance,
+      isUrdu: isUrdu,
+      isBold: true,
+    ));
+
+    for (final transaction in transactions) {
+      final columns = AccountBalanceUtils.transactionColumns(transaction);
+      runningBalance += columns.debit - columns.credit;
+      if (runningBalance.abs() < 0.01) runningBalance = 0;
+      rows.add(_accountStatementRow(
+        date: transaction.formattedDate,
+        description: transaction.description,
+        debit: columns.debit,
+        credit: columns.credit,
+        balance: runningBalance,
+        isUrdu: isUrdu,
+      ));
+    }
+
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.grey500, width: 0.5),
+      columnWidths: {
+        0: const pw.FlexColumnWidth(1.25),
+        1: const pw.FlexColumnWidth(2.2),
+        2: const pw.FlexColumnWidth(1.2),
+        3: const pw.FlexColumnWidth(1.2),
+        4: const pw.FlexColumnWidth(1.5),
+      },
+      children: rows,
+    );
+  }
+
+  pw.TableRow _accountStatementRow({
+    required String date,
+    required String description,
+    required double debit,
+    required double credit,
+    required double balance,
+    required bool isUrdu,
+    bool isBold = false,
+  }) {
+    return pw.TableRow(children: [
+      _buildTableCell(date, false, isBold, 8),
+      _buildTableCell(description, isUrdu, isBold, 8),
+      _buildTableCell(
+        debit > 0 ? Formatters.formatAmountWithCurrency(debit) : '-',
+        false,
+        isBold,
+        8,
+      ),
+      _buildTableCell(
+        credit > 0 ? Formatters.formatAmountWithCurrency(credit) : '-',
+        false,
+        isBold,
+        8,
+      ),
+      _buildTableCell(_formatSignedBalance(balance), false, isBold, 8),
+    ]);
+  }
+
+  double _openingBalance(Account account) {
+    final opening = account.initialBalance;
+    return account.balanceType.trim().toLowerCase() == 'payable'
+        ? -opening
+        : opening;
+  }
+
+  double _closingBalance(Account account, List<Transaction> transactions) {
+    final totals = transactions.fold<AccountTransactionColumns>(
+      const AccountTransactionColumns(debit: 0, credit: 0),
+      (sum, transaction) {
+        final columns = AccountBalanceUtils.transactionColumns(transaction);
+        return AccountTransactionColumns(
+          debit: sum.debit + columns.debit,
+          credit: sum.credit + columns.credit,
+        );
+      },
+    );
+    return _openingBalance(account) + totals.debit - totals.credit;
+  }
+
+  String _formatSignedBalance(double balance) {
+    final formatted = Formatters.formatAmountWithCurrency(balance.abs());
+    if (balance < -0.01) return '-$formatted';
+    return formatted;
   }
 
   pw.Widget _buildFinancialReportHeader(int year, int month, bool isUrdu) {
