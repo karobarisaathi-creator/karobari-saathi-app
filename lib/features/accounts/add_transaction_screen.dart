@@ -179,7 +179,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     _dateInputController.text = DateFormat('dd/MM/yy').format(_selectedDate);
     _setupDateListener();
-    _setupAmountControllerListener();
 
     Provider.of<StockService>(context, listen: false).addListener(_loadData);
     _loadData();
@@ -263,32 +262,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   bool _isSyncingGrandTotal = false;
 
-  void _setupAmountControllerListener() {
-    _amountController.addListener(() {
-      if (_isSyncingGrandTotal) return;
-      if (_itemEntries.length == 1) {
-        _isSyncingGrandTotal = true;
-        try {
-          final entry = _itemEntries.first;
-          final grandTotal =
-              Formatters.tryParseAmount(_amountController.text) ?? 0;
-          final formattedTotal =
-              Formatters.formatAmountWithoutCurrency(grandTotal);
-          if (entry.totalController.text != formattedTotal) {
-            entry.totalController.text = formattedTotal;
-            final finalQuantity = _effectiveEntryQuantity(entry);
-            final rate =
-                finalQuantity > 0 ? grandTotal / finalQuantity : grandTotal;
-            entry.rateController.text =
-                Formatters.formatAmountWithoutCurrency(rate);
-          }
-        } finally {
-          _isSyncingGrandTotal = false;
-        }
-      }
-    });
-  }
-
   void _setupEntryListeners(_ItemEntry entry) {
     bool isSyncing = false;
 
@@ -308,24 +281,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       } finally {
         isSyncing = false;
       }
-    }
-
-    void calculateFromTotal() {
-      if (isSyncing) return;
-      isSyncing = true;
-      try {
-        final finalQuantity = _effectiveEntryQuantity(entry);
-        final total =
-            Formatters.tryParseAmount(entry.totalController.text) ?? 0;
-        final rate = finalQuantity > 0 ? total / finalQuantity : total;
-        final formattedRate = Formatters.formatAmountWithoutCurrency(rate);
-        if (entry.rateController.text != formattedRate) {
-          entry.rateController.text = formattedRate;
-        }
-        _calculateGrandTotal();
-      } finally {
-        isSyncing = false;
-      }
+      if (mounted) setState(() {});
     }
 
     entry.quantityController.addListener(calculateFromRate);
@@ -334,7 +290,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       if (!entry.applyingSuggestedRate) entry.rateWasManuallyEdited = true;
       calculateFromRate();
     });
-    entry.totalController.addListener(calculateFromTotal);
     entry.descriptionController.addListener(() {
       final previousStockItemId = entry.stockItemId;
       final stockItem = _stockItemsByName[
@@ -557,6 +512,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   icon: PhosphorIcons.wallet(),
                   fontFamily: fontFamily,
                   fontWeight: FontWeight.bold,
+                  readOnly: _itemEntries.any((item) =>
+                      item.quantityController.text.trim().isNotEmpty ||
+                      item.subQuantityController.text.trim().isNotEmpty ||
+                      item.rateController.text.trim().isNotEmpty),
                 ),
                 if (widget.isPartySettlement) ...[
                   const SizedBox(height: 12),
@@ -936,7 +895,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       fontFamily: fontFamily,
                       fontWeight: FontWeight.bold,
                       isCurrency: true,
-                      readOnly: false)),
+                      readOnly: true)),
               if (_itemEntries.length > 1)
                 IconButton(
                     icon: Icon(
@@ -1586,7 +1545,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       bool isCurrency = false,
       IconData? icon,
       required String fontFamily,
-      required FontWeight fontWeight}) {
+      required FontWeight fontWeight,
+      bool readOnly = false}) {
     final isUrdu = isUrduHelper(context);
     return TextFormField(
       controller: controller,
@@ -1598,6 +1558,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           : (isNumber
               ? [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))]
               : null),
+      readOnly: readOnly,
       style: TextStyle(
           color: AppTheme.darkColor,
           fontFamily: (isNumber || isCurrency) ? '' : fontFamily,

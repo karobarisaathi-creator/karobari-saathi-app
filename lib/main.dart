@@ -52,8 +52,7 @@ import 'package:account_app/features/accounts/reports_screen.dart';
 import 'package:account_app/features/notifications/notifications_screen.dart';
 import 'package:account_app/features/professions/professions_screen.dart';
 import 'package:account_app/features/accounts/add_transaction_screen.dart';
-import 'package:account_app/features/settings/app_lock_screen.dart'
-    as real_lock; // Import the real screen
+import 'package:account_app/features/settings/app_lock_gate.dart';
 import 'package:account_app/features/dashboard/app_shell_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart'; // نئی تھیم فائل شامل کی
 
@@ -248,7 +247,7 @@ class MyApp extends StatelessWidget {
                     bottom: true,
                     left: false,
                     right: false,
-                    child: restChild!,
+                    child: AppLockGate(child: restChild!),
                   ),
                 ),
               );
@@ -283,7 +282,6 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
   bool _isLoading = true;
   bool _needsLogin = true;
   bool _needsProfileSetup = false;
-  bool _isUnlocked = false; // Tracks session unlock status
 
   // Colors for loading screen (Matches AppTheme)
   final Color _themeColor = const Color(0xFF123248); // AppTheme.darkColor
@@ -406,38 +404,11 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
       return LoginScreen();
     }
 
-    // 2. Check App Lock
-    return FutureBuilder<bool>(
-      future: Provider.of<SecurityService>(context, listen: false)
-          .isAppLockEnabled(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingScreen();
-        }
+    if (_needsProfileSetup) {
+      return const MasterProfileScreen();
+    }
 
-        final isAppLockEnabled = snapshot.data ?? false;
-
-        // If lock is enabled and not yet unlocked in this session
-        // REMOVED BYPASS - LOCK IS NOW ACTIVE
-        if (isAppLockEnabled && !_isUnlocked) {
-          return real_lock.AppLockScreen(
-            onUnlock: () {
-              setState(() {
-                _isUnlocked = true;
-              });
-            },
-          );
-        }
-
-        // 3. Every account needs a basic profile; artisan mode is optional.
-        if (_needsProfileSetup) {
-          return const MasterProfileScreen(); // Updated
-        }
-
-        // 4. Main Navigation
-        return AppShellScreen(key: AppShellScreen.navigationKey);
-      },
-    );
+    return AppShellScreen(key: AppShellScreen.navigationKey);
   }
 
   Widget _buildLoadingScreen() {

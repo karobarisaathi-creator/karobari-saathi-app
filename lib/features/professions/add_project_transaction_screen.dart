@@ -129,7 +129,6 @@ class _AddProjectTransactionScreenState
 
     _dateInputController.text = DateFormat('dd/MM/yy').format(_selectedDate);
     _setupDateListener();
-    _setupAmountControllerListener();
     _loadItemNames();
   }
 
@@ -178,32 +177,6 @@ class _AddProjectTransactionScreenState
 
   bool _isSyncingGrandTotal = false;
 
-  void _setupAmountControllerListener() {
-    _amountController.addListener(() {
-      if (_isSyncingGrandTotal) return;
-      if (_itemEntries.length == 1) {
-        _isSyncingGrandTotal = true;
-        try {
-          final entry = _itemEntries.first;
-          final grandTotal =
-              Formatters.tryParseAmount(_amountController.text) ?? 0;
-          final formattedTotal =
-              Formatters.formatAmountWithoutCurrency(grandTotal);
-          if (entry.totalController.text != formattedTotal) {
-            entry.totalController.text = formattedTotal;
-            final finalQuantity = _effectiveEntryQuantity(entry);
-            final rate =
-                finalQuantity > 0 ? grandTotal / finalQuantity : grandTotal;
-            entry.rateController.text =
-                Formatters.formatAmountWithoutCurrency(rate);
-          }
-        } finally {
-          _isSyncingGrandTotal = false;
-        }
-      }
-    });
-  }
-
   void _setupEntryListeners(_ItemEntry entry) {
     bool isSyncing = false;
 
@@ -222,30 +195,12 @@ class _AddProjectTransactionScreenState
       } finally {
         isSyncing = false;
       }
-    }
-
-    void calculateFromTotal() {
-      if (isSyncing) return;
-      isSyncing = true;
-      try {
-        final finalQuantity = _effectiveEntryQuantity(entry);
-        final total =
-            Formatters.tryParseAmount(entry.totalController.text) ?? 0;
-        final rate = finalQuantity > 0 ? total / finalQuantity : total;
-        final formattedRate = Formatters.formatAmountWithoutCurrency(rate);
-        if (entry.rateController.text != formattedRate) {
-          entry.rateController.text = formattedRate;
-        }
-        _calculateGrandTotal();
-      } finally {
-        isSyncing = false;
-      }
+      if (mounted) setState(() {});
     }
 
     entry.quantityController.addListener(calculateFromRate);
     entry.subQuantityController.addListener(calculateFromRate);
     entry.rateController.addListener(calculateFromRate);
-    entry.totalController.addListener(calculateFromTotal);
     entry.descriptionController.addListener(() => setState(() {}));
   }
 
@@ -380,6 +335,10 @@ class _AddProjectTransactionScreenState
                         icon: PhosphorIcons.wallet(),
                         fontFamily: fontFamily,
                         fontWeight: FontWeight.bold,
+                        readOnly: _itemEntries.any((item) =>
+                            item.quantityController.text.trim().isNotEmpty ||
+                            item.subQuantityController.text.trim().isNotEmpty ||
+                            item.rateController.text.trim().isNotEmpty),
                       ),
                     ],
                   ),
@@ -438,8 +397,8 @@ class _AddProjectTransactionScreenState
                     ],
                   ),
                 ],
-              ),
-            ),
+        ),
+      ),
     );
   }
 
@@ -451,7 +410,7 @@ class _AddProjectTransactionScreenState
     final masterProf = db.getProfession(masterId);
 
     final rawCategories = masterProf?.categories ?? widget.profession.categories;
-    
+
     List<String> filteredRaw = rawCategories.where((c) {
       if (_selectedType == 'income') {
         return c.startsWith('INC:');
@@ -638,7 +597,7 @@ class _AddProjectTransactionScreenState
                       fontFamily: fontFamily,
                       fontWeight: FontWeight.bold,
                       isNumber: true,
-                      readOnly: false)),
+                      readOnly: true)),
               if (_itemEntries.length > 1)
                 IconButton(
                     icon: Icon(
@@ -729,7 +688,8 @@ class _AddProjectTransactionScreenState
       bool isCurrency = false,
       IconData? icon,
       required String fontFamily,
-      required FontWeight fontWeight}) {
+      required FontWeight fontWeight,
+      bool readOnly = false}) {
     return TextFormField(
       controller: controller,
       keyboardType: (isNumber || isCurrency)
@@ -740,6 +700,7 @@ class _AddProjectTransactionScreenState
           : (isNumber
               ? [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))]
               : null),
+      readOnly: readOnly,
       style: TextStyle(
           color: AppTheme.darkColor,
           fontFamily: (isNumber || isCurrency) ? '' : fontFamily,

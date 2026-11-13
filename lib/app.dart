@@ -37,14 +37,13 @@ import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/security_service.dart';
 import 'package:account_app/core/services/offline_queue_service.dart';
 import 'package:account_app/core/services/settings_service.dart';
+import 'package:account_app/features/settings/app_lock_gate.dart';
 
 // Screens
 import 'package:account_app/features/settings/login_screen.dart';
 import 'package:account_app/features/accounts/party_list_screen.dart';
 import 'package:account_app/features/dashboard/app_shell_screen.dart';
 import 'package:account_app/features/settings/master_profile_screen.dart'; // Updated
-import 'package:account_app/features/settings/app_lock_screen.dart'
-    as real_lock;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -146,7 +145,7 @@ class MyApp extends StatelessWidget {
 
               return Directionality(
                 textDirection: languageService.textDirection,
-                child: child!,
+                child: AppLockGate(child: child!),
               );
             },
 
@@ -173,7 +172,6 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
   bool _isLoading = true;
   bool _needsProfileSetup = false;
   bool _isLoggedIn = false;
-  bool _isAppUnlocked = false;
 
   @override
   void initState() {
@@ -190,12 +188,7 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
-      // Re-lock app when it goes to background
-      setState(() {
-        _isAppUnlocked = false;
-      });
-    } else if (state == AppLifecycleState.resumed &&
+    if (state == AppLifecycleState.resumed &&
         FirebaseAuth.instance.currentUser != null) {
       unawaited(_checkAutoBackup());
     }
@@ -268,28 +261,10 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
       return LoginScreen();
     }
 
-    // 2. Check App Lock (Only if logged in)
-    return Consumer<SecurityService>(
-      builder: (context, securityService, child) {
-        final isAppLockEnabled = securityService.isLockEnabled;
+    if (_needsProfileSetup) {
+      return const MasterProfileScreen();
+    }
 
-        if (isAppLockEnabled && !_isAppUnlocked) {
-          return real_lock.AppLockScreen(
-            onUnlock: () {
-              setState(() {
-                _isAppUnlocked = true;
-              });
-            },
-          );
-        }
-
-        // 3. Check Profile Setup
-        if (_needsProfileSetup) {
-          return const MasterProfileScreen();
-        } else {
-          return AppShellScreen(key: AppShellScreen.navigationKey);
-        }
-      },
-    );
+    return AppShellScreen(key: AppShellScreen.navigationKey);
   }
 }

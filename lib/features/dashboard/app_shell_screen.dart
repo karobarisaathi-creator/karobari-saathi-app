@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/widgets/main_bottom_nav_bar.dart';
 import 'package:account_app/features/accounts/party_list_screen.dart';
 import 'package:account_app/features/notifications/notifications_screen.dart';
@@ -69,6 +73,24 @@ class AppShellScreenState extends State<AppShellScreen> {
   void onItemTapped(int index) {
     if (index >= 0 && index < _screens.length && index != _selectedIndex) {
       setState(() => _selectedIndex = index);
+    }
+    if (index == 4) unawaited(_requestNotificationPermission());
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    try {
+      await Provider.of<NotificationService>(context, listen: false)
+          .requestNotificationsPermission();
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'app shell screen',
+          context: ErrorDescription(
+              'while requesting notification permission from the inbox'),
+        ),
+      );
     }
   }
 

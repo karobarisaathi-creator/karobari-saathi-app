@@ -18,6 +18,8 @@ class AppLockSettingsScreen extends StatefulWidget {
 
 class _AppLockSettingsScreenState extends State<AppLockSettingsScreen> {
   bool _isEnabled = false;
+  bool _isBiometricAvailable = false;
+  bool _isBiometricEnabled = false;
   bool _isLoading = true;
   bool _isBusy = false;
 
@@ -28,10 +30,15 @@ class _AppLockSettingsScreenState extends State<AppLockSettingsScreen> {
   }
 
   Future<void> _loadStatus() async {
-    final isEnabled = await context.read<SecurityService>().isAppLockEnabled();
+    final securityService = context.read<SecurityService>();
+    final isEnabled = await securityService.isAppLockEnabled();
+    final isBiometricAvailable = await securityService.isBiometricsAvailable();
+    final isBiometricEnabled = await securityService.isBiometricEnabled();
     if (!mounted) return;
     setState(() {
       _isEnabled = isEnabled;
+      _isBiometricAvailable = isBiometricAvailable;
+      _isBiometricEnabled = isBiometricEnabled;
       _isLoading = false;
     });
   }
@@ -66,7 +73,10 @@ class _AppLockSettingsScreenState extends State<AppLockSettingsScreen> {
         if (verified == true) {
           await context.read<SecurityService>().setAppLockEnabled(false);
           if (!mounted) return;
-          setState(() => _isEnabled = false);
+          setState(() {
+            _isEnabled = false;
+            _isBiometricEnabled = false;
+          });
           AppToast.success(
             context,
             isUrdu ? 'ایپ لاک بند ہو گیا' : 'App Lock disabled',
@@ -80,6 +90,84 @@ class _AppLockSettingsScreenState extends State<AppLockSettingsScreen> {
           isUrdu
               ? 'سیکیورٹی سیٹنگ تبدیل نہیں ہو سکی: $error'
               : 'Could not update security settings: $error',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isBusy = false);
+    }
+  }
+
+  Future<void> _toggleBiometric(bool enabled, bool isUrdu) async {
+    if (!_isEnabled || _isBusy) return;
+    setState(() => _isBusy = true);
+    try {
+      final securityService = context.read<SecurityService>();
+      if (enabled) {
+        final available = await securityService.isBiometricsAvailable();
+        if (!available) {
+          if (mounted) {
+            setState(() => _isBiometricAvailable = false);
+            AppToast.error(
+              context,
+              isUrdu
+                  ? 'اس ڈیوائس میں فنگر پرنٹ یا فیس لاک سیٹ اپ نہیں ہے۔'
+                  : 'Set up fingerprint or face unlock in device settings first.',
+            );
+          }
+          return;
+        }
+
+        final authenticated = await securityService.authenticateWithBiometrics(
+          localizedReason: isUrdu
+              ? 'فنگر پرنٹ فعال کرنے کے لیے تصدیق کریں'
+              : 'Verify your identity to enable biometric unlock',
+        );
+        if (!authenticated) {
+          if (mounted) {
+            AppToast.error(
+              context,
+              isUrdu
+                  ? 'بایومیٹرک تصدیق مکمل نہیں ہوئی۔'
+                  : 'Biometric verification was not completed.',
+            );
+          }
+          return;
+        }
+
+        await securityService.setBiometricEnabled(true);
+        if (!mounted) return;
+        setState(() {
+          _isBiometricAvailable = true;
+          _isBiometricEnabled = true;
+        });
+        AppToast.success(
+          context,
+          isUrdu ? 'فنگر پرنٹ لاک فعال ہو گیا' : 'Biometric unlock enabled',
+        );
+      } else {
+        final verified = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const AppLockScreen(isVerifyingOnly: true),
+          ),
+        );
+        if (verified != true || !mounted) return;
+
+        await securityService.setBiometricEnabled(false);
+        if (!mounted) return;
+        setState(() => _isBiometricEnabled = false);
+        AppToast.success(
+          context,
+          isUrdu ? 'فنگر پرنٹ لاک بند ہو گیا' : 'Biometric unlock disabled',
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        AppToast.error(
+          context,
+          isUrdu
+              ? 'بایومیٹرک سیٹنگ تبدیل نہیں ہو سکی: $error'
+              : 'Could not update biometric settings: $error',
         );
       }
     } finally {
@@ -241,6 +329,39 @@ class _AppLockSettingsScreenState extends State<AppLockSettingsScreen> {
                   onTap:
                       _isEnabled && !_isBusy ? () => _changePin(isUrdu) : null,
                 ),
+                if (_isEnabled) ...[
+                  const SizedBox(height: 14),
+                  _SettingsCard(
+                    icon: Icons.fingerprint_rounded,
+                    title: isUrdu ? 'فنگر پرنٹ لاک' : 'Biometric unlock',
+                    subtitle: _isBiometricEnabled
+                        ? (isUrdu
+                            ? 'ایپ کھولنے کے لیے فنگر پرنٹ یا فیس استعمال کریں'
+                            : 'Use fingerprint or face to unlock the app')
+                        : _isBiometricAvailable
+                            ? (isUrdu
+                                ? 'فنگر پرنٹ یا فیس سے فوری لاگ اِن'
+                                : 'Quick unlock with fingerprint or face')
+                            : (isUrdu
+                                ? 'پہلے ڈیوائس سیٹنگز میں فنگر پرنٹ یا فیس سیٹ کریں'
+                                : 'Set up fingerprint or face unlock in device settings'),
+                    fontFamily: fontFamily,
+                    trailing: _isBusy
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2.5),
+                          )
+                        : Switch.adaptive(
+                            value: _isBiometricEnabled,
+                            activeThumbColor: AppTheme.themeColor,
+                            onChanged:
+                                (_isBiometricAvailable || _isBiometricEnabled)
+                                    ? (value) => _toggleBiometric(value, isUrdu)
+                                    : null,
+                          ),
+                  ),
+                ],
                 if (!_isEnabled) ...[
                   const SizedBox(height: 12),
                   UrduAwareText(

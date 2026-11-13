@@ -147,7 +147,7 @@ class ShopItemCardWidget extends StatelessWidget {
                                           ? '%'
                                           : item.badge!),
                               style: const TextStyle(
-                                fontSize: 9.5,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w900,
                                 color: Colors.white,
                               ),
@@ -166,7 +166,7 @@ class ShopItemCardWidget extends StatelessWidget {
                         UrduAwareText(
                           item.name,
                           style: TextStyle(
-                            fontSize: 13.5,
+                            fontSize: 15,
                             fontWeight: FontWeight.w800,
                             color: selected ? goldColor : AppTheme.darkColor,
                             letterSpacing: -0.2,
@@ -180,7 +180,7 @@ class ShopItemCardWidget extends StatelessWidget {
                             UrduAwareText(
                               Formatters.formatAmountWithCurrency(item.rate),
                               style: TextStyle(
-                                fontSize: 14.5,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w900,
                                 color:
                                     selected ? goldColor : AppTheme.darkColor,
@@ -193,7 +193,7 @@ class ShopItemCardWidget extends StatelessWidget {
                                 Formatters.formatAmountWithCurrency(
                                     item.oldRate!),
                                 style: const TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12.5,
                                   fontWeight: FontWeight.w700,
                                   color: AppTheme.textSecondary,
                                   decoration: TextDecoration.lineThrough,
@@ -204,7 +204,7 @@ class ShopItemCardWidget extends StatelessWidget {
                             UrduAwareText(
                               item.unit,
                               style: const TextStyle(
-                                fontSize: 10.5,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 color: AppTheme.textSecondary,
                               ),
@@ -260,7 +260,7 @@ class ShopItemCardWidget extends StatelessWidget {
                               ? 'بقیہ اسٹاک: ${((item.stock - item.quantity) < 0 ? 0 : (item.stock - item.quantity)).toStringAsFixed(item.stock % 1 == 0 ? 0 : 1)}'
                               : 'بل میں شامل کریں',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 11.5,
                         fontWeight:
                             selected ? FontWeight.w900 : FontWeight.w800,
                         color: selected ? goldColor : AppTheme.incomeColor,
@@ -270,7 +270,7 @@ class ShopItemCardWidget extends StatelessWidget {
                     UrduAwareText(
                       Formatters.formatAmountWithCurrency(item.total),
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 13,
                         fontWeight: FontWeight.w900,
                         color: selected ? goldColor : AppTheme.goldColor,
                       ),
@@ -314,7 +314,7 @@ class ShopItemCardWidget extends StatelessWidget {
                       UrduAwareText(
                         'تفصیل دیکھیں',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w800,
                           color: selected ? goldColor : AppTheme.darkColor,
                         ),
@@ -358,7 +358,7 @@ class ShopItemCardWidget extends StatelessWidget {
                         child: UrduAwareText(
                           out ? 'ختم' : (low ? 'کم' : 'دستیاب'),
                           style: TextStyle(
-                            fontSize: 9.5,
+                            fontSize: 11,
                             fontWeight: FontWeight.w800,
                             color: out
                                 ? Colors.white

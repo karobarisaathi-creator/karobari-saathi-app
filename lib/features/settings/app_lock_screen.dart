@@ -34,6 +34,8 @@ class _AppLockScreenState extends State<AppLockScreen> {
   bool _isLoading = true;
   bool _isError = false;
   bool _isBiometricAvailable = false;
+  bool _isAuthenticatingBiometrics = false;
+  String? _errorTextOverride;
 
   final Color _greyColor = const Color(0xFF607D8B);
 
@@ -87,16 +89,27 @@ class _AppLockScreenState extends State<AppLockScreen> {
   }
 
   Future<void> _authenticateWithBiometrics() async {
+    if (_isAuthenticatingBiometrics) return;
+    setState(() => _isAuthenticatingBiometrics = true);
     final securityService =
         Provider.of<SecurityService>(context, listen: false);
-    FocusScope.of(context).unfocus();
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    try {
+      FocusScope.of(context).unfocus();
 
-    final isAuthenticated = await securityService.authenticateWithBiometrics();
+      final isAuthenticated = await securityService.authenticateWithBiometrics(
+        localizedReason: isUrdu
+            ? 'ایپ کھولنے کے لیے اپنی شناخت کی تصدیق کریں'
+            : 'Authenticate to unlock Karobari Saathi',
+      );
 
-    if (isAuthenticated && mounted) {
-      widget.onUnlock?.call();
-    } else {
-      _showKeyboard();
+      if (isAuthenticated && mounted) {
+        widget.onUnlock?.call();
+      } else {
+        _showKeyboard();
+      }
+    } finally {
+      if (mounted) setState(() => _isAuthenticatingBiometrics = false);
     }
   }
 
@@ -162,7 +175,10 @@ class _AppLockScreenState extends State<AppLockScreen> {
                             ),
                             style: const TextStyle(color: Colors.transparent),
                             onChanged: (value) {
-                              setState(() => _isError = false);
+                              setState(() {
+                                _isError = false;
+                                _errorTextOverride = null;
+                              });
                               if (value.length == 4) _validatePin(value);
                             },
                           ),
@@ -357,8 +373,9 @@ class _AppLockScreenState extends State<AppLockScreen> {
                                             !widget.isVerifyingOnly) ...[
                                           const SizedBox(height: 16),
                                           TextButton.icon(
-                                            onPressed:
-                                                _authenticateWithBiometrics,
+                                            onPressed: _isAuthenticatingBiometrics
+                                                ? null
+                                                : _authenticateWithBiometrics,
                                             icon: const Icon(
                                               Icons.fingerprint_rounded,
                                               size: 22,
@@ -433,6 +450,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
   }
 
   String _getErrorText(bool isUrdu) {
+    if (_errorTextOverride != null) return _errorTextOverride!;
     if (_isVerifyingOldPin) {
       return isUrdu ? 'پرانا پن کوڈ درست نہیں ہے' : 'Old PIN is incorrect';
     }
@@ -442,74 +460,111 @@ class _AppLockScreenState extends State<AppLockScreen> {
     return isUrdu ? 'غلط پن کوڈ' : 'Wrong PIN Code';
   }
 
+  Future<void> _showPinFailure({
+    required SecurityService securityService,
+    required bool isUrdu,
+    required String fallbackMessage,
+  }) async {
+    final retryDelay = await securityService.pinRetryDelay();
+    final remainingSeconds = retryDelay.inSeconds +
+        (retryDelay.inMilliseconds.remainder(1000) > 0 ? 1 : 0);
+    if (!mounted) return;
+
+    setState(() {
+      _isError = true;
+      _errorTextOverride = retryDelay > Duration.zero
+          ? (isUrdu
+              ? 'بہت زیادہ کوششیں ہو گئیں۔ $remainingSeconds سیکنڈ بعد دوبارہ کوشش کریں۔'
+              : 'Too many attempts. Try again in $remainingSeconds seconds.')
+          : fallbackMessage;
+      _pinController.clear();
+    });
+    _showKeyboard();
+  }
+
   Future<void> _validatePin(String enteredPin) async {
     await Future.delayed(const Duration(milliseconds: 200));
     if (!mounted) return;
 
     final securityService =
         Provider.of<SecurityService>(context, listen: false);
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
     final cleanPin = enteredPin.trim();
 
-    if (_isVerifyingOldPin) {
-      final isValid = await securityService.validatePin(cleanPin);
-      if (isValid) {
-        setState(() {
-          _isVerifyingOldPin = false;
-          _pinController.clear();
-          _isError = false;
-        });
-        _showKeyboard();
-      } else {
-        setState(() {
-          _isError = true;
-          _pinController.clear();
-        });
-        _showKeyboard();
-      }
-      return;
-    }
-
-    if (widget.isSettingUp || widget.isChangingPin) {
-      if (_newPinCache == null) {
-        setState(() {
-          _newPinCache = cleanPin;
-          _pinController.clear();
-        });
-        _showKeyboard();
-      } else {
-        if (cleanPin == _newPinCache) {
-          await securityService.setNewPin(cleanPin);
-          if (mounted) {
-            Navigator.pop(context, true);
-          }
-        } else {
+    try {
+      if (_isVerifyingOldPin) {
+        final isValid = await securityService.validatePin(cleanPin);
+        if (isValid) {
           setState(() {
-            _isError = true;
+            _isVerifyingOldPin = false;
             _pinController.clear();
-            _newPinCache = null;
+            _isError = false;
+            _errorTextOverride = null;
           });
           _showKeyboard();
+        } else {
+          await _showPinFailure(
+            securityService: securityService,
+            isUrdu: isUrdu,
+            fallbackMessage:
+                isUrdu ? 'پرانا پن کوڈ درست نہیں ہے' : 'Old PIN is incorrect',
+          );
         }
+        return;
       }
-    } else {
-      // ⭐ normal unlock یا verifyOnly — دونوں کے لیے validatePin
-      final isValid = await securityService.validatePin(cleanPin);
-      if (isValid) {
-        // ⭐ اگر صرف verify کرنا ہے تو true واپس کریں
-        if (widget.isVerifyingOnly) {
-          if (mounted) {
-            Navigator.pop(context, true);
+
+      if (widget.isSettingUp || widget.isChangingPin) {
+        if (_newPinCache == null) {
+          setState(() {
+            _newPinCache = cleanPin;
+            _pinController.clear();
+          });
+          _showKeyboard();
+        } else {
+          if (cleanPin == _newPinCache) {
+            await securityService.setNewPin(cleanPin);
+            if (mounted) {
+              Navigator.pop(context, true);
+            }
+          } else {
+            setState(() {
+              _isError = true;
+              _errorTextOverride = null;
+              _pinController.clear();
+              _newPinCache = null;
+            });
+            _showKeyboard();
           }
-          return;
         }
-        widget.onUnlock?.call();
       } else {
-        setState(() {
-          _isError = true;
-          _pinController.clear();
-        });
-        _showKeyboard();
+        final isValid = await securityService.validatePin(cleanPin);
+        if (isValid) {
+          if (widget.isVerifyingOnly) {
+            if (mounted) {
+              Navigator.pop(context, true);
+            }
+            return;
+          }
+          widget.onUnlock?.call();
+        } else {
+          await _showPinFailure(
+            securityService: securityService,
+            isUrdu: isUrdu,
+            fallbackMessage: isUrdu ? 'غلط پن کوڈ' : 'Wrong PIN Code',
+          );
+        }
       }
+    } catch (error, stackTrace) {
+      debugPrint('PIN verification failed: $error\n$stackTrace');
+      if (!mounted) return;
+      setState(() {
+        _isError = true;
+        _errorTextOverride = isUrdu
+            ? 'پن کی تصدیق نہیں ہو سکی۔ دوبارہ کوشش کریں۔'
+            : 'Could not verify PIN. Please try again.';
+        _pinController.clear();
+      });
+      _showKeyboard();
     }
   }
 }

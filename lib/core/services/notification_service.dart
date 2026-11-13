@@ -44,6 +44,10 @@ class NotificationService with ChangeNotifier {
   String? _activeUserId;
   bool _isDisposed = false;
   bool _isProcessingPendingPartyNotifications = false;
+  bool _isDrainingNotificationTaps = false;
+  int _nextLocalNotificationId =
+      DateTime.now().millisecondsSinceEpoch & 0x7fffffff;
+  final List<Map<String, dynamic>?> _pendingNotificationTaps = [];
 
   GlobalKey<NavigatorState>? _navigatorKey;
 
@@ -76,6 +80,38 @@ class NotificationService with ChangeNotifier {
 
   void setNavigatorKey(GlobalKey<NavigatorState> key) {
     _navigatorKey = key;
+    unawaited(_drainPendingNotificationTaps());
+  }
+
+  Future<bool> requestNotificationsPermission() async {
+    try {
+      var settings = await _firebaseMessaging.getNotificationSettings();
+      if (settings.authorizationStatus == AuthorizationStatus.notDetermined) {
+        settings = await _firebaseMessaging.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
+
+      final isGranted =
+          _hasNotificationPermission(settings.authorizationStatus);
+      if (isGranted) {
+        _fcmToken = await _firebaseMessaging.getToken();
+        final userId = _auth.currentUser?.uid;
+        if (userId != null) await _registerCurrentToken(userId);
+      }
+      return isGranted;
+    } catch (error, stackTrace) {
+      debugPrint('Notification permission request failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  bool _hasNotificationPermission(AuthorizationStatus status) {
+    return status == AuthorizationStatus.authorized ||
+        status == AuthorizationStatus.provisional;
   }
 
   Future<void> _initNotifications() async {
@@ -124,6 +160,9 @@ class NotificationService with ChangeNotifier {
 
   Future<void> _registerCurrentToken(String userId) async {
     try {
+      final settings = await _firebaseMessaging.getNotificationSettings();
+      if (!_hasNotificationPermission(settings.authorizationStatus)) return;
+
       final token = _fcmToken ?? await _firebaseMessaging.getToken();
       if (token == null || _auth.currentUser?.uid != userId) return;
       _fcmToken = token;
@@ -144,6 +183,9 @@ class NotificationService with ChangeNotifier {
     if (userId == null) return;
 
     try {
+      final settings = await _firebaseMessaging.getNotificationSettings();
+      if (!_hasNotificationPermission(settings.authorizationStatus)) return;
+
       final userRef = _firestore.collection('users').doc(userId);
       if (previousToken != null && previousToken != token) {
         await userRef.set({
@@ -295,21 +337,10 @@ class NotificationService with ChangeNotifier {
         FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
     _openedMessageSubscription ??=
         FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      _handleNotificationTap(message.data['type']?.toString(), message.data);
+      _handleNotificationTap(message.data);
     });
     _tokenRefreshSubscription ??=
         _firebaseMessaging.onTokenRefresh.listen(_handleTokenRefresh);
-
-    try {
-      await _firebaseMessaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-    } catch (error, stackTrace) {
-      debugPrint('Notification permission request failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-    }
 
     try {
       _fcmToken = await _firebaseMessaging.getToken();
@@ -325,10 +356,7 @@ class NotificationService with ChangeNotifier {
     try {
       final initialMessage = await _firebaseMessaging.getInitialMessage();
       if (initialMessage != null) {
-        await _handleNotificationTap(
-          initialMessage.data['type']?.toString(),
-          initialMessage.data,
-        );
+        await _handleNotificationTap(initialMessage.data);
       }
     } catch (error, stackTrace) {
       debugPrint('Unable to process initial FCM notification: $error');
@@ -337,36 +365,47 @@ class NotificationService with ChangeNotifier {
   }
 
   Future<void> _handleNotificationTap(
-    String? _type, [
     Map<String, dynamic>? data,
-  ]) async {
-    NavigatorState? navigator;
-    for (var attempt = 0; attempt < 20; attempt++) {
-      navigator = _navigatorKey?.currentState;
-      if (navigator != null && navigator.mounted) break;
-      await Future.delayed(const Duration(milliseconds: 100));
-    }
+  ) async {
+    _pendingNotificationTaps
+        .add(data == null ? null : Map<String, dynamic>.from(data));
+    await _drainPendingNotificationTaps();
+  }
 
-    if (navigator == null || !navigator.mounted) {
-      debugPrint('Cannot open notification: app navigator is unavailable.');
-      return;
-    }
+  Future<void> _drainPendingNotificationTaps() async {
+    if (_isDrainingNotificationTaps || _isDisposed) return;
+    _isDrainingNotificationTaps = true;
+    try {
+      while (_pendingNotificationTaps.isNotEmpty) {
+        NavigatorState? navigator;
+        for (var attempt = 0; attempt < 30; attempt++) {
+          navigator = _navigatorKey?.currentState;
+          if (navigator != null && navigator.mounted) break;
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
 
-    final accountId =
-        (data?['accountId'] ?? data?['relatedAccountId'])?.toString().trim();
-    if (accountId != null && accountId.isNotEmpty && accountId != 'null') {
-      navigator.push(
-        MaterialPageRoute(
-          builder: (context) => _buildDestinationScreen(accountId),
-        ),
-      );
-      return;
-    }
+        if (navigator == null || !navigator.mounted) {
+          debugPrint(
+              'Notification tap queued until the app navigator is ready.');
+          return;
+        }
 
-    if (_navigatorKey?.currentState?.mounted == true) {
-      _navigatorKey!.currentState!.pushNamed('/notifications');
-    } else {
-      debugPrint('Cannot open notifications: app navigator was disposed.');
+        final data = _pendingNotificationTaps.removeAt(0);
+        final accountId = (data?['accountId'] ?? data?['relatedAccountId'])
+            ?.toString()
+            .trim();
+        if (accountId != null && accountId.isNotEmpty && accountId != 'null') {
+          navigator.push(
+            MaterialPageRoute(
+              builder: (context) => _buildDestinationScreen(accountId),
+            ),
+          );
+        } else {
+          navigator.pushNamed('/notifications');
+        }
+      }
+    } finally {
+      _isDrainingNotificationTaps = false;
     }
   }
 
@@ -436,10 +475,7 @@ class NotificationService with ChangeNotifier {
         senderName: message.data['senderName']?.toString() ?? 'Karobari Saathi',
         imageUrl: message.data['senderPhotoUrl']?.toString() ??
             message.data['imageUrl']?.toString(),
-        onTap: () => _handleNotificationTap(
-          message.data['type']?.toString(),
-          message.data,
-        ),
+        onTap: () => _handleNotificationTap(message.data),
       );
     } catch (error, stackTrace) {
       debugPrint('Unable to show in-app notification banner: $error');
@@ -481,7 +517,6 @@ class NotificationService with ChangeNotifier {
       priority: Priority.max,
       playSound: true,
       enableVibration: true,
-      fullScreenIntent: true,
     );
 
     const NotificationDetails details = NotificationDetails(
@@ -495,8 +530,9 @@ class NotificationService with ChangeNotifier {
       'data': dataPayload ?? <String, dynamic>{},
     });
 
+    _nextLocalNotificationId = (_nextLocalNotificationId + 1) & 0x7fffffff;
     await _localNotifications.show(
-      DateTime.now().millisecondsSinceEpoch.remainder(100000),
+      _nextLocalNotificationId,
       title,
       body,
       details,
@@ -512,7 +548,6 @@ class NotificationService with ChangeNotifier {
       if (decoded is Map<String, dynamic>) {
         final data = decoded['data'];
         _handleNotificationTap(
-          decoded['type']?.toString(),
           data is Map ? Map<String, dynamic>.from(data) : null,
         );
         return;
@@ -523,30 +558,8 @@ class NotificationService with ChangeNotifier {
 
     final parts = payload.split('|');
     _handleNotificationTap(
-      parts.first,
       parts.length > 1 ? {'accountId': parts[1]} : null,
     );
-  }
-
-  void _addNotificationFromMessage(RemoteMessage message) {}
-
-  NotificationType _getNotificationTypeFromString(String type) {
-    switch (type) {
-      case 'transaction':
-        return NotificationType.transaction;
-      case 'share':
-      case 'account_share':
-        return NotificationType.share;
-      case 'reminder':
-        return NotificationType.reminder;
-      case 'report':
-      case 'price_drop':
-        return NotificationType.report;
-      case 'system':
-        return NotificationType.system;
-      default:
-        return NotificationType.general;
-    }
   }
 
   void markAsRead(String notificationId) {
@@ -727,11 +740,13 @@ class NotificationService with ChangeNotifier {
     if (myName.isEmpty) myName = currentUser.phoneNumber ?? 'ایک صارف';
 
     String targetPhone = partyPhoneNumber.replaceAll(RegExp(r'[\s-]+'), '');
-    if (targetPhone.startsWith('03'))
+    if (targetPhone.startsWith('03')) {
       targetPhone = '+92${targetPhone.substring(1)}';
-    else if (targetPhone.startsWith('3'))
+    } else if (targetPhone.startsWith('3')) {
       targetPhone = '+92$targetPhone';
-    else if (targetPhone.startsWith('92')) targetPhone = '+$targetPhone';
+    } else if (targetPhone.startsWith('92')) {
+      targetPhone = '+$targetPhone';
+    }
 
     try {
       final querySnapshot = await _firestore

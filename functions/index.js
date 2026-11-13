@@ -6,6 +6,16 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
+function boundedText(value, fallback, maxLength) {
+  const text = typeof value === "string" && value.trim()
+    ? value.trim()
+    : fallback;
+  const characters = Array.from(text);
+  return characters.length > maxLength
+    ? `${characters.slice(0, maxLength - 1).join("")}…`
+    : text;
+}
+
 exports.aggregateShopReview = onDocumentWritten(
   "public_shops/{shopId}/reviews/{userId}",
   async (event) => {
@@ -101,20 +111,45 @@ exports.sendNotificationOnCreate = onDocumentCreated(
       notificationId: String(event.params.notificationId),
     };
 
-    if (notification.data && typeof notification.data === "object") {
-      for (const [key, value] of Object.entries(notification.data)) {
-        if (value == null) continue;
-        dataPayload[key] =
-          typeof value === "string" ? value : JSON.stringify(value);
+    for (const key of ["accountId", "relatedAccountId"]) {
+      const value = notification.data?.[key];
+      if (typeof value === "string" && value.trim()) {
+        dataPayload[key] = value.trim();
       }
+    }
+    if (
+      typeof notification.data?.senderName === "string" &&
+      notification.data.senderName.trim()
+    ) {
+      dataPayload.senderName = boundedText(
+        notification.data.senderName,
+        "",
+        80,
+      );
+    }
+    if (
+      typeof notification.data?.senderPhotoUrl === "string" &&
+      notification.data.senderPhotoUrl.trim()
+    ) {
+      dataPayload.senderPhotoUrl = boundedText(
+        notification.data.senderPhotoUrl,
+        "",
+        512,
+      );
     }
 
     const message = {
       tokens,
       notification: {
-        title: String(notification.title || "نیا نوٹیفیکیشن"),
-        body: String(
-          notification.message || "آپ کے اکاؤنٹ میں نئی سرگرمی ہوئی ہے",
+        title: boundedText(
+          notification.title,
+          "نیا نوٹیفیکیشن",
+          100,
+        ),
+        body: boundedText(
+          notification.message,
+          "آپ کے اکاؤنٹ میں نئی سرگرمی ہوئی ہے",
+          240,
         ),
       },
       data: dataPayload,

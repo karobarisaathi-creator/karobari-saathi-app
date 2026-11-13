@@ -12,6 +12,7 @@ class SecurityService with ChangeNotifier {
   final LocalAuthentication _localAuth = LocalAuthentication();
   bool _isLockEnabled = false;
   bool _isBiometricEnabled = false;
+  bool _isInitialized = false;
   late final Future<void> _initialization;
 
   SecurityService() {
@@ -22,9 +23,15 @@ class SecurityService with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _isLockEnabled = prefs.getBool('app_lock_enabled') ?? false;
     _isBiometricEnabled = prefs.getBool('app_biometric_enabled') ?? false;
+    if (!_isLockEnabled && _isBiometricEnabled) {
+      await prefs.setBool('app_biometric_enabled', false);
+      _isBiometricEnabled = false;
+    }
+    _isInitialized = true;
     notifyListeners();
   }
 
+  bool get isInitialized => _isInitialized;
   bool get isLockEnabled => _isLockEnabled;
   bool get isBioEnabled => _isBiometricEnabled;
   final String _encryptionKey = 'a_very_secret_key_that_is_32_lon';
@@ -86,20 +93,56 @@ class SecurityService with ChangeNotifier {
 
   // Validate PIN
   Future<bool> validatePin(String enteredPin) async {
+    await _initialization;
+    if (!RegExp(r'^\d{4}$').hasMatch(enteredPin)) return false;
+
+    final prefs = await SharedPreferences.getInstance();
+    final lockoutUntil = prefs.getInt('app_pin_lockout_until') ?? 0;
+    if (lockoutUntil > DateTime.now().millisecondsSinceEpoch) return false;
+
     final storedPinHash = await _secureStorage.read(key: 'app_pin_hash');
     if (storedPinHash == null) return false;
 
     final enteredPinHash = hashData(enteredPin);
-    return storedPinHash == enteredPinHash;
+    if (storedPinHash == enteredPinHash) {
+      await prefs.remove('app_pin_failed_attempts');
+      await prefs.remove('app_pin_lockout_until');
+      return true;
+    }
+
+    final failedAttempts = (prefs.getInt('app_pin_failed_attempts') ?? 0) + 1;
+    await prefs.setInt('app_pin_failed_attempts', failedAttempts);
+    if (failedAttempts >= 5) {
+      final lockoutLevel = ((failedAttempts - 5) ~/ 5).clamp(0, 4).toInt();
+      final lockoutSeconds = min(300, 30 * (1 << lockoutLevel)).toInt();
+      await prefs.setInt(
+        'app_pin_lockout_until',
+        DateTime.now().millisecondsSinceEpoch + lockoutSeconds * 1000,
+      );
+    }
+    return false;
+  }
+
+  Future<Duration> pinRetryDelay() async {
+    await _initialization;
+    final prefs = await SharedPreferences.getInstance();
+    final lockoutUntil = prefs.getInt('app_pin_lockout_until') ?? 0;
+    final remaining = lockoutUntil - DateTime.now().millisecondsSinceEpoch;
+    return Duration(milliseconds: max(0, remaining).toInt());
   }
 
   // Set new PIN
   Future<void> setNewPin(String newPin) async {
     await _initialization;
+    if (!RegExp(r'^\d{4}$').hasMatch(newPin)) {
+      throw ArgumentError('PIN must contain exactly four digits.');
+    }
     final pinHash = hashData(newPin);
     await _secureStorage.write(key: 'app_pin_hash', value: pinHash);
 
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('app_pin_failed_attempts');
+    await prefs.remove('app_pin_lockout_until');
     _isLockEnabled = true;
     await prefs.setBool('app_lock_enabled', true);
     notifyListeners();
@@ -114,9 +157,13 @@ class SecurityService with ChangeNotifier {
   // Enable/disable app lock
   Future<void> setAppLockEnabled(bool enabled) async {
     await _initialization;
-    _isLockEnabled = enabled;
     final prefs = await SharedPreferences.getInstance();
+    if (!enabled) {
+      await prefs.setBool('app_biometric_enabled', false);
+    }
     await prefs.setBool('app_lock_enabled', enabled);
+    _isLockEnabled = enabled;
+    if (!enabled) _isBiometricEnabled = false;
     notifyListeners();
   }
 
@@ -129,7 +176,7 @@ class SecurityService with ChangeNotifier {
       final availableBiometrics = await _localAuth.getAvailableBiometrics();
       return availableBiometrics.isNotEmpty;
     } catch (e) {
-      print("Biometric Check Error: $e");
+      debugPrint('Biometric availability check failed: $e');
       return false;
     }
   }
@@ -143,23 +190,31 @@ class SecurityService with ChangeNotifier {
   // Enable/Disable biometric
   Future<void> setBiometricEnabled(bool enabled) async {
     await _initialization;
-    _isBiometricEnabled = enabled;
+    if (enabled && !_isLockEnabled) {
+      throw StateError('Enable App Lock before enabling biometric unlock.');
+    }
+    if (enabled && !await isBiometricsAvailable()) {
+      throw StateError('No enrolled biometrics are available on this device.');
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('app_biometric_enabled', enabled);
+    _isBiometricEnabled = enabled;
     notifyListeners();
   }
 
   // Authenticate with biometrics
-  Future<bool> authenticateWithBiometrics() async {
+  Future<bool> authenticateWithBiometrics({
+    required String localizedReason,
+  }) async {
     try {
-      // Adjusted parameters to be compatible with various versions
       final bool didAuthenticate = await _localAuth.authenticate(
-        localizedReason: 'Please authenticate to access the app',
+        localizedReason: localizedReason,
+        biometricOnly: true,
+        persistAcrossBackgrounding: true,
       );
       return didAuthenticate;
     } catch (e) {
-      print("Biometric Auth Error: $e");
-      // Fallback attempt for older APIs if needed, though 'authenticate' is standard.
+      debugPrint('Biometric authentication failed: $e');
       return false;
     }
   }
