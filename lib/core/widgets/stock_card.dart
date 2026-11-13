@@ -273,22 +273,27 @@ class StockCard extends StatelessWidget {
                               runSpacing: 5,
                               crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
-                                // Category (بڑا)
+                                // Category
                                 if (item.categoryName.isNotEmpty)
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 4.5,
+                                      horizontal: 9,
+                                      vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
                                       color: AppTheme.themeColor
                                           .withValues(alpha: 0.10),
                                       borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: AppTheme.themeColor
+                                            .withValues(alpha: 0.25),
+                                        width: 1,
+                                      ),
                                     ),
                                     child: UrduAwareText(
                                       categoryName,
                                       style: TextStyle(
-                                        fontSize: 12.5,
+                                        fontSize: 12,
                                         fontWeight: FontWeight.w800,
                                         color: AppTheme.themeColor,
                                         fontFamily: fontFamily,
@@ -299,18 +304,23 @@ class StockCard extends StatelessWidget {
                                 if (item.sku.isNotEmpty)
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3,
+                                      horizontal: 9,
+                                      vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
                                       color: AppTheme.backgroundColor,
-                                      borderRadius: BorderRadius.circular(5),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: AppTheme.darkColor
+                                            .withValues(alpha: 0.12),
+                                        width: 1,
+                                      ),
                                     ),
                                     child: UrduAwareText(
                                       '#${item.sku}',
                                       style: const TextStyle(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w700,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
                                         color: AppTheme.textSecondary,
                                         fontFamily: 'monospace',
                                         letterSpacing: 0.2,
@@ -321,12 +331,16 @@ class StockCard extends StatelessWidget {
                                 if (item.trackStock && minAlert > 0)
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3.5,
+                                      horizontal: 9,
+                                      vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFFFEF3C7),
-                                      borderRadius: BorderRadius.circular(5),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: const Color(0xFFFDE68A),
+                                        width: 1,
+                                      ),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -341,7 +355,7 @@ class StockCard extends StatelessWidget {
                                         UrduAwareText(
                                           '${isUrdu ? "کم از کم" : "Min"}: ${_formatQuantity(minAlert)} $unitLabel',
                                           style: TextStyle(
-                                            fontSize: 11.5,
+                                            fontSize: 12,
                                             fontWeight: FontWeight.w800,
                                             color: const Color(0xFFB45309),
                                             fontFamily: fontFamily,
@@ -353,8 +367,8 @@ class StockCard extends StatelessWidget {
                                 // Status badge (دائیں طرف)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4.5,
+                                    horizontal: 9,
+                                    vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
                                     color: statusBg,
@@ -369,15 +383,15 @@ class StockCard extends StatelessWidget {
                                     children: [
                                       Icon(
                                         statusIcon,
-                                        size: 12,
+                                        size: 11,
                                         color: statusColor,
                                       ),
-                                      const SizedBox(width: 4),
+                                      const SizedBox(width: 3),
                                       UrduAwareText(
                                         statusText,
                                         style: TextStyle(
                                           fontSize: 12,
-                                          fontWeight: FontWeight.w900,
+                                          fontWeight: FontWeight.w800,
                                           color: statusColor,
                                           fontFamily: fontFamily,
                                         ),
@@ -640,7 +654,7 @@ class StockCard extends StatelessWidget {
                       child: SizedBox(
                         width: 60,
                         child: UrduAwareText(
-                          '${isUrdu ? "کم از کم" : "Min"} ${_formatQuantity(minAlert)}',
+                          '${_formatQuantity(minAlert)}',
                           style: TextStyle(
                             fontSize: 8.5,
                             fontWeight: FontWeight.w800,

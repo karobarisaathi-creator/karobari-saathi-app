@@ -449,11 +449,15 @@ class StockDetailScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 9,
-                            vertical: 4.5,
+                            vertical: 4,
                           ),
                           decoration: BoxDecoration(
                             color: AppTheme.verifiedGold.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: AppTheme.verifiedGold.withValues(alpha: 0.35),
+                              width: 1,
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -461,14 +465,14 @@ class StockDetailScreen extends StatelessWidget {
                               Icon(
                                 PhosphorIcons.bellRinging(
                                     PhosphorIconsStyle.fill),
-                                size: 12,
+                                size: 11,
                                 color: AppTheme.verifiedGold,
                               ),
                               const SizedBox(width: 3),
                               UrduAwareText(
-                                '${isUrdu ? "کم از کم" : "Min"}: ${_formatQuantity(minAlert)} $unitLabel',
+                                ' ${_formatQuantity(minAlert)} $unitLabel',
                                 style: TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w800,
                                   color: AppTheme.verifiedGold,
                                   fontFamily: fontFamily,
@@ -480,8 +484,8 @@ class StockDetailScreen extends StatelessWidget {
                       // Status badge
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4.5,
+                          horizontal: 9,
+                          vertical: 4,
                         ),
                         decoration: BoxDecoration(
                           color: status.bg,
@@ -494,13 +498,13 @@ class StockDetailScreen extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(status.icon, size: 12, color: status.color),
-                            const SizedBox(width: 4),
+                            Icon(status.icon, size: 11, color: status.color),
+                            const SizedBox(width: 3),
                             UrduAwareText(
                               status.text,
                               style: TextStyle(
                                 fontSize: 12,
-                                fontWeight: FontWeight.w900,
+                                fontWeight: FontWeight.w800,
                                 color: status.color,
                                 fontFamily: fontFamily,
                               ),
@@ -727,19 +731,24 @@ class StockDetailScreen extends StatelessWidget {
     required String text,
     required Color color,
     required Color bg,
+    Color? borderColor,
     String? fontFamily,
     bool isMono = false,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: borderColor ?? color.withValues(alpha: 0.25),
+          width: 1,
+        ),
       ),
       child: UrduAwareText(
         text,
         style: TextStyle(
-          fontSize: isMono ? 11.5 : 12.5,
+          fontSize: 12,
           fontWeight: FontWeight.w800,
           color: color,
           fontFamily: isMono ? 'monospace' : fontFamily,
