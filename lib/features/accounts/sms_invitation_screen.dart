@@ -51,8 +51,8 @@ class _BalanceAlertDialogState extends State<BalanceAlertDialog> {
       final status = widget.party.balance.abs() < 0.01
           ? (isUrdu ? "حساب صاف" : "Settled")
           : widget.party.balance > 0
-              ? (isUrdu ? "آپ سے لینے ہیں" : "Receivable")
-              : (isUrdu ? "آپ کو دینے ہیں" : "Payable");
+              ? (isUrdu ? "آپ کو دینے ہیں" : "Payable")
+              : (isUrdu ? "آپ نے لینے ہیں" : "Receivable");
 
       String initialMessage;
       if (isUrdu) {

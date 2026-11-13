@@ -2,7 +2,7 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/utils/account_balance_utils.dart';
 import 'package:account_app/core/utils/party_ledger_metrics.dart';
-import 'package:account_app/features/accounts/widgets/party_tools_grid_widget.dart';
+import 'package:account_app/features/accounts/widgets/party_trust_metrics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Transaction _transaction({
@@ -408,11 +408,45 @@ void main() {
       );
 
       expect(metrics.paymentScore, 0);
-      expect(metrics.balanceScore, 0);
       expect(metrics.agingScore, 15);
-      expect(metrics.paymentTimingScore, 0);
+      expect(metrics.paymentTimingScore, 50);
       expect(metrics.fullPaymentScore, 0);
-      expect(metrics.overallScore, closeTo(5.25, 0.01));
+      expect(metrics.overallScore, closeTo(11, 0.01));
+      expect(metrics.riskLevel, 'high');
+    });
+
+    test('does not treat missing payment timing as a failed payment', () {
+      final now = DateTime(2025, 4, 11);
+      final party = Account(
+        id: 'party-1',
+        name: 'Customer',
+        phone: '',
+        category: 'customer',
+        initialBalance: 0,
+        balanceType: 'receivable',
+        balance: 100,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final metrics = PartyTrustMetrics.calculate(
+        party: party,
+        transactions: [
+          _transaction(
+            id: 'new-bill',
+            type: 'expense',
+            amount: 100,
+            date: now,
+          ),
+        ],
+        isUrdu: false,
+        now: now,
+      );
+
+      expect(metrics.averagePaymentDays, isNull);
+      expect(metrics.paymentTimingScore, 50);
+      expect(metrics.overallScore, closeTo(45, 0.01));
+      expect(metrics.riskLevel, 'low');
     });
 
     test('counts supplier debit as payment under the party ledger columns', () {
@@ -473,6 +507,7 @@ void main() {
       expect(metrics.paymentScore, 50);
       expect(metrics.fullPaymentScore, 50);
       expect(metrics.hasTransactionHistory, isFalse);
+      expect(metrics.riskLevel, 'unknown');
       expect(metrics.ratingTitle, contains('no history'));
     });
   });

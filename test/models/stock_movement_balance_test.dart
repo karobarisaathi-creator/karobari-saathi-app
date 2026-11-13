@@ -59,6 +59,13 @@ void main() {
     test('sales respect the item out-of-stock policy', () {
       expect(
         StockService.canSellQuantity(
+          availableStock: 0,
+          quantity: 1,
+        ),
+        isFalse,
+      );
+      expect(
+        StockService.canSellQuantity(
           availableStock: 2,
           quantity: 3,
         ),

@@ -1,6 +1,5 @@
 // lib/features/quick_bill/quick_bill_item_selection_screen.dart
 
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -8,6 +7,7 @@ import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
+import 'package:account_app/core/models/stock_movement_model.dart';
 import 'package:account_app/core/models/shop_model.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/stock_service.dart';
@@ -31,7 +31,8 @@ class QuickBillCartLine {
   final double? oldRate;
   final String? stockItemId;
   final String? stockItemName;
-  final double? availableStock;
+  double? availableStock;
+  bool stopWhenOut;
   double quantity;
 
   final bool isManual;
@@ -45,6 +46,7 @@ class QuickBillCartLine {
     this.stockItemId,
     this.stockItemName,
     this.availableStock,
+    this.stopWhenOut = true,
     this.quantity = 0,
     this.isManual = false,
     this.manualType,
@@ -55,8 +57,8 @@ class QuickBillCartLine {
   String get cartKey => isManual
       ? 'manual:${identityHashCode(this)}'
       : (stockItemId != null
-      ? 'stock:$stockItemId'
-      : 'history:${name.trim().toLowerCase()}');
+          ? 'stock:$stockItemId'
+          : 'history:${name.trim().toLowerCase()}');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -72,6 +74,7 @@ class _QuickBillCatalogItem {
   final String category;
   final String? stockItemId;
   final double? availableStock;
+  final bool stopWhenOut;
   final bool featured;
   final String? imageUrl;
 
@@ -85,6 +88,7 @@ class _QuickBillCatalogItem {
     required this.category,
     this.stockItemId,
     this.availableStock,
+    this.stopWhenOut = true,
     this.featured = false,
     this.imageUrl,
   });
@@ -164,8 +168,10 @@ class _QuickBillItemSelectionScreenState
   String _query = '';
   bool _showSearch = false;
   bool _isCustomItemExpanded = false;
-  final UrduAwareTextEditingController _customNameCtrl = UrduAwareTextEditingController();
-  final UrduAwareTextEditingController _customRateCtrl = UrduAwareTextEditingController();
+  final UrduAwareTextEditingController _customNameCtrl =
+      UrduAwareTextEditingController();
+  final UrduAwareTextEditingController _customRateCtrl =
+      UrduAwareTextEditingController();
   String? _customUnit;
   final Map<String, QuickBillCartLine> _cart = {};
 
@@ -242,7 +248,8 @@ class _QuickBillItemSelectionScreenState
     }
 
     final maximum = line.availableStock;
-    if (quantity < 0 || (maximum != null && quantity > maximum)) {
+    if (quantity < 0 ||
+        (line.stopWhenOut && maximum != null && quantity > maximum)) {
       AppToast.warning(
         context,
         isUrdu
@@ -298,11 +305,10 @@ class _QuickBillItemSelectionScreenState
   // Navigation
   // ═════════════════════════════════════════════════════════════
   void _openPreview(
-      List<QuickBillCartLine> selectedLines,
-      bool isUrdu,
-      ) async {
-    final manualWithQty =
-    _manualItems.where((l) => l.quantity > 0).toList();
+    List<QuickBillCartLine> selectedLines,
+    bool isUrdu,
+  ) async {
+    final manualWithQty = _manualItems.where((l) => l.quantity > 0).toList();
     final allLines = [...selectedLines, ...manualWithQty];
 
     if (allLines.isEmpty) {
@@ -341,6 +347,7 @@ class _QuickBillItemSelectionScreenState
   // MEMOIZED CATALOG & FILTER CACHE
   // ═════════════════════════════════════════════════════════════
   List<StockItem>? _cachedStockItems;
+  List<StockMovement>? _cachedStockMovements;
   List<_QuickBillCatalogItem>? _cachedCatalogList;
   List<String>? _cachedCategories;
   String? _cachedQuery;
@@ -349,15 +356,23 @@ class _QuickBillItemSelectionScreenState
 
   List<_QuickBillCatalogItem> _getOrBuildCatalog(StockService stockService) {
     if (_cachedCatalogList != null &&
-        identical(_cachedStockItems, stockService.items)) {
+        identical(_cachedStockItems, stockService.items) &&
+        identical(_cachedStockMovements, stockService.movements)) {
       return _cachedCatalogList!;
     }
 
     _cachedStockItems = stockService.items;
+    _cachedStockMovements = stockService.movements;
     final list = <_QuickBillCatalogItem>[];
 
     for (final item in stockService.items) {
       if (item.isArchived) continue;
+      final currentStock = item.trackStock
+          ? stockService.availableStockForTransaction(
+              item.id,
+              excludingTransactionId: widget.transactionToEdit?.id,
+            )
+          : null;
       list.add(_QuickBillCatalogItem(
         key: 'stock:${item.id}',
         name: item.name,
@@ -369,12 +384,12 @@ class _QuickBillItemSelectionScreenState
             ? item.categoryName
             : QuickBillConstants.defaultCategory,
         stockItemId: item.id,
-        availableStock: item.trackStock && item.stopWhenOut
-            ? stockService.availableStockForTransaction(
-                item.id,
-                excludingTransactionId: widget.transactionToEdit?.id,
-              )
-            : null,
+        availableStock: currentStock == null
+            ? null
+            : currentStock.isFinite
+                ? currentStock.clamp(0.0, double.infinity).toDouble()
+                : 0,
+        stopWhenOut: item.stopWhenOut,
         featured: item.featured,
         imageUrl: item.imagePath,
       ));
@@ -442,13 +457,21 @@ class _QuickBillItemSelectionScreenState
     final stockService = Provider.of<StockService>(context);
 
     final catalogList = _getOrBuildCatalog(stockService);
+    for (final item in catalogList) {
+      final line = _cart[item.key];
+      if (line == null) continue;
+
+      line.availableStock = item.availableStock;
+      line.stopWhenOut = item.stopWhenOut;
+      if (line.stopWhenOut && item.availableStock != null) {
+        line.quantity = line.quantity.clamp(0.0, item.availableStock!);
+      }
+    }
     final categories = _getCategories(catalogList);
     final entries = _getFilteredEntries(catalogList);
 
-    final stockSelected =
-        _cart.values.where((l) => l.quantity > 0).toList();
-    final manualSelected =
-        _manualItems.where((l) => l.quantity > 0).toList();
+    final stockSelected = _cart.values.where((l) => l.quantity > 0).toList();
+    final manualSelected = _manualItems.where((l) => l.quantity > 0).toList();
     final totalSelectedCount = stockSelected.length + manualSelected.length;
     final total = [
       ...stockSelected,
@@ -462,7 +485,8 @@ class _QuickBillItemSelectionScreenState
         showBackButton: false,
         leadingWidth: 50,
         leading: IconButton(
-          icon: const Icon(Icons.add_circle_outline_rounded, color: AppTheme.verifiedGold, size: 26),
+          icon: const Icon(Icons.add_circle_outline_rounded,
+              color: AppTheme.verifiedGold, size: 26),
           tooltip: isUrdu ? 'کسٹم اشیاء شامل کریں' : 'Add Custom Item',
           onPressed: () => setState(() {
             _isCustomItemExpanded = !_isCustomItemExpanded;
@@ -476,9 +500,7 @@ class _QuickBillItemSelectionScreenState
         actions: [
           IconButton(
             icon: Icon(
-              _showSearch
-                  ? PhosphorIcons.x()
-                  : PhosphorIcons.magnifyingGlass(),
+              _showSearch ? PhosphorIcons.x() : PhosphorIcons.magnifyingGlass(),
               color: Colors.white,
             ),
             tooltip: isUrdu ? 'تلاش' : 'Search',
@@ -505,7 +527,8 @@ class _QuickBillItemSelectionScreenState
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppTheme.verifiedGold, width: 1.5),
+                    border:
+                        Border.all(color: AppTheme.verifiedGold, width: 1.5),
                     boxShadow: [
                       BoxShadow(
                         color: AppTheme.themeColor.withValues(alpha: 0.1),
@@ -517,197 +540,264 @@ class _QuickBillItemSelectionScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.handyman_rounded, color: AppTheme.themeColor, size: 20),
-                                    const SizedBox(width: 8),
-                                    UrduAwareText(
-                                      isUrdu ? 'نیا کسٹم اشیاء / مزدوری شامل کریں' : 'Add Custom Item / Labor',
-                                      style: TextStyle(
-                                        fontSize: 14.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.darkColor,
-                                        fontFamily: fontFamily,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    IconButton(
-                                      icon: const Icon(Icons.close_rounded, size: 18),
-                                      onPressed: () => setState(() {
-                                        _customNameCtrl.clear();
-                                        _customRateCtrl.clear();
-                                        _customUnit = null;
-                                        _isCustomItemExpanded = false;
-                                      }),
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      flex: 3,
-                                      child: TextField(
-                                        controller: _customNameCtrl,
-                                        style: TextStyle(fontFamily: fontFamily),
-                                        decoration: InputDecoration(
-                                          labelText: isUrdu ? 'اشیاء یا سروس کا نام' : 'Item or Service Name',
-                                          labelStyle: TextStyle(fontFamily: fontFamily),
-                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      flex: 2,
-                                      child: TextField(
-                                        controller: _customRateCtrl,
-                                        style: TextStyle(fontFamily: fontFamily),
-                                        keyboardType: TextInputType.number,
-                                        decoration: InputDecoration(
-                                          labelText: isUrdu ? 'ریٹ (روپے)' : 'Rate (Rs)',
-                                          labelStyle: TextStyle(fontFamily: fontFamily),
-                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                UrduAwareText(
-                                  isUrdu ? 'اکائی منتخب کریں:' : 'Select Unit:',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: fontFamily, color: AppTheme.textSecondary),
-                                ),
-                                const SizedBox(height: 6),
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    children: ['ڈبہ', 'کلو', 'لیٹر', 'من', 'یونٹ', 'عدد', 'بوری', 'پیکٹ'].map((u) {
-                                      final isSelected = u == _customUnit;
-                                      return Padding(
-                                        padding: const EdgeInsets.only(right: 6),
-                                        child: ChoiceChip(
-                                          label: UrduAwareText(u, style: TextStyle(fontFamily: fontFamily, fontSize: 11)),
-                                          selected: isSelected,
-                                          selectedColor: AppTheme.themeColor,
-                                          backgroundColor: Colors.grey.shade100,
-                                          labelStyle: TextStyle(
-                                              color: isSelected ? Colors.white : Colors.black87),
-                                          onSelected: (_) {
-                                            setState(() {
-                                              if (_customUnit == u) {
-                                                _customUnit = null;
-                                              } else {
-                                                _customUnit = u;
-                                              }
-                                            });
-                                          },
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                UrduAwareText(
-                                  isUrdu ? 'فوری ٹیگز / خدمات:' : 'Quick Services / Tags:',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: fontFamily, color: AppTheme.textSecondary),
-                                ),
-                                const SizedBox(height: 6),
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    children: (isUrdu
-                                        ? ['مزدوری', 'سروس', 'ڈلیوری', 'کرایہ', 'کمیشن', 'پیکنگ']
-                                        : ['Labor', 'Service', 'Delivery', 'Rent', 'Commission', 'Packing']).map((tag) {
-                                      final isSelected = _customNameCtrl.text.trim() == tag;
-                                      return Padding(
-                                        padding: const EdgeInsets.only(right: 6),
-                                        child: ChoiceChip(
-                                          label: UrduAwareText(tag, style: TextStyle(fontFamily: fontFamily, fontSize: 11)),
-                                          selected: isSelected,
-                                          selectedColor: AppTheme.verifiedGold,
-                                          backgroundColor: Colors.grey.shade100,
-                                          labelStyle: TextStyle(
-                                              color: isSelected ? Colors.white : Colors.black87),
-                                          onSelected: (_) {
-                                            setState(() {
-                                              if (_customNameCtrl.text.trim() == tag) {
-                                                _customNameCtrl.clear();
-                                              } else {
-                                                _customNameCtrl.text = tag;
-                                              }
-                                            });
-                                          },
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: () => setState(() {
-                                          _customNameCtrl.clear();
-                                          _customRateCtrl.clear();
-                                          _customUnit = null;
-                                          _isCustomItemExpanded = false;
-                                        }),
-                                        style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                        ),
-                                        child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel'),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: ElevatedButton(
-                                        onPressed: () {
-                                          final name = _customNameCtrl.text.trim();
-                                          final rate = double.tryParse(_customRateCtrl.text) ?? 0.0;
-                                          const qty = 1.0;
-                                          if (name.isEmpty || rate <= 0) {
-                                            AppToast.warning(context, isUrdu ? 'درست نام اور ریٹ درج کریں' : 'Enter valid name and rate');
-                                            return;
-                                          }
-                                          setState(() {
-                                            _manualItems.add(QuickBillCartLine(
-                                              name: name,
-                                              rate: rate,
-                                              quantity: qty,
-                                              unit: _customUnit,
-                                              stockItemId: null,
-                                              stockItemName: name,
-                                            ));
-                                            _customNameCtrl.clear();
-                                            _customRateCtrl.clear();
-                                            _customUnit = null;
-                                            _isCustomItemExpanded = false;
-                                          });
-                                          AppToast.success(context, isUrdu ? 'کسٹم اشیاء شامل ہو گئیں' : 'Custom item added');
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppTheme.verifiedGold,
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                          elevation: 0,
-                                        ),
-                                        child: UrduAwareText(isUrdu ? 'محفوظ کریں' : 'Save'),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                      Row(
+                        children: [
+                          Icon(Icons.handyman_rounded,
+                              color: AppTheme.themeColor, size: 20),
+                          const SizedBox(width: 8),
+                          UrduAwareText(
+                            isUrdu
+                                ? 'نیا کسٹم اشیاء / مزدوری شامل کریں'
+                                : 'Add Custom Item / Labor',
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.darkColor,
+                              fontFamily: fontFamily,
                             ),
                           ),
+                          const Spacer(),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            onPressed: () => setState(() {
+                              _customNameCtrl.clear();
+                              _customRateCtrl.clear();
+                              _customUnit = null;
+                              _isCustomItemExpanded = false;
+                            }),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: TextField(
+                              controller: _customNameCtrl,
+                              style: TextStyle(fontFamily: fontFamily),
+                              decoration: InputDecoration(
+                                labelText: isUrdu
+                                    ? 'اشیاء یا سروس کا نام'
+                                    : 'Item or Service Name',
+                                labelStyle: TextStyle(fontFamily: fontFamily),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 12),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: TextField(
+                              controller: _customRateCtrl,
+                              style: TextStyle(fontFamily: fontFamily),
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: isUrdu ? 'ریٹ (روپے)' : 'Rate (Rs)',
+                                labelStyle: TextStyle(fontFamily: fontFamily),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      UrduAwareText(
+                        isUrdu ? 'اکائی منتخب کریں:' : 'Select Unit:',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: fontFamily,
+                            color: AppTheme.textSecondary),
+                      ),
+                      const SizedBox(height: 6),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            'ڈبہ',
+                            'کلو',
+                            'لیٹر',
+                            'من',
+                            'یونٹ',
+                            'عدد',
+                            'بوری',
+                            'پیکٹ'
+                          ].map((u) {
+                            final isSelected = u == _customUnit;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: ChoiceChip(
+                                label: UrduAwareText(u,
+                                    style: TextStyle(
+                                        fontFamily: fontFamily, fontSize: 11)),
+                                selected: isSelected,
+                                selectedColor: AppTheme.themeColor,
+                                backgroundColor: Colors.grey.shade100,
+                                labelStyle: TextStyle(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.black87),
+                                onSelected: (_) {
+                                  setState(() {
+                                    if (_customUnit == u) {
+                                      _customUnit = null;
+                                    } else {
+                                      _customUnit = u;
+                                    }
+                                  });
+                                },
+                              ),
+                            );
+                          }).toList(),
                         ),
+                      ),
+                      const SizedBox(height: 10),
+                      UrduAwareText(
+                        isUrdu
+                            ? 'فوری ٹیگز / خدمات:'
+                            : 'Quick Services / Tags:',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: fontFamily,
+                            color: AppTheme.textSecondary),
+                      ),
+                      const SizedBox(height: 6),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: (isUrdu
+                                  ? [
+                                      'مزدوری',
+                                      'سروس',
+                                      'ڈلیوری',
+                                      'کرایہ',
+                                      'کمیشن',
+                                      'پیکنگ'
+                                    ]
+                                  : [
+                                      'Labor',
+                                      'Service',
+                                      'Delivery',
+                                      'Rent',
+                                      'Commission',
+                                      'Packing'
+                                    ])
+                              .map((tag) {
+                            final isSelected =
+                                _customNameCtrl.text.trim() == tag;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: ChoiceChip(
+                                label: UrduAwareText(tag,
+                                    style: TextStyle(
+                                        fontFamily: fontFamily, fontSize: 11)),
+                                selected: isSelected,
+                                selectedColor: AppTheme.verifiedGold,
+                                backgroundColor: Colors.grey.shade100,
+                                labelStyle: TextStyle(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.black87),
+                                onSelected: (_) {
+                                  setState(() {
+                                    if (_customNameCtrl.text.trim() == tag) {
+                                      _customNameCtrl.clear();
+                                    } else {
+                                      _customNameCtrl.text = tag;
+                                    }
+                                  });
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => setState(() {
+                                _customNameCtrl.clear();
+                                _customRateCtrl.clear();
+                                _customUnit = null;
+                                _isCustomItemExpanded = false;
+                              }),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
+                              child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                final name = _customNameCtrl.text.trim();
+                                final rate =
+                                    double.tryParse(_customRateCtrl.text) ??
+                                        0.0;
+                                const qty = 1.0;
+                                if (name.isEmpty || rate <= 0) {
+                                  AppToast.warning(
+                                      context,
+                                      isUrdu
+                                          ? 'درست نام اور ریٹ درج کریں'
+                                          : 'Enter valid name and rate');
+                                  return;
+                                }
+                                setState(() {
+                                  _manualItems.add(QuickBillCartLine(
+                                    name: name,
+                                    rate: rate,
+                                    quantity: qty,
+                                    unit: _customUnit,
+                                    stockItemId: null,
+                                    stockItemName: name,
+                                  ));
+                                  _customNameCtrl.clear();
+                                  _customRateCtrl.clear();
+                                  _customUnit = null;
+                                  _isCustomItemExpanded = false;
+                                });
+                                AppToast.success(
+                                    context,
+                                    isUrdu
+                                        ? 'کسٹم اشیاء شامل ہو گئیں'
+                                        : 'Custom item added');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.verifiedGold,
+                                foregroundColor: Colors.white,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                elevation: 0,
+                              ),
+                              child:
+                                  UrduAwareText(isUrdu ? 'محفوظ کریں' : 'Save'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
             // ═══ Search Bar (Conditional) ═══
             if (_showSearch)
@@ -744,30 +834,30 @@ class _QuickBillItemSelectionScreenState
             stockService.isLoading
                 ? _buildShimmerItemList()
                 : (entries.isEmpty && _manualItems.isEmpty)
-                ? _buildEmptyState(isUrdu, fontFamily)
-                : ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: _manualItems.length + entries.length,
-              itemBuilder: (context, index) {
-                // Manual / Custom Items
-                if (index < _manualItems.length) {
-                  final manualItem = _manualItems[index];
-                  return _buildManualItemCard(
-                    manualItem,
-                    isUrdu,
-                    fontFamily,
-                  );
-                }
-                // Stock Catalog Items
-                final e = entries[index - _manualItems.length];
-                return _buildItemCard(
-                  e,
-                  isUrdu,
-                );
-              },
-            ),
+                    ? _buildEmptyState(isUrdu, fontFamily)
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: _manualItems.length + entries.length,
+                        itemBuilder: (context, index) {
+                          // Manual / Custom Items
+                          if (index < _manualItems.length) {
+                            final manualItem = _manualItems[index];
+                            return _buildManualItemCard(
+                              manualItem,
+                              isUrdu,
+                              fontFamily,
+                            );
+                          }
+                          // Stock Catalog Items
+                          final e = entries[index - _manualItems.length];
+                          return _buildItemCard(
+                            e,
+                            isUrdu,
+                          );
+                        },
+                      ),
           ],
         ),
       ),
@@ -851,7 +941,6 @@ class _QuickBillItemSelectionScreenState
     );
   }
 
-
   // ═════════════════════════════════════════════════════════════
   // Search Bar
   // ═════════════════════════════════════════════════════════════
@@ -885,9 +974,7 @@ class _QuickBillItemSelectionScreenState
             color: isActive ? AppTheme.goldColor : Colors.white,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: isActive
-                  ? AppTheme.goldColor
-                  : AppTheme.backgroundColor,
+              color: isActive ? AppTheme.goldColor : AppTheme.backgroundColor,
               width: 1.5,
             ),
             boxShadow: isActive
@@ -922,17 +1009,14 @@ class _QuickBillItemSelectionScreenState
     _QuickBillCatalogItem e,
     bool isUrdu,
   ) {
-    final originalLine = widget.transactionToEdit?.items
-        .where((item) {
-          if (item.stockItemId != null && item.stockItemId!.isNotEmpty) {
-            return item.stockItemId == e.stockItemId;
-          }
-          final oldName = item.description.trim().toLowerCase();
-          return oldName == e.name.trim().toLowerCase() ||
-              (e.nameUrdu.isNotEmpty &&
-                  oldName == e.nameUrdu.trim().toLowerCase());
-        })
-        .firstOrNull;
+    final originalLine = widget.transactionToEdit?.items.where((item) {
+      if (item.stockItemId != null && item.stockItemId!.isNotEmpty) {
+        return item.stockItemId == e.stockItemId;
+      }
+      final oldName = item.description.trim().toLowerCase();
+      return oldName == e.name.trim().toLowerCase() ||
+          (e.nameUrdu.isNotEmpty && oldName == e.nameUrdu.trim().toLowerCase());
+    }).firstOrNull;
     final line = _cart.putIfAbsent(
       e.key,
       () => QuickBillCartLine(
@@ -943,6 +1027,7 @@ class _QuickBillItemSelectionScreenState
         stockItemId: e.stockItemId,
         stockItemName: e.name,
         availableStock: e.availableStock,
+        stopWhenOut: e.stopWhenOut,
         quantity: originalLine?.quantity ?? 0,
       ),
     );
@@ -983,19 +1068,25 @@ class _QuickBillItemSelectionScreenState
       shop: quickBillShop,
       quickBillMode: true,
       showStockQuantity: maximum != null,
+      allowOutOfStockSelection: !line.stopWhenOut,
       onQuantityEdit: () => _editQuantity(line, isUrdu),
       onQuantityIncrement: () {
-        setState(() => line.quantity = maximum == null
-            ? line.quantity + 1
-            : (line.quantity + 1).clamp(0.0, maximum));
+        setState(() {
+          line.quantity = !line.stopWhenOut || maximum == null
+              ? line.quantity + 1
+              : (line.quantity + 1).clamp(0.0, maximum);
+        });
       },
       onQuantityDecrement: () {
-        setState(() => line.quantity = (line.quantity - 1).clamp(0.0, double.infinity));
+        setState(() =>
+            line.quantity = (line.quantity - 1).clamp(0.0, double.infinity));
       },
       onQuantitySet: (quantity) {
-        setState(() => line.quantity = maximum == null
-            ? quantity
-            : quantity.clamp(0.0, maximum));
+        setState(() {
+          line.quantity = !line.stopWhenOut || maximum == null
+              ? quantity
+              : quantity.clamp(0.0, maximum);
+        });
       },
     );
   }
@@ -1137,7 +1228,9 @@ class _QuickBillItemSelectionScreenState
                           ),
                           const SizedBox(width: 6),
                           Icon(
-                            isUrdu ? PhosphorIcons.arrowLeft() : PhosphorIcons.arrowRight(),
+                            isUrdu
+                                ? PhosphorIcons.arrowLeft()
+                                : PhosphorIcons.arrowRight(),
                             size: 15,
                             color: Colors.white,
                           ),
@@ -1392,8 +1485,12 @@ class _ManualEntryDialogState extends State<_ManualEntryDialog> {
                       children: [
                         UrduAwareText(
                           widget.editLine != null
-                              ? (isUrdu ? 'کسٹم اشیاء اپڈیٹ کریں' : 'Update Custom Item')
-                              : (isUrdu ? 'کسٹم اشیاء شامل کریں' : 'Add Custom Item'),
+                              ? (isUrdu
+                                  ? 'کسٹم اشیاء اپڈیٹ کریں'
+                                  : 'Update Custom Item')
+                              : (isUrdu
+                                  ? 'کسٹم اشیاء شامل کریں'
+                                  : 'Add Custom Item'),
                           style: TextStyle(
                             fontSize: 15.5,
                             fontWeight: FontWeight.w800,
@@ -1487,7 +1584,8 @@ class _ManualEntryDialogState extends State<_ManualEntryDialog> {
 
                       // Description input field - ONLY shown when 'other' is selected
                       if (_selectedType == 'other') ...[
-                        _buildSectionLabel(isUrdu ? 'تفصیل *' : 'DESCRIPTION *'),
+                        _buildSectionLabel(
+                            isUrdu ? 'تفصیل *' : 'DESCRIPTION *'),
                         const SizedBox(height: 8),
                         _buildInputField(
                           controller: _descController,
@@ -1650,9 +1748,8 @@ class _ManualEntryDialogState extends State<_ManualEntryDialog> {
             color: isActive ? const Color(0xFFD97706) : Colors.white,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isActive
-                  ? const Color(0xFFD97706)
-                  : AppTheme.backgroundColor,
+              color:
+                  isActive ? const Color(0xFFD97706) : AppTheme.backgroundColor,
               width: 1.5,
             ),
           ),

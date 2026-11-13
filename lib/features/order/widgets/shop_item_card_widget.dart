@@ -20,6 +20,7 @@ class ShopItemCardWidget extends StatelessWidget {
   final bool quickBillMode;
   final bool showStockQuantity;
   final bool showStepper;
+  final bool allowOutOfStockSelection;
 
   const ShopItemCardWidget({
     super.key,
@@ -32,6 +33,7 @@ class ShopItemCardWidget extends StatelessWidget {
     this.quickBillMode = false,
     this.showStockQuantity = true,
     this.showStepper = false,
+    this.allowOutOfStockSelection = false,
   });
 
   @override
@@ -382,6 +384,8 @@ class ShopItemCardWidget extends StatelessWidget {
   Widget _buildStepper(BuildContext context, Color goldColor) {
     final qty = item.quantity;
     final selected = qty > 0;
+    final stockLimitReached =
+        !allowOutOfStockSelection && (item.isOutOfStock || qty >= item.stock);
 
     return Container(
       padding: const EdgeInsets.all(4),
@@ -466,19 +470,17 @@ class ShopItemCardWidget extends StatelessWidget {
           Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: (item.isOutOfStock || qty >= item.stock)
-                  ? null
-                  : onQuantityIncrement,
+              onTap: stockLimitReached ? null : onQuantityIncrement,
               borderRadius: BorderRadius.circular(50),
               child: Container(
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: (item.isOutOfStock || qty >= item.stock)
+                  color: stockLimitReached
                       ? const Color(0xFFEEF1F5)
                       : Colors.white,
                   shape: BoxShape.circle,
-                  boxShadow: (item.isOutOfStock || qty >= item.stock)
+                  boxShadow: stockLimitReached
                       ? null
                       : [
                           BoxShadow(
@@ -491,7 +493,7 @@ class ShopItemCardWidget extends StatelessWidget {
                 child: Icon(
                   PhosphorIcons.plus(),
                   size: 14,
-                  color: (item.isOutOfStock || qty >= item.stock)
+                  color: stockLimitReached
                       ? AppTheme.textSecondary.withValues(alpha: 0.5)
                       : goldColor,
                 ),

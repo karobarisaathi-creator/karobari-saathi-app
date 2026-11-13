@@ -11,6 +11,8 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/utils/account_balance_utils.dart';
+import 'package:account_app/features/accounts/widgets/party_trust_metrics.dart';
+import 'package:account_app/features/accounts/widgets/party_trust_popup.dart';
 import 'profile_info_widget.dart';
 import 'profile_update_dialog.dart';
 
@@ -98,6 +100,12 @@ class _PartyCardState extends State<PartyCard> {
         .toList();
     final cycleBalance = AccountBalanceUtils.currentCycle(transactions);
     final double displayBalance = cycleBalance.balance;
+
+    final trustMetrics = PartyTrustMetrics.calculate(
+      party: widget.party,
+      transactions: transactions,
+      isUrdu: isUrdu,
+    );
 
     final bool isReceivable = displayBalance >= 0;
     final bool isSettled = displayBalance.abs() < 0.01;
@@ -346,14 +354,59 @@ class _PartyCardState extends State<PartyCard> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(PhosphorIcons.phone(),
-                                  size: 20, color: AppTheme.greenColor),
-                              const SizedBox(width: 8),
+                                  size: 18, color: AppTheme.greenColor),
+                              const SizedBox(width: 4),
                               UrduAwareText(
-                                isUrdu ? 'کال کریں' : 'Call Party',
+                                isUrdu ? 'کال' : 'Call',
                                 style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 12,
                                   fontWeight: fontWeight,
                                   color: AppTheme.darkColor,
+                                  fontFamily: fontFamily,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    Container(
+                        height: 24,
+                        width: 1,
+                        color: Colors.grey.withValues(alpha: 0.3)),
+
+                    // Trust Score Action
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => PartyTrustPopup.show(
+                          context: context,
+                          trustScore: trustMetrics.hasTransactionHistory
+                              ? trustMetrics.overallScore
+                              : null,
+                          isSupplier: trustMetrics.isSupplier,
+                          isUrdu: isUrdu,
+                          fontFamily: fontFamily,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                PhosphorIcons.shieldCheck(PhosphorIconsStyle.fill),
+                                size: 16,
+                                color: trustMetrics.badgeColor,
+                              ),
+                              const SizedBox(width: 4),
+                              UrduAwareText(
+                                trustMetrics.hasTransactionHistory
+                                    ? '${trustMetrics.overallScore.round()}%'
+                                    : (isUrdu ? 'بھروسہ' : 'Trust'),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: trustMetrics.badgeColor,
                                   fontFamily: fontFamily,
                                 ),
                               ),
@@ -378,17 +431,17 @@ class _PartyCardState extends State<PartyCard> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               UrduAwareText(
-                                isUrdu ? 'یاددہانی بھیجیں' : 'Send Reminder',
+                                isUrdu ? 'یاددہانی' : 'Reminder',
                                 style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 12,
                                   fontWeight: fontWeight,
                                   color: AppTheme.themeColor,
                                   fontFamily: fontFamily,
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 4),
                               Icon(PhosphorIcons.bell(),
-                                  size: 20, color: AppTheme.themeColor),
+                                  size: 18, color: AppTheme.themeColor),
                             ],
                           ),
                         ),

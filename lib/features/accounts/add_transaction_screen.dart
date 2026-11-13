@@ -382,7 +382,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       final stockItem = _stockItemsByName[
           entry.descriptionController.text.trim().toLowerCase()];
       if (stockItem != null) {
-        entry.stockItemId = stockItem.id;
         entry.unit = stockItem.unit;
         if (widget.transactionToEdit != null) {
           entry.rateWasManuallyEdited = true;
@@ -678,6 +677,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   Widget _buildItemRow(
       int index, bool isUrdu, String fontFamily, FontWeight fontWeight) {
     final entry = _itemEntries[index];
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -708,10 +708,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     final stockItem =
                         _stockItemsByName[selection.trim().toLowerCase()];
                     if (stockItem != null) {
-                      setState(() {
-                        entry.stockItemId = stockItem.id;
-                        entry.unit = stockItem.unit;
-                      });
+                      entry.unit = stockItem.unit;
+                      if (entry.stockItemId != stockItem.id) {
+                        entry.stockItemId = null;
+                      }
                       final suggestedRate = stockItem.sellingPrice > 0
                           ? stockItem.sellingPrice
                           : stockItem.purchasePrice;

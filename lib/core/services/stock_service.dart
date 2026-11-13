@@ -260,9 +260,7 @@ class StockService with ChangeNotifier {
               : StockMovementType.purchase,
           quantity: quantity,
           unitPrice: quantity > 0 ? discountedAmount / quantity : 0,
-          reason: transaction.type == 'income'
-              ? 'Sale'
-              : 'Purchase',
+          reason: transaction.type == 'income' ? 'Sale' : 'Purchase',
           note: (transaction.referenceNumber != null &&
                   transaction.referenceNumber!.trim().isNotEmpty)
               ? 'Bill #${transaction.referenceNumber!.trim()}'
@@ -382,8 +380,7 @@ class StockService with ChangeNotifier {
     if (user == null) throw StateError('Sign in to add a stock item.');
 
     // Instant local UI update
-    _items.removeWhere((i) => i.id == item.id);
-    _items.add(item);
+    _items = [..._items.where((existing) => existing.id != item.id), item];
 
     try {
       final userDoc = _firestore.collection('users').doc(user.uid);
@@ -414,7 +411,8 @@ class StockService with ChangeNotifier {
         availableStock: item.trackStock ? item.initialQuantity : null,
       );
     } catch (e) {
-      debugPrint('StockService: Offline or network error adding item, queueing: $e');
+      debugPrint(
+          'StockService: Offline or network error adding item, queueing: $e');
       await OfflineQueueService().enqueueOperation(
         module: 'stock',
         action: 'create',
@@ -435,9 +433,12 @@ class StockService with ChangeNotifier {
 
     final idx = _items.indexWhere((i) => i.id == item.id);
     if (idx != -1) {
-      _items[idx] = item;
+      _items = [
+        for (final existing in _items)
+          if (existing.id == item.id) item else existing,
+      ];
     } else {
-      _items.add(item);
+      _items = [..._items, item];
     }
 
     try {
@@ -450,7 +451,8 @@ class StockService with ChangeNotifier {
 
       await _syncPublicItem(user.uid, item, availableStock: availableStock);
     } catch (e) {
-      debugPrint('StockService: Offline or network error updating item, queueing: $e');
+      debugPrint(
+          'StockService: Offline or network error updating item, queueing: $e');
       await OfflineQueueService().enqueueOperation(
         module: 'stock',
         action: 'update',
@@ -474,7 +476,7 @@ class StockService with ChangeNotifier {
     if (item == null) throw StateError('Stock item $itemId is unavailable.');
 
     final updated = item.copyWith(isArchived: true, updatedAt: DateTime.now());
-    _items.removeWhere((i) => i.id == itemId);
+    _items = _items.where((i) => i.id != itemId).toList();
 
     try {
       await _firestore
@@ -488,7 +490,8 @@ class StockService with ChangeNotifier {
           );
       await _syncPublicItem(user.uid, updated);
     } catch (e) {
-      debugPrint('StockService: Offline or network error archiving item, queueing: $e');
+      debugPrint(
+          'StockService: Offline or network error archiving item, queueing: $e');
       await OfflineQueueService().enqueueOperation(
         module: 'stock',
         action: 'update',
@@ -622,7 +625,8 @@ class StockService with ChangeNotifier {
     return imageRef.getDownloadURL();
   }
 
-  Future<List<String>> uploadStockImages(List<File> images, String itemId) async {
+  Future<List<String>> uploadStockImages(
+      List<File> images, String itemId) async {
     final user = _auth.currentUser;
     if (user == null) throw StateError('Sign in to upload stock images.');
     final urls = <String>[];
@@ -744,7 +748,8 @@ class StockService with ChangeNotifier {
       totalSalesPotentialValue += (qty * item.sellingPrice);
 
       final itemMovements = _movements
-          .where((m) => m.stockItemId == item.id && m.type == StockMovementType.sale)
+          .where((m) =>
+              m.stockItemId == item.id && m.type == StockMovementType.sale)
           .length;
 
       if (qty <= 0) {
@@ -765,8 +770,9 @@ class StockService with ChangeNotifier {
 
     final stockoutRate =
         activeItemsCount > 0 ? (outOfStockCount / activeItemsCount) * 100 : 0.0;
-    final turnoverRate =
-        totalPurchaseValue > 0 ? (totalSalesPotentialValue / totalPurchaseValue) : 1.2;
+    final turnoverRate = totalPurchaseValue > 0
+        ? (totalSalesPotentialValue / totalPurchaseValue)
+        : 1.2;
     final holdingDays = turnoverRate > 0 ? (365 / turnoverRate) : 90.0;
 
     return {
@@ -808,7 +814,8 @@ class StockService with ChangeNotifier {
       if (item.isArchived || !item.trackStock) continue;
       final qty = calculateCurrentStock(item.id);
       final salesCount = _movements
-          .where((m) => m.stockItemId == item.id && m.type == StockMovementType.sale)
+          .where((m) =>
+              m.stockItemId == item.id && m.type == StockMovementType.sale)
           .length;
       if (qty > 0 && salesCount == 0) {
         dead.add(item);
@@ -819,7 +826,8 @@ class StockService with ChangeNotifier {
 
   String getItemVelocity(StockItem item) {
     final salesCount = _movements
-        .where((m) => m.stockItemId == item.id && m.type == StockMovementType.sale)
+        .where(
+            (m) => m.stockItemId == item.id && m.type == StockMovementType.sale)
         .length;
     final qty = calculateCurrentStock(item.id);
     if (salesCount > 3) return 'fast';
