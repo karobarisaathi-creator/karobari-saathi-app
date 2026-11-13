@@ -448,8 +448,8 @@ class StockDetailScreen extends StatelessWidget {
                       if (item.trackStock && minAlert > 0)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
+                            horizontal: 9,
+                            vertical: 4.5,
                           ),
                           decoration: BoxDecoration(
                             color: AppTheme.verifiedGold.withValues(alpha: 0.15),
@@ -461,14 +461,14 @@ class StockDetailScreen extends StatelessWidget {
                               Icon(
                                 PhosphorIcons.bellRinging(
                                     PhosphorIconsStyle.fill),
-                                size: 10,
+                                size: 12,
                                 color: AppTheme.verifiedGold,
                               ),
                               const SizedBox(width: 3),
                               UrduAwareText(
                                 '${isUrdu ? "کم از کم" : "Min"}: ${_formatQuantity(minAlert)} $unitLabel',
                                 style: TextStyle(
-                                  fontSize: 10,
+                                  fontSize: 11.5,
                                   fontWeight: FontWeight.w800,
                                   color: AppTheme.verifiedGold,
                                   fontFamily: fontFamily,
@@ -480,8 +480,8 @@ class StockDetailScreen extends StatelessWidget {
                       // Status badge
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 9,
-                          vertical: 4,
+                          horizontal: 10,
+                          vertical: 4.5,
                         ),
                         decoration: BoxDecoration(
                           color: status.bg,
@@ -494,13 +494,13 @@ class StockDetailScreen extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(status.icon, size: 11, color: status.color),
+                            Icon(status.icon, size: 12, color: status.color),
                             const SizedBox(width: 4),
                             UrduAwareText(
                               status.text,
                               style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
                                 color: status.color,
                                 fontFamily: fontFamily,
                               ),
@@ -731,7 +731,7 @@ class StockDetailScreen extends StatelessWidget {
     bool isMono = false,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(6),
@@ -739,8 +739,8 @@ class StockDetailScreen extends StatelessWidget {
       child: UrduAwareText(
         text,
         style: TextStyle(
-          fontSize: isMono ? 10 : 10.5,
-          fontWeight: FontWeight.w700,
+          fontSize: isMono ? 11.5 : 12.5,
+          fontWeight: FontWeight.w800,
           color: color,
           fontFamily: isMono ? 'monospace' : fontFamily,
           letterSpacing: 0.2,
