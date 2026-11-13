@@ -179,6 +179,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     _dateInputController.text = DateFormat('dd/MM/yy').format(_selectedDate);
     _setupDateListener();
+    _setupAmountControllerListener();
 
     Provider.of<StockService>(context, listen: false).addListener(_loadData);
     _loadData();
@@ -260,25 +261,80 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
   }
 
-  void _setupEntryListeners(_ItemEntry entry) {
-    void calculate() {
-      final finalQuantity = _effectiveEntryQuantity(entry);
-      final rate = Formatters.tryParseAmount(entry.rateController.text) ?? 0;
+  bool _isSyncingGrandTotal = false;
 
-      final total = finalQuantity * rate;
-      final formattedTotal = Formatters.formatAmountWithoutCurrency(total);
-      if (entry.totalController.text != formattedTotal) {
-        entry.totalController.text = formattedTotal;
+  void _setupAmountControllerListener() {
+    _amountController.addListener(() {
+      if (_isSyncingGrandTotal) return;
+      if (_itemEntries.length == 1) {
+        _isSyncingGrandTotal = true;
+        try {
+          final entry = _itemEntries.first;
+          final grandTotal =
+              Formatters.tryParseAmount(_amountController.text) ?? 0;
+          final formattedTotal =
+              Formatters.formatAmountWithoutCurrency(grandTotal);
+          if (entry.totalController.text != formattedTotal) {
+            entry.totalController.text = formattedTotal;
+            final finalQuantity = _effectiveEntryQuantity(entry);
+            final rate =
+                finalQuantity > 0 ? grandTotal / finalQuantity : grandTotal;
+            entry.rateController.text =
+                Formatters.formatAmountWithoutCurrency(rate);
+          }
+        } finally {
+          _isSyncingGrandTotal = false;
+        }
       }
-      _calculateGrandTotal();
+    });
+  }
+
+  void _setupEntryListeners(_ItemEntry entry) {
+    bool isSyncing = false;
+
+    void calculateFromRate() {
+      if (isSyncing) return;
+      isSyncing = true;
+      try {
+        final finalQuantity = _effectiveEntryQuantity(entry);
+        final rate = Formatters.tryParseAmount(entry.rateController.text) ?? 0;
+
+        final total = finalQuantity * rate;
+        final formattedTotal = Formatters.formatAmountWithoutCurrency(total);
+        if (entry.totalController.text != formattedTotal) {
+          entry.totalController.text = formattedTotal;
+        }
+        _calculateGrandTotal();
+      } finally {
+        isSyncing = false;
+      }
     }
 
-    entry.quantityController.addListener(calculate);
-    entry.subQuantityController.addListener(calculate);
+    void calculateFromTotal() {
+      if (isSyncing) return;
+      isSyncing = true;
+      try {
+        final finalQuantity = _effectiveEntryQuantity(entry);
+        final total =
+            Formatters.tryParseAmount(entry.totalController.text) ?? 0;
+        final rate = finalQuantity > 0 ? total / finalQuantity : total;
+        final formattedRate = Formatters.formatAmountWithoutCurrency(rate);
+        if (entry.rateController.text != formattedRate) {
+          entry.rateController.text = formattedRate;
+        }
+        _calculateGrandTotal();
+      } finally {
+        isSyncing = false;
+      }
+    }
+
+    entry.quantityController.addListener(calculateFromRate);
+    entry.subQuantityController.addListener(calculateFromRate);
     entry.rateController.addListener(() {
       if (!entry.applyingSuggestedRate) entry.rateWasManuallyEdited = true;
-      calculate();
+      calculateFromRate();
     });
+    entry.totalController.addListener(calculateFromTotal);
     entry.descriptionController.addListener(() {
       final previousStockItemId = entry.stockItemId;
       final stockItem = _stockItemsByName[
@@ -301,8 +357,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   }
 
   double _effectiveEntryQuantity(_ItemEntry entry) {
-    final quantity = double.tryParse(entry.quantityController.text) ?? 0;
-    final subQuantity = double.tryParse(entry.subQuantityController.text) ?? 0;
+    final rawQty = entry.quantityController.text.trim();
+    final rawSubQty = entry.subQuantityController.text.trim();
+    final bool isQtyBlank = rawQty.isEmpty && rawSubQty.isEmpty;
+    final quantity = isQtyBlank ? 1.0 : (double.tryParse(rawQty) ?? 0);
+    final subQuantity = double.tryParse(rawSubQty) ?? 0;
+
     if (entry.unit == 'من' || entry.unit == 'maund') {
       return quantity + (subQuantity / 40);
     }
@@ -322,16 +382,23 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   }
 
   void _calculateGrandTotal() {
-    double grandTotal = 0;
-    for (var entry in _itemEntries) {
-      grandTotal += Formatters.tryParseAmount(entry.totalController.text) ?? 0;
-    }
-    final formattedGrandTotal =
-        Formatters.formatAmountWithoutCurrency(grandTotal);
-    if (_amountController.text != formattedGrandTotal) {
-      setState(() {
-        _amountController.text = formattedGrandTotal;
-      });
+    if (_isSyncingGrandTotal) return;
+    _isSyncingGrandTotal = true;
+    try {
+      double grandTotal = 0;
+      for (var entry in _itemEntries) {
+        grandTotal +=
+            Formatters.tryParseAmount(entry.totalController.text) ?? 0;
+      }
+      final formattedGrandTotal =
+          Formatters.formatAmountWithoutCurrency(grandTotal);
+      if (_amountController.text != formattedGrandTotal) {
+        setState(() {
+          _amountController.text = formattedGrandTotal;
+        });
+      }
+    } finally {
+      _isSyncingGrandTotal = false;
     }
   }
 
@@ -869,7 +936,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       fontFamily: fontFamily,
                       fontWeight: FontWeight.bold,
                       isCurrency: true,
-                      readOnly: true)),
+                      readOnly: false)),
               if (_itemEntries.length > 1)
                 IconButton(
                     icon: Icon(

@@ -120,7 +120,6 @@ class PartyToolsGridWidget extends StatelessWidget {
                   trustScore: trustMetrics.hasTransactionHistory
                       ? trustMetrics.overallScore
                       : null,
-                  isSupplier: trustMetrics.isSupplier,
                   isUrdu: isUrdu,
                   fontFamily: fontFamily,
                 ),

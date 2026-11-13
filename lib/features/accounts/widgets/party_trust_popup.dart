@@ -7,14 +7,12 @@ import 'package:account_app/core/widgets/urdu_aware_text.dart';
 
 class PartyTrustPopup extends StatelessWidget {
   final double? trustScore;
-  final bool isSupplier;
   final bool isUrdu;
   final String? fontFamily;
 
   const PartyTrustPopup({
     super.key,
     required this.trustScore,
-    required this.isSupplier,
     required this.isUrdu,
     this.fontFamily,
   });
@@ -22,7 +20,6 @@ class PartyTrustPopup extends StatelessWidget {
   static Future<void> show({
     required BuildContext context,
     required double? trustScore,
-    required bool isSupplier,
     required bool isUrdu,
     String? fontFamily,
   }) {
@@ -32,7 +29,6 @@ class PartyTrustPopup extends StatelessWidget {
       barrierColor: AppTheme.darkColor.withValues(alpha: 0.55),
       builder: (_) => PartyTrustPopup(
         trustScore: trustScore,
-        isSupplier: isSupplier,
         isUrdu: isUrdu,
         fontFamily: fontFamily,
       ),
@@ -110,43 +106,6 @@ class PartyTrustPopup extends StatelessWidget {
       default:
         return const Color(0xFFE5E7EB);
     }
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // Trust Label
-  // ═══════════════════════════════════════════════════════════
-  String _getTrustLabel() {
-    final score = trustScore;
-    if (score == null) {
-      return isUrdu ? 'خطرہ نامعلوم' : 'Risk unknown';
-    }
-    if (isSupplier) {
-      if (score >= 80) {
-        return isUrdu ? 'ہماری ادائیگی بہت بہتر' : 'Our payments: excellent';
-      }
-      if (score >= 60) {
-        return isUrdu ? 'ہماری ادائیگی بہتر' : 'Our payments: good';
-      }
-      if (score >= 40) {
-        return isUrdu ? 'ہماری ادائیگی درمیانی' : 'Our payments: fair';
-      }
-      return isUrdu ? 'ہماری ادائیگی کمزور' : 'Our payments: needs attention';
-    }
-
-    if (score >= 80) {
-      return isUrdu
-          ? 'گاہک کی ادائیگی بہت اچھی'
-          : 'Customer payments: excellent';
-    }
-    if (score >= 60) {
-      return isUrdu ? 'گاہک کی ادائیگی اچھی' : 'Customer payments: good';
-    }
-    if (score >= 40) {
-      return isUrdu ? 'گاہک کی ادائیگی درمیانی' : 'Customer payments: fair';
-    }
-    return isUrdu
-        ? 'گاہک کی ادائیگی کمزور'
-        : 'Customer payments: needs attention';
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -294,6 +253,16 @@ class PartyTrustPopup extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            UrduAwareText(
+              isUrdu ? 'بھروسہ پوائنٹ' : 'Trust Point',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: badgeColor,
+                fontFamily: fontFamily,
+              ),
+            ),
+            const SizedBox(height: 8),
             // ═══ BIG NUMBER ═══
             UrduAwareText(
               trustScore == null ? '—' : '${trustScore!.round()}%',
@@ -304,19 +273,6 @@ class PartyTrustPopup extends StatelessWidget {
                 height: 1,
                 letterSpacing: -1.5,
                 fontFamily: null,
-              ),
-            ),
-            const SizedBox(height: 2),
-
-            // ═══ TRUST / RISK LABEL ═══
-            UrduAwareText(
-              _getTrustLabel(),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                color: badgeColor,
-                letterSpacing: 0.3,
-                fontFamily: fontFamily,
               ),
             ),
             const SizedBox(height: 12),

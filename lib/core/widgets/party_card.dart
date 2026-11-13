@@ -384,7 +384,6 @@ class _PartyCardState extends State<PartyCard> {
                           trustScore: trustMetrics.hasTransactionHistory
                               ? trustMetrics.overallScore
                               : null,
-                          isSupplier: trustMetrics.isSupplier,
                           isUrdu: isUrdu,
                           fontFamily: fontFamily,
                         ),

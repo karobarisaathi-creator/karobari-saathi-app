@@ -129,6 +129,7 @@ class _AddProjectTransactionScreenState
 
     _dateInputController.text = DateFormat('dd/MM/yy').format(_selectedDate);
     _setupDateListener();
+    _setupAmountControllerListener();
     _loadItemNames();
   }
 
@@ -175,38 +176,111 @@ class _AddProjectTransactionScreenState
     }
   }
 
+  bool _isSyncingGrandTotal = false;
+
+  void _setupAmountControllerListener() {
+    _amountController.addListener(() {
+      if (_isSyncingGrandTotal) return;
+      if (_itemEntries.length == 1) {
+        _isSyncingGrandTotal = true;
+        try {
+          final entry = _itemEntries.first;
+          final grandTotal =
+              Formatters.tryParseAmount(_amountController.text) ?? 0;
+          final formattedTotal =
+              Formatters.formatAmountWithoutCurrency(grandTotal);
+          if (entry.totalController.text != formattedTotal) {
+            entry.totalController.text = formattedTotal;
+            final finalQuantity = _effectiveEntryQuantity(entry);
+            final rate =
+                finalQuantity > 0 ? grandTotal / finalQuantity : grandTotal;
+            entry.rateController.text =
+                Formatters.formatAmountWithoutCurrency(rate);
+          }
+        } finally {
+          _isSyncingGrandTotal = false;
+        }
+      }
+    });
+  }
+
   void _setupEntryListeners(_ItemEntry entry) {
-    void calculate() {
-      double quantity = double.tryParse(entry.quantityController.text) ?? 0;
-      double subQuantity =
-          double.tryParse(entry.subQuantityController.text) ?? 0;
-      double rate = double.tryParse(entry.rateController.text) ?? 0;
-      double finalQuantity = quantity;
-      if (entry.unit == 'من' || entry.unit == 'maund') {
-        finalQuantity = quantity + (subQuantity / 40);
-      } else if (entry.unit == 'درجن' || entry.unit == 'doz') {
-        finalQuantity = quantity + (subQuantity / 12);
+    bool isSyncing = false;
+
+    void calculateFromRate() {
+      if (isSyncing) return;
+      isSyncing = true;
+      try {
+        final finalQuantity = _effectiveEntryQuantity(entry);
+        final rate = Formatters.tryParseAmount(entry.rateController.text) ?? 0;
+        final total = finalQuantity * rate;
+        final formattedTotal = Formatters.formatAmountWithoutCurrency(total);
+        if (entry.totalController.text != formattedTotal) {
+          entry.totalController.text = formattedTotal;
+        }
+        _calculateGrandTotal();
+      } finally {
+        isSyncing = false;
       }
-      final total = finalQuantity * rate;
-      if (entry.totalController.text != total.toStringAsFixed(0)) {
-        entry.totalController.text = total.toStringAsFixed(0);
-      }
-      _calculateGrandTotal();
     }
 
-    entry.quantityController.addListener(calculate);
-    entry.subQuantityController.addListener(calculate);
-    entry.rateController.addListener(calculate);
+    void calculateFromTotal() {
+      if (isSyncing) return;
+      isSyncing = true;
+      try {
+        final finalQuantity = _effectiveEntryQuantity(entry);
+        final total =
+            Formatters.tryParseAmount(entry.totalController.text) ?? 0;
+        final rate = finalQuantity > 0 ? total / finalQuantity : total;
+        final formattedRate = Formatters.formatAmountWithoutCurrency(rate);
+        if (entry.rateController.text != formattedRate) {
+          entry.rateController.text = formattedRate;
+        }
+        _calculateGrandTotal();
+      } finally {
+        isSyncing = false;
+      }
+    }
+
+    entry.quantityController.addListener(calculateFromRate);
+    entry.subQuantityController.addListener(calculateFromRate);
+    entry.rateController.addListener(calculateFromRate);
+    entry.totalController.addListener(calculateFromTotal);
     entry.descriptionController.addListener(() => setState(() {}));
   }
 
-  void _calculateGrandTotal() {
-    double grandTotal = 0;
-    for (var entry in _itemEntries) {
-      grandTotal += double.tryParse(entry.totalController.text) ?? 0;
+  double _effectiveEntryQuantity(_ItemEntry entry) {
+    final rawQty = entry.quantityController.text.trim();
+    final rawSubQty = entry.subQuantityController.text.trim();
+    final bool isQtyBlank = rawQty.isEmpty && rawSubQty.isEmpty;
+    final quantity = isQtyBlank ? 1.0 : (double.tryParse(rawQty) ?? 0);
+    final subQuantity = double.tryParse(rawSubQty) ?? 0;
+
+    if (entry.unit == 'من' || entry.unit == 'maund') {
+      return quantity + (subQuantity / 40);
     }
-    if (_amountController.text != grandTotal.toStringAsFixed(0)) {
-      setState(() => _amountController.text = grandTotal.toStringAsFixed(0));
+    if (entry.unit == 'درجن' || entry.unit == 'doz') {
+      return quantity + (subQuantity / 12);
+    }
+    return quantity;
+  }
+
+  void _calculateGrandTotal() {
+    if (_isSyncingGrandTotal) return;
+    _isSyncingGrandTotal = true;
+    try {
+      double grandTotal = 0;
+      for (var entry in _itemEntries) {
+        grandTotal +=
+            Formatters.tryParseAmount(entry.totalController.text) ?? 0;
+      }
+      final formattedGrandTotal =
+          Formatters.formatAmountWithoutCurrency(grandTotal);
+      if (_amountController.text != formattedGrandTotal) {
+        setState(() => _amountController.text = formattedGrandTotal);
+      }
+    } finally {
+      _isSyncingGrandTotal = false;
     }
   }
 
@@ -564,7 +638,7 @@ class _AddProjectTransactionScreenState
                       fontFamily: fontFamily,
                       fontWeight: FontWeight.bold,
                       isNumber: true,
-                      readOnly: true)),
+                      readOnly: false)),
               if (_itemEntries.length > 1)
                 IconButton(
                     icon: Icon(
@@ -752,8 +826,11 @@ class _AddProjectTransactionScreenState
       return;
     }
 
-    double grandTotal = double.tryParse(_amountController.text) ?? 0;
-    if (grandTotal <= 0) return;
+    double grandTotal = Formatters.tryParseAmount(_amountController.text) ?? 0;
+    if (grandTotal <= 0) {
+      AppToast.error(context, isUrdu ? 'رقم درج کریں' : 'Please enter amount');
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -769,12 +846,12 @@ class _AddProjectTransactionScreenState
       String mainDesc = "";
       for (var entry in _itemEntries) {
         final desc = entry.descriptionController.text;
-        final total = double.tryParse(entry.totalController.text) ?? 0;
+        final total = Formatters.tryParseAmount(entry.totalController.text) ?? 0;
         if (total > 0 || desc.isNotEmpty) {
           items.add(model.TransactionItem(
             description: desc,
-            quantity: double.tryParse(entry.quantityController.text) ?? 1,
-            rate: double.tryParse(entry.rateController.text) ?? total,
+            quantity: _effectiveEntryQuantity(entry),
+            rate: Formatters.tryParseAmount(entry.rateController.text) ?? total,
             total: total,
             unit: entry.unit,
           ));
