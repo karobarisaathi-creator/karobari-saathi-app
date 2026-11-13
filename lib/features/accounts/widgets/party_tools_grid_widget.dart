@@ -32,10 +32,9 @@ class PartyToolsGridWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final db = Provider.of<DatabaseService>(context, listen: false);
+    final db = Provider.of<DatabaseService>(context);
     final currentParty = db.getAccount(party.id) ?? party;
-    final allTx =
-    db.getAllTransactions().where((t) => t.accountId == party.id).toList();
+    final allTx = db.getTransactions(party.id);
     final trustMetrics = PartyTrustMetrics.calculate(
       party: currentParty,
       transactions: allTx,
@@ -103,11 +102,8 @@ class PartyToolsGridWidget extends StatelessWidget {
                 iconColor: AppTheme.incomeColor,
                 onTap: () async {
                   final pdfService =
-                  Provider.of<PdfService>(context, listen: false);
-                  final txs = db
-                      .getAllTransactions()
-                      .where((t) => t.accountId == party.id)
-                      .toList();
+                      Provider.of<PdfService>(context, listen: false);
+                  final txs = db.getTransactions(party.id);
                   await pdfService.generateAccountStatement(
                     account: party,
                     transactions: txs,
@@ -119,7 +115,13 @@ class PartyToolsGridWidget extends StatelessWidget {
                 icon: PhosphorIcons.shieldCheck(),
                 label: isUrdu ? 'بھروسہ پوائنٹ' : 'Trust Point',
                 iconColor: trustMetrics.badgeColor,
-                onTap: () => _showTrustPopup(context),
+                onTap: () => PartyTrustPopup.show(
+                  context: context,
+                  party: currentParty,
+                  metrics: trustMetrics,
+                  isUrdu: isUrdu,
+                  fontFamily: fontFamily,
+                ),
               ),
               _buildToolItem(
                 icon: PhosphorIcons.pencilLine(),
@@ -199,36 +201,14 @@ class PartyToolsGridWidget extends StatelessWidget {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // 🆕 TRUST POPUP — نیا
-  // ═════════════════════════════════════════════════════════════
-  void _showTrustPopup(BuildContext context) {
-    final db = Provider.of<DatabaseService>(context, listen: false);
-    final currentParty = db.getAccount(party.id) ?? party;
-    final allTx =
-    db.getAllTransactions().where((t) => t.accountId == party.id).toList();
-    final metrics = PartyTrustMetrics.calculate(
-      party: currentParty,
-      transactions: allTx,
-      isUrdu: isUrdu,
-    );
-
-    PartyTrustPopup.show(
-      context: context,
-      party: currentParty,
-      metrics: metrics,
-      isUrdu: isUrdu,
-      fontFamily: fontFamily,
-    );
-  }
-
-  // ═════════════════════════════════════════════════════════════
   // Delete confirmation — ویسا ہی
   // ═════════════════════════════════════════════════════════════
   Future<void> _confirmDelete(BuildContext context) async {
     final db = Provider.of<DatabaseService>(context, listen: false);
-    final transactions =
-    db.getAllTransactions().where((t) => t.accountId == party.id).toList();
-    final hasData = transactions.isNotEmpty || party.balance != 0;
+    final transactions = db.getTransactions(party.id);
+    final hasData = transactions.isNotEmpty ||
+        party.initialBalance.abs() > 0.01 ||
+        party.balance.abs() > 0.01;
 
     final nameController = TextEditingController();
     bool canDelete = !hasData;
@@ -238,7 +218,7 @@ class PartyToolsGridWidget extends StatelessWidget {
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: UrduAwareText(
             isUrdu ? 'پارٹی کو مستقل ختم کریں؟' : 'Permanently Delete Party?',
             style: TextStyle(
@@ -278,7 +258,7 @@ class PartyToolsGridWidget extends StatelessWidget {
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10)),
                     contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                   onChanged: (val) {
                     setState(() {
@@ -351,10 +331,9 @@ class PartyTrustMetrics {
   final bool isSupplier;
 
   // 🆕 نئی فیلڈز
-  final double trendPercent;
+  final double? trendPercent;
   final String riskLevel;
   final String paymentHabit;
-  final double suggestedLimit;
   final double? lastTxAmount;
   final int? lastTxDaysAgo;
   final String? lastTxType;
@@ -385,7 +364,6 @@ class PartyTrustMetrics {
     required this.trendPercent,
     required this.riskLevel,
     required this.paymentHabit,
-    required this.suggestedLimit,
     required this.lastTxAmount,
     required this.lastTxDaysAgo,
     required this.lastTxType,
@@ -410,137 +388,144 @@ class PartyTrustMetrics {
     final billed = ledger.totalBilled;
     final received = ledger.totalReceived;
     final currentBal = ledger.outstandingBalance;
+    final hasChargeHistory = ledger.chargeEntryCount > 0;
     final paymentScore = billed > 0
         ? (received / billed * 100).clamp(0.0, 100.0).toDouble()
         : (currentBal > 0 ? 0.0 : 50.0);
     final balanceScore = currentBal > 0
-        ? (billed > 0 ? billed / (billed + currentBal) * 100 : 0.0)
-        .clamp(0.0, 100.0)
-        .toDouble()
+        ? (billed > 0
+                ? (billed - currentBal).clamp(0.0, billed) / billed * 100
+                : 0.0)
+            .clamp(0.0, 100.0)
+            .toDouble()
         : 100.0;
 
     final averagePaymentDays = ledger.averagePaymentDays;
     final paymentTimingScore = averagePaymentDays == null
         ? (ledger.chargeEntryCount == 0 ? 50.0 : 0.0)
         : averagePaymentDays <= 7
-        ? 100.0
-        : averagePaymentDays <= 15
-        ? 85.0
-        : averagePaymentDays <= 30
-        ? 70.0
-        : averagePaymentDays <= 60
-        ? 50.0
-        : averagePaymentDays <= 90
-        ? 30.0
-        : 10.0;
+            ? 100.0
+            : averagePaymentDays <= 15
+                ? 85.0
+                : averagePaymentDays <= 30
+                    ? 70.0
+                    : averagePaymentDays <= 60
+                        ? 50.0
+                        : averagePaymentDays <= 90
+                            ? 30.0
+                            : 10.0;
     final fullPaymentScore = ledger.chargeEntryCount == 0
         ? 50.0
         : ledger.fullyPaidEntries / ledger.chargeEntryCount * 100;
 
-    final overall = txCount == 0
+    final overall = !hasChargeHistory
         ? 50.0
         : (paymentScore * 0.30) +
-        (balanceScore * 0.10) +
-        (ledger.agingScore * 0.35) +
-        (paymentTimingScore * 0.10) +
-        (fullPaymentScore * 0.15);
+            (balanceScore * 0.10) +
+            (ledger.agingScore * 0.35) +
+            (paymentTimingScore * 0.10) +
+            (fullPaymentScore * 0.15);
     final clampedOverall = overall.clamp(0.0, 100.0).toDouble();
     final String title;
     final String recText;
     final Color color;
 
-    if (txCount == 0) {
-      title = party.initialBalance == 0
+    if (!hasChargeHistory) {
+      title = txCount == 0 && party.initialBalance != 0
           ? (isUrdu
-          ? 'نیا کھاتہ — ابھی تاریخ نہیں'
-          : 'New account — no history yet')
-          : (isUrdu
-          ? 'ابتدائی بقایا — تاریخ دستیاب نہیں'
-          : 'Opening balance — age unknown');
+              ? 'ابتدائی بقایا — تاریخ دستیاب نہیں'
+              : 'Opening balance — age unknown')
+          : txCount == 0
+              ? (isUrdu
+                  ? 'نیا کھاتہ — ابھی تاریخ نہیں'
+                  : 'New account — no history yet')
+              : (isUrdu
+                  ? 'ابھی واجب انٹری کا ریکارڈ نہیں'
+                  : 'No charge history to assess yet');
       recText = isUrdu
-          ? 'یہ صرف درج شدہ ریکارڈ کا اشارہ ہے، ادھار کی ضمانت نہیں۔'
-          : 'This is an estimate from recorded entries, not a credit guarantee.';
-      color = const Color(0xFF0284C7);
+          ? 'کھاتے میں واجب انٹری درج ہونے کے بعد ادائیگی کا ریکارڈ بنے گا۔'
+          : 'A payment record can be assessed after charge entries are recorded.';
+      color = AppTheme.textSecondary;
     } else {
       if (clampedOverall >= 88) {
         title = isSupplier
             ? (isUrdu
-            ? 'سپلائر کو ہماری ادائیگی: بہت بہتر'
-            : 'Our payments to supplier: very healthy')
+                ? 'سپلائر کو ہماری ادائیگی: بہت بہتر'
+                : 'Our payments to supplier: very healthy')
             : (isUrdu
-            ? '🌟 گاہک کی ادائیگی کا ریکارڈ بہت اچھا'
-            : '🌟 Customer payment record: excellent');
+                ? '🌟 گاہک کی ادائیگی کا ریکارڈ بہت اچھا'
+                : '🌟 Customer payment record: excellent');
         recText = isSupplier
             ? (isUrdu
-            ? 'اس سپلائر کو آپ کی درج شدہ ادائیگیاں اچھی ہیں؛ ادائیگی کی طے شدہ شرائط بھی دیکھیں۔'
-            : 'Your recorded payments to this supplier are strong; also check the agreed payment terms.')
+                ? 'اس سپلائر کو آپ کی درج شدہ ادائیگیاں اچھی ہیں؛ ادائیگی کی طے شدہ شرائط بھی دیکھیں۔'
+                : 'Your recorded payments to this supplier are strong; also check the agreed payment terms.')
             : (isUrdu
-            ? 'گاہک سے درج شدہ وصولی اچھی ہے؛ نیا ادھار دینے سے پہلے اپنی پالیسی بھی دیکھیں۔'
-            : 'The customer’s recorded payment history is strong; use your credit policy before extending more credit.');
+                ? 'گاہک سے درج شدہ وصولی اچھی ہے؛ نیا ادھار دینے سے پہلے اپنی پالیسی بھی دیکھیں۔'
+                : 'The customer’s recorded payment history is strong; use your credit policy before extending more credit.');
         color = const Color(0xFF16A34A);
       } else if (clampedOverall >= 75) {
         title = isSupplier
             ? (isUrdu
-            ? 'سپلائر کو ہماری ادائیگی: بہتر'
-            : 'Our payments to supplier: healthy')
+                ? 'سپلائر کو ہماری ادائیگی: بہتر'
+                : 'Our payments to supplier: healthy')
             : (isUrdu
-            ? '⭐ گاہک کا ادائیگی ریکارڈ اچھا'
-            : '⭐ Customer payment record: good');
+                ? '⭐ گاہک کا ادائیگی ریکارڈ اچھا'
+                : '⭐ Customer payment record: good');
         recText = isSupplier
             ? (isUrdu
-            ? 'سپلائر کو ادائیگی کا ریکارڈ بہتر ہے، مگر واجب رقم کی عمر بھی دیکھیں۔'
-            : 'Your supplier payments are generally on track; also review the age of amounts payable.')
+                ? 'سپلائر کو ادائیگی کا ریکارڈ بہتر ہے، مگر واجب رقم کی عمر بھی دیکھیں۔'
+                : 'Your supplier payments are generally on track; also review the age of amounts payable.')
             : (isUrdu
-            ? 'گاہک کی درج شدہ ادائیگی بہتر ہے، مگر بقایا کی عمر بھی دیکھیں۔'
-            : 'The customer’s recorded payments are generally on track; also review the age of outstanding dues.');
+                ? 'گاہک کی درج شدہ ادائیگی بہتر ہے، مگر بقایا کی عمر بھی دیکھیں۔'
+                : 'The customer’s recorded payments are generally on track; also review the age of outstanding dues.');
         color = const Color(0xFF0284C7);
       } else if (clampedOverall >= 55) {
         title = isSupplier
             ? (isUrdu
-            ? 'سپلائر کو ہماری ادائیگی: درمیانہ'
-            : 'Our payments to supplier: fair')
+                ? 'سپلائر کو ہماری ادائیگی: درمیانہ'
+                : 'Our payments to supplier: fair')
             : (isUrdu
-            ? '⚡ گاہک کا ادائیگی ریکارڈ درمیانہ'
-            : '⚡ Customer payment record: fair');
+                ? '⚡ گاہک کا ادائیگی ریکارڈ درمیانہ'
+                : '⚡ Customer payment record: fair');
         recText = isSupplier
             ? (isUrdu
-            ? 'سپلائر کو کچھ رقم واجب یا پرانی ہو سکتی ہے؛ ادائیگی کی شرائط کا جائزہ لیں۔'
-            : 'Some supplier amounts may be due or aging; review your payment terms.')
+                ? 'سپلائر کو کچھ رقم واجب یا پرانی ہو سکتی ہے؛ ادائیگی کی شرائط کا جائزہ لیں۔'
+                : 'Some supplier amounts may be due or aging; review your payment terms.')
             : (isUrdu
-            ? 'گاہک سے کچھ رقم بقایا یا پرانی ہو سکتی ہے؛ نیا ادھار محدود رکھنے پر غور کریں۔'
-            : 'Some customer dues may be outstanding or aging; consider limiting additional credit.');
+                ? 'گاہک سے کچھ رقم بقایا یا پرانی ہو سکتی ہے؛ نیا ادھار محدود رکھنے پر غور کریں۔'
+                : 'Some customer dues may be outstanding or aging; consider limiting additional credit.');
         color = const Color(0xFFD97706);
       } else if (clampedOverall >= 35) {
         title = isSupplier
             ? (isUrdu
-            ? 'سپلائر کو ہماری ادائیگی: توجہ درکار'
-            : 'Our payments to supplier: needs attention')
+                ? 'سپلائر کو ہماری ادائیگی: توجہ درکار'
+                : 'Our payments to supplier: needs attention')
             : (isUrdu
-            ? '⚠️ گاہک کی ادائیگی: احتیاط درکار'
-            : '⚠️ Customer payments: needs caution');
+                ? '⚠️ گاہک کی ادائیگی: احتیاط درکار'
+                : '⚠️ Customer payments: needs caution');
         recText = isSupplier
             ? (isUrdu
-            ? 'سپلائر کو واجب اور تاخیر شدہ ادائیگیوں کا جائزہ لیں۔'
-            : 'Review amounts payable to the supplier and any overdue payments.')
+                ? 'سپلائر کو واجب اور تاخیر شدہ ادائیگیوں کا جائزہ لیں۔'
+                : 'Review amounts payable to the supplier and any overdue payments.')
             : (isUrdu
-            ? 'گاہک کے بقایا اور تاخیر کا جائزہ لے کر اگلا لین دین طے کریں۔'
-            : 'Review the customer’s outstanding and overdue dues before the next transaction.');
+                ? 'گاہک کے بقایا اور تاخیر کا جائزہ لے کر اگلا لین دین طے کریں۔'
+                : 'Review the customer’s outstanding and overdue dues before the next transaction.');
         color = const Color(0xFFEA580C);
       } else {
         title = isSupplier
             ? (isUrdu
-            ? 'سپلائر کو ہماری ادائیگی: کمزور'
-            : 'Our payments to supplier: poor')
+                ? 'سپلائر کو ہماری ادائیگی: کمزور'
+                : 'Our payments to supplier: poor')
             : (isUrdu
-            ? '🚨 گاہک کا ادائیگی ریکارڈ کمزور'
-            : '🚨 Customer payment record: poor');
+                ? '🚨 گاہک کا ادائیگی ریکارڈ کمزور'
+                : '🚨 Customer payment record: poor');
         recText = isSupplier
             ? (isUrdu
-            ? 'سپلائر کو واجب رقم زیادہ یا پرانی ہے؛ کھاتے اور طے شدہ تاریخوں کی تصدیق کریں۔'
-            : 'Amounts payable to the supplier are high or old; verify the ledger and agreed due dates.')
+                ? 'سپلائر کو واجب رقم زیادہ یا پرانی ہے؛ کھاتے اور طے شدہ تاریخوں کی تصدیق کریں۔'
+                : 'Amounts payable to the supplier are high or old; verify the ledger and agreed due dates.')
             : (isUrdu
-            ? 'گاہک سے بقایا زیادہ یا پرانا ہے؛ نیا ادھار دینے سے پہلے کھاتے کی تصدیق کریں۔'
-            : 'The customer’s recorded dues are high or old; verify the ledger before extending more credit.');
+                ? 'گاہک سے بقایا زیادہ یا پرانا ہے؛ نیا ادھار دینے سے پہلے کھاتے کی تصدیق کریں۔'
+                : 'The customer’s recorded dues are high or old; verify the ledger before extending more credit.');
         color = const Color(0xFFDC2626);
       }
     }
@@ -552,16 +537,20 @@ class PartyTrustMetrics {
       referenceNow: referenceNow,
     );
 
-    // 🆕 Risk
+    // Risk reflects the overdue share of the current positive balance.
     final String riskLevel;
-    if (txCount == 0) {
+    if (!hasChargeHistory) {
       riskLevel = 'unknown';
-    } else if (clampedOverall >= 75 && ledger.overdueBalance < 5000) {
+    } else if (currentBal <= 0.01) {
       riskLevel = 'low';
-    } else if (clampedOverall >= 50) {
-      riskLevel = 'medium';
     } else {
-      riskLevel = 'high';
+      final overdueShare =
+          (ledger.overdueBalance / currentBal).clamp(0.0, 1.0).toDouble();
+      riskLevel = overdueShare >= 0.5
+          ? 'high'
+          : overdueShare > 0
+              ? 'medium'
+              : 'low';
     }
 
     // 🆕 Habit
@@ -576,35 +565,29 @@ class PartyTrustMetrics {
       paymentHabit = 'late';
     }
 
-    // 🆕 Limit
-    final double suggestedLimit;
-    if (txCount == 0) {
-      suggestedLimit = 5000;
-    } else if (riskLevel == 'low') {
-      suggestedLimit = (billed * 0.5).clamp(0.0, double.infinity);
-    } else if (riskLevel == 'medium') {
-      suggestedLimit = (billed * 0.3).clamp(0.0, double.infinity);
-    } else {
-      suggestedLimit = 0;
-    }
-
     // 🆕 Last Tx
     double? lastTxAmount;
     int? lastTxDaysAgo;
     String? lastTxType;
     if (transactions.isNotEmpty) {
       final sorted = transactions.toList()
-        ..sort((a, b) => b.date.compareTo(a.date));
+        ..sort((a, b) {
+          final dateOrder = b.date.compareTo(a.date);
+          if (dateOrder != 0) return dateOrder;
+          final createdOrder = b.createdAt.compareTo(a.createdAt);
+          if (createdOrder != 0) return createdOrder;
+          return b.id.compareTo(a.id);
+        });
       final last = sorted.first;
       final columns = AccountBalanceUtils.transactionColumns(last);
       final charge = isSupplier ? columns.credit : columns.debit;
       final payment = isSupplier ? columns.debit : columns.credit;
 
-      if (charge > payment) {
-        lastTxAmount = charge;
+      if (charge > payment + 0.01) {
+        lastTxAmount = charge - payment;
         lastTxType = 'purchase';
-      } else {
-        lastTxAmount = payment;
+      } else if (payment > charge + 0.01) {
+        lastTxAmount = payment - charge;
         lastTxType = 'payment';
       }
       lastTxDaysAgo = referenceNow.difference(last.date).inDays.clamp(0, 99999);
@@ -630,12 +613,11 @@ class PartyTrustMetrics {
       outstandingBalance: currentBal,
       overdueBalance: ledger.overdueBalance,
       unknownAgeBalance: ledger.unknownAgeBalance,
-      hasTransactionHistory: txCount > 0,
+      hasTransactionHistory: hasChargeHistory,
       isSupplier: isSupplier,
       trendPercent: trendPercent,
       riskLevel: riskLevel,
       paymentHabit: paymentHabit,
-      suggestedLimit: suggestedLimit,
       lastTxAmount: lastTxAmount,
       lastTxDaysAgo: lastTxDaysAgo,
       lastTxType: lastTxType,
@@ -643,13 +625,11 @@ class PartyTrustMetrics {
   }
 
   // 🆕 Trend helper
-  static double _calculateTrend({
+  static double? _calculateTrend({
     required List<Transaction> transactions,
     required bool isSupplier,
     required DateTime referenceNow,
   }) {
-    if (transactions.length < 2) return 0.0;
-
     final recentStart = referenceNow.subtract(const Duration(days: 30));
     final previousStart = referenceNow.subtract(const Duration(days: 60));
 
@@ -674,14 +654,14 @@ class PartyTrustMetrics {
       prevPayment += payment;
     }
 
-    if (prevCharge == 0 && prevPayment == 0) return 0.0;
+    if (recentCharge <= 0.01 || prevCharge <= 0.01) return null;
 
-    final recentRatio = recentCharge > 0 ? recentPayment / recentCharge : 0.0;
-    final prevRatio = prevCharge > 0 ? prevPayment / prevCharge : 0.0;
-
-    if (prevRatio == 0) {
-      return recentRatio > 0 ? 100.0 : 0.0;
-    }
-    return ((recentRatio - prevRatio) / prevRatio) * 100;
+    final recentRatio =
+        (recentPayment / recentCharge).clamp(0.0, 1.0).toDouble();
+    final prevRatio = (prevPayment / prevCharge).clamp(0.0, 1.0).toDouble();
+    if (prevRatio == 0) return recentRatio > 0 ? 100.0 : 0.0;
+    return (((recentRatio - prevRatio) / prevRatio) * 100)
+        .clamp(-100.0, 100.0)
+        .toDouble();
   }
 }

@@ -206,19 +206,19 @@ class PartyTrustPopup extends StatelessWidget {
         shape: BoxShape.circle,
         gradient: halfFilled
             ? LinearGradient(
-          stops: const [0.5, 0.5],
-          colors: [fill, Colors.black.withValues(alpha: 0.08)],
-        )
+                stops: const [0.5, 0.5],
+                colors: [fill, Colors.black.withValues(alpha: 0.08)],
+              )
             : null,
         color: halfFilled ? null : fill,
         boxShadow: shadow != null
             ? [
-          BoxShadow(
-            color: shadow,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ]
+                BoxShadow(
+                  color: shadow,
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ]
             : null,
       ),
     );
@@ -235,7 +235,10 @@ class PartyTrustPopup extends StatelessWidget {
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 440),
+        constraints: BoxConstraints(
+          maxWidth: 440,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
@@ -268,8 +271,8 @@ class PartyTrustPopup extends StatelessWidget {
                     if (metrics.paymentHabit != 'none') _buildHabit(),
                     // Last Transaction
                     if (metrics.lastTxType != null) _buildLastTx(),
-                    // Suggested Limit
-                    if (metrics.hasTransactionHistory) _buildLimit(),
+                    // Recorded settlement history
+                    if (metrics.chargeEntryCount > 0) _buildSettlementSummary(),
                     // Opinion
                     _buildOpinion(),
                   ],
@@ -326,11 +329,11 @@ class PartyTrustPopup extends StatelessWidget {
                 UrduAwareText(
                   metrics.isSupplier
                       ? (isUrdu
-                      ? 'سپلائر کو ہماری ادائیگی'
-                      : 'Our Payment Record with Supplier')
+                          ? 'سپلائر کو ہماری ادائیگی'
+                          : 'Our Payment Record with Supplier')
                       : (isUrdu
-                      ? 'گاہک کی ادائیگی کا ریکارڈ'
-                      : 'Customer Payment Record'),
+                          ? 'گاہک کی ادائیگی کا ریکارڈ'
+                          : 'Customer Payment Record'),
                   style: TextStyle(
                     fontFamily: fontFamily,
                     fontSize: 13,
@@ -363,6 +366,31 @@ class PartyTrustPopup extends StatelessWidget {
               ],
             ),
           ),
+
+          if (metrics.trendPercent != null &&
+              metrics.trendPercent!.abs() >= 1) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+              decoration: BoxDecoration(
+                color: (metrics.trendPercent! >= 0
+                        ? const Color(0xFF16A34A)
+                        : const Color(0xFFDC2626))
+                    .withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: UrduAwareText(
+                '${metrics.trendPercent! >= 0 ? '↑' : '↓'} ${metrics.trendPercent!.abs().round()}%',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                  color: metrics.trendPercent! >= 0
+                      ? const Color(0xFF047857)
+                      : const Color(0xFFB91C1C),
+                ),
+              ),
+            ),
+          ],
 
           // Close button
           Material(
@@ -497,10 +525,10 @@ class PartyTrustPopup extends StatelessWidget {
               color: avgDays == null
                   ? AppTheme.themeColor
                   : avgDays < 30
-                  ? const Color(0xFF16A34A)
-                  : avgDays < 60
-                  ? const Color(0xFFD97706)
-                  : const Color(0xFFDC2626),
+                      ? const Color(0xFF16A34A)
+                      : avgDays < 60
+                          ? const Color(0xFFD97706)
+                          : const Color(0xFFDC2626),
             ),
           ),
           const SizedBox(width: 5),
@@ -638,8 +666,8 @@ class PartyTrustPopup extends StatelessWidget {
     final daysAgoText = daysAgo == 0
         ? (isUrdu ? 'آج' : 'Today')
         : daysAgo == 1
-        ? (isUrdu ? 'کل' : 'Yesterday')
-        : '$daysAgo ${isUrdu ? "دن پہلے" : "days ago"}';
+            ? (isUrdu ? 'کل' : 'Yesterday')
+            : '$daysAgo ${isUrdu ? "دن پہلے" : "days ago"}';
 
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
@@ -714,58 +742,89 @@ class PartyTrustPopup extends StatelessWidget {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // SUGGESTED LIMIT
+  // RECORDED SETTLEMENT HISTORY
   // ═══════════════════════════════════════════════════════════
-  Widget _buildLimit() {
-    final badgeColor = _getBadgeColor();
-
+  Widget _buildSettlementSummary() {
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: badgeColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: badgeColor.withValues(alpha: 0.2),
-          width: 1,
-        ),
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.darkColor.withValues(alpha: 0.08)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('💡', style: TextStyle(fontSize: 15)),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                UrduAwareText(
-                  isUrdu ? 'تجویز کردہ حد' : 'SUGGESTED LIMIT',
-                  style: TextStyle(
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textSecondary,
-                    letterSpacing: 0.3,
-                    fontFamily: fontFamily,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                UrduAwareText(
-                  metrics.suggestedLimit > 0
-                      ? Formatters.formatAmountWithCurrency(
-                      metrics.suggestedLimit)
-                      : (isUrdu ? 'ادھار نہیں' : 'No credit'),
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    color: badgeColor,
-                    fontFamily: null,
-                  ),
-                ),
-              ],
+          UrduAwareText(
+            isUrdu ? 'کھاتے کی ادائیگی کا خلاصہ' : 'ACCOUNT SETTLEMENT SUMMARY',
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textSecondary,
+              fontFamily: fontFamily,
             ),
+          ),
+          const SizedBox(height: 7),
+          Row(
+            children: [
+              Expanded(
+                child: _buildSettlementCount(
+                  isUrdu ? 'کل' : 'Entries',
+                  metrics.chargeEntryCount,
+                  AppTheme.darkColor,
+                ),
+              ),
+              Expanded(
+                child: _buildSettlementCount(
+                  isUrdu ? 'مکمل' : 'Settled',
+                  metrics.fullyPaidEntries,
+                  const Color(0xFF16A34A),
+                ),
+              ),
+              Expanded(
+                child: _buildSettlementCount(
+                  isUrdu ? 'جزوی' : 'Partial',
+                  metrics.partiallyPaidEntries,
+                  const Color(0xFFD97706),
+                ),
+              ),
+              Expanded(
+                child: _buildSettlementCount(
+                  isUrdu ? 'باقی' : 'Open',
+                  metrics.unpaidEntries,
+                  const Color(0xFFDC2626),
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSettlementCount(String label, int count, Color color) {
+    return Column(
+      children: [
+        UrduAwareText(
+          '$count',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: 2),
+        UrduAwareText(
+          label,
+          style: TextStyle(
+            fontSize: 8,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.textSecondary,
+            fontFamily: fontFamily,
+          ),
+        ),
+      ],
     );
   }
 
@@ -829,7 +888,7 @@ class PartyTrustPopup extends StatelessWidget {
     final score = metrics.overallScore;
     final isSupplier = metrics.isSupplier;
 
-    if (!metrics.hasTransactionHistory || score == 0) {
+    if (!metrics.hasTransactionHistory) {
       return {
         'icon': '🆕',
         'action': isUrdu ? 'ابھی کوئی رائے نہیں' : 'No opinion yet',
@@ -847,11 +906,11 @@ class PartyTrustPopup extends StatelessWidget {
             : (isUrdu ? 'مزید لین دین کریں' : 'Continue more transactions'),
         'text': isSupplier
             ? (isUrdu
-            ? 'سپلائر کو ادائیگی کا ریکارڈ مضبوط ہے، اعتماد بڑھا سکتے ہیں'
-            : 'Payment record with supplier is strong, can build more trust')
+                ? 'سپلائر کو ادائیگی کا ریکارڈ مضبوط ہے، اعتماد بڑھا سکتے ہیں'
+                : 'Payment record with supplier is strong, can build more trust')
             : (isUrdu
-            ? 'گاہک کا ریکارڈ اچھا ہے، اعتماد بڑھا سکتے ہیں'
-            : 'Customer record is good, can build more trust'),
+                ? 'گاہک کا ریکارڈ اچھا ہے، اعتماد بڑھا سکتے ہیں'
+                : 'Customer record is good, can build more trust'),
       };
     } else if (score >= 55) {
       return {
@@ -859,11 +918,11 @@ class PartyTrustPopup extends StatelessWidget {
         'action': isUrdu ? 'محدود لین دین کریں' : 'Limit transactions',
         'text': isSupplier
             ? (isUrdu
-            ? 'کچھ ادائیگیاں واجب ہیں، پہلے پرانی رقم دیکھیں'
-            : 'Some payments due, check old amount first')
+                ? 'کچھ ادائیگیاں واجب ہیں، پہلے پرانی رقم دیکھیں'
+                : 'Some payments due, check old amount first')
             : (isUrdu
-            ? 'کچھ بقایا ہے، پہلے پرانی رقم وصول کریں'
-            : 'Some dues pending, recover old amount first'),
+                ? 'کچھ بقایا ہے، پہلے پرانی رقم وصول کریں'
+                : 'Some dues pending, recover old amount first'),
       };
     } else if (score >= 35) {
       return {
@@ -871,11 +930,11 @@ class PartyTrustPopup extends StatelessWidget {
         'action': isUrdu ? 'احتیاط سے لین دین کریں' : 'Transact with caution',
         'text': isSupplier
             ? (isUrdu
-            ? 'ادائیگی میں تاخیر ہے، شرائط دوبارہ طے کریں'
-            : 'Payment is delayed, re-negotiate terms')
+                ? 'ادائیگی میں تاخیر ہے، شرائط دوبارہ طے کریں'
+                : 'Payment is delayed, re-negotiate terms')
             : (isUrdu
-            ? 'بقایا بڑھ رہا ہے، نقد لین دین کریں'
-            : 'Dues increasing, do cash transactions'),
+                ? 'بقایا بڑھ رہا ہے، نقد لین دین کریں'
+                : 'Dues increasing, do cash transactions'),
       };
     } else {
       return {
@@ -883,8 +942,8 @@ class PartyTrustPopup extends StatelessWidget {
         'action': isUrdu ? 'لین دین نہ کریں' : 'Do not transact',
         'text': isSupplier
             ? (isUrdu
-            ? 'پرانی رقم واپس لیں، پھر سوچیں'
-            : 'Recover old amount first, then think')
+                ? 'سپلائر کے واجب بقایا اور ادائیگی کی تاریخ کا جائزہ لیں۔'
+                : 'Review payable balances and your payment history with this supplier.')
             : (isUrdu ? 'پہلے پرانا حساب صاف کریں' : 'Clear old account first'),
       };
     }
