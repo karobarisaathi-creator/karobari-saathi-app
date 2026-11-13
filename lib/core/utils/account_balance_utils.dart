@@ -39,6 +39,11 @@ class AccountTransactionColumns {
 class AccountBalanceUtils {
   static const String partySettlementCategory = 'party_settlement';
 
+  static bool isSupplierCategory(String category) {
+    final normalized = category.trim().toLowerCase();
+    return normalized == 'supplier' || normalized == 'سپلائر';
+  }
+
   static String partySettlementDescription({
     required String type,
     required String paymentMethod,
@@ -198,8 +203,7 @@ class AccountBalanceUtils {
   }) {
     final precedingTransactions = transactions.where((transaction) {
       if (transaction.id == receipt.id ||
-          transaction.accountId != receipt.accountId ||
-          transaction.partnershipId != null) {
+          transaction.accountId != receipt.accountId) {
         return false;
       }
       return _compareOrder(transaction, receipt) < 0;

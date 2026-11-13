@@ -61,10 +61,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     try {
       final db = Provider.of<DatabaseService>(context, listen: false);
       final allProfs = db.getProfessions();
-      _allTransactions = db
-          .getAllTransactions()
-          .where((t) => t.partnershipId == null)
-          .toList();
+      _allTransactions = db.getAllTransactions().toList();
 
       if (widget.selectedProfession != null) {
         if (widget.selectedProfession!.isMaster ?? false) {
@@ -382,7 +379,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 40),
-          child: UrduAwareText(isUrdu ? "کوئی ڈیٹا موجود نہیں" : "No data available",
+          child: UrduAwareText(
+              isUrdu ? "کوئی ڈیٹا موجود نہیں" : "No data available",
               style: TextStyle(color: Colors.grey, fontFamily: fontFamily)),
         ),
       );

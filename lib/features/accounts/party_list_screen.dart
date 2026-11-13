@@ -109,8 +109,7 @@ class _PartyListScreenState extends State<PartyListScreen> {
                 for (var party in parties) {
                   final transactions = databaseService
                       .getAllTransactions()
-                      .where((t) =>
-                          t.accountId == party.id && t.partnershipId == null)
+                      .where((t) => t.accountId == party.id)
                       .toList();
                   final cycleBalance =
                       AccountBalanceUtils.currentCycle(transactions);
@@ -332,7 +331,7 @@ class _PartyListScreenState extends State<PartyListScreen> {
 
         final partyTransactions = databaseService
             .getAllTransactions()
-            .where((t) => t.accountId == party.id && t.partnershipId == null)
+            .where((t) => t.accountId == party.id)
             .toList();
 
         double partyTaken = 0;

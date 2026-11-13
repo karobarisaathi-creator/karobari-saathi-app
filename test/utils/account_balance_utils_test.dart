@@ -13,6 +13,7 @@ Transaction _transaction({
   double receivedAmount = 0,
   double pendingAmount = 0,
   bool receiptFromCounterparty = false,
+  String? partnershipId,
   String category = 'Sale',
   String description = 'Transaction',
 }) {
@@ -31,6 +32,7 @@ Transaction _transaction({
     receivedAmount: receivedAmount,
     pendingAmount: pendingAmount,
     receiptFromCounterparty: receiptFromCounterparty,
+    partnershipId: partnershipId,
   );
 }
 
@@ -581,6 +583,31 @@ void main() {
   });
 
   group('AccountBalanceUtils.receiptBreakdown', () {
+    test('includes older transactions with a legacy partnership id', () {
+      final previousBill = _transaction(
+        id: 'legacy-bill',
+        type: 'expense',
+        amount: 100,
+        date: DateTime(2026, 1, 1),
+        partnershipId: 'old-partnership',
+      );
+      final receipt = _transaction(
+        id: 'receipt',
+        type: 'income',
+        amount: 30,
+        category: AccountBalanceUtils.partySettlementCategory,
+        date: DateTime(2026, 1, 2),
+      );
+
+      final result = AccountBalanceUtils.receiptBreakdown(
+        transactions: [previousBill, receipt],
+        receipt: receipt,
+      );
+
+      expect(result.openingBalance, 100);
+      expect(result.finalBalance, 70);
+    });
+
     test('uses the Party Details Debit minus Credit sign for every receipt',
         () {
       final receipts = [

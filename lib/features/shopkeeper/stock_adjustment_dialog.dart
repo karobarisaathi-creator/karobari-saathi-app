@@ -7,12 +7,12 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/models/stock_movement_model.dart';
-import 'package:account_app/core/models/transaction_item_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
+import 'package:account_app/core/utils/stock_return_transaction_utils.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/utils/formatters.dart';
@@ -83,110 +83,6 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
         .fold<double>(0, (total, line) => total + line.quantity);
   }
 
-  model.Transaction _reduceItemFromTransaction(
-    model.Transaction transaction,
-    double quantityToReturn,
-  ) {
-    const epsilon = 0.000001;
-    var remainingToReturn = quantityToReturn;
-    var removedSubtotal = 0.0;
-    final updatedItemsReversed = <TransactionItem>[];
-
-    for (final line in transaction.items.reversed) {
-      if (line.stockItemId != widget.item.id ||
-          line.quantity <= 0 ||
-          remainingToReturn <= epsilon) {
-        updatedItemsReversed.add(line);
-        continue;
-      }
-
-      final removedQuantity =
-          remainingToReturn < line.quantity ? remainingToReturn : line.quantity;
-      final oldLineTotal =
-          line.total > 0 ? line.total : line.quantity * line.rate;
-      final remainingQuantity = line.quantity - removedQuantity;
-      final remainingLineTotal = remainingQuantity <= epsilon
-          ? 0.0
-          : oldLineTotal * (remainingQuantity / line.quantity);
-      removedSubtotal += oldLineTotal - remainingLineTotal;
-      remainingToReturn -= removedQuantity;
-
-      if (remainingQuantity > epsilon) {
-        updatedItemsReversed.add(
-          TransactionItem(
-            description: line.description,
-            quantity: remainingQuantity,
-            rate: line.rate,
-            total: remainingLineTotal,
-            unit: line.unit,
-            stockItemId: line.stockItemId,
-          ),
-        );
-      }
-    }
-
-    if (remainingToReturn > epsilon) {
-      throw StateError(
-          'Return quantity exceeds the latest transaction quantity.');
-    }
-
-    final updatedItems = updatedItemsReversed.reversed.toList();
-    final oldSubtotal = transaction.subtotal > 0
-        ? transaction.subtotal
-        : transaction.items.fold<double>(
-            0,
-            (total, line) =>
-                total +
-                (line.total > 0 ? line.total : line.quantity * line.rate),
-          );
-    final discountReduction = oldSubtotal > 0 && transaction.discountAmount > 0
-        ? (transaction.discountAmount * (removedSubtotal / oldSubtotal))
-            .clamp(0.0, transaction.discountAmount)
-            .toDouble()
-        : 0.0;
-    final amountReduction = removedSubtotal - discountReduction;
-    final updatedAmount =
-        (transaction.amount - amountReduction).clamp(0.0, double.infinity);
-    final updatedSubtotal =
-        (oldSubtotal - removedSubtotal).clamp(0.0, double.infinity);
-    final updatedDiscount = (transaction.discountAmount - discountReduction)
-        .clamp(0.0, double.infinity);
-    final adjustedReceivedAmount = (transaction.receivedAmount - amountReduction)
-        .clamp(0.0, double.infinity);
-    final updatedPending = (updatedAmount - adjustedReceivedAmount)
-        .clamp(0.0, double.infinity);
-
-    return model.Transaction(
-      id: transaction.id,
-      accountId: transaction.accountId,
-      amount: updatedAmount,
-      type: transaction.type,
-      category: transaction.category,
-      description: transaction.description,
-      date: transaction.date,
-      billImage: transaction.billImage,
-      quantity: transaction.quantity,
-      rate: transaction.rate,
-      receivedAmount: adjustedReceivedAmount,
-      pendingAmount: updatedPending,
-      referenceNumber: transaction.referenceNumber,
-      paymentMethod: transaction.paymentMethod,
-      isPending: updatedPending > epsilon,
-      createdAt: transaction.createdAt,
-      updatedAt: DateTime.now(),
-      professionId: transaction.professionId,
-      professionName: transaction.professionName,
-      partnershipId: transaction.partnershipId,
-      voiceNote: transaction.voiceNote,
-      items: updatedItems,
-      subtotal: updatedSubtotal,
-      discountAmount: updatedDiscount,
-      discountPercent: transaction.discountPercent,
-      discountReason: transaction.discountReason,
-      receiptFromCounterparty: transaction.receiptFromCounterparty,
-    );
-  }
-
   bool get _shouldShowTypeSelector {
     return widget.showTypeSelector ??
         (widget.initialType == StockMovementType.customerReturn ||
@@ -206,7 +102,8 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
             widget.item.sellingPrice > 0)
         ? widget.item.sellingPrice
         : widget.item.purchasePrice;
-    _priceController.text = initialPrice > 0 ? Formatters.formatAmount(initialPrice) : '';
+    _priceController.text =
+        initialPrice > 0 ? Formatters.formatAmount(initialPrice) : '';
     _qtyController.addListener(_onQtyChanged);
   }
 
@@ -339,8 +236,8 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
       );
       return;
     }
-    final price =
-        Formatters.tryParseAmount(_priceController.text) ?? widget.item.purchasePrice;
+    final price = Formatters.tryParseAmount(_priceController.text) ??
+        widget.item.purchasePrice;
 
     String reason = _noteController.text.trim();
     if (reason.isEmpty) {
@@ -393,9 +290,10 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
     setState(() => _isSaving = true);
     try {
       if (_isReturn) {
-        final updatedTransaction = _reduceItemFromTransaction(
-          latestMatchingTransaction!,
-          enteredQuantity,
+        final updatedTransaction = StockReturnTransactionUtils.applyReturn(
+          transaction: latestMatchingTransaction!,
+          stockItemId: widget.item.id,
+          quantityToReturn: enteredQuantity,
         );
         final stockSynced =
             await databaseService.updateTransaction(updatedTransaction);
@@ -683,7 +581,8 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
     );
   }
 
-  Widget _buildReturnUnifiedCard(bool isUrdu, String? fontFamily, BuildContext context) {
+  Widget _buildReturnUnifiedCard(
+      bool isUrdu, String? fontFamily, BuildContext context) {
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
@@ -795,7 +694,8 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18.5)),
+        borderRadius:
+            const BorderRadius.vertical(bottom: Radius.circular(18.5)),
       ),
       child: Row(
         children: [
@@ -826,12 +726,14 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
     );
   }
 
-  void _openPartyPicker(List<Account> parties, bool isUrdu, String? fontFamily) async {
+  void _openPartyPicker(
+      List<Account> parties, bool isUrdu, String? fontFamily) async {
     final selected = await showModalBottomSheet<Account>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _MatchingPartyPickerSheet(parties: parties, isUrdu: isUrdu, fontFamily: fontFamily),
+      builder: (context) => _MatchingPartyPickerSheet(
+          parties: parties, isUrdu: isUrdu, fontFamily: fontFamily),
     );
     if (selected != null) {
       setState(() {
@@ -853,9 +755,10 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
             account.isActive && matchingPartyIds.contains(account.id))
         .toList()
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    
-    final selectedParty = parties.where((party) => party.id == _selectedPartyId).firstOrNull;
-    
+
+    final selectedParty =
+        parties.where((party) => party.id == _selectedPartyId).firstOrNull;
+
     final selectedLatestTransaction = selectedParty == null
         ? null
         : matchingTransactions
@@ -893,21 +796,27 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 InkWell(
-                  onTap: parties.isEmpty ? null : () => _openPartyPicker(parties, isUrdu, fontFamily),
+                  onTap: parties.isEmpty
+                      ? null
+                      : () => _openPartyPicker(parties, isUrdu, fontFamily),
                   borderRadius: BorderRadius.circular(14),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF5F7FA),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: state.hasError ? AppTheme.expenseColor : AppTheme.backgroundColor,
+                        color: state.hasError
+                            ? AppTheme.expenseColor
+                            : AppTheme.backgroundColor,
                         width: 1.5,
                       ),
                     ),
                     child: Row(
                       children: [
-                        Icon(PhosphorIcons.user(), color: AppTheme.textSecondary, size: 18),
+                        Icon(PhosphorIcons.user(),
+                            color: AppTheme.textSecondary, size: 18),
                         const SizedBox(width: 10),
                         Expanded(
                           child: UrduAwareText(
@@ -917,16 +826,23 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                                     ? (isCustomerReturn
                                         ? 'اس آئٹم کی کوئی فروخت موجود نہیں'
                                         : 'اس آئٹم کی کوئی خریداری موجود نہیں')
-                                    : (isUrdu ? 'پارٹی منتخب کرنے کے لیے یہاں کلک کریں' : 'Tap to select party')),
+                                    : (isUrdu
+                                        ? 'پارٹی منتخب کرنے کے لیے یہاں کلک کریں'
+                                        : 'Tap to select party')),
                             style: TextStyle(
-                              color: selectedParty != null ? AppTheme.darkColor : AppTheme.textSecondary,
+                              color: selectedParty != null
+                                  ? AppTheme.darkColor
+                                  : AppTheme.textSecondary,
                               fontSize: 13,
-                              fontWeight: selectedParty != null ? FontWeight.w600 : FontWeight.normal,
+                              fontWeight: selectedParty != null
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
                               fontFamily: fontFamily,
                             ),
                           ),
                         ),
-                        const Icon(Icons.arrow_drop_down, color: AppTheme.textSecondary),
+                        const Icon(Icons.arrow_drop_down,
+                            color: AppTheme.textSecondary),
                       ],
                     ),
                   ),
@@ -935,7 +851,10 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                   const SizedBox(height: 6),
                   Text(
                     state.errorText ?? '',
-                    style: TextStyle(color: AppTheme.expenseColor, fontSize: 11.5, fontFamily: fontFamily),
+                    style: TextStyle(
+                        color: AppTheme.expenseColor,
+                        fontSize: 11.5,
+                        fontFamily: fontFamily),
                   ),
                 ],
               ],
@@ -1233,8 +1152,6 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
     );
   }
 
-
-
   // ═════════════════════════════════════════════
   // 3. Combined Unit Price & Reason Note Card
   // ═════════════════════════════════════════════
@@ -1281,7 +1198,8 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
             children: [
               // 1. Unit Price Row (Icon + Label on Right, Amount on Left with Currency Formatter)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 child: Row(
                   children: [
                     Icon(
@@ -1303,8 +1221,11 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                     Expanded(
                       child: TextFormField(
                         controller: _priceController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [CurrencyInputFormatter(allowDecimals: true)],
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        inputFormatters: [
+                          CurrencyInputFormatter(allowDecimals: true)
+                        ],
                         textAlign: TextAlign.left,
                         textDirection: TextDirection.ltr,
                         style: const TextStyle(
@@ -1319,7 +1240,8 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                           hintStyle: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: AppTheme.textSecondary.withValues(alpha: 0.6),
+                            color:
+                                AppTheme.textSecondary.withValues(alpha: 0.6),
                           ),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
@@ -1336,7 +1258,8 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
               const Divider(height: 1, color: Color(0xFFE1E5EC)),
               // 2. Reason / Note Row (Expands 1 to 3 lines)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1368,7 +1291,8 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                         minLines: 1,
                         maxLines: 3,
                         keyboardType: TextInputType.multiline,
-                        textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
+                        textDirection:
+                            isUrdu ? TextDirection.rtl : TextDirection.ltr,
                         textAlign: isUrdu ? TextAlign.right : TextAlign.left,
                         style: TextStyle(
                           fontFamily: fontFamily,
@@ -1378,11 +1302,13 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                         ),
                         decoration: InputDecoration(
                           hintText: isUrdu ? 'درج کریں...' : 'Add a note...',
-                          hintTextDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
+                          hintTextDirection:
+                              isUrdu ? TextDirection.rtl : TextDirection.ltr,
                           hintStyle: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: AppTheme.textSecondary.withValues(alpha: 0.6),
+                            color:
+                                AppTheme.textSecondary.withValues(alpha: 0.6),
                             fontFamily: fontFamily,
                           ),
                           border: InputBorder.none,
@@ -1492,7 +1418,8 @@ class _MatchingPartyPickerSheet extends StatefulWidget {
   });
 
   @override
-  State<_MatchingPartyPickerSheet> createState() => _MatchingPartyPickerSheetState();
+  State<_MatchingPartyPickerSheet> createState() =>
+      _MatchingPartyPickerSheetState();
 }
 
 class _MatchingPartyPickerSheetState extends State<_MatchingPartyPickerSheet> {
@@ -1550,7 +1477,9 @@ class _MatchingPartyPickerSheetState extends State<_MatchingPartyPickerSheet> {
                       padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
                       child: SearchSortBar(
                         controller: _searchController,
-                        hintText: widget.isUrdu ? 'نام یا فون نمبر سے تلاش کریں' : 'Search by name or phone',
+                        hintText: widget.isUrdu
+                            ? 'نام یا فون نمبر سے تلاش کریں'
+                            : 'Search by name or phone',
                         onSearchChanged: (v) => setState(() => _query = v),
                       ),
                     ),
@@ -1558,7 +1487,8 @@ class _MatchingPartyPickerSheetState extends State<_MatchingPartyPickerSheet> {
                       ListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         itemCount: filtered.length,
                         itemBuilder: (context, index) {
                           final account = filtered[index];
@@ -1573,8 +1503,11 @@ class _MatchingPartyPickerSheetState extends State<_MatchingPartyPickerSheet> {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                         child: UrduAwareText(
-                          widget.isUrdu ? 'کوئی پارٹی نہیں ملی' : 'No parties found',
-                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                          widget.isUrdu
+                              ? 'کوئی پارٹی نہیں ملی'
+                              : 'No parties found',
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.black54),
                         ),
                       ),
                   ],
@@ -1587,4 +1520,3 @@ class _MatchingPartyPickerSheetState extends State<_MatchingPartyPickerSheet> {
     );
   }
 }
-

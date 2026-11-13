@@ -825,9 +825,7 @@ class PdfService with ChangeNotifier {
     await _loadFonts();
     final pdf = pw.Document();
     final accountTransactions = transactions
-        .where((transaction) =>
-            transaction.accountId == account.id &&
-            transaction.partnershipId == null)
+        .where((transaction) => transaction.accountId == account.id)
         .toList()
       ..sort((first, second) {
         final dateOrder = first.date.compareTo(second.date);
@@ -849,7 +847,7 @@ class PdfService with ChangeNotifier {
         build: (context) => [
           _buildAccountHeader(account, closingBalance, isUrdu),
           pw.SizedBox(height: 20),
-          _buildAccountStatementTable(accountTransactions, isUrdu),
+          _buildAccountStatementTable(account, accountTransactions, isUrdu),
           pw.SizedBox(height: 20),
           _buildAccountSummary(account, accountTransactions, isUrdu),
         ],
@@ -1073,6 +1071,7 @@ class PdfService with ChangeNotifier {
   }
 
   pw.Widget _buildAccountStatementTable(
+    Account account,
     List<Transaction> transactions,
     bool isUrdu,
   ) {

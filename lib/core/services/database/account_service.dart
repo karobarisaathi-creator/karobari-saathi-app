@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:account_app/core/models/account_model.dart';
+import 'package:account_app/core/utils/account_balance_utils.dart';
 import 'base_service.dart';
 
 class AccountService extends BaseService {
@@ -84,6 +85,26 @@ class AccountService extends BaseService {
               .where((t) => t.accountId == accountId)
               .toList() ??
           [];
+      final isParty = switch (account.category.trim().toLowerCase()) {
+        'customer' || 'supplier' => true,
+        _ => false,
+      };
+      if (isParty) {
+        double openingBalance = account.initialBalance;
+        if (account.balanceType.toLowerCase() == 'payable') {
+          openingBalance = -openingBalance;
+        }
+        final newBalance = AccountBalanceUtils.ledgerBalance(
+          transactions,
+          initialBalance: openingBalance,
+        );
+        await accountsBox?.put(
+          account.id,
+          account.copyWith(balance: newBalance),
+        );
+        return;
+      }
+
       double income = transactions
           .where((t) => t.type == 'income')
           .fold(0.0, (sum, t) => sum + t.accountBalanceAmount);
@@ -109,5 +130,4 @@ class AccountService extends BaseService {
   Future<int> getPartiesCount() async => accountsBox?.length ?? 0;
   Future<int> getPendingDuesCount() async =>
       accountsBox?.values.where((p) => p.balance != 0).length ?? 0;
-
 }

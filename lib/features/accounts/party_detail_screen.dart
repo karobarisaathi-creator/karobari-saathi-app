@@ -287,7 +287,7 @@ class _CombinedHeader extends StatelessWidget {
       builder: (context, dbService, _) {
         final allTx = dbService
             .getAllTransactions()
-            .where((t) => t.accountId == party.id && t.partnershipId == null)
+            .where((t) => t.accountId == party.id)
             .toList()
           ..sort((a, b) => b.date.compareTo(a.date));
 
@@ -311,7 +311,7 @@ class _CombinedHeader extends StatelessWidget {
         final bool isReceivable = currentBalance > 0;
         final bool isSettled = currentBalance.abs() < 0.01;
         final settlementType = isSettled
-            ? (party.category.toLowerCase() == 'supplier'
+            ? (AccountBalanceUtils.isSupplierCategory(party.category)
                 ? 'expense'
                 : 'income')
             : (isReceivable ? 'income' : 'expense');
@@ -722,7 +722,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
     if (!mounted) return;
     final txs = _dbService
         .getAllTransactions()
-        .where((t) => t.accountId == widget.party.id && t.partnershipId == null)
+        .where((t) => t.accountId == widget.party.id)
         .toList()
       ..sort((a, b) => _compareTransactions(b, a));
     setState(() {
@@ -941,7 +941,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
     final dbService = Provider.of<DatabaseService>(context, listen: false);
     final allAccountTxs = dbService
         .getAllTransactions()
-        .where((t) => t.accountId == widget.party.id && t.partnershipId == null)
+        .where((t) => t.accountId == widget.party.id)
         .toList()
       ..sort(_compareTransactions);
 
@@ -1100,11 +1100,13 @@ class _TransactionsTabState extends State<_TransactionsTab> {
           borderRadius: BorderRadius.zero,
           border: Border(
             top: BorderSide(
-              color: AppTheme.themeColor.withValues(alpha: expanded ? 0.35 : 0.2),
+              color:
+                  AppTheme.themeColor.withValues(alpha: expanded ? 0.35 : 0.2),
               width: 1.5,
             ),
             bottom: BorderSide(
-              color: AppTheme.themeColor.withValues(alpha: expanded ? 0.35 : 0.2),
+              color:
+                  AppTheme.themeColor.withValues(alpha: expanded ? 0.35 : 0.2),
               width: 1.5,
             ),
           ),
@@ -1476,7 +1478,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
 
     final allTx = db
         .getAllTransactions()
-        .where((t) => t.accountId == widget.party.id && t.partnershipId == null)
+        .where((t) => t.accountId == widget.party.id)
         .toList();
 
     _totalIn = 0;

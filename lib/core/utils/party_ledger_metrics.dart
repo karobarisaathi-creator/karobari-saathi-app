@@ -1,6 +1,5 @@
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/utils/account_balance_utils.dart';
-import 'package:account_app/core/utils/quick_bill_trust_metrics.dart';
 
 class PartyLedgerMetrics {
   final double totalBilled;
@@ -9,6 +8,11 @@ class PartyLedgerMetrics {
   final double overdueBalance;
   final double unknownAgeBalance;
   final double agingScore;
+  final double? averagePaymentDays;
+  final int chargeEntryCount;
+  final int fullyPaidEntries;
+  final int partiallyPaidEntries;
+  final int unpaidEntries;
   final Map<String, double> outstandingQuickBills;
 
   const PartyLedgerMetrics({
@@ -18,6 +22,11 @@ class PartyLedgerMetrics {
     required this.overdueBalance,
     required this.unknownAgeBalance,
     required this.agingScore,
+    required this.averagePaymentDays,
+    required this.chargeEntryCount,
+    required this.fullyPaidEntries,
+    required this.partiallyPaidEntries,
+    required this.unpaidEntries,
     required this.outstandingQuickBills,
   });
 
@@ -26,126 +35,124 @@ class PartyLedgerMetrics {
     double openingBalance = 0,
     String balanceType = 'receivable',
     String partyCategory = 'customer',
+    DateTime? now,
   }) {
-    final isSupplier = partyCategory.trim().toLowerCase() == 'supplier';
+    final isSupplier = AccountBalanceUtils.isSupplierCategory(partyCategory);
     final partyDirection = isSupplier ? -1.0 : 1.0;
     final openingDirection =
         balanceType.trim().toLowerCase() == 'payable' ? -1.0 : 1.0;
     final openingDue = openingBalance * openingDirection * partyDirection;
 
-    final sortedTransactions = transactions
-        .where((transaction) => transaction.partnershipId == null)
-        .toList()
-      ..sort(_compareOrder);
+    final sortedTransactions = transactions.toList()..sort(_compareOrder);
     final openEntries = <_OpenLedgerEntry>[];
-    var availableCredit = 0.0;
+    var availableRecordedCredit = 0.0;
+    var availableOpeningCredit = 0.0;
     var totalBilled = 0.0;
+    var totalReceived = 0.0;
 
     if (openingDue > 0) {
       openEntries.add(_OpenLedgerEntry(
         amount: openingDue,
         date: null,
+        isOpeningBalance: true,
       ));
+      totalBilled = openingDue;
     } else if (openingDue < 0) {
-      availableCredit = -openingDue;
+      availableOpeningCredit = -openingDue;
     }
 
-    void applyCredit(double amount) {
+    double applyToOpenEntries(
+      double amount, {
+      DateTime? paymentDate,
+    }) {
       var remaining = amount;
-      // Receipts aren't linked to invoice IDs, so allocate them oldest-first.
       for (final entry in openEntries) {
         if (remaining <= 0.01) break;
-        final applied = remaining < entry.amount ? remaining : entry.amount;
-        entry.amount -= applied;
+        if (entry.remainingAmount <= 0.01) continue;
+
+        final applied = remaining < entry.remainingAmount
+            ? remaining
+            : entry.remainingAmount;
+        entry.remainingAmount -= applied;
+        entry.paidAmount += applied;
         remaining -= applied;
+
+        if (entry.date != null && paymentDate != null) {
+          final daysToPay =
+              paymentDate.difference(entry.date!).inDays.clamp(0, 100000);
+          entry.timedPaidAmount += applied;
+          entry.weightedPaymentDays += applied * daysToPay;
+        }
       }
-      openEntries.removeWhere((entry) => entry.amount <= 0.01);
-      if (remaining > 0.01) availableCredit += remaining;
+      return amount - remaining;
     }
 
     for (final transaction in sortedTransactions) {
-      if (transaction.category == AccountBalanceUtils.partySettlementCategory) {
-        applyCredit(transaction.amount.clamp(0, double.infinity).toDouble());
-        continue;
+      final columns = AccountBalanceUtils.transactionColumns(transaction);
+      final charge = isSupplier ? columns.credit : columns.debit;
+      final payment = isSupplier ? columns.debit : columns.credit;
+
+      if (charge > 0.01) {
+        totalBilled += charge;
+        openEntries.add(_OpenLedgerEntry(
+          amount: charge,
+          date: transaction.date,
+          quickBillId: transaction.isQuickBill ? transaction.id : null,
+        ));
+
+        if (availableOpeningCredit > 0) {
+          final applied = applyToOpenEntries(
+            availableOpeningCredit,
+          );
+          availableOpeningCredit -= applied;
+        }
+        if (availableRecordedCredit > 0) {
+          final applied = applyToOpenEntries(
+            availableRecordedCredit,
+          );
+          availableRecordedCredit -= applied;
+        }
       }
 
-      if (transaction.receiptFromCounterparty && !transaction.isQuickBill) {
-        final columns = AccountBalanceUtils.transactionColumns(transaction);
-        final dueChange = (columns.debit - columns.credit) * partyDirection;
-        if (dueChange > 0) {
-          totalBilled += dueChange;
-          var due = dueChange;
-          if (availableCredit > 0) {
-            final applied = availableCredit < due ? availableCredit : due;
-            due -= applied;
-            availableCredit -= applied;
-          }
-          if (due > 0.01) {
-            openEntries.add(_OpenLedgerEntry(
-              amount: due,
-              date: transaction.date,
-            ));
-          }
-        } else if (dueChange < 0) {
-          applyCredit(-dueChange);
-        }
-        continue;
-      }
-
-      final isCharge = isSupplier
-          ? transaction.type == 'expense'
-          : transaction.type == 'income';
-      final isPayment = isSupplier
-          ? transaction.type == 'income'
-          : transaction.type == 'expense';
-
-      if (isCharge) {
-        final billAmount = transaction.isQuickBill && !isSupplier
-            ? QuickBillTrustMetrics.billTotal(transaction)
-            : transaction.amount;
-        final received = transaction.isQuickBill && !isSupplier
-            ? QuickBillTrustMetrics.amountReceived(transaction)
-            : transaction.receivedAmount.clamp(0, billAmount).toDouble();
-        totalBilled += billAmount;
-        var due = (billAmount - received).clamp(0, billAmount).toDouble();
-        if (availableCredit > 0 && due > 0) {
-          final applied = availableCredit < due ? availableCredit : due;
-          due -= applied;
-          availableCredit -= applied;
-        }
-        if (due > 0.01) {
-          openEntries.add(_OpenLedgerEntry(
-            amount: due,
-            date: transaction.date,
-            quickBillId: transaction.isQuickBill ? transaction.id : null,
-          ));
-        }
-      } else if (isPayment) {
-        applyCredit(transaction.amount.clamp(0, double.infinity).toDouble());
+      if (payment > 0.01) {
+        totalReceived += payment;
+        final applied = applyToOpenEntries(
+          payment,
+          paymentDate: transaction.date,
+        );
+        final excess = payment - applied;
+        if (excess > 0.01) availableRecordedCredit += excess;
       }
     }
 
-    final now = DateTime.now();
-    var outstandingBalance = 0.0;
+    final referenceNow = now ?? DateTime.now();
+    var openBalance = 0.0;
     var overdueBalance = 0.0;
     var unknownAgeBalance = 0.0;
+    var knownAgeBalance = 0.0;
     var ageWeightedBalance = 0.0;
+    var totalTimedPaid = 0.0;
+    var weightedPaymentDays = 0.0;
     final outstandingQuickBills = <String, double>{};
 
     for (final entry in openEntries) {
-      outstandingBalance += entry.amount;
-      if (entry.quickBillId != null) {
-        outstandingQuickBills[entry.quickBillId!] = entry.amount;
+      openBalance += entry.remainingAmount;
+      totalTimedPaid += entry.timedPaidAmount;
+      weightedPaymentDays += entry.weightedPaymentDays;
+      if (entry.quickBillId != null && entry.remainingAmount > 0.01) {
+        outstandingQuickBills[entry.quickBillId!] = entry.remainingAmount;
       }
 
+      if (entry.remainingAmount <= 0.01) continue;
       if (entry.date == null) {
-        unknownAgeBalance += entry.amount;
-        ageWeightedBalance += entry.amount * 0.5;
+        unknownAgeBalance += entry.remainingAmount;
         continue;
       }
 
-      final daysOpen = now.difference(entry.date!).inDays.clamp(0, 100000);
-      if (daysOpen >= 30) overdueBalance += entry.amount;
+      knownAgeBalance += entry.remainingAmount;
+      final daysOpen =
+          referenceNow.difference(entry.date!).inDays.clamp(0, 100000);
+      if (daysOpen >= 30) overdueBalance += entry.remainingAmount;
       final ageWeight = daysOpen >= 90
           ? 0.15
           : daysOpen >= 60
@@ -153,27 +160,43 @@ class PartyLedgerMetrics {
               : daysOpen >= 30
                   ? 0.7
                   : 1.0;
-      ageWeightedBalance += entry.amount * ageWeight;
+      ageWeightedBalance += entry.remainingAmount * ageWeight;
     }
 
-    final agingScore = outstandingBalance <= 0
+    final chargeEntries =
+        openEntries.where((entry) => !entry.isOpeningBalance).toList();
+    final fullyPaidEntries =
+        chargeEntries.where((entry) => entry.remainingAmount <= 0.01).length;
+    final partiallyPaidEntries = chargeEntries
+        .where(
+            (entry) => entry.paidAmount > 0.01 && entry.remainingAmount > 0.01)
+        .length;
+    final unpaidEntries = chargeEntries
+        .where(
+            (entry) => entry.paidAmount <= 0.01 && entry.remainingAmount > 0.01)
+        .length;
+    final agingScore = openBalance <= 0
         ? 100.0
-        : (ageWeightedBalance / outstandingBalance * 100)
-            .clamp(0.0, 100.0)
-            .toDouble();
-    final unpaidBilled = openEntries
-        .where((entry) => entry.quickBillId != null || entry.date != null)
-        .fold<double>(0, (sum, entry) => sum + entry.amount);
-    final totalReceived =
-        (totalBilled - unpaidBilled).clamp(0, totalBilled).toDouble();
+        : knownAgeBalance <= 0
+            ? 50.0
+            : (ageWeightedBalance / knownAgeBalance * 100)
+                .clamp(0.0, 100.0)
+                .toDouble();
 
     return PartyLedgerMetrics(
       totalBilled: totalBilled,
       totalReceived: totalReceived,
-      outstandingBalance: outstandingBalance - availableCredit,
+      outstandingBalance:
+          openBalance - availableRecordedCredit - availableOpeningCredit,
       overdueBalance: overdueBalance,
       unknownAgeBalance: unknownAgeBalance,
       agingScore: agingScore,
+      averagePaymentDays:
+          totalTimedPaid > 0 ? weightedPaymentDays / totalTimedPaid : null,
+      chargeEntryCount: chargeEntries.length,
+      fullyPaidEntries: fullyPaidEntries,
+      partiallyPaidEntries: partiallyPaidEntries,
+      unpaidEntries: unpaidEntries,
       outstandingQuickBills:
           Map<String, double>.unmodifiable(outstandingQuickBills),
     );
@@ -191,13 +214,18 @@ class PartyLedgerMetrics {
 }
 
 class _OpenLedgerEntry {
-  double amount;
+  double remainingAmount;
+  double paidAmount = 0;
+  double timedPaidAmount = 0;
+  double weightedPaymentDays = 0;
   final DateTime? date;
   final String? quickBillId;
+  final bool isOpeningBalance;
 
   _OpenLedgerEntry({
-    required this.amount,
+    required double amount,
     required this.date,
     this.quickBillId,
-  });
+    this.isOpeningBalance = false,
+  }) : remainingAmount = amount;
 }

@@ -26,13 +26,17 @@ This document provides a detailed overview of each screen and its functionality 
 
 *   **English:**
     *   **Transaction Ledger:** View all money-in and money-out records for a specific person.
+    *   **Debit / Credit:** Party balances use the shared ledger columns. Debit (بنام) increases the amount due from a customer; Credit (جمع) reduces it. Supplier metrics interpret the sides in reverse: Credit increases the amount payable to the supplier, and Debit reduces it.
+    *   **Quick Bills:** Quick Bill totals and payments use their dedicated column mapping, so the bill total, amount received, and outstanding amount remain separate.
     *   **Profession Reference:** See which business/project a transaction belongs to.
-    *   **PDF Reports:** Generate and share professional PDF statements.
+    *   **PDF Reports:** Generate a chronological statement with opening balance, Debit, Credit, running balance, and closing balance.
     *   **Bulk Entry:** Add multiple entries quickly using the "Page Entry" feature.
 *   **اردو:**
     *   **لین دین کا ریکارڈ:** کسی خاص بندے کے ساتھ تمام پیسوں کا حساب کتاب دیکھیں۔
+    *   **ڈیبٹ / کریڈٹ:** پارٹی کے کھاتے میں مشترک کالم استعمال ہوتے ہیں۔ گاہک کے لیے ڈیبٹ (بنام) واجب رقم بڑھاتا اور کریڈٹ (جمع) اسے کم کرتا ہے۔ سپلائر کے میٹرکس میں سمت الٹ ہے: کریڈٹ سپلائر کو قابلِ ادائیگی رقم بڑھاتا ہے اور ڈیبٹ اسے کم کرتا ہے۔
+    *   **Quick Bill:** بل کی پوری رقم، وصول شدہ رقم اور باقی رقم الگ کالموں سے حساب ہوتی ہے؛ جزوی ادائیگی دوبارہ منہا نہیں ہوتی۔
     *   **پیشے کا حوالہ:** دیکھیں کہ کون سا لین دین کس کاروبار یا کام کی مد میں ہوا۔
-    *   **پی ڈی ایف رپورٹ:** کھاتے کی پروفیشنل رپورٹ بنائیں اور شیئر کریں۔
+    *   **پی ڈی ایف رپورٹ:** تاریخ وار اسٹیٹمنٹ بنائیں جس میں ابتدائی بیلنس، ڈیبٹ، کریڈٹ، ہر انٹری کے بعد چلتا بیلنس اور اختتامی بیلنس شامل ہوں۔
     *   **پیج انٹری:** ایک ساتھ کئی انٹریز جلدی سے درج کریں۔
 
 ---
@@ -73,11 +77,65 @@ This document provides a detailed overview of each screen and its functionality 
 *   **English:**
     *   **Rate History:** Track how item prices changed over time with this party.
     *   **Hide Feature:** Swipe to hide specific rates from history without affecting balance.
-    *   **Trust Score:** A 5-star rating based on payment frequency and volume.
+    *   **Payment Record Score:** One private 0–100 score with its subject labeled: for a customer it summarizes the customer's recorded payment history; for a supplier it summarizes your recorded payments to that supplier. It does not separately score both sides or assess service quality.
 *   **اردو:**
     *   **ریٹ ہسٹری:** دیکھیں کہ وقت کے ساتھ اشیاء کے ریٹ میں کیا تبدیلی آئی۔
     *   **چھپانے کا فیچر:** بیلنس خراب کیے بغیر کسی ریٹ کو لسٹ سے غائب کرنا۔
-    *   **اعتماد کا اسکور:** ادائیگیوں کی ترتیب اور حجم پر مبنی 5 سٹار ریٹنگ۔
+    *   **ادائیگی ریکارڈ اسکور:** ایک نجی 0 سے 100 اسکور ہے اور ساتھ بتایا جاتا ہے کہ ریکارڈ کس کا ہے: گاہک کے لیے گاہک کی درج شدہ ادائیگی، اور سپلائر کے لیے سپلائر کو آپ کی درج شدہ ادائیگی۔ یہ دونوں طرف کے الگ الگ اسکور یا سروس کے معیار کا اندازہ نہیں۔
+
+### Party Trust Index: calculation details (پارٹی پھروسہ انڈیکس: حساب کی تفصیل)
+
+The single score is calculated from the party's transactions and opening balance. Its subject depends on the party category: for a customer, it describes the customer's recorded payment/clearance history; for a supplier, it describes your recorded settlement/payment history with that supplier. It does not separately score both sides, or infer service quality, fairness, or intent from ledger data. Each entry uses the same Debit/Credit mapping as the party ledger; it does not infer a charge or payment from `type` alone.
+
+یہ ایک ہی اسکور پارٹی کے ابتدائی بیلنس اور عام (غیر پارٹنرشپ) لین دین سے بنتا ہے۔ اس کا موضوع پارٹی کی قسم کے مطابق واضح ہے: گاہک کے لیے گاہک کی درج شدہ ادائیگی/بقایا ہسٹری، اور سپلائر کے لیے سپلائر کو آپ کی درج شدہ ادائیگی/تصفیہ۔ یہ دونوں فریقوں کے الگ الگ اسکور نہیں، اور کھاتے سے سروس کے معیار، انصاف یا نیت کا اندازہ نہیں لگاتا۔ ہر انٹری کے لیے وہی Debit/Credit mapping استعمال ہوتی ہے جو پارٹی لیجر میں ہے؛ صرف `type` دیکھ کر رقم کی سمت طے نہیں کی جاتی۔
+
+* **Who is being described? / اسکور کس کے بارے میں ہے؟**
+  * **Customer / گاہک:** The score describes the customer's recorded payments to you and the remaining dues. It is an estimate based on entries in your ledger, not proof of the customer's overall character or creditworthiness.
+  * **Supplier / سپلائر:** The score describes your payments and outstanding payable balance with the supplier. It does not rate the supplier's reliability; supplier service, delivery, quality, and your satisfaction are not measured by this ledger score.
+  * **Your own conduct / آپ کا اپنا ریکارڈ:** Supplier payment behavior is visible because payments to the supplier are recorded in the ledger. Other aspects of how you treat a customer or supplier cannot be scored unless the app records those specific commitments and outcomes.
+  * **گاہک:** اسکور آپ کو گاہک کی درج شدہ ادائیگی اور باقی بقایا دکھاتا ہے۔ یہ آپ کے کھاتے کا اندازہ ہے، گاہک کے کردار یا مجموعی ساکھ کا ثبوت نہیں۔
+  * **سپلائر:** اسکور سپلائر کو آپ کی ادائیگی اور قابلِ ادائیگی بقایا دکھاتا ہے؛ سپلائر کی قابلِ اعتماد ہونے کی ریٹنگ نہیں۔ سروس، ڈیلیوری، معیار اور آپ کا اطمینان اس کھاتے سے نہیں ناپے جاتے۔
+  * **آپ کا اپنا رویہ:** سپلائر کو آپ کی ادائیگی کا ریکارڈ کھاتے سے دکھایا جا سکتا ہے۔ گاہک یا سپلائر کے ساتھ دوسرے معاملات تبھی ناپے جا سکتے ہیں جب ایپ ان وعدوں اور ان کے نتائج کا الگ ریکارڈ رکھے۔
+
+* **Charge and payment sides / واجب رقم اور ادائیگی کی سمت**
+  * For a customer, Debit is a charge that increases the amount due; Credit is a payment/receipt that reduces it.
+  * For a supplier, the sides reverse: Credit is a charge that increases payable; Debit is a payment that reduces payable.
+  * Quick Bills use their shared special mapping. For example, a 1,000 bill with 300 received contributes 1,000 to the charge and 300 to payment; the remaining due is 700.
+  * A stock return reduces the original bill and its unpaid due first. Recorded receipts are reduced only if they exceed the adjusted bill total.
+  * A mirrored transaction imported from a notification follows its mapped ledger columns, rather than a second, notification-specific interpretation.
+  * Stored customer and supplier `Account.balance` is recalculated from those same Debit/Credit columns. Other account types keep their income-minus-expense balance calculation.
+  * گاہک کے لیے Debit (بنام) واجب رقم بڑھاتا اور Credit (جمع/وصولی) اسے کم کرتا ہے۔ سپلائر کے لیے سمت الٹ ہوتی ہے۔
+  * Quick Bill بھی اسی مشترک special mapping سے آتا ہے۔ مثال: 1,000 کے بل میں 300 وصول ہوئے ہوں تو واجب رقم 1,000، وصولی 300 اور باقی 700 ہے۔
+  * اسٹاک کی واپسی اصل بل اور اس کے بقایا کو پہلے کم کرتی ہے۔ وصول شدہ رقم صرف تب کم ہوتی ہے جب وہ نئے بل سے زیادہ ہو۔
+  * نوٹیفکیشن سے آنے والی الٹی انٹری بھی انہی mapped کالموں کے مطابق شمار ہوتی ہے؛ اس کے لیے الگ اندازہ نہیں لگایا جاتا۔
+  * گاہک اور سپلائر کا محفوظ `Account.balance` بھی انہی Debit/Credit کالموں سے بنتا ہے؛ دوسری اقسام کے کھاتوں میں آمدن منفی خرچ والا حساب برقرار ہے۔
+
+* **Opening balance and advance / ابتدائی بقایا اور ایڈوانس**
+  * `initialBalance` and `balanceType` form the opening ledger amount. A positive opening due becomes an undated open entry and is included in total billed/due. If the opening balance represents an advance, it is stored as available opening credit.
+  * Payments are allocated oldest-open-entry-first. An opening advance is applied to a later charge before later recorded excess payments, but opening balances are not counted as recorded payments or payment-speed evidence. Unused advance stays as credit.
+  * Any payment beyond the open dues remains available credit for future charges. The displayed outstanding balance is open dues minus available recorded credit and unused opening credit; a negative result is an advance/credit balance.
+  * `initialBalance` اور `balanceType` سے ابتدائی کھاتے کی سمت بنتی ہے۔ ابتدائی واجب رقم تاریخ نامعلوم انٹری کے طور پر کھلتی ہے۔ ابتدائی ایڈوانس دستیاب کریڈٹ رہتا ہے اور بعد کے بل پر لگتا ہے۔
+  * وصولی پہلے پرانے بقایا پر لگتی ہے۔ ابتدائی ایڈوانس بعد کے واجب پر لگتا ہے، مگر اسے درج شدہ وصولی یا ادائیگی کے دنوں کا ثبوت نہیں مانا جاتا۔ استعمال نہ ہونے والا ایڈوانس کریڈٹ رہتا ہے۔
+  * موجودہ بقایا = کھلی واجب انٹریاں − دستیاب کریڈٹ۔ منفی نتیجہ ایڈوانس/کریڈٹ ہے، واجب الادا رقم نہیں۔
+
+* **Component percentages / ہر شعبے کا فیصد**
+  * **Recorded payment clearance (30% weight):** `recorded transaction payments / total billed × 100`, capped at 100. Opening advances are excluded because they are not recorded payment transactions. If there is no billed amount, the component is 0 when a positive due remains; otherwise it is 50 (insufficient payment history).
+  * **Current balance (10% weight):** when positive due exists and there is billed history, `clamp(totalBilled − outstandingDue, 0, totalBilled) / totalBilled × 100`; no positive due yields 100. This reaches 0 when none of the billed amount has been cleared. Its weight is limited because it overlaps with payment clearance.
+  * **Outstanding age (35% weight):** each dated open balance is weighted 100% before 30 days, 70% at 30–59 days, 40% at 60–89 days, and 15% at 90 days or more. Balances with unknown age are excluded from this calculation and shown separately; when no dated balance exists but an unknown-age due remains, the component is neutral (50%). No outstanding balance yields 100%.
+  * **Payment timing (10% weight):** the average days to pay is weighted by recorded payment amounts applied to dated charges. Up to 7 days scores 100; 8–15 scores 85; 16–30 scores 70; 31–60 scores 50; 61–90 scores 30; over 90 scores 10. Opening advances and prior credits applied before a charge do not count as zero-day payment evidence.
+  * **Full-payment rate (15% weight):** `fully settled charge entries / all charge entries × 100`. Partial and unpaid entries are included in the denominator. Opening balances are excluded because they are not dated transaction entries. No charge history is treated as insufficient evidence.
+  * **Overall:** `payment × 0.30 + balance × 0.10 + age × 0.35 + payment timing × 0.10 + full-payment rate × 0.15`, capped at 100. The balance component has a lower weight because it overlaps with payment clearance. With no transaction history, the UI shows no percentage (`—`) for the overall score or any component; the internal fallback is not presented as a rating.
+  * **ادائیگی کی شرح (30%):** `ریکارڈ شدہ ٹرانزیکشن ادائیگیاں ÷ کل واجب × 100`، زیادہ سے زیادہ 100۔ ابتدائی ایڈوانس اس میں شامل نہیں کیونکہ وہ ادائیگی کی ٹرانزیکشن نہیں۔ واجب رقم نہ ہو تو مثبت بقایا کی صورت میں 0، ورنہ ناکافی ہسٹری کی وجہ سے 50۔
+  * **موجودہ بقایا (10%):** مثبت بقایا اور واجب ریکارڈ ہونے پر `clamp(کل واجب − موجودہ بقایا، 0، کل واجب) ÷ کل واجب × 100`؛ بقایا نہ ہو تو 100۔ اس لیے کچھ بھی ادا نہ ہونے پر اسکور 0 ہوگا۔ ادائیگی کی شرح سے مشابہ ہونے کی وجہ سے اس کا وزن کم رکھا ہے۔
+  * **بقایا کی عمر (35%):** 30 دن سے کم پر 100%، 30–59 دن پر 70%، 60–89 دن پر 40%، اور 90 دن یا زیادہ پر 15% وزن۔ نامعلوم عمر والا ابتدائی بقایا اس حساب سے الگ دکھایا جاتا ہے؛ اگر صرف نامعلوم عمر کا بقایا ہو تو اسکور 50 (غیر جانب دار) ہے۔ بقایا نہ ہو تو 100۔
+  * **ادائیگی میں لگنے والے دن (10%):** درج شدہ ادائیگی کو بل کی تاریخ سے ملا کر رقم کے وزن کے مطابق اوسط دن نکالے جاتے ہیں۔ 7 دن تک 100، 8–15 دن 85، 16–30 دن 70، 31–60 دن 50، 61–90 دن 30، اور 90 دن سے زیادہ 10۔ ابتدائی ایڈوانس یا بل سے پہلے موجود کریڈٹ کو صفر دن کی ادائیگی نہیں مانا جاتا۔
+  * **مکمل ادائیگی کی شرح (15%):** `مکمل ادا/وصول شدہ واجب انٹریاں ÷ کل واجب انٹریاں × 100`۔ جزوی اور غیر ادا شدہ انٹریاں بھی کل میں شامل ہیں۔ ابتدائی بیلنس انٹری شمار نہیں ہوتا؛ لین دین نہ ہو تو اسکور 50 یعنی ریکارڈ ناکافی ہے۔
+  * **مجموعی فیصد:** `ادائیگی × 30% + بقایا × 10% + عمر × 35% + ادائیگی کے دن × 10% + مکمل ادائیگی × 15%`، زیادہ سے زیادہ 100۔ کھاتے میں کوئی لین دین نہ ہو تو مجموعی اسکور اور تمام شعبوں میں فیصد کے بجائے `—` دکھتا ہے؛ اصل بقایا کی رقم پھر بھی دکھائی جا سکتی ہے۔
+
+### Party statement PDF (پارٹی اسٹیٹمنٹ پی ڈی ایف)
+
+* **English:** The statement filters transactions to the selected account, then sorts by date, creation time, and ID. It starts with a signed opening balance (`payable` is Credit/negative; otherwise the opening amount is Debit/positive). Each row uses the shared party Debit/Credit columns and updates the running balance as `previous balance + Debit − Credit`. The summary totals those same rows; closing balance is `opening balance + total Debit − total Credit`. This keeps the report independent from unrelated accounts and from profession income/expense totals.
+* **اردو:** رپورٹ صرف منتخب پارٹی کی انٹریاں لیتی ہے، تاریخ، وقتِ اندراج اور ID کے مطابق ترتیب دیتی ہے، اور ابتدائی بیلنس سے شروع کرتی ہے۔ `payable` ابتدائی بیلنس کریڈٹ/منفی اور دوسری صورت ڈیبٹ/مثبت ہوتا ہے۔ ہر قطار پر چلتا بیلنس `پچھلا بیلنس + ڈیبٹ − کریڈٹ` سے بنتا ہے۔ خلاصے کا اختتامی بیلنس `ابتدائی بیلنس + کل ڈیبٹ − کل کریڈٹ` ہے۔ اس لیے اسٹیٹمنٹ کسی دوسری پارٹی یا پیشے کے آمدن/خرچ کے ٹوٹل پر منحصر نہیں۔
 
 ---
 

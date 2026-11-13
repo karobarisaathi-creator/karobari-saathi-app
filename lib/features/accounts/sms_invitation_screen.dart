@@ -48,9 +48,11 @@ class _BalanceAlertDialogState extends State<BalanceAlertDialog> {
           Provider.of<LanguageService>(context, listen: false);
       final isUrdu = languageService.isUrdu;
       final balance = widget.party.balance.abs().toStringAsFixed(0);
-      final status = widget.party.balance >= 0
-          ? (isUrdu ? "میں نے آپ کو دینے ہیں" : "Payable")
-          : (isUrdu ? "میں نے آپ سے لینے ہیں" : "Receivable");
+      final status = widget.party.balance.abs() < 0.01
+          ? (isUrdu ? "حساب صاف" : "Settled")
+          : widget.party.balance > 0
+              ? (isUrdu ? "آپ سے لینے ہیں" : "Receivable")
+              : (isUrdu ? "آپ کو دینے ہیں" : "Payable");
 
       String initialMessage;
       if (isUrdu) {
@@ -110,7 +112,8 @@ Please verify. Thanks.""";
             ),
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0),
                 child: Column(
                   children: [
                     // Bill Paper Container Style (Matches Receipt)

@@ -9,8 +9,6 @@ import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/category_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
 
-// GroupActivity کو ہٹا دیں کیونکہ اب Partnership استعمال ہو رہا ہے
-
 import 'package:account_app/core/utils/image_utils.dart';
 
 class FirebaseService with ChangeNotifier {
@@ -84,7 +82,8 @@ class FirebaseService with ChangeNotifier {
     }
   }
 
-  Future<List<model.Transaction>> getTransactionsFromCloud(String accountId) async {
+  Future<List<model.Transaction>> getTransactionsFromCloud(
+      String accountId) async {
     final user = _auth.currentUser;
     if (user != null) {
       final snapshot = await _firestore
@@ -131,13 +130,11 @@ class FirebaseService with ChangeNotifier {
     return [];
   }
 
-
-
   // File Storage
   Future<String> uploadFile(String filePath, String fileName) async {
     try {
       File fileToUpload = File(filePath);
-      
+
       // If it's an image, compress it
       final ext = filePath.split('.').last.toLowerCase();
       if (['jpg', 'jpeg', 'png'].contains(ext)) {
@@ -212,7 +209,8 @@ class FirebaseService with ChangeNotifier {
     }
   }
 
-  Future<void> waitForConnection({int maxRetries = 3, Duration delay = const Duration(seconds: 2)}) async {
+  Future<void> waitForConnection(
+      {int maxRetries = 3, Duration delay = const Duration(seconds: 2)}) async {
     for (int i = 0; i < maxRetries; i++) {
       if (await checkConnection()) {
         return;

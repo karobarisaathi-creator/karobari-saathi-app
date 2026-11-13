@@ -94,7 +94,7 @@ class _PartyCardState extends State<PartyCard> {
     final dbService = Provider.of<DatabaseService>(context);
     final transactions = dbService
         .getAllTransactions()
-        .where((t) => t.accountId == widget.party.id && t.partnershipId == null)
+        .where((t) => t.accountId == widget.party.id)
         .toList();
     final cycleBalance = AccountBalanceUtils.currentCycle(transactions);
     final double displayBalance = cycleBalance.balance;
@@ -198,11 +198,10 @@ class _PartyCardState extends State<PartyCard> {
                               if (senderPhone != null &&
                                   senderPhone.isNotEmpty &&
                                   partyPhone.isNotEmpty) {
-                                if (senderPhone.endsWith(
-                                    partyPhone.length > 10
-                                        ? partyPhone
-                                            .substring(partyPhone.length - 10)
-                                        : partyPhone)) {
+                                if (senderPhone.endsWith(partyPhone.length > 10
+                                    ? partyPhone
+                                        .substring(partyPhone.length - 10)
+                                    : partyPhone)) {
                                   return true;
                                 }
                               }
@@ -225,7 +224,8 @@ class _PartyCardState extends State<PartyCard> {
                                     Border.all(color: Colors.white, width: 1.5),
                                 boxShadow: [
                                   BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.2),
+                                      color:
+                                          Colors.black.withValues(alpha: 0.2),
                                       blurRadius: 4),
                                 ],
                               ),

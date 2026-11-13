@@ -1,3 +1,5 @@
+// lib/features/accounts/widgets/party_tools_grid_widget.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -6,12 +8,13 @@ import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/pdf_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
+import 'package:account_app/core/utils/account_balance_utils.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/utils/party_ledger_metrics.dart';
-import 'package:account_app/core/utils/quick_bill_trust_metrics.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/features/accounts/add_party_screen.dart';
 import 'package:account_app/features/accounts/bulk_party_transaction_screen.dart';
+import 'package:account_app/features/accounts/widgets/party_trust_popup.dart';
 
 class PartyToolsGridWidget extends StatelessWidget {
   final Account party;
@@ -31,10 +34,8 @@ class PartyToolsGridWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final db = Provider.of<DatabaseService>(context, listen: false);
     final currentParty = db.getAccount(party.id) ?? party;
-    final allTx = db
-        .getAllTransactions()
-        .where((t) => t.accountId == party.id && t.partnershipId == null)
-        .toList();
+    final allTx =
+    db.getAllTransactions().where((t) => t.accountId == party.id).toList();
     final trustMetrics = PartyTrustMetrics.calculate(
       party: currentParty,
       transactions: allTx,
@@ -102,7 +103,7 @@ class PartyToolsGridWidget extends StatelessWidget {
                 iconColor: AppTheme.incomeColor,
                 onTap: () async {
                   final pdfService =
-                      Provider.of<PdfService>(context, listen: false);
+                  Provider.of<PdfService>(context, listen: false);
                   final txs = db
                       .getAllTransactions()
                       .where((t) => t.accountId == party.id)
@@ -116,9 +117,9 @@ class PartyToolsGridWidget extends StatelessWidget {
               ),
               _buildToolItem(
                 icon: PhosphorIcons.shieldCheck(),
-                label: isUrdu ? 'پھروسہ انڈیکس' : 'Trust Index',
+                label: isUrdu ? 'بھروسہ پوائنٹ' : 'Trust Point',
                 iconColor: trustMetrics.badgeColor,
-                onTap: () => _showPersonalReviewDialog(context),
+                onTap: () => _showTrustPopup(context),
               ),
               _buildToolItem(
                 icon: PhosphorIcons.pencilLine(),
@@ -197,54 +198,36 @@ class PartyToolsGridWidget extends StatelessWidget {
     );
   }
 
-  void _showPersonalReviewDialog(BuildContext context) {
-    showDialog(
+  // ═════════════════════════════════════════════════════════════
+  // 🆕 TRUST POPUP — نیا
+  // ═════════════════════════════════════════════════════════════
+  void _showTrustPopup(BuildContext context) {
+    final db = Provider.of<DatabaseService>(context, listen: false);
+    final currentParty = db.getAccount(party.id) ?? party;
+    final allTx =
+    db.getAllTransactions().where((t) => t.accountId == party.id).toList();
+    final metrics = PartyTrustMetrics.calculate(
+      party: currentParty,
+      transactions: allTx,
+      isUrdu: isUrdu,
+    );
+
+    PartyTrustPopup.show(
       context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _PersonalReviewCard(
-                party: party,
-                isUrdu: isUrdu,
-                fontFamily: fontFamily,
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: TextButton.styleFrom(
-                    backgroundColor: AppTheme.backgroundColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: UrduAwareText(
-                    isUrdu ? 'بند کریں' : 'Close',
-                    style: TextStyle(
-                      fontFamily: fontFamily,
-                      color: AppTheme.darkColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      party: currentParty,
+      metrics: metrics,
+      isUrdu: isUrdu,
+      fontFamily: fontFamily,
     );
   }
 
+  // ═════════════════════════════════════════════════════════════
+  // Delete confirmation — ویسا ہی
+  // ═════════════════════════════════════════════════════════════
   Future<void> _confirmDelete(BuildContext context) async {
     final db = Provider.of<DatabaseService>(context, listen: false);
     final transactions =
-        db.getAllTransactions().where((t) => t.accountId == party.id).toList();
+    db.getAllTransactions().where((t) => t.accountId == party.id).toList();
     final hasData = transactions.isNotEmpty || party.balance != 0;
 
     final nameController = TextEditingController();
@@ -255,7 +238,7 @@ class PartyToolsGridWidget extends StatelessWidget {
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: UrduAwareText(
             isUrdu ? 'پارٹی کو مستقل ختم کریں؟' : 'Permanently Delete Party?',
             style: TextStyle(
@@ -295,7 +278,7 @@ class PartyToolsGridWidget extends StatelessWidget {
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10)),
                     contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                   onChanged: (val) {
                     setState(() {
@@ -339,135 +322,128 @@ class PartyToolsGridWidget extends StatelessWidget {
   }
 }
 
+// ═════════════════════════════════════════════════════════════
+// PartyTrustMetrics — آپ کی موجودہ + 4 نئی فیلڈز
+// ═════════════════════════════════════════════════════════════
 class PartyTrustMetrics {
+  // ✅ موجودہ فیلڈز — ویسے ہی
   final double overallScore;
   final double paymentScore;
   final double balanceScore;
   final double agingScore;
-  final double durationScore;
-  final double activityScore;
+  final double paymentTimingScore;
+  final double fullPaymentScore;
   final String ratingTitle;
   final String recommendation;
   final Color badgeColor;
 
-  final int totalTransactions;
-  final int quickBillsCount;
-  final int fullyPaidQuickBills;
+  final int chargeEntryCount;
+  final int fullyPaidEntries;
+  final int partiallyPaidEntries;
+  final int unpaidEntries;
+  final double? averagePaymentDays;
   final double totalBilled;
   final double totalReceived;
   final double outstandingBalance;
   final double overdueBalance;
   final double unknownAgeBalance;
-  final bool hasRepeatProducts;
+  final bool hasTransactionHistory;
   final bool isSupplier;
+
+  // 🆕 نئی فیلڈز
+  final double trendPercent;
+  final String riskLevel;
+  final String paymentHabit;
+  final double suggestedLimit;
+  final double? lastTxAmount;
+  final int? lastTxDaysAgo;
+  final String? lastTxType;
 
   const PartyTrustMetrics({
     required this.overallScore,
     required this.paymentScore,
     required this.balanceScore,
     required this.agingScore,
-    required this.durationScore,
-    required this.activityScore,
+    required this.paymentTimingScore,
+    required this.fullPaymentScore,
     required this.ratingTitle,
     required this.recommendation,
     required this.badgeColor,
-    required this.totalTransactions,
-    required this.quickBillsCount,
-    required this.fullyPaidQuickBills,
+    required this.chargeEntryCount,
+    required this.fullyPaidEntries,
+    required this.partiallyPaidEntries,
+    required this.unpaidEntries,
+    required this.averagePaymentDays,
     required this.totalBilled,
     required this.totalReceived,
     required this.outstandingBalance,
     required this.overdueBalance,
     required this.unknownAgeBalance,
-    required this.hasRepeatProducts,
+    required this.hasTransactionHistory,
     required this.isSupplier,
+    // 🆕 نئی
+    required this.trendPercent,
+    required this.riskLevel,
+    required this.paymentHabit,
+    required this.suggestedLimit,
+    required this.lastTxAmount,
+    required this.lastTxDaysAgo,
+    required this.lastTxType,
   });
 
   factory PartyTrustMetrics.calculate({
     required Account party,
     required List<Transaction> transactions,
     required bool isUrdu,
+    DateTime? now,
   }) {
+    final referenceNow = now ?? DateTime.now();
     final ledger = PartyLedgerMetrics.calculate(
       transactions: transactions,
       openingBalance: party.initialBalance,
       balanceType: party.balanceType,
       partyCategory: party.category,
+      now: referenceNow,
     );
-    final qbMetrics = QuickBillTrustMetrics.fromTransactions(transactions);
     final txCount = transactions.length;
-    final quickBills = transactions.where((transaction) {
-      final isPartyCharge = isSupplier
-          ? transaction.type == 'expense'
-          : transaction.type == 'income';
-      return transaction.isQuickBill && isPartyCharge;
-    }).toList();
-    final qbFullyPaidCount = quickBills
-        .where((bill) => (ledger.outstandingQuickBills[bill.id] ?? 0) <= 0.01)
-        .length;
-    DateTime? earliestDate;
-    DateTime? latestDate;
-    for (final tx in transactions) {
-      if (earliestDate == null || tx.date.isBefore(earliestDate)) {
-        earliestDate = tx.date;
-      }
-      if (latestDate == null || tx.date.isAfter(latestDate)) {
-        latestDate = tx.date;
-      }
-    }
-
+    final isSupplier = AccountBalanceUtils.isSupplierCategory(party.category);
     final billed = ledger.totalBilled;
     final received = ledger.totalReceived;
     final currentBal = ledger.outstandingBalance;
-    final isSupplier = party.category.trim().toLowerCase() == 'supplier';
     final paymentScore = billed > 0
         ? (received / billed * 100).clamp(0.0, 100.0).toDouble()
         : (currentBal > 0 ? 0.0 : 50.0);
     final balanceScore = currentBal > 0
         ? (billed > 0 ? billed / (billed + currentBal) * 100 : 0.0)
-            .clamp(0.0, 100.0)
-            .toDouble()
+        .clamp(0.0, 100.0)
+        .toDouble()
         : 100.0;
 
-    double durationScore = 50.0;
-    if (earliestDate != null) {
-      final days =
-          DateTime.now().difference(earliestDate).inDays.clamp(0, 100000);
-      if (days > 365) {
-        durationScore = 100.0;
-      } else if (days > 90) {
-        durationScore = 85.0 + ((days - 90) / 275 * 15);
-      } else if (days > 30) {
-        durationScore = 70.0 + ((days - 30) / 60 * 15);
-      } else {
-        durationScore = 50.0 + (days / 30 * 20);
-      }
-      durationScore = durationScore.clamp(0.0, 100.0);
-    }
+    final averagePaymentDays = ledger.averagePaymentDays;
+    final paymentTimingScore = averagePaymentDays == null
+        ? (ledger.chargeEntryCount == 0 ? 50.0 : 0.0)
+        : averagePaymentDays <= 7
+        ? 100.0
+        : averagePaymentDays <= 15
+        ? 85.0
+        : averagePaymentDays <= 30
+        ? 70.0
+        : averagePaymentDays <= 60
+        ? 50.0
+        : averagePaymentDays <= 90
+        ? 30.0
+        : 10.0;
+    final fullPaymentScore = ledger.chargeEntryCount == 0
+        ? 50.0
+        : ledger.fullyPaidEntries / ledger.chargeEntryCount * 100;
 
-    double activityScore =
-        txCount == 0 ? 0.0 : (txCount * 8.0).clamp(20.0, 65.0);
-    if (qbMetrics.repeatProductCustomerCount > 0) {
-      activityScore += 10.0;
-    }
-    if (latestDate != null) {
-      final daysSinceLast =
-          DateTime.now().difference(latestDate).inDays.clamp(0, 100000);
-      if (daysSinceLast <= 30) {
-        activityScore += 15.0;
-      } else if (daysSinceLast <= 90) {
-        activityScore += 8.0;
-      }
-    }
-    activityScore = activityScore.clamp(0.0, 100.0);
-
-    final overall = txCount == 0 && party.initialBalance == 0
+    final overall = txCount == 0
         ? 50.0
         : (paymentScore * 0.30) +
-            (balanceScore * 0.20) +
-            (ledger.agingScore * 0.25) +
-            (durationScore * 0.10) +
-            (activityScore * 0.15);
+        (balanceScore * 0.10) +
+        (ledger.agingScore * 0.35) +
+        (paymentTimingScore * 0.10) +
+        (fullPaymentScore * 0.15);
     final clampedOverall = overall.clamp(0.0, 100.0).toDouble();
     final String title;
     final String recText;
@@ -476,11 +452,11 @@ class PartyTrustMetrics {
     if (txCount == 0) {
       title = party.initialBalance == 0
           ? (isUrdu
-              ? 'نیا کھاتہ — ابھی تاریخ نہیں'
-              : 'New account — no history yet')
+          ? 'نیا کھاتہ — ابھی تاریخ نہیں'
+          : 'New account — no history yet')
           : (isUrdu
-              ? 'ابتدائی بقایا — تاریخ دستیاب نہیں'
-              : 'Opening balance — age unknown');
+          ? 'ابتدائی بقایا — تاریخ دستیاب نہیں'
+          : 'Opening balance — age unknown');
       recText = isUrdu
           ? 'یہ صرف درج شدہ ریکارڈ کا اشارہ ہے، ادھار کی ضمانت نہیں۔'
           : 'This is an estimate from recorded entries, not a credit guarantee.';
@@ -489,50 +465,149 @@ class PartyTrustMetrics {
       if (clampedOverall >= 88) {
         title = isSupplier
             ? (isUrdu
-                ? 'سپلائر کھاتہ: بہت بہتر'
-                : 'Supplier ledger: very healthy')
+            ? 'سپلائر کو ہماری ادائیگی: بہت بہتر'
+            : 'Our payments to supplier: very healthy')
             : (isUrdu
-                ? '🌟 بہت اچھا ادائیگی ریکارڈ'
-                : '🌟 Excellent payment history');
-        recText = isUrdu
-            ? 'درج شدہ ادائیگیوں کا ریکارڈ اچھا ہے؛ نیا ادھار دینے سے پہلے اپنی پالیسی بھی دیکھیں۔'
-            : 'Recorded payment history is strong; use your own credit policy before extending credit.';
+            ? '🌟 گاہک کی ادائیگی کا ریکارڈ بہت اچھا'
+            : '🌟 Customer payment record: excellent');
+        recText = isSupplier
+            ? (isUrdu
+            ? 'اس سپلائر کو آپ کی درج شدہ ادائیگیاں اچھی ہیں؛ ادائیگی کی طے شدہ شرائط بھی دیکھیں۔'
+            : 'Your recorded payments to this supplier are strong; also check the agreed payment terms.')
+            : (isUrdu
+            ? 'گاہک سے درج شدہ وصولی اچھی ہے؛ نیا ادھار دینے سے پہلے اپنی پالیسی بھی دیکھیں۔'
+            : 'The customer’s recorded payment history is strong; use your credit policy before extending more credit.');
         color = const Color(0xFF16A34A);
       } else if (clampedOverall >= 75) {
         title = isSupplier
-            ? (isUrdu ? 'سپلائر کھاتہ: بہتر' : 'Supplier ledger: healthy')
-            : (isUrdu ? '⭐ اچھا ادائیگی ریکارڈ' : '⭐ Good payment history');
-        recText = isUrdu
-            ? 'کھاتہ مجموعی طور پر بہتر ہے، مگر بقایا کی عمر بھی دیکھیں۔'
-            : 'The ledger is generally healthy; also review the age of outstanding dues.';
+            ? (isUrdu
+            ? 'سپلائر کو ہماری ادائیگی: بہتر'
+            : 'Our payments to supplier: healthy')
+            : (isUrdu
+            ? '⭐ گاہک کا ادائیگی ریکارڈ اچھا'
+            : '⭐ Customer payment record: good');
+        recText = isSupplier
+            ? (isUrdu
+            ? 'سپلائر کو ادائیگی کا ریکارڈ بہتر ہے، مگر واجب رقم کی عمر بھی دیکھیں۔'
+            : 'Your supplier payments are generally on track; also review the age of amounts payable.')
+            : (isUrdu
+            ? 'گاہک کی درج شدہ ادائیگی بہتر ہے، مگر بقایا کی عمر بھی دیکھیں۔'
+            : 'The customer’s recorded payments are generally on track; also review the age of outstanding dues.');
         color = const Color(0xFF0284C7);
       } else if (clampedOverall >= 55) {
         title = isSupplier
-            ? (isUrdu ? 'سپلائر کھاتہ: درمیانہ' : 'Supplier ledger: moderate')
-            : (isUrdu ? '⚡ درمیانہ ادائیگی ریکارڈ' : '⚡ Fair payment history');
-        recText = isUrdu
-            ? 'کچھ رقم بقایا یا پرانی ہو سکتی ہے؛ نیا ادھار محدود رکھیں۔'
-            : 'Some dues may be outstanding or aging; consider limiting additional credit.';
+            ? (isUrdu
+            ? 'سپلائر کو ہماری ادائیگی: درمیانہ'
+            : 'Our payments to supplier: fair')
+            : (isUrdu
+            ? '⚡ گاہک کا ادائیگی ریکارڈ درمیانہ'
+            : '⚡ Customer payment record: fair');
+        recText = isSupplier
+            ? (isUrdu
+            ? 'سپلائر کو کچھ رقم واجب یا پرانی ہو سکتی ہے؛ ادائیگی کی شرائط کا جائزہ لیں۔'
+            : 'Some supplier amounts may be due or aging; review your payment terms.')
+            : (isUrdu
+            ? 'گاہک سے کچھ رقم بقایا یا پرانی ہو سکتی ہے؛ نیا ادھار محدود رکھنے پر غور کریں۔'
+            : 'Some customer dues may be outstanding or aging; consider limiting additional credit.');
         color = const Color(0xFFD97706);
       } else if (clampedOverall >= 35) {
         title = isSupplier
             ? (isUrdu
-                ? 'سپلائر کھاتہ: توجہ درکار'
-                : 'Supplier ledger: needs attention')
-            : (isUrdu ? '⚠️ احتیاط کریں' : '⚠️ Needs caution');
-        recText = isUrdu
-            ? 'بقایا اور تاخیر کا جائزہ لے کر اگلا لین دین طے کریں۔'
-            : 'Review outstanding and overdue amounts before the next transaction.';
+            ? 'سپلائر کو ہماری ادائیگی: توجہ درکار'
+            : 'Our payments to supplier: needs attention')
+            : (isUrdu
+            ? '⚠️ گاہک کی ادائیگی: احتیاط درکار'
+            : '⚠️ Customer payments: needs caution');
+        recText = isSupplier
+            ? (isUrdu
+            ? 'سپلائر کو واجب اور تاخیر شدہ ادائیگیوں کا جائزہ لیں۔'
+            : 'Review amounts payable to the supplier and any overdue payments.')
+            : (isUrdu
+            ? 'گاہک کے بقایا اور تاخیر کا جائزہ لے کر اگلا لین دین طے کریں۔'
+            : 'Review the customer’s outstanding and overdue dues before the next transaction.');
         color = const Color(0xFFEA580C);
       } else {
         title = isSupplier
-            ? (isUrdu ? 'سپلائر کھاتہ: کمزور' : 'Supplier ledger: poor')
-            : (isUrdu ? '🚨 کمزور ادائیگی ریکارڈ' : '🚨 Weak payment history');
-        recText = isUrdu
-            ? 'ریکارڈ میں بقایا زیادہ یا پرانا ہے؛ اگلا قدم طے کرنے سے پہلے تصدیق کریں۔'
-            : 'Recorded dues are high or old; verify the ledger before deciding what to do next.';
+            ? (isUrdu
+            ? 'سپلائر کو ہماری ادائیگی: کمزور'
+            : 'Our payments to supplier: poor')
+            : (isUrdu
+            ? '🚨 گاہک کا ادائیگی ریکارڈ کمزور'
+            : '🚨 Customer payment record: poor');
+        recText = isSupplier
+            ? (isUrdu
+            ? 'سپلائر کو واجب رقم زیادہ یا پرانی ہے؛ کھاتے اور طے شدہ تاریخوں کی تصدیق کریں۔'
+            : 'Amounts payable to the supplier are high or old; verify the ledger and agreed due dates.')
+            : (isUrdu
+            ? 'گاہک سے بقایا زیادہ یا پرانا ہے؛ نیا ادھار دینے سے پہلے کھاتے کی تصدیق کریں۔'
+            : 'The customer’s recorded dues are high or old; verify the ledger before extending more credit.');
         color = const Color(0xFFDC2626);
       }
+    }
+
+    // 🆕 Trend
+    final trendPercent = _calculateTrend(
+      transactions: transactions,
+      isSupplier: isSupplier,
+      referenceNow: referenceNow,
+    );
+
+    // 🆕 Risk
+    final String riskLevel;
+    if (txCount == 0) {
+      riskLevel = 'unknown';
+    } else if (clampedOverall >= 75 && ledger.overdueBalance < 5000) {
+      riskLevel = 'low';
+    } else if (clampedOverall >= 50) {
+      riskLevel = 'medium';
+    } else {
+      riskLevel = 'high';
+    }
+
+    // 🆕 Habit
+    final String paymentHabit;
+    if (averagePaymentDays == null) {
+      paymentHabit = 'none';
+    } else if (averagePaymentDays <= 30) {
+      paymentHabit = 'onTime';
+    } else if (averagePaymentDays <= 60) {
+      paymentHabit = 'slightDelay';
+    } else {
+      paymentHabit = 'late';
+    }
+
+    // 🆕 Limit
+    final double suggestedLimit;
+    if (txCount == 0) {
+      suggestedLimit = 5000;
+    } else if (riskLevel == 'low') {
+      suggestedLimit = (billed * 0.5).clamp(0.0, double.infinity);
+    } else if (riskLevel == 'medium') {
+      suggestedLimit = (billed * 0.3).clamp(0.0, double.infinity);
+    } else {
+      suggestedLimit = 0;
+    }
+
+    // 🆕 Last Tx
+    double? lastTxAmount;
+    int? lastTxDaysAgo;
+    String? lastTxType;
+    if (transactions.isNotEmpty) {
+      final sorted = transactions.toList()
+        ..sort((a, b) => b.date.compareTo(a.date));
+      final last = sorted.first;
+      final columns = AccountBalanceUtils.transactionColumns(last);
+      final charge = isSupplier ? columns.credit : columns.debit;
+      final payment = isSupplier ? columns.debit : columns.credit;
+
+      if (charge > payment) {
+        lastTxAmount = charge;
+        lastTxType = 'purchase';
+      } else {
+        lastTxAmount = payment;
+        lastTxType = 'payment';
+      }
+      lastTxDaysAgo = referenceNow.difference(last.date).inDays.clamp(0, 99999);
     }
 
     return PartyTrustMetrics(
@@ -540,462 +615,73 @@ class PartyTrustMetrics {
       paymentScore: paymentScore,
       balanceScore: balanceScore,
       agingScore: ledger.agingScore,
-      durationScore: durationScore,
-      activityScore: activityScore,
+      paymentTimingScore: paymentTimingScore,
+      fullPaymentScore: fullPaymentScore,
       ratingTitle: title,
       recommendation: recText,
       badgeColor: color,
-      totalTransactions: txCount,
-      quickBillsCount: quickBills.length,
-      fullyPaidQuickBills: qbFullyPaidCount,
+      chargeEntryCount: ledger.chargeEntryCount,
+      fullyPaidEntries: ledger.fullyPaidEntries,
+      partiallyPaidEntries: ledger.partiallyPaidEntries,
+      unpaidEntries: ledger.unpaidEntries,
+      averagePaymentDays: averagePaymentDays,
       totalBilled: billed,
       totalReceived: received,
       outstandingBalance: currentBal,
       overdueBalance: ledger.overdueBalance,
       unknownAgeBalance: ledger.unknownAgeBalance,
-      hasRepeatProducts: qbMetrics.repeatProductCustomerCount > 0,
+      hasTransactionHistory: txCount > 0,
       isSupplier: isSupplier,
-    );
-  }
-}
-
-class _PersonalReviewCard extends StatelessWidget {
-  final Account party;
-  final bool isUrdu;
-  final String? fontFamily;
-
-  const _PersonalReviewCard({
-    required this.party,
-    required this.isUrdu,
-    this.fontFamily,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final db = Provider.of<DatabaseService>(context, listen: false);
-    final currentParty = db.getAccount(party.id) ?? party;
-    final allTx = db
-        .getAllTransactions()
-        .where((t) => t.accountId == party.id && t.partnershipId == null)
-        .toList();
-
-    final metrics = PartyTrustMetrics.calculate(
-      party: currentParty,
-      transactions: allTx,
-      isUrdu: isUrdu,
-    );
-
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Header Row
-          Row(
-            children: [
-              Icon(PhosphorIcons.shieldCheck(),
-                  size: 20, color: metrics.badgeColor),
-              const SizedBox(width: 8),
-              Expanded(
-                child: UrduAwareText(
-                  isUrdu ? 'پارٹی کا پھروسہ انڈیکس' : 'Party Trust Index',
-                  style: TextStyle(
-                    fontFamily: fontFamily,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.darkColor,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppTheme.expenseColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.lock, size: 11, color: AppTheme.expenseColor),
-                    const SizedBox(width: 4),
-                    UrduAwareText(
-                      isUrdu ? 'صرف آپ' : 'Only you',
-                      style: TextStyle(
-                        fontFamily: fontFamily,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.expenseColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Overall Score Card Box
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  metrics.badgeColor.withValues(alpha: 0.12),
-                  metrics.badgeColor.withValues(alpha: 0.04),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: metrics.badgeColor.withValues(alpha: 0.25),
-                width: 1.5,
-              ),
-            ),
-            child: Row(
-              children: [
-                // Score Circle / Badge
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: metrics.badgeColor,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: metrics.badgeColor.withValues(alpha: 0.35),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    '${metrics.overallScore.round()}%',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                // Rating Title & Party Name
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      UrduAwareText(
-                        currentParty.name,
-                        style: TextStyle(
-                          fontFamily: fontFamily,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.darkColor,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 3),
-                      UrduAwareText(
-                        metrics.ratingTitle,
-                        style: TextStyle(
-                          fontFamily: fontFamily,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w800,
-                          color: metrics.badgeColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          _buildLedgerSummary(metrics, isUrdu, fontFamily),
-          const SizedBox(height: 16),
-
-          // Section Title: Detailed Breakdown
-          UrduAwareText(
-            isUrdu
-                ? 'الگ الگ شعبوں میں پھروسہ فیصد:'
-                : 'Trust Breakdown by Category:',
-            style: TextStyle(
-              fontFamily: fontFamily,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // 1. Payment Clearance Rate
-          _buildMetricProgressBar(
-            label:
-                isUrdu ? 'ریکارڈ میں کل وصولی' : 'Recorded Payment Clearance',
-            score: metrics.paymentScore,
-            color: const Color(0xFF16A34A),
-            icon: PhosphorIcons.checkCircle(),
-          ),
-
-          // 2. Balance & Credit Health
-          _buildMetricProgressBar(
-            label: isUrdu ? 'موجودہ بقایا' : 'Current Outstanding Balance',
-            score: metrics.balanceScore,
-            color: const Color(0xFF0284C7),
-            icon: PhosphorIcons.scales(),
-          ),
-
-          _buildMetricProgressBar(
-            label: isUrdu ? 'بقایا کی عمر' : 'Outstanding Age',
-            score: metrics.agingScore,
-            color: const Color(0xFFEA580C),
-            icon: PhosphorIcons.clock(),
-          ),
-
-          // 4. Relationship Duration & Loyalty
-          _buildMetricProgressBar(
-            label: isUrdu
-                ? 'تعلق اور کاروبار کا دورانیہ'
-                : 'Relationship Duration',
-            score: metrics.durationScore,
-            color: const Color(0xFF8B5CF6),
-            icon: PhosphorIcons.handshake(),
-          ),
-
-          // 5. Transaction Activity & Repeat Consistency
-          _buildMetricProgressBar(
-            label: isUrdu
-                ? 'لین دین کی باقاعدگی اور تسلسل'
-                : 'Transaction Activity & Consistency',
-            score: metrics.activityScore,
-            color: const Color(0xFFF59E0B),
-            icon: PhosphorIcons.chartLineUp(),
-          ),
-
-          if (metrics.quickBillsCount > 0) ...[
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(PhosphorIcons.receipt(),
-                      size: 14, color: AppTheme.darkColor),
-                  const SizedBox(width: 6),
-                  UrduAwareText(
-                    isUrdu
-                        ? 'فوری بلز: ${metrics.fullyPaidQuickBills}/${metrics.quickBillsCount} مکمل ادا شدہ'
-                        : 'Quick Bills: ${metrics.fullyPaidQuickBills}/${metrics.quickBillsCount} fully paid',
-                    style: TextStyle(
-                      fontFamily: fontFamily,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.darkColor,
-                    ),
-                  ),
-                  if (metrics.hasRepeatProducts) ...[
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF16A34A).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: UrduAwareText(
-                        isUrdu ? 'مکرر پروڈکٹ ڈیمانڈ' : 'Repeat Buyer',
-                        style: TextStyle(
-                          fontFamily: fontFamily,
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF16A34A),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 14),
-
-          // Smart Recommendation Box
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(PhosphorIcons.lightbulb(),
-                    size: 18, color: metrics.badgeColor),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: UrduAwareText(
-                    metrics.recommendation,
-                    style: TextStyle(
-                      fontFamily: fontFamily,
-                      fontSize: 11.5,
-                      height: 1.35,
-                      color: AppTheme.darkColor,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Footer note
-          UrduAwareText(
-            isUrdu
-                ? 'یہ حساب آپ کے مکمل لین دین اور کھاتہ ریکارڈ کی بنیاد پر ہے؛ پارٹی کو نظر نہیں آتا۔'
-                : 'Calculated from full ledger history; private to you.',
-            style: TextStyle(
-              fontFamily: fontFamily,
-              fontSize: 10.5,
-              color: Colors.grey.shade500,
-            ),
-          ),
-        ],
-      ),
+      trendPercent: trendPercent,
+      riskLevel: riskLevel,
+      paymentHabit: paymentHabit,
+      suggestedLimit: suggestedLimit,
+      lastTxAmount: lastTxAmount,
+      lastTxDaysAgo: lastTxDaysAgo,
+      lastTxType: lastTxType,
     );
   }
 
-  Widget _buildLedgerSummary(
-    PartyTrustMetrics metrics,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
-    final balanceLabel = metrics.outstandingBalance < -0.01
-        ? (isUrdu ? 'ایڈوانس/کریڈٹ' : 'Advance / credit')
-        : (isUrdu ? 'موجودہ بقایا' : 'Current due');
-    final limitation = metrics.isSupplier
-        ? (isUrdu
-            ? 'یہ سپلائر کے کھاتے اور آپ کی ادائیگیوں کی کیفیت ہے، سپلائر کی ساکھ نہیں۔'
-            : 'This reflects your supplier ledger and settlements, not the supplier’s reliability.')
-        : (isUrdu
-            ? 'کسی بل سے منسلک نہ ہونے والی وصولی پرانی رقم میں پہلے لگائی گئی ہے؛ اسکور صرف درج شدہ ریکارڈ کا اندازہ ہے۔'
-            : 'Unlinked payments are applied to the oldest dues first. This is an estimate from recorded entries, not a credit guarantee.');
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.backgroundColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          UrduAwareText(
-            '$balanceLabel: ${Formatters.formatAmountWithCurrency(metrics.outstandingBalance.abs())}',
-            style: TextStyle(
-              fontFamily: fontFamily,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.darkColor,
-            ),
-          ),
-          const SizedBox(height: 3),
-          UrduAwareText(
-            isUrdu
-                ? '30 دن سے پرانا: ${Formatters.formatAmountWithCurrency(metrics.overdueBalance)}'
-                : 'Over 30 days: ${Formatters.formatAmountWithCurrency(metrics.overdueBalance)}',
-            style: TextStyle(
-              fontFamily: fontFamily,
-              fontSize: 11,
-              color: AppTheme.textSecondary,
-            ),
-          ),
-          if (metrics.unknownAgeBalance > 0.01) ...[
-            const SizedBox(height: 3),
-            UrduAwareText(
-              isUrdu
-                  ? 'عمر نامعلوم (ابتدائی بقایا): ${Formatters.formatAmountWithCurrency(metrics.unknownAgeBalance)}'
-                  : 'Age unknown (opening balance): ${Formatters.formatAmountWithCurrency(metrics.unknownAgeBalance)}',
-              style: TextStyle(
-                fontFamily: fontFamily,
-                fontSize: 11,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-          ],
-          const SizedBox(height: 6),
-          UrduAwareText(
-            limitation,
-            style: TextStyle(
-              fontFamily: fontFamily,
-              fontSize: 10.5,
-              color: AppTheme.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricProgressBar({
-    required String label,
-    required double score,
-    required Color color,
-    required IconData icon,
+  // 🆕 Trend helper
+  static double _calculateTrend({
+    required List<Transaction> transactions,
+    required bool isSupplier,
+    required DateTime referenceNow,
   }) {
-    final roundScore = score.round();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 6),
-              Expanded(
-                child: UrduAwareText(
-                  label,
-                  style: TextStyle(
-                    fontFamily: fontFamily,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.darkColor,
-                  ),
-                ),
-              ),
-              UrduAwareText(
-                '$roundScore%',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: score / 100.0,
-              minHeight: 6,
-              backgroundColor: color.withValues(alpha: 0.12),
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-            ),
-          ),
-        ],
-      ),
-    );
+    if (transactions.length < 2) return 0.0;
+
+    final recentStart = referenceNow.subtract(const Duration(days: 30));
+    final previousStart = referenceNow.subtract(const Duration(days: 60));
+
+    double recentCharge = 0, recentPayment = 0;
+    for (final tx in transactions) {
+      if (!tx.date.isAfter(recentStart)) continue;
+      final col = AccountBalanceUtils.transactionColumns(tx);
+      final charge = isSupplier ? col.credit : col.debit;
+      final payment = isSupplier ? col.debit : col.credit;
+      recentCharge += charge;
+      recentPayment += payment;
+    }
+
+    double prevCharge = 0, prevPayment = 0;
+    for (final tx in transactions) {
+      if (tx.date.isAfter(recentStart)) continue;
+      if (!tx.date.isAfter(previousStart)) continue;
+      final col = AccountBalanceUtils.transactionColumns(tx);
+      final charge = isSupplier ? col.credit : col.debit;
+      final payment = isSupplier ? col.debit : col.credit;
+      prevCharge += charge;
+      prevPayment += payment;
+    }
+
+    if (prevCharge == 0 && prevPayment == 0) return 0.0;
+
+    final recentRatio = recentCharge > 0 ? recentPayment / recentCharge : 0.0;
+    final prevRatio = prevCharge > 0 ? prevPayment / prevCharge : 0.0;
+
+    if (prevRatio == 0) {
+      return recentRatio > 0 ? 100.0 : 0.0;
+    }
+    return ((recentRatio - prevRatio) / prevRatio) * 100;
   }
 }
