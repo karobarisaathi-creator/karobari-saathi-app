@@ -278,120 +278,113 @@ class StockDetailScreen extends StatelessWidget {
             // ═══════════════════════════════════════
             // GALLERY SECTION — Full width image
             // ═══════════════════════════════════════
-            Container(
-              color: AppTheme.backgroundColor,
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: AspectRatio(
-                  aspectRatio: 16 / 10,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Gradient background
-                      Container(
+            AspectRatio(
+              aspectRatio: 16 / 10,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Gradient background
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          status.color.withValues(alpha: 0.15),
+                          status.color.withValues(alpha: 0.05),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Image with tap to zoom
+                  GestureDetector(
+                    onTap: () {
+                      if (item.allImages.isNotEmpty) {
+                        openFullScreenImageGallery(
+                          context,
+                          item.allImages,
+                          initialIndex: 0,
+                        );
+                      }
+                    },
+                    child: _buildItemImage(item, status.color),
+                  ),
+
+                  // Featured badge (top-right)
+                  if (item.featured)
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                          gradient: const LinearGradient(
                             colors: [
-                              status.color.withValues(alpha: 0.15),
-                              status.color.withValues(alpha: 0.05),
+                              AppTheme.verifiedGold,
+                              AppTheme.verifiedGold,
                             ],
                           ),
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.verifiedGold
+                                  .withValues(alpha: 0.45),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                         ),
-                      ),
-                      // Image with tap to zoom
-                      GestureDetector(
-                        onTap: () {
-                          if (item.allImages.isNotEmpty) {
-                            openFullScreenImageGallery(
-                              context,
-                              item.allImages,
-                              initialIndex: 0,
-                            );
-                          }
-                        },
-                        child: _buildItemImage(item, status.color),
-                      ),
-
-                      // Featured badge (top-right)
-                      if (item.featured)
-                        Positioned(
-                          top: 10,
-                          right: 10,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.star_rounded,
+                              size: 12,
+                              color: Colors.white,
                             ),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  AppTheme.verifiedGold,
-                                  AppTheme.verifiedGold,
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(999),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppTheme.verifiedGold
-                                      .withValues(alpha: 0.45),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.star_rounded,
-                                  size: 12,
-                                  color: Colors.white,
-                                ),
-                                const SizedBox(width: 4),
-                                UrduAwareText(
-                                  isUrdu ? 'نمایاں' : 'Featured',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                    fontFamily: fontFamily,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                      // Image count badge (bottom-right)
-                      if (item.allImages.length > 1)
-                        Positioned(
-                          bottom: 10,
-                          right: 10,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.darkColor.withValues(alpha: 0.65),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: UrduAwareText(
-                              '1 / ${item.allImages.length}',
-                              style: const TextStyle(
-                                fontSize: 10,
+                            const SizedBox(width: 4),
+                            UrduAwareText(
+                              isUrdu ? 'نمایاں' : 'Featured',
+                              style: TextStyle(
+                                fontSize: 10.5,
                                 fontWeight: FontWeight.w800,
                                 color: Colors.white,
+                                fontFamily: fontFamily,
                               ),
                             ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  // Image count badge (bottom-right)
+                  if (item.allImages.length > 1)
+                    Positioned(
+                      bottom: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.darkColor.withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: UrduAwareText(
+                          '1 / ${item.allImages.length}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
                           ),
                         ),
-                    ],
-                  ),
-                ),
+                      ),
+                    ),
+                ],
               ),
             ),
 
@@ -470,7 +463,7 @@ class StockDetailScreen extends StatelessWidget {
                               ),
                               const SizedBox(width: 3),
                               UrduAwareText(
-                                ' ${_formatQuantity(minAlert)} $unitLabel',
+                                '${isUrdu ? "کم از کم" : "Min"}: ${_formatQuantity(minAlert)} $unitLabel',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w800,
@@ -1633,7 +1626,7 @@ class StockDetailScreen extends StatelessWidget {
                       child: SizedBox(
                         width: 60,
                         child: UrduAwareText(
-                          '${isUrdu ? "کم از کم" : "Min"} ${_formatQuantity(minAlert)}',
+                          ' ${_formatQuantity(minAlert)}',
                           style: TextStyle(
                             fontSize: 8.5,
                             fontWeight: FontWeight.w800,
@@ -1675,7 +1668,7 @@ class StockDetailScreen extends StatelessWidget {
     final path = images.isNotEmpty ? images.first : item.imagePath;
     final fallback = Icon(
       PhosphorIcons.package(PhosphorIconsStyle.duotone),
-      size: 38,
+      size: 48,
       color: statusColor,
     );
 
@@ -1685,20 +1678,17 @@ class StockDetailScreen extends StatelessWidget {
     final isRemote =
         uri != null && (uri.scheme == 'https' || uri.scheme == 'http');
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: isRemote
-          ? Image.network(
-              path,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => fallback,
-            )
-          : Image.file(
-              File(path),
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => fallback,
-            ),
-    );
+    return isRemote
+        ? Image.network(
+            path,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => fallback,
+          )
+        : Image.file(
+            File(path),
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => fallback,
+          );
   }
 }
 
