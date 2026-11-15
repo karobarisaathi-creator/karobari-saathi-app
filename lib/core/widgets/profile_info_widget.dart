@@ -113,13 +113,11 @@ class ProfileInfoWidget extends StatelessWidget {
     final effectiveTextColor = textColor ?? AppTheme.darkColor;
     final effectiveSubtitleColor = subtitleColor ?? AppTheme.textSecondary;
 
-    final displayCategory = category != null
-        ? _getTranslatedCategory(category!, isUrdu)
-        : '';
+    final displayCategory =
+        category != null ? _getTranslatedCategory(category!, isUrdu) : '';
 
-    final displayName = name.trim().isEmpty
-        ? (isUrdu ? 'نامعلوم' : 'Unknown')
-        : name;
+    final displayName =
+        name.trim().isEmpty ? (isUrdu ? 'نامعلوم' : 'Unknown') : name;
 
     final size = customSize ?? (isLarge ? 50 : 36);
     final radius = borderRadius ?? 12.0;
@@ -234,7 +232,8 @@ class ProfileInfoWidget extends StatelessWidget {
         placeholder: (context, url) => Container(
           color: AppTheme.darkColor.withValues(alpha: 0.05),
         ),
-        errorWidget: (context, url, error) => _buildPlaceholderImage(displayName),
+        errorWidget: (context, url, error) =>
+            _buildPlaceholderImage(displayName),
       );
     }
 
@@ -317,7 +316,7 @@ class ProfileInfoWidget extends StatelessWidget {
               children: [
                 if (phone.isNotEmpty)
                   UrduAwareText(
-                    phone,
+                    Formatters.formatPhoneNumber(phone),
                     style: TextStyle(
                       fontSize: 13,
                       color: effectiveSubtitleColor,
@@ -455,7 +454,8 @@ class ProfileInfoWidget extends StatelessWidget {
                   ],
                 ),
               ],
-              if (phone.isNotEmpty || (address != null && address!.isNotEmpty)) ...[
+              if (phone.isNotEmpty ||
+                  (address != null && address!.isNotEmpty)) ...[
                 SizedBox(height: verticalSpacing),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -471,12 +471,15 @@ class ProfileInfoWidget extends StatelessWidget {
                             fontFamily: phoneHasUrdu ? fontFamily : '',
                           ),
                         ),
-                      if (phone.isNotEmpty && address != null && address!.isNotEmpty)
+                      if (phone.isNotEmpty &&
+                          address != null &&
+                          address!.isNotEmpty)
                         UrduAwareText(
                           '  •  ',
                           style: TextStyle(
                             fontSize: 13,
-                            color: effectiveSubtitleColor.withValues(alpha: 0.6),
+                            color:
+                                effectiveSubtitleColor.withValues(alpha: 0.6),
                           ),
                         ),
                       if (address != null && address!.isNotEmpty)
@@ -486,7 +489,8 @@ class ProfileInfoWidget extends StatelessWidget {
                             fontSize: 13,
                             color: addressColor ?? effectiveSubtitleColor,
                             fontFamily: fontFamily,
-                            fontWeight: isAddressBold ? FontWeight.w900 : fontWeight,
+                            fontWeight:
+                                isAddressBold ? FontWeight.w900 : fontWeight,
                             height: 1.0,
                           ),
                         ),
@@ -512,9 +516,11 @@ class ProfileInfoWidget extends StatelessWidget {
               if (reputationLabel != null) ...[
                 SizedBox(height: verticalSpacing),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: reputationBgColor ?? AppTheme.themeColor.withValues(alpha: 0.1),
+                    color: reputationBgColor ??
+                        AppTheme.themeColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: UrduAwareText(

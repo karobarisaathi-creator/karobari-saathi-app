@@ -198,20 +198,14 @@ class _PartyCardState extends State<PartyCard> {
                             if (data != null) {
                               if (data['accountId'] == widget.party.id)
                                 return true;
-                              final senderPhone = data['senderPhone']
-                                  ?.toString()
-                                  .replaceAll(RegExp(r'\D'), '');
-                              final partyPhone = widget.party.phone
-                                  .replaceAll(RegExp(r'\D'), '');
-                              if (senderPhone != null &&
-                                  senderPhone.isNotEmpty &&
-                                  partyPhone.isNotEmpty) {
-                                if (senderPhone.endsWith(partyPhone.length > 10
-                                    ? partyPhone
-                                        .substring(partyPhone.length - 10)
-                                    : partyPhone)) {
-                                  return true;
-                                }
+                              final senderPhone =
+                                  data['senderPhone']?.toString() ?? '';
+                              if (senderPhone.isNotEmpty &&
+                                  Formatters.phoneNumbersMatch(
+                                    senderPhone,
+                                    widget.party.phone,
+                                  )) {
+                                return true;
                               }
                             }
                             return false;
@@ -393,7 +387,8 @@ class _PartyCardState extends State<PartyCard> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
-                                PhosphorIcons.shieldCheck(PhosphorIconsStyle.fill),
+                                PhosphorIcons.shieldCheck(
+                                    PhosphorIconsStyle.fill),
                                 size: 16,
                                 color: trustMetrics.badgeColor,
                               ),

@@ -195,8 +195,11 @@ class ShopCardWidget extends StatelessWidget {
                               ],
                             ],
                           ),
-                          if (shop.area.isNotEmpty ||
-                              shop.latitude != null) ...[
+                          if ((shop.latitude != null &&
+                                      shop.longitude != null ||
+                                  shop.area.trim().length >= 3) &&
+                              ((shop.showArea && shop.area.trim().isNotEmpty) ||
+                                  shop.showDistance)) ...[
                             const SizedBox(height: 4),
                             LocationChipWidget(
                               latitude: shop.latitude,
@@ -205,7 +208,8 @@ class ShopCardWidget extends StatelessWidget {
                               isUrdu: isUrdu,
                               isChip: false,
                               showAddress: shop.showArea,
-                              showTime: true,
+                              showDistance: shop.showDistance,
+                              showTime: shop.showDistance,
                               color: AppTheme.themeColor,
                               style: const TextStyle(
                                 fontSize: 10.5,

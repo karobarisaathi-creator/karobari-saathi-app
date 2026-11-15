@@ -270,7 +270,7 @@ class _PartyListScreenState extends State<PartyListScreen> {
       bool isUrdu, String fontFamily) {
     final filteredParties = parties.where((p) {
       return p.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          p.phone.contains(_searchQuery);
+          Formatters.phoneMatchesSearch(p.phone, _searchQuery);
     }).toList();
 
     filteredParties.sort((a, b) => _isAscending

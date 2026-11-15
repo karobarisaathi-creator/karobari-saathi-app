@@ -9,6 +9,7 @@ import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/party_card.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
+import 'package:account_app/core/utils/formatters.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// گاہک منتخب کرنے کی شیٹ — نقد گاہک یا موجودہ پارٹیوں میں سے کوئی ایک۔
@@ -51,7 +52,7 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
         .where((a) =>
             _query.isEmpty ||
             a.name.toLowerCase().contains(_query.toLowerCase()) ||
-            a.phone.contains(_query))
+            Formatters.phoneMatchesSearch(a.phone, _query))
         .toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
@@ -124,7 +125,8 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                       ListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         itemCount: parties.length,
                         itemBuilder: (context, index) {
                           final account = parties[index];

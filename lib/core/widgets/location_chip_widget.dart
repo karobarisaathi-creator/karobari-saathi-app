@@ -11,6 +11,7 @@ class LocationChipWidget extends StatefulWidget {
   final double? longitude;
   final String? address;
   final bool showAddress;
+  final bool showDistance;
   final bool showTime;
   final bool isUrdu;
   final bool isChip;
@@ -27,6 +28,7 @@ class LocationChipWidget extends StatefulWidget {
     this.longitude,
     this.address,
     this.showAddress = true,
+    this.showDistance = true,
     this.showTime = true,
     this.isUrdu = true,
     this.isChip = true,
@@ -133,6 +135,7 @@ class _LocationChipWidgetState extends State<LocationChipWidget> {
     if (oldWidget.latitude != widget.latitude ||
         oldWidget.longitude != widget.longitude ||
         oldWidget.address != widget.address ||
+        oldWidget.showDistance != widget.showDistance ||
         oldWidget.speedKmh != widget.speedKmh) {
       _destLat = widget.latitude;
       _destLon = widget.longitude;
@@ -143,6 +146,15 @@ class _LocationChipWidgetState extends State<LocationChipWidget> {
   Future<void> _computeDistance() async {
     if (!mounted) return;
     final id = ++_requestId; // capture current request
+
+    if (!widget.showDistance) {
+      setState(() {
+        _calculating = false;
+        _distanceText = null;
+        _timeText = null;
+      });
+      return;
+    }
 
     setState(() => _calculating = true);
 
@@ -266,7 +278,8 @@ class _LocationChipWidgetState extends State<LocationChipWidget> {
     } catch (e, st) {
       debugPrint('LocationChip openMaps error: $e\n$st');
       if (mounted) {
-        _showSnack(widget.isUrdu ? 'نقشہ کھولنے میں خرابی' : 'Error opening maps');
+        _showSnack(
+            widget.isUrdu ? 'نقشہ کھولنے میں خرابی' : 'Error opening maps');
       }
     }
   }
@@ -294,13 +307,15 @@ class _LocationChipWidgetState extends State<LocationChipWidget> {
       parts.add(widget.address!.trim());
     }
 
-    final dist = _distanceText ??
-        (_calculating
-            ? (widget.isUrdu ? 'فاصلہ معلوم ہو رہا ہے...' : 'Calculating distance...')
-            : (widget.isUrdu
-                ? 'فاصلہ دستیاب نہیں'
-                : 'Distance unavailable'));
-    parts.add(dist);
+    if (widget.showDistance) {
+      final dist = _distanceText ??
+          (_calculating
+              ? (widget.isUrdu
+                  ? 'فاصلہ معلوم ہو رہا ہے...'
+                  : 'Calculating distance...')
+              : (widget.isUrdu ? 'فاصلہ دستیاب نہیں' : 'Distance unavailable'));
+      parts.add(dist);
+    }
 
     if (widget.showTime && _timeText != null) parts.add(_timeText!);
 

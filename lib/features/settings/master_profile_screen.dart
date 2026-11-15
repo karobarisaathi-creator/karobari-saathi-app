@@ -67,8 +67,14 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
       if (!success) {
         AppToast.error(
           context,
-          _controller.errorMessage ??
-              (isUrdu ? 'پروفائل محفوظ نہیں ہو سکا' : 'Unable to save profile'),
+          _controller.locationUnavailable
+              ? (isUrdu
+                  ? 'دکان کا پتہ نقشے پر نہیں ملا۔ پتہ درست کریں یا لوکیشن کی اجازت دے کر دوبارہ کوشش کریں۔'
+                  : 'Shop address could not be located. Correct the address or allow location access and try again.')
+              : (_controller.errorMessage ??
+                  (isUrdu
+                      ? 'پروفائل محفوظ نہیں ہو سکا'
+                      : 'Unable to save profile')),
         );
         return;
       }
@@ -235,8 +241,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                               Expanded(
                                 child: UrduAwareText(
                                   isUrdu
-                                      ? '🏪 دکان رجسٹر کرنے کی تفصیل:\nاگر آپ "دکان کا نام" اور "دکان کا پتہ" دونوں درج کریں گے، تو آپ کی دکان "قریبی دکاندار" کی فہرست میں شامل ہو جائے گی اور علاقے کے تمام گاہک آپ کا اسٹاک، سامان اور کیٹلاگ لائیو دیکھ سکیں گے۔'
-                                      : '🏪 Shop Registration Details:\nBy entering both Shop Name and Address, your shop will be listed under "Nearby Shops". Local customers will be able to browse your live stock, items, and catalog.',
+                                      ? '🏪 دکان رجسٹر کرنے کی تفصیل:\nدکان کا نام درج کریں؛ پتہ درج کریں تو اسی سے مقام لیا جائے گا۔ پتہ خالی چھوڑنے پر ایپ آپ کی موجودہ لوکیشن استعمال کرے گی۔ پھر آپ کی دکان "قریبی دکاندار" میں دکھائی دے گی۔'
+                                      : '🏪 Shop Registration Details:\nEnter a shop name and address to list your shop under "Nearby Shops". If the address is left blank, the app will use your current location. Customers can browse your live stock and catalog.',
                                   style: TextStyle(
                                     fontSize: 11.5,
                                     fontWeight: FontWeight.w700,

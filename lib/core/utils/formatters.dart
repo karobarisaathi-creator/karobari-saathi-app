@@ -2,6 +2,7 @@
 
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
+import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 import 'package:account_app/core/models/app_settings_model.dart';
 
 class CurrencyInputFormatter extends TextInputFormatter {
@@ -193,23 +194,128 @@ class Formatters {
   // PHONE
   // ═══════════════════════════════════════════════════════════
   static String formatPhoneNumber(String phone) {
-    if (phone.trim().isEmpty) return '';
-    String clean = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    final trimmed = phone.trim();
+    if (trimmed.isEmpty) return '';
+    final parsed = _parsePhoneNumber(trimmed);
+    if (parsed == null) return trimmed;
 
-    if (clean.startsWith('+')) {
-      clean = clean.substring(1);
+    final nationalFormat = parsed.formatNsn();
+    if (parsed.isoCode == IsoCode.PK &&
+        parsed.nsn.length == 10 &&
+        parsed.nsn.startsWith('3')) {
+      return nationalFormat.startsWith('0')
+          ? nationalFormat
+          : '0$nationalFormat';
     }
-    if (clean.startsWith('00')) {
-      clean = clean.substring(2);
-    }
-    if (clean.startsWith('92') && clean.length >= 11) {
-      clean = '0' + clean.substring(2);
-    }
-    if (clean.length == 10 && !clean.startsWith('0')) {
-      clean = '0' + clean;
+    return nationalFormat;
+  }
+
+  static String phoneComparisonKey(String phone) {
+    final parsed = _parsePhoneNumber(phone);
+    return (parsed?.international ?? phone).replaceAll(RegExp(r'\D'), '');
+  }
+
+  static bool phoneNumbersMatch(String first, String second) {
+    final firstKey = phoneComparisonKey(first);
+    final secondKey = phoneComparisonKey(second);
+    if (firstKey.isEmpty || secondKey.isEmpty) return false;
+    if (firstKey == secondKey) return true;
+
+    final firstIsInternational = _isInternationalInput(first);
+    final secondIsInternational = _isInternationalInput(second);
+    if (firstIsInternational == secondIsInternational) {
+      return false;
     }
 
-    return clean.isNotEmpty ? clean : phone;
+    final internationalPhone = _parsePhoneNumber(
+      firstIsInternational ? first : second,
+    );
+    if (internationalPhone == null) return false;
+
+    final localNumber = firstIsInternational ? second : first;
+    final localDigits = localNumber.replaceAll(RegExp(r'\D'), '');
+    final localNsn = localDigits.startsWith('0')
+        ? localDigits.substring(1)
+        : _parsePhoneNumber(localNumber)?.nsn ?? localDigits;
+    return internationalPhone.nsn == localNsn;
+  }
+
+  static bool phoneMatchesSearch(String phone, String query) {
+    final queryDigits = query.replaceAll(RegExp(r'\D'), '');
+    if (queryDigits.isEmpty) return false;
+
+    final candidates = <String>{queryDigits};
+    if (queryDigits.startsWith('00')) candidates.add(queryDigits.substring(2));
+    if (queryDigits.startsWith('92')) candidates.add(queryDigits.substring(2));
+    if (queryDigits.startsWith('0')) candidates.add(queryDigits.substring(1));
+
+    final key = phoneComparisonKey(phone);
+    return candidates
+        .any((candidate) => candidate.isNotEmpty && key.contains(candidate));
+  }
+
+  static List<String> phoneNumberLookupCandidates(String phone) {
+    final trimmed = phone.trim();
+    final digits = trimmed.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return const [];
+
+    final parsed = _parsePhoneNumber(trimmed);
+    final localFormat = parsed == null ? null : formatPhoneNumber(trimmed);
+    return <String>{
+      trimmed,
+      digits,
+      if (parsed != null) parsed.international,
+      if (parsed != null) parsed.international.replaceFirst('+', ''),
+      if (parsed != null) '00${parsed.international.substring(1)}',
+      if (parsed != null) parsed.nsn,
+      if (parsed != null) parsed.formatNsn(),
+      if (localFormat != null) localFormat,
+      if (localFormat != null) localFormat.replaceAll(RegExp(r'\D'), ''),
+    }.toList(growable: false);
+  }
+
+  static PhoneNumber? _parsePhoneNumber(String phone) {
+    final trimmed = phone.trim();
+    if (trimmed.isEmpty) return null;
+
+    var input = trimmed;
+    if (input.startsWith('00')) {
+      input = '+${input.substring(2)}';
+    } else if (!input.startsWith('+')) {
+      final digits = input.replaceAll(RegExp(r'\D'), '');
+      if (digits.startsWith('92') && digits.length == 12) {
+        input = '+$digits';
+      }
+    }
+
+    PhoneNumber? tryParse(String value) {
+      try {
+        final parsed = PhoneNumber.parse(value, callerCountry: IsoCode.PK);
+        return parsed.isValidLength() ? parsed : null;
+      } on PhoneNumberException {
+        return null;
+      }
+    }
+
+    final parsed = tryParse(input);
+    if (parsed != null) return parsed;
+
+    final digits = input.replaceAll(RegExp(r'\D'), '');
+    if (!input.startsWith('+') &&
+        digits.length > 10 &&
+        !digits.startsWith('0')) {
+      return tryParse('+$digits');
+    }
+    return null;
+  }
+
+  static bool _isInternationalInput(String phone) {
+    final trimmed = phone.trim();
+    final digits = trimmed.replaceAll(RegExp(r'\D'), '');
+    return trimmed.startsWith('+') ||
+        trimmed.startsWith('00') ||
+        (digits.startsWith('92') && digits.length == 12) ||
+        (digits.length > 10 && !digits.startsWith('0'));
   }
 
   static String toE164(String phone, {String defaultCountryCode = '+92'}) {

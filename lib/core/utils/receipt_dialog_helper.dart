@@ -149,7 +149,11 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
         : (addedSenderName.isNotEmpty ? addedSenderName : accountName);
     final partyPhone = isIncomingNotification
         ? senderPhone
-        : (addedSenderPhone.isNotEmpty ? addedSenderPhone : accountPhone);
+        : (addedSenderPhone.isNotEmpty
+            ? addedSenderPhone
+            : (accountPhone.isNotEmpty
+                ? accountPhone
+                : widget.transaction.customerPhone ?? ''));
 
     // ⭐ اصول: اوپر ہمیشہ میرا نام (Business Name)، نیچے بنام میں پارٹی کا نام
     _businessName = userName;

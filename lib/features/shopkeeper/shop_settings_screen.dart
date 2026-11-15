@@ -7,6 +7,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/language_service.dart';
+import 'package:account_app/core/services/location_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
@@ -35,6 +36,9 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
   bool _showTrust = true;
   bool _showItemsCount = true;
   bool _showTags = true;
+  double? _latitude;
+  double? _longitude;
+  String _savedAddress = '';
 
   // Urdu Aware Controllers for Inputs
   late UrduAwareTextEditingController _shopNameCtrl;
@@ -93,6 +97,11 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
         _areaCtrl.text =
             (settings['businessAddress'] ?? profile['businessAddress'] ?? '')
                 .toString();
+        _savedAddress = _areaCtrl.text.trim();
+        _latitude =
+            ((settings['latitude'] ?? profile['latitude']) as num?)?.toDouble();
+        _longitude = ((settings['longitude'] ?? profile['longitude']) as num?)
+            ?.toDouble();
         _deliveryTimeCtrl.text = (settings['deliveryTime'] ?? '').toString();
         _deliveryFeeCtrl.text = (settings['deliveryFee'] ?? '').toString();
         _minOrderCtrl.text = (settings['minOrder'] ?? '').toString();
@@ -246,10 +255,33 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
     setState(() => _isSaving = true);
 
     try {
+      final address = _areaCtrl.text.trim();
+      final addressHasNotChanged = address == _savedAddress;
+      final shopLocation = await LocationService.resolveShopLocation(
+        address: address,
+        fallbackLatitude: addressHasNotChanged ? _latitude : null,
+        fallbackLongitude: addressHasNotChanged ? _longitude : null,
+      );
+      if (shopLocation == null) {
+        throw StateError(
+          isUrdu
+              ? 'دکان کا پتہ نقشے پر نہیں ملا اور موجودہ مقام بھی دستیاب نہیں۔'
+              : 'Could not find the shop address or current location.',
+        );
+      }
+
+      final resolvedAddress =
+          (shopLocation['businessAddress'] ?? address).toString();
+      _areaCtrl.text = resolvedAddress;
+      _latitude = (shopLocation['latitude'] as num).toDouble();
+      _longitude = (shopLocation['longitude'] as num).toDouble();
+
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'shopName': _shopNameCtrl.text.trim(),
         'displayName': _ownerNameCtrl.text.trim(),
-        'businessAddress': _areaCtrl.text.trim(),
+        'businessAddress': resolvedAddress,
+        'latitude': _latitude,
+        'longitude': _longitude,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
@@ -258,7 +290,9 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
           'uid': user.uid,
           'shopName': _shopNameCtrl.text.trim(),
           'ownerName': _ownerNameCtrl.text.trim(),
-          'businessAddress': _areaCtrl.text.trim(),
+          'businessAddress': resolvedAddress,
+          'latitude': _latitude,
+          'longitude': _longitude,
           'displayName': _ownerNameCtrl.text.trim(),
           'isOpen': _isOpen,
           'distance': '',
@@ -289,6 +323,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
             .collection('public_shops')
             .doc(user.uid)
             .set(payload, SetOptions(merge: true));
+        _savedAddress = resolvedAddress;
       } else {
         await FirebaseFirestore.instance
             .collection('public_shops')

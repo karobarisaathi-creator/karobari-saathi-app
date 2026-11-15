@@ -529,7 +529,10 @@ class PdfService with ChangeNotifier {
   pw.Widget _buildReceiptContent(
       Transaction transaction, Account? account, bool isUrdu) {
     final accountName = account?.name ?? (isUrdu ? 'نامعلوم' : 'Unknown');
-    final accountPhone = account?.phone ?? '';
+    final phone = account?.phone.trim().isNotEmpty == true
+        ? account!.phone
+        : transaction.customerPhone ?? '';
+    final accountPhone = Formatters.formatPhoneNumber(phone);
 
     return pw.Container(
       padding: const pw.EdgeInsets.all(20),
@@ -747,7 +750,8 @@ class PdfService with ChangeNotifier {
         for (var account in accounts)
           pw.TableRow(children: [
             _buildTableCell(account.name, isUrdu, false, 9),
-            _buildTableCell(account.phone, false, false, 9),
+            _buildTableCell(
+                Formatters.formatPhoneNumber(account.phone), false, false, 9),
             _buildTableCell(
                 Formatters.formatAmountWithCurrency(account.balance),
                 false,
@@ -1005,7 +1009,11 @@ class PdfService with ChangeNotifier {
             isUrdu ? 'اکاؤنٹ اسٹیٹمنٹ' : 'Account Statement', isUrdu, true, 20),
         pw.SizedBox(height: 15),
         _buildDetailRow(isUrdu ? 'نام:' : 'Name:', account.name, isUrdu),
-        _buildDetailRow(isUrdu ? 'فون:' : 'Phone:', account.phone, isUrdu),
+        _buildDetailRow(
+          isUrdu ? 'فون:' : 'Phone:',
+          Formatters.formatPhoneNumber(account.phone),
+          isUrdu,
+        ),
         _buildDetailRow(
           balanceLabel,
           _formatSignedBalance(closingBalance),

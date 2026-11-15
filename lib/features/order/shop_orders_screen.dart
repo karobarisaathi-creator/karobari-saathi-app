@@ -14,6 +14,7 @@ import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/features/order/services/shop_order_service.dart';
 
 class ShopOrdersScreen extends StatelessWidget {
@@ -392,7 +393,7 @@ class _OrderCardState extends State<_OrderCard> {
                             ),
                             const SizedBox(width: 4),
                             UrduAwareText(
-                              customerPhone,
+                              Formatters.formatPhoneNumber(customerPhone),
                               style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,

@@ -69,7 +69,7 @@ class ExcelService with ChangeNotifier {
     for (var account in accounts) {
       rows.add([
         account.name,
-        account.phone,
+        Formatters.formatPhoneNumber(account.phone),
         Formatters.formatAmountWithCurrency(account.balance),
       ]);
     }

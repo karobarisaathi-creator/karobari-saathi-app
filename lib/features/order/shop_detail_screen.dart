@@ -649,24 +649,25 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _miniHeaderStatWidget(
-                        LocationChipWidget(
-                          latitude: shop.latitude,
-                          longitude: shop.longitude,
-                          address: shop.area,
-                          showAddress: false,
-                          showTime: false,
-                          isUrdu: isUrdu,
-                          isChip: false,
-                          color: Colors.white,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
+                      if (shop.showDistance)
+                        _miniHeaderStatWidget(
+                          LocationChipWidget(
+                            latitude: shop.latitude,
+                            longitude: shop.longitude,
+                            address: shop.area,
+                            showAddress: false,
+                            showTime: false,
+                            isUrdu: isUrdu,
+                            isChip: false,
                             color: Colors.white,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
                           ),
+                          isUrdu ? 'فاصلہ' : 'Distance',
                         ),
-                        isUrdu ? 'فاصلہ' : 'Distance',
-                      ),
                       _miniHeaderStat(
                         PhosphorIcons.clock(),
                         shop.deliveryTime,

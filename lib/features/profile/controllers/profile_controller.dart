@@ -6,6 +6,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:account_app/core/config/app_roles.dart';
 import 'package:account_app/core/utils/image_utils.dart';
+import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/core/services/location_service.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 
 enum ProfileSaveStatus { idle, loading, success, error }
@@ -32,12 +34,17 @@ class ProfileController extends ChangeNotifier {
   File? profileImage;
   String? remoteBannerImage;
   File? bannerImage;
+  double? _latitude;
+  double? _longitude;
+  String _savedAddress = '';
   ProfileSaveStatus saveStatus = ProfileSaveStatus.idle;
   String? errorMessage;
+  bool locationUnavailable = false;
 
   bool get isShopkeeper =>
       shopNameController.text.trim().isNotEmpty &&
-      addressController.text.trim().isNotEmpty;
+      (addressController.text.trim().isNotEmpty ||
+          (_latitude != null && _longitude != null));
 
   Future<void> loadExistingProfile() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -47,7 +54,7 @@ class ProfileController extends ChangeNotifier {
     hasLoadError = false;
     errorMessage = null;
     notifyListeners();
-    phoneController.text = user.phoneNumber ?? '';
+    phoneController.text = Formatters.formatPhoneNumber(user.phoneNumber ?? '');
     emailController.text = user.email ?? '';
     remoteProfileImage = user.photoURL;
 
@@ -62,10 +69,14 @@ class ProfileController extends ChangeNotifier {
               .toString();
       emailController.text = (data?['email'] ?? user.email ?? '').toString();
       addressController.text = (data?['businessAddress'] ?? '').toString();
+      _savedAddress = addressController.text.trim();
+      _latitude = (data?['latitude'] as num?)?.toDouble();
+      _longitude = (data?['longitude'] as num?)?.toDouble();
       shopNameController.text = (data?['shopName'] ?? '').toString();
       selectedRole = isShopkeeper ? AppRole.shopkeeper : AppRole.simple;
       remoteProfileImage = (data?['photoURL'] ?? user.photoURL)?.toString();
-      remoteBannerImage = (data?['shopBannerUrl'] ?? data?['bannerUrl'])?.toString();
+      remoteBannerImage =
+          (data?['shopBannerUrl'] ?? data?['bannerUrl'])?.toString();
       isEditing = nameController.text.trim().isNotEmpty;
     } catch (error) {
       hasLoadError = true;
@@ -84,13 +95,15 @@ class ProfileController extends ChangeNotifier {
       return false;
     }
     if (hasLoadError) {
-      errorMessage = 'Profile could not be loaded. Reopen this screen and try again before saving.';
+      errorMessage =
+          'Profile could not be loaded. Reopen this screen and try again before saving.';
       saveStatus = ProfileSaveStatus.error;
       notifyListeners();
       return false;
     }
 
     saveStatus = ProfileSaveStatus.loading;
+    locationUnavailable = false;
     notifyListeners();
 
     try {
@@ -117,8 +130,28 @@ class ProfileController extends ChangeNotifier {
       }
 
       final hasShopName = shopNameController.text.trim().isNotEmpty;
-      final hasShopAddress = addressController.text.trim().isNotEmpty;
-      final effectiveShopkeeper = hasShopName && hasShopAddress;
+      Map<String, dynamic>? shopLocation;
+      if (hasShopName) {
+        final address = addressController.text.trim();
+        final addressHasNotChanged = address == _savedAddress;
+        shopLocation = await LocationService.resolveShopLocation(
+          address: address,
+          fallbackLatitude: addressHasNotChanged ? _latitude : null,
+          fallbackLongitude: addressHasNotChanged ? _longitude : null,
+        );
+        if (shopLocation == null) {
+          locationUnavailable = true;
+          throw StateError(
+            'Could not resolve the shop address or current location.',
+          );
+        }
+        addressController.text =
+            (shopLocation['businessAddress'] ?? address).toString();
+        _latitude = (shopLocation['latitude'] as num).toDouble();
+        _longitude = (shopLocation['longitude'] as num).toDouble();
+      }
+
+      final effectiveShopkeeper = hasShopName && shopLocation != null;
       selectedRole = effectiveShopkeeper ? AppRole.shopkeeper : AppRole.simple;
 
       await user.updateDisplayName(nameController.text.trim());
@@ -133,6 +166,8 @@ class ProfileController extends ChangeNotifier {
         'role': selectedRole.id,
         'photoURL': profileImageUrl,
         'shopBannerUrl': bannerImageUrl,
+        'latitude': effectiveShopkeeper ? _latitude : FieldValue.delete(),
+        'longitude': effectiveShopkeeper ? _longitude : FieldValue.delete(),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
@@ -143,6 +178,8 @@ class ProfileController extends ChangeNotifier {
           'ownerName': nameController.text.trim(),
           'shopName': shopNameController.text.trim(),
           'businessAddress': addressController.text.trim(),
+          'latitude': _latitude,
+          'longitude': _longitude,
           'role': selectedRole.id,
           'photoURL': profileImageUrl,
           'profileImageUrl': profileImageUrl,
@@ -167,11 +204,15 @@ class ProfileController extends ChangeNotifier {
             .doc(user.uid)
             .set(publicShopData, SetOptions(merge: true));
       } else {
-        await FirebaseFirestore.instance.collection('public_shops').doc(user.uid).delete();
+        await FirebaseFirestore.instance
+            .collection('public_shops')
+            .doc(user.uid)
+            .delete();
       }
 
       remoteProfileImage = profileImageUrl;
       remoteBannerImage = bannerImageUrl;
+      _savedAddress = addressController.text.trim();
       saveStatus = ProfileSaveStatus.success;
       isEditing = true;
       notifyListeners();

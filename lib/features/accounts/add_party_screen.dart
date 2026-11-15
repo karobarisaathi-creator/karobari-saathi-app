@@ -42,6 +42,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
   late String _selectedCategory;
   File? _profileImage;
   String? _remoteImageUrl; // For profiles found via global lookup
+  String? _selectedPhoneNumber;
   bool _isLoading = false;
   bool _isSearchingProfile = false;
   Map<String, String>? _foundProfile;
@@ -59,7 +60,8 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
     
     if (widget.partyToEdit != null) {
       _nameController.text = widget.partyToEdit!.name;
-      _phoneController.text = widget.partyToEdit!.phone;
+      _phoneController.text =
+          Formatters.formatPhoneNumber(widget.partyToEdit!.phone);
       _addressController.text = widget.partyToEdit!.address ?? '';
       
       _selectedCategory = widget.partyToEdit!.category;
@@ -403,7 +405,8 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
           onSelect: (name, phone) {
             setState(() {
               _nameController.text = name;
-              _phoneController.text = phone.replaceAll(' ', '');
+              _selectedPhoneNumber = phone;
+              _phoneController.text = Formatters.formatPhoneNumber(phone);
             });
             Navigator.pop(context);
           },
@@ -432,17 +435,18 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
 
       // Check for duplicate phone number
       final existingAccounts = databaseService.getAccounts();
-      final cleanNewPhone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
-      
-      bool isDuplicate = existingAccounts.any((a) {
-        String p1 = a.phone.replaceAll(RegExp(r'\D'), '');
-        String p2 = cleanNewPhone;
-        // Normalize 92 to 0
-        if (p1.startsWith('92')) p1 = '0${p1.substring(2)}';
-        if (p2.startsWith('92')) p2 = '0${p2.substring(2)}';
-        
-        return p1 == p2 && (widget.partyToEdit == null || a.id != widget.partyToEdit!.id);
-      });
+      final enteredPhone = _phoneController.text.trim();
+      final originalPhone = _selectedPhoneNumber ?? widget.partyToEdit?.phone;
+      final partyPhone = originalPhone != null &&
+            Formatters.phoneNumbersMatch(originalPhone, enteredPhone)
+        ? originalPhone
+        : enteredPhone;
+      final isDuplicate = existingAccounts.any(
+      (account) =>
+          Formatters.phoneNumbersMatch(account.phone, enteredPhone) &&
+          (widget.partyToEdit == null ||
+              account.id != widget.partyToEdit!.id),
+      );
 
       if (isDuplicate) {
         setState(() => _isLoading = false);
@@ -474,7 +478,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
         // Edit Mode
         final updatedParty = widget.partyToEdit!.copyWith(
           name: _nameController.text,
-          phone: _phoneController.text,
+          phone: partyPhone,
           address: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
           category: _selectedCategory,
           profileImage: finalImagePath,
@@ -489,7 +493,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
         final party = Account(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           name: _nameController.text,
-          phone: _phoneController.text,
+          phone: partyPhone,
           address: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
           category: _selectedCategory,
           initialBalance: 0.0,
@@ -578,7 +582,8 @@ class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
       _filteredContacts = widget.contacts.where((contact) {
         final name = contact.displayName.toLowerCase();
         final phone = contact.phones.isNotEmpty ? contact.phones.first.number : '';
-        return name.contains(query) || phone.contains(query);
+        return name.contains(query) ||
+            Formatters.phoneMatchesSearch(phone, query);
       }).toList();
     });
   }
@@ -664,7 +669,7 @@ class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
                               ),
                             ),
                             subtitle: UrduAwareText(
-                              phone,
+                              Formatters.formatPhoneNumber(phone),
                               style: const TextStyle(fontFamily: '', fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.bold),
                             ),
                             onTap: () => widget.onSelect(contact.displayName, phone),

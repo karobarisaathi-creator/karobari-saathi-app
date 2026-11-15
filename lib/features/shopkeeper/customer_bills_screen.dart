@@ -225,8 +225,11 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
                 final partyPhone = tx.customerPhone?.trim().isNotEmpty == true
                     ? tx.customerPhone!.trim()
                     : partyAccount?.phone.trim();
-                final partyLabel =
-                    partyName?.isNotEmpty == true ? partyName : partyPhone;
+                final partyLabel = partyName?.isNotEmpty == true
+                    ? partyName
+                    : partyPhone == null
+                        ? null
+                        : Formatters.formatPhoneNumber(partyPhone);
                 final displayAmount = _getTxDisplayAmount(tx);
                 final txProfit = _calculateTxProfit(tx, stockService);
 
@@ -323,6 +326,16 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
                                       ],
                                     ],
                                   ),
+                                  if (partyPhone?.isNotEmpty == true) ...[
+                                    const SizedBox(height: 3),
+                                    UrduAwareText(
+                                      Formatters.formatPhoneNumber(partyPhone!),
+                                      style: const TextStyle(
+                                        fontSize: 10.5,
+                                        color: AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),

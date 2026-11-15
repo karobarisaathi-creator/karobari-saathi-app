@@ -13,6 +13,7 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/widgets/in_app_notification_banner.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
+import 'package:account_app/core/utils/formatters.dart';
 
 const String _pendingPartyNotificationsBoxName =
     'pending_party_notifications_v1';
@@ -739,23 +740,27 @@ class NotificationService with ChangeNotifier {
     String myName = currentUser.displayName ?? '';
     if (myName.isEmpty) myName = currentUser.phoneNumber ?? 'ایک صارف';
 
-    String targetPhone = partyPhoneNumber.replaceAll(RegExp(r'[\s-]+'), '');
-    if (targetPhone.startsWith('03')) {
-      targetPhone = '+92${targetPhone.substring(1)}';
-    } else if (targetPhone.startsWith('3')) {
-      targetPhone = '+92$targetPhone';
-    } else if (targetPhone.startsWith('92')) {
-      targetPhone = '+$targetPhone';
+    final phoneCandidates =
+        Formatters.phoneNumberLookupCandidates(partyPhoneNumber);
+    if (phoneCandidates.isEmpty) {
+      return PartyNotificationResult.recipientNotFound;
     }
 
     try {
-      final querySnapshot = await _firestore
-          .collection('users')
-          .where('phoneNumber', isEqualTo: targetPhone)
-          .limit(1)
-          .get();
+      QuerySnapshot<Map<String, dynamic>>? querySnapshot;
+      for (final candidate in phoneCandidates) {
+        final result = await _firestore
+            .collection('users')
+            .where('phoneNumber', isEqualTo: candidate)
+            .limit(1)
+            .get();
+        if (result.docs.isNotEmpty) {
+          querySnapshot = result;
+          break;
+        }
+      }
 
-      if (querySnapshot.docs.isNotEmpty) {
+      if (querySnapshot != null && querySnapshot.docs.isNotEmpty) {
         final targetUserId = querySnapshot.docs.first.id;
         if (targetUserId == currentUser.uid) {
           return PartyNotificationResult.sameUser;

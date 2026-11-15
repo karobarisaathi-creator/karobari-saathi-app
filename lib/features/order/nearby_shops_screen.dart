@@ -1,8 +1,11 @@
 // lib/features/order/nearby_shops_screen.dart
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:account_app/core/services/language_service.dart';
@@ -11,6 +14,7 @@ import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/models/shop_model.dart';
+import 'package:account_app/core/services/location_service.dart';
 import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 import 'package:account_app/features/order/shop_detail_screen.dart';
 import 'package:account_app/features/order/widgets/shop_card_widget.dart';
@@ -63,6 +67,8 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
   bool _openShopsOnly = false;
   bool _isLoading = false;
   String? _loadError;
+  double? _userLatitude;
+  double? _userLongitude;
 
   final TextEditingController _searchCtrl = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -73,6 +79,16 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
   void initState() {
     super.initState();
     _loadPublicShops();
+    unawaited(_loadCurrentLocation());
+  }
+
+  Future<void> _loadCurrentLocation() async {
+    final coordinates = await LocationService.getCurrentCoordinates();
+    if (!mounted || coordinates == null) return;
+    setState(() {
+      _userLatitude = coordinates['latitude'];
+      _userLongitude = coordinates['longitude'];
+    });
   }
 
   Future<void> _loadPublicShops({bool forceRefresh = false}) async {
@@ -188,6 +204,21 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
     );
   }
 
+  double _distanceForShop(Shop shop) {
+    if (_userLatitude != null &&
+        _userLongitude != null &&
+        shop.latitude != null &&
+        shop.longitude != null) {
+      return Geolocator.distanceBetween(
+        _userLatitude!,
+        _userLongitude!,
+        shop.latitude!,
+        shop.longitude!,
+      );
+    }
+    return shop.distanceVal;
+  }
+
   // ═════════════════════════════════════════════════════════════
   @override
   void dispose() {
@@ -300,7 +331,8 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
     } else if (_sortBy == 'time') {
       filtered.sort((a, b) => a.timeVal.compareTo(b.timeVal));
     } else if (_sortBy == 'nearest') {
-      filtered.sort((a, b) => a.distanceVal.compareTo(b.distanceVal));
+      filtered
+          .sort((a, b) => _distanceForShop(a).compareTo(_distanceForShop(b)));
     }
 
     return Column(

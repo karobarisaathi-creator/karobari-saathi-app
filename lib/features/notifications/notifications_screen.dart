@@ -11,6 +11,7 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
 import 'package:account_app/core/utils/account_balance_utils.dart';
+import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
 import 'package:account_app/core/utils/receipt_dialog_helper.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
@@ -493,7 +494,6 @@ class _NotificationListTabState extends State<_NotificationListTab>
       return [notification];
     }
 
-    final senderPhone = _normalizePhone(phone);
     return widget.notifications.where((candidate) {
       if (candidate.type != NotificationType.transaction ||
           candidate.data?['isAdded'] == true) {
@@ -501,13 +501,8 @@ class _NotificationListTabState extends State<_NotificationListTab>
       }
       final candidatePhone = candidate.data?['senderPhone']?.toString() ?? '';
       return candidatePhone.isNotEmpty &&
-          _normalizePhone(candidatePhone) == senderPhone;
+          Formatters.phoneNumbersMatch(candidatePhone, phone);
     }).toList();
-  }
-
-  String _normalizePhone(String phone) {
-    final digits = phone.replaceAll(RegExp(r'\D'), '');
-    return digits.length >= 10 ? digits.substring(digits.length - 10) : digits;
   }
 
   Future<void> _addToLedger(AppNotification n) =>
@@ -546,13 +541,12 @@ class _NotificationListTabState extends State<_NotificationListTab>
     }
 
     final accounts = db.getAccounts();
-    final lookup = _normalizePhone(phone);
     Account? target;
     try {
       target = accounts.firstWhere(
         (account) =>
             account.phone.isNotEmpty &&
-            _normalizePhone(account.phone) == lookup,
+            Formatters.phoneNumbersMatch(account.phone, phone),
       );
     } catch (_) {}
 

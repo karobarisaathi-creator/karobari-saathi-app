@@ -1,4 +1,5 @@
 import 'base_service.dart';
+import 'package:account_app/core/utils/formatters.dart';
 
 class ProfileService extends BaseService {
   static final Map<String, Map<String, String>> _profileCacheMap = {};
@@ -6,41 +7,16 @@ class ProfileService extends BaseService {
   static void clearCache() => _profileCacheMap.clear();
 
   Future<Map<String, String>?> findPublicProfileByPhone(String phone) async {
-    final clean = phone.replaceAll(RegExp(r'\D'), '');
-    final potentials = <String>[];
-
-    if (clean.startsWith('92')) {
-      potentials.add('+$clean');
-      potentials.add('0${clean.substring(2)}');
-    } else if (clean.startsWith('03')) {
-      potentials.add(clean);
-      potentials.add('+92${clean.substring(1)}');
-    } else if (clean.startsWith('3') && clean.length == 10) {
-      potentials.add('+92$clean');
-      potentials.add('0$clean');
-    } else {
-      potentials.add(phone);
-      if (phone.startsWith('+')) {
-        potentials.add(phone.substring(1));
-      } else {
-        potentials.add('+$phone');
-      }
-    }
-
-    for (final p in potentials) {
+    for (final candidate in Formatters.phoneNumberLookupCandidates(phone)) {
       final query = await firestore
           .collection('users')
-          .where('phoneNumber', isEqualTo: p)
+          .where('phoneNumber', isEqualTo: candidate)
           .limit(1)
           .get();
       if (query.docs.isNotEmpty) {
         final data = query.docs.first.data();
         final uid = query.docs.first.id;
 
-        if (_profileCacheMap.containsKey(uid)) {
-          return _profileCacheMap[uid];
-        }
-        
         String addr = (data['businessAddress'] ??
                 data['address'] ??
                 data['shopAddress'] ??
@@ -51,11 +27,16 @@ class ProfileService extends BaseService {
 
         if (addr.isEmpty) {
           try {
-            final shopDoc = await firestore.collection('public_shops').doc(uid).get();
+            final shopDoc =
+                await firestore.collection('public_shops').doc(uid).get();
             if (shopDoc.exists) {
               final shopData = shopDoc.data();
               if (shopData != null) {
-                addr = (shopData['businessAddress'] ?? shopData['address'] ?? shopData['location'] ?? '').toString();
+                addr = (shopData['businessAddress'] ??
+                        shopData['address'] ??
+                        shopData['location'] ??
+                        '')
+                    .toString();
               }
             }
           } catch (_) {}
@@ -65,10 +46,13 @@ class ProfileService extends BaseService {
           'uid': uid,
           'name': (data['displayName'] ?? data['name'] ?? '').toString(),
           'photoUrl': (data['photoURL'] ??
-              data['photoUrl'] ??
-              data['profileImage'] ??
-              '').toString(),
-          'profession': (data['profession'] ?? data['category'] ?? data['shopName'] ?? '').toString(),
+                  data['photoUrl'] ??
+                  data['profileImage'] ??
+                  '')
+              .toString(),
+          'profession':
+              (data['profession'] ?? data['category'] ?? data['shopName'] ?? '')
+                  .toString(),
           'address': addr,
         };
 
@@ -107,15 +91,20 @@ class ProfileService extends BaseService {
               data['storeAddress'] ??
               data['location'] ??
               '')
-            .toString();
+          .toString();
 
       if (addr.isEmpty) {
         try {
-          final shopDoc = await firestore.collection('public_shops').doc(uid).get();
+          final shopDoc =
+              await firestore.collection('public_shops').doc(uid).get();
           if (shopDoc.exists) {
             final shopData = shopDoc.data();
             if (shopData != null) {
-              addr = (shopData['businessAddress'] ?? shopData['address'] ?? shopData['location'] ?? '').toString();
+              addr = (shopData['businessAddress'] ??
+                      shopData['address'] ??
+                      shopData['location'] ??
+                      '')
+                  .toString();
             }
           }
         } catch (_) {}
@@ -125,9 +114,12 @@ class ProfileService extends BaseService {
         'uid': uid,
         'name': (data['displayName'] ?? data['name'] ?? '').toString(),
         'photoUrl':
-            (data['photoURL'] ?? data['photoUrl'] ?? data['profileImage'] ?? '').toString(),
+            (data['photoURL'] ?? data['photoUrl'] ?? data['profileImage'] ?? '')
+                .toString(),
         'phone': (data['phoneNumber'] ?? '').toString(),
-        'profession': (data['profession'] ?? data['category'] ?? data['shopName'] ?? '').toString(),
+        'profession':
+            (data['profession'] ?? data['category'] ?? data['shopName'] ?? '')
+                .toString(),
         'address': addr,
       };
 

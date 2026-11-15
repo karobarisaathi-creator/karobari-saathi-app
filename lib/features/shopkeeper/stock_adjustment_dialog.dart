@@ -1432,7 +1432,7 @@ class _MatchingPartyPickerSheetState extends State<_MatchingPartyPickerSheet> {
         .where((a) =>
             _query.isEmpty ||
             a.name.toLowerCase().contains(_query.toLowerCase()) ||
-            a.phone.contains(_query))
+            Formatters.phoneMatchesSearch(a.phone, _query))
         .toList();
 
     final contentHeight = MediaQuery.of(context).size.height * 0.78;

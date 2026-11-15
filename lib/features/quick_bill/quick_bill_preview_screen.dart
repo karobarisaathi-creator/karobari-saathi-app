@@ -79,7 +79,8 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
             : 'QB-$existingBillNumber')
         : 'QB-1';
     _billNumberController = TextEditingController(text: billNum);
-    _customerPhoneController.text = original?.customerPhone ?? '';
+    _customerPhoneController.text =
+        Formatters.formatPhoneNumber(original?.customerPhone ?? '');
 
     // Initialize discount from existing transaction
     if (original != null && original.discountAmount > 0) {
@@ -184,7 +185,8 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
         : databaseService.getAccount(transaction.accountId);
     if (_customerPhoneController.text.trim().isEmpty &&
         _selectedAccount != null) {
-      _customerPhoneController.text = _selectedAccount!.phone;
+      _customerPhoneController.text =
+          Formatters.formatPhoneNumber(_selectedAccount!.phone);
     }
 
     if (transaction.pendingAmount <= 0) {
@@ -246,7 +248,8 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
       _selectedAccount = result.account;
       final accountPhone = result.account?.phone.trim() ?? '';
       if (accountPhone.isNotEmpty) {
-        _customerPhoneController.text = accountPhone;
+        _customerPhoneController.text =
+            Formatters.formatPhoneNumber(accountPhone);
       } else if (result.isCashCustomer &&
           previousAccountPhone.isNotEmpty &&
           _customerPhoneController.text.trim() == previousAccountPhone) {
