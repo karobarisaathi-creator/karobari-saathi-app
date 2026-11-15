@@ -121,10 +121,17 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
     return Container(
       padding: EdgeInsets.only(bottom: bottomPadding),
       decoration: BoxDecoration(
-        color: AppTheme.darkColor,
+        color: Colors.white,
         borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(15),
+          top: Radius.circular(20),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -139,9 +146,7 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: statusColor,
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(15),
-                      ),
+
                     ),
                     child: UrduAwareText(
                       isUrdu
@@ -236,8 +241,9 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
           child: Icon(
             isActive ? activeIcon : icon,
             size: 22,
-            color:
-                isActive ? Colors.white : Colors.white.withValues(alpha: 0.55),
+            color: isActive
+                ? AppTheme.themeColor
+                : AppTheme.textSecondary.withValues(alpha: 0.7),
           ),
         ),
       ),
@@ -325,8 +331,8 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
                         : PhosphorIcons.bell(),
                     size: 22,
                     color: isActive
-                        ? Colors.white
-                        : Colors.white.withValues(alpha: 0.55),
+                        ? AppTheme.themeColor
+                        : AppTheme.textSecondary.withValues(alpha: 0.7),
                   ),
                   if (notifService.unreadCount > 0)
                     Positioned(
@@ -342,7 +348,7 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
                           color: AppTheme.expenseColor,
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                            color: AppTheme.darkColor,
+                            color: Colors.white,
                             width: 1.5,
                           ),
                         ),
