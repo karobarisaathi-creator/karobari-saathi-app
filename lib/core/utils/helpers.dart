@@ -245,13 +245,6 @@ class AppHelpers {
     return age;
   }
 
-  /// Whole calendar days from [from] to [to] (time of day ignored).
-  static int daysBetween(DateTime from, DateTime to) {
-    final start = DateTime.utc(from.year, from.month, from.day);
-    final end = DateTime.utc(to.year, to.month, to.day);
-    return end.difference(start).inDays;
-  }
-
   static String getGreeting({bool isUrdu = false}) {
     final hour = DateTime.now().hour;
 

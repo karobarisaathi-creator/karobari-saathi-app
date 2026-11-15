@@ -304,6 +304,56 @@ class Formatters {
     return DateFormat('hh:mm a').format(date);
   }
 
+  static String getMonthName(int month, {bool isUrdu = false}) {
+    final urduMonths = [
+      'جنوری',
+      'فروری',
+      'مارچ',
+      'اپریل',
+      'مئی',
+      'جون',
+      'جولائی',
+      'اگست',
+      'ستمبر',
+      'اکتوبر',
+      'نومبر',
+      'دسمبر',
+    ];
+
+    final englishMonths = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    return isUrdu ? urduMonths[month - 1] : englishMonths[month - 1];
+  }
+
+  static String getDayName(int day, {bool isUrdu = false}) {
+    final urduDays = ['اتوار', 'پیر', 'منگل', 'بدھ', 'جمعرات', 'جمعہ', 'ہفتہ'];
+
+    final englishDays = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ];
+
+    return isUrdu ? urduDays[day - 1] : englishDays[day - 1];
+  }
+
   // ═══════════════════════════════════════════════════════════
   // RELATIVE TIME
   // ═══════════════════════════════════════════════════════════
@@ -639,5 +689,4 @@ class Formatters {
 
     return sanitized.trim();
   }
-
 }

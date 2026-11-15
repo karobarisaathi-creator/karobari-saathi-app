@@ -1,6 +1,3 @@
-// date_utils.dart
-import 'package:intl/intl.dart';
-
 class DateUtils {
   // Get start of day
   static DateTime startOfDay(DateTime date) {
@@ -44,22 +41,6 @@ class DateUtils {
     return DateTime(date.year, 12, 31, 23, 59, 59, 999);
   }
 
-  // Check if date is today
-  static bool isToday(DateTime date) {
-    final now = DateTime.now();
-    return date.year == now.year &&
-        date.month == now.month &&
-        date.day == now.day;
-  }
-
-  // Check if date is yesterday
-  static bool isYesterday(DateTime date) {
-    final yesterday = DateTime.now().subtract(Duration(days: 1));
-    return date.year == yesterday.year &&
-        date.month == yesterday.month &&
-        date.day == yesterday.day;
-  }
-
   // Check if date is this week
   static bool isThisWeek(DateTime date) {
     final now = DateTime.now();
@@ -84,91 +65,18 @@ class DateUtils {
     return DateTime(date.year, date.month + 1, 0).day;
   }
 
+  // Whole calendar days between two dates, ignoring the time of day.
+  static int daysBetween(DateTime from, DateTime to) {
+    final start = DateTime.utc(from.year, from.month, from.day);
+    final end = DateTime.utc(to.year, to.month, to.day);
+    return end.difference(start).inDays;
+  }
+
   // Get week number
   static int getWeekNumber(DateTime date) {
     final firstDay = DateTime(date.year, 1, 1);
     final days = date.difference(firstDay).inDays;
     return ((days + firstDay.weekday - 1) / 7).floor() + 1;
-  }
-
-  // Format date for display
-  static String formatForDisplay(DateTime date) {
-    if (isToday(date)) {
-      return 'آج';
-    } else if (isYesterday(date)) {
-      return 'کل';
-    } else if (isThisWeek(date)) {
-      return DateFormat('EEEE').format(date);
-    } else if (isThisYear(date)) {
-      return DateFormat('dd MMM').format(date);
-    } else {
-      return DateFormat('dd/MM/yyyy').format(date);
-    }
-  }
-
-  // Get month name
-  static String getMonthName(int month, {bool isUrdu = false}) {
-    final urduMonths = [
-      'جنوری',
-      'فروری',
-      'مارچ',
-      'اپریل',
-      'مئی',
-      'جون',
-      'جولائی',
-      'اگست',
-      'ستمبر',
-      'اکتوبر',
-      'نومبر',
-      'دسمبر',
-    ];
-
-    final englishMonths = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-
-    return isUrdu ? urduMonths[month - 1] : englishMonths[month - 1];
-  }
-
-  // Get day name
-  static String getDayName(int day, {bool isUrdu = false}) {
-    final urduDays = ['اتوار', 'پیر', 'منگل', 'بدھ', 'جمعرات', 'جمعہ', 'ہفتہ'];
-
-    final englishDays = [
-      'Sunday',
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-    ];
-
-    return isUrdu ? urduDays[day - 1] : englishDays[day - 1];
-  }
-
-  // Calculate age
-  static int calculateAge(DateTime birthDate) {
-    final now = DateTime.now();
-    int age = now.year - birthDate.year;
-
-    if (now.month < birthDate.month ||
-        (now.month == birthDate.month && now.day < birthDate.day)) {
-      age--;
-    }
-
-    return age;
   }
 
   // Add business days
@@ -231,29 +139,5 @@ class DateUtils {
     }
 
     return nextDay;
-  }
-
-  // Format duration between dates
-  static String formatDurationBetween(DateTime from, DateTime to) {
-    final difference = to.difference(from);
-
-    if (difference.inDays > 365) {
-      final years = (difference.inDays / 365).floor();
-      return '$years سال';
-    } else if (difference.inDays > 30) {
-      final months = (difference.inDays / 30).floor();
-      return '$months مہینے';
-    } else if (difference.inDays > 7) {
-      final weeks = (difference.inDays / 7).floor();
-      return '$weeks ہفتے';
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays} دن';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} گھنٹے';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} منٹ';
-    } else {
-      return '${difference.inSeconds} سیکنڈ';
-    }
   }
 }
