@@ -122,9 +122,6 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
       padding: EdgeInsets.only(bottom: bottomPadding),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(20),
-        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
@@ -146,7 +143,6 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: statusColor,
-
                     ),
                     child: UrduAwareText(
                       isUrdu
