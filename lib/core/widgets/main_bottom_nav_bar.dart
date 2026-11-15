@@ -116,7 +116,7 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     final statusColor =
-        _isOffline ? AppTheme.expenseColor : AppTheme.incomeColor;
+        _isOffline ? AppTheme.expenseColor : AppTheme.greenColor;
 
     return Container(
       padding: EdgeInsets.only(bottom: bottomPadding),
