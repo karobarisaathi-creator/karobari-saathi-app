@@ -217,19 +217,18 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
                     : tx.id.length <= 4
                         ? tx.id
                         : tx.id.substring(tx.id.length - 4);
-                final partyAccount =
-                    (tx.accountId != QuickBillConstants.cashCustomerAccountId)
-                        ? databaseService.getAccount(tx.accountId)
-                        : null;
+                final isCashCustomer =
+                    tx.accountId == QuickBillConstants.cashCustomerAccountId;
+                final partyAccount = isCashCustomer
+                    ? null
+                    : databaseService.getAccount(tx.accountId);
                 final partyName = partyAccount?.name.trim();
                 final partyPhone = tx.customerPhone?.trim().isNotEmpty == true
                     ? tx.customerPhone!.trim()
                     : partyAccount?.phone.trim();
                 final partyLabel = partyName?.isNotEmpty == true
                     ? partyName
-                    : partyPhone == null
-                        ? null
-                        : Formatters.displayPhone(partyPhone);
+                    : null;
                 final displayAmount = _getTxDisplayAmount(tx);
                 final txProfit = _calculateTxProfit(tx, stockService);
 
@@ -326,7 +325,8 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
                                       ],
                                     ],
                                   ),
-                                  if (partyPhone?.isNotEmpty == true) ...[
+                                  if (isCashCustomer &&
+                                      partyPhone?.isNotEmpty == true) ...[
                                     const SizedBox(height: 3),
                                     UrduAwareText(
                                       Formatters.displayPhone(partyPhone!),
