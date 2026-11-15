@@ -393,7 +393,7 @@ class _OrderCardState extends State<_OrderCard> {
                             ),
                             const SizedBox(width: 4),
                             UrduAwareText(
-                              Formatters.formatPhoneNumber(customerPhone),
+                              Formatters.displayPhone(customerPhone),
                               style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,

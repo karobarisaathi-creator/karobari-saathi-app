@@ -229,7 +229,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
                     ? partyName
                     : partyPhone == null
                         ? null
-                        : Formatters.formatPhoneNumber(partyPhone);
+                        : Formatters.displayPhone(partyPhone);
                 final displayAmount = _getTxDisplayAmount(tx);
                 final txProfit = _calculateTxProfit(tx, stockService);
 
@@ -329,7 +329,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
                                   if (partyPhone?.isNotEmpty == true) ...[
                                     const SizedBox(height: 3),
                                     UrduAwareText(
-                                      Formatters.formatPhoneNumber(partyPhone!),
+                                      Formatters.displayPhone(partyPhone!),
                                       style: const TextStyle(
                                         fontSize: 10.5,
                                         color: AppTheme.textSecondary,

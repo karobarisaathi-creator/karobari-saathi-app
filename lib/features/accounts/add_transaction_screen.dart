@@ -1492,10 +1492,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     return TextFormField(
       controller: controller,
       keyboardType: (isNumber || isCurrency)
-          ? const TextInputType.numberWithOptions(decimal: true)
+          ? TextInputType.numberWithOptions(
+              decimal: isNumber && !isCurrency,
+            )
           : TextInputType.text,
       inputFormatters: isCurrency
-          ? [CurrencyInputFormatter()]
+          ? [CurrencyInputFormatter(allowDecimals: false)]
           : (isNumber
               ? [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))]
               : null),
@@ -1551,10 +1553,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     return TextFormField(
       controller: controller,
       keyboardType: (isNumber || isCurrency)
-          ? const TextInputType.numberWithOptions(decimal: true)
+          ? TextInputType.numberWithOptions(
+              decimal: isNumber && !isCurrency,
+            )
           : TextInputType.text,
       inputFormatters: isCurrency
-          ? [CurrencyInputFormatter()]
+          ? [CurrencyInputFormatter(allowDecimals: false)]
           : (isNumber
               ? [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))]
               : null),

@@ -136,12 +136,12 @@ class BaseLedgerWidget extends StatelessWidget {
     final String topName = businessName.trim().isNotEmpty
         ? businessName.trim()
         : (isUrdu ? 'میرا کاروبار' : 'My Business');
-    final topPhone = Formatters.formatPhoneNumber(businessPhone);
+    final topPhone = Formatters.displayPhone(businessPhone);
 
     final String bottomName = billedToName.trim().isNotEmpty
         ? billedToName.trim()
         : (account?.name ?? (isUrdu ? 'نقد گاہک' : 'Cash Customer'));
-    final bottomPhone = Formatters.formatPhoneNumber(
+    final bottomPhone = Formatters.displayPhone(
       billedToPhone.trim().isNotEmpty
           ? billedToPhone.trim()
           : (account?.phone ?? ''),

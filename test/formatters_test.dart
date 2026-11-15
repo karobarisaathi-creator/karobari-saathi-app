@@ -2,20 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:account_app/core/utils/formatters.dart';
 
 void main() {
-  group('Enterprise Security & Validation Tests', () {
+  group('Formatters Tests', () {
     test('Should sanitize malicious HTML and control characters', () {
       const input = "<script>alert('XSS')</script> Hello\u200BWorld\x01";
       final result = Formatters.sanitizeText(input);
       expect(result, "alert('XSS') HelloWorld");
       expect(result.contains('<script>'), false);
       expect(result.contains('\u200B'), false);
-    });
-
-    test('Should detect prohibited keywords even with case variations', () {
-      expect(
-          Formatters.containsProhibitedContent("This is a FRAUD item"), true);
-      expect(Formatters.containsProhibitedContent("یہ جَعلی چیز ہے"), true);
-      expect(Formatters.containsProhibitedContent("Fresh Apples"), false);
     });
 
     test('Should normalize international phone numbers to E.164', () {
@@ -26,6 +19,10 @@ void main() {
       // International
       expect(Formatters.normalizePhoneNumber("+14155552671"), "+14155552671");
       expect(Formatters.normalizePhoneNumber("0014155552671"), "+14155552671");
+      expect(
+        Formatters.normalizePhoneNumber("919876543210"),
+        "+919876543210",
+      );
 
       // Invalid
       expect(Formatters.normalizePhoneNumber("12345"), null);
@@ -63,6 +60,7 @@ void main() {
         Formatters.phoneMatchesSearch('03001234567', '+92 300 123'),
         isTrue,
       );
+      expect(Formatters.phoneMatchesSearch('03001234567', '03'), isFalse);
       expect(Formatters.phoneMatchesSearch('03001234567', 'abc'), isFalse);
     });
 
@@ -92,17 +90,69 @@ void main() {
       };
 
       for (final entry in countryNumbers.entries) {
-        final formattedDigits = Formatters.formatPhoneNumber(entry.key)
+        final formattedDigits = Formatters.displayPhone(entry.key)
+            .replaceAll(RegExp(r'[\u2066\u2069]'), '')
             .replaceAll(RegExp(r'\D'), '');
         expect(formattedDigits.startsWith(entry.value), isFalse);
       }
 
       expect(
-        Formatters.formatPhoneNumber('+923001234567').replaceAll(
-          RegExp(r'\D'),
-          '',
-        ),
+        Formatters.displayPhone('+923001234567')
+            .replaceAll(RegExp(r'[\u2066\u2069]'), '')
+            .replaceAll(RegExp(r'\D'), ''),
         '03001234567',
+      );
+      final formatted = Formatters.formatPhoneNumber('+923001234567');
+      expect(
+        Formatters.displayPhone('+923001234567'),
+        '\u2066$formatted\u2069',
+      );
+      expect(
+        Formatters.displayPhone(''),
+        '',
+      );
+      expect(
+        Formatters.maskPhoneNumber('+923001234567'),
+        '\u2066${formatted.substring(0, 4)}*******\u2069',
+      );
+    });
+
+    test('Text helpers preserve whitespace and joining characters', () {
+      expect(Formatters.getInitials(' Ali  Khan '), 'AK');
+      expect(Formatters.getInitials('Ali '), 'A');
+      expect(Formatters.getInitials('  '), '?');
+
+      const input = '<script>alert(1)</script> line one\n\tاردو\u200Cجوڑ\u200D';
+      final sanitized = Formatters.sanitizeText(input);
+      expect(sanitized, "alert(1) line one\n\tاردو\u200Cجوڑ\u200D");
+      expect(Formatters.sanitizeText('x < 3 > 2'), 'x < 3 > 2');
+    });
+
+    test('Formatting helpers preserve signs, scale, and language', () {
+      expect(Formatters.formatBalance(-500), '-Rs 500');
+      expect(Formatters.formatPercentage(85), '85.0%');
+      expect(Formatters.formatNumberCompact(999999), '1.0M');
+      expect(
+        Formatters.formatPendingAmount(500, isUrdu: false),
+        'Rs 500 pending',
+      );
+      expect(
+        Formatters.formatRelativeTime(
+          DateTime.now().subtract(const Duration(minutes: 2)),
+          isUrdu: false,
+        ),
+        '2 min ago',
+      );
+    });
+
+    test('E.164 helpers share international normalization behavior', () {
+      expect(
+        Formatters.toE164('0091 98765 43210'),
+        Formatters.normalizePhoneNumber('+91 98765 43210'),
+      );
+      expect(
+        Formatters.toE164('4155552671', defaultCountryCode: '+1'),
+        '+14155552671',
       );
     });
   });

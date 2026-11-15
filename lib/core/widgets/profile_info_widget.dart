@@ -316,7 +316,7 @@ class ProfileInfoWidget extends StatelessWidget {
               children: [
                 if (phone.isNotEmpty)
                   UrduAwareText(
-                    Formatters.formatPhoneNumber(phone),
+                    Formatters.displayPhone(phone),
                     style: TextStyle(
                       fontSize: 13,
                       color: effectiveSubtitleColor,
@@ -464,7 +464,7 @@ class ProfileInfoWidget extends StatelessWidget {
                     children: [
                       if (phone.isNotEmpty)
                         UrduAwareText(
-                          Formatters.formatPhoneNumber(phone),
+                          Formatters.displayPhone(phone),
                           style: TextStyle(
                             fontSize: 13,
                             color: effectiveSubtitleColor,

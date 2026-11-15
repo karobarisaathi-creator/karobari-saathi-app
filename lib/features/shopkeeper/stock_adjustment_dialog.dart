@@ -1222,9 +1222,9 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
                       child: TextFormField(
                         controller: _priceController,
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                            decimal: false),
                         inputFormatters: [
-                          CurrencyInputFormatter(allowDecimals: true)
+                          CurrencyInputFormatter(allowDecimals: false)
                         ],
                         textAlign: TextAlign.left,
                         textDirection: TextDirection.ltr,

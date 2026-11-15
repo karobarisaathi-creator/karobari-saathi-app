@@ -1209,7 +1209,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
                                         decimal: true),
-                                inputFormatters: [CurrencyInputFormatter()],
+                                inputFormatters: [CurrencyInputFormatter(allowDecimals: true)],
                                 style:
                                     const TextStyle(color: AppTheme.darkColor),
                                 decoration: InputDecoration(

@@ -153,7 +153,9 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
                         controller: _areaController,
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
-                        inputFormatters: [CurrencyInputFormatter()],
+                        inputFormatters: [
+                          CurrencyInputFormatter(allowDecimals: true),
+                        ],
                         style: const TextStyle(color: AppTheme.darkColor),
                         decoration: InputDecoration(
                           labelText: isUrdu ? 'رقبہ (ایکڑ)' : 'Area (Acres)',
@@ -171,7 +173,9 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
                         controller: _prodController,
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
-                        inputFormatters: [CurrencyInputFormatter()],
+                        inputFormatters: [
+                          CurrencyInputFormatter(allowDecimals: true),
+                        ],
                         style: const TextStyle(color: AppTheme.darkColor),
                         decoration: InputDecoration(
                           labelText: isUrdu ? 'پیداوار (من)' : 'Yield (Mun)',

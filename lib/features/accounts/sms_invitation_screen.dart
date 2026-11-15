@@ -159,7 +159,7 @@ Please verify. Thanks.""";
                                         ),
                                         if (widget.party.phone.isNotEmpty)
                                           UrduAwareText(
-                                            Formatters.formatPhoneNumber(
+                                            Formatters.displayPhone(
                                                 widget.party.phone),
                                             style: const TextStyle(
                                                 color: Colors.blueGrey,

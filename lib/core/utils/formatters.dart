@@ -7,8 +7,12 @@ import 'package:account_app/core/models/app_settings_model.dart';
 
 class CurrencyInputFormatter extends TextInputFormatter {
   final bool allowDecimals;
+  final int maxDecimalPlaces;
 
-  CurrencyInputFormatter({this.allowDecimals = true});
+  const CurrencyInputFormatter({
+    this.allowDecimals = false,
+    this.maxDecimalPlaces = 2,
+  }) : assert(maxDecimalPlaces >= 0);
 
   @override
   TextEditingValue formatEditUpdate(
@@ -19,47 +23,95 @@ class CurrencyInputFormatter extends TextInputFormatter {
       return newValue;
     }
 
-    String text = newValue.text;
-
-    if (allowDecimals && text.contains('.')) {
-      final parts = text.split('.');
-      if (parts.length > 2) {
-        return oldValue;
-      }
-
-      String integerPart = parts[0].replaceAll(RegExp(r'\D'), '');
-      String decimalPart = parts[1].replaceAll(RegExp(r'\D'), '');
-
-      final number = int.tryParse(integerPart) ?? 0;
-      final formatter = NumberFormat('#,##0', 'en_US');
-      final formattedInteger =
-          integerPart.isEmpty ? '' : formatter.format(number);
-
-      final formattedText = '$formattedInteger.$decimalPart';
-
-      return TextEditingValue(
-        text: formattedText,
-        selection: TextSelection.collapsed(offset: formattedText.length),
-      );
-    }
-
-    String cleanText = text.replaceAll(RegExp(r'\D'), '');
-
-    if (cleanText.isEmpty) {
+    final settings = Formatters.currentSettings;
+    final selectionOffset =
+        newValue.selection.extentOffset.clamp(0, newValue.text.length);
+    final beforeCursor = newValue.text.substring(0, selectionOffset);
+    final digitsBeforeCursor =
+        beforeCursor.replaceAll(RegExp(r'\D'), '').length;
+    final decimalWasBeforeCursor = allowDecimals &&
+        (beforeCursor.contains(settings.decimalSeparator) ||
+            (settings.decimalSeparator != '.' && beforeCursor.contains('.')));
+    final formattedText = _formatInput(
+      newValue.text,
+      settings.thousandSeparator,
+      settings.decimalSeparator,
+    );
+    if (formattedText.isEmpty) {
       return const TextEditingValue(
         text: '',
         selection: TextSelection.collapsed(offset: 0),
       );
     }
 
-    final number = int.tryParse(cleanText) ?? 0;
-    final formatter = NumberFormat('#,##0', 'en_US');
-    final formattedText = formatter.format(number);
-
+    var cursor = 0;
+    var digitsSeen = 0;
+    while (cursor < formattedText.length && digitsSeen < digitsBeforeCursor) {
+      if (RegExp(r'\d').hasMatch(formattedText[cursor])) digitsSeen++;
+      cursor++;
+    }
+    if (decimalWasBeforeCursor) {
+      final separatorIndex = formattedText.indexOf(settings.decimalSeparator);
+      if (separatorIndex >= 0 && cursor <= separatorIndex) {
+        cursor = separatorIndex + 1;
+      }
+    }
+    cursor = cursor.clamp(0, formattedText.length);
     return TextEditingValue(
       text: formattedText,
-      selection: TextSelection.collapsed(offset: formattedText.length),
+      selection: TextSelection.collapsed(offset: cursor),
     );
+  }
+
+  String _formatInput(String input, String grouping, String decimal) {
+    var text = input.replaceAll(RegExp(r'[^0-9.,]'), '');
+    if (text.isEmpty) return '';
+
+    final dotIndex = text.lastIndexOf('.');
+    final commaIndex = text.lastIndexOf(',');
+    String integerPart;
+    String fractionPart = '';
+    if (dotIndex >= 0 || commaIndex >= 0) {
+      final decimalIndex = dotIndex > commaIndex ? dotIndex : commaIndex;
+      final separator = text[decimalIndex];
+      final suffixLength = text.length - decimalIndex - 1;
+      final isConfiguredGrouping = separator == grouping &&
+          separator != decimal &&
+          suffixLength == 3 &&
+          (dotIndex < 0 || commaIndex < 0);
+      if (isConfiguredGrouping) {
+        integerPart = text;
+      } else {
+        integerPart = text.substring(0, decimalIndex);
+        if (allowDecimals && maxDecimalPlaces > 0) {
+          final fractionDigits =
+              text.substring(decimalIndex + 1).replaceAll(RegExp(r'\D'), '');
+          fractionPart = fractionDigits.substring(
+            0,
+            fractionDigits.length.clamp(0, maxDecimalPlaces),
+          );
+        }
+      }
+    } else {
+      integerPart = text;
+    }
+
+    final digits = integerPart.replaceAll(RegExp(r'\D'), '');
+    final grouped = _groupDigits(digits, grouping);
+    if (fractionPart.isEmpty) return grouped;
+    return '$grouped$decimal$fractionPart';
+  }
+
+  String _groupDigits(String digits, String separator) {
+    if (digits.length <= 3 || separator.isEmpty) return digits;
+    final groups = <String>[];
+    var end = digits.length;
+    while (end > 3) {
+      groups.insert(0, digits.substring(end - 3, end));
+      end -= 3;
+    }
+    groups.insert(0, digits.substring(0, end));
+    return groups.join(separator);
   }
 }
 
@@ -77,7 +129,7 @@ class Formatters {
 
   static String get currencySymbol => _settings.currencySymbol;
   static String get currencyCode => _settings.currencyCode;
-  static int get decimalPlaces => _settings.decimalPlaces;
+  static int get decimalPlaces => 0;
 
   // Legacy support
   static String get currency => _settings.currencySymbol;
@@ -90,64 +142,150 @@ class Formatters {
   /// استعمال: '${Formatters.formatAmountWithCurrency(x)}' — پرانا کوڈ کام کرے گا
   static String formatAmount(num amount) {
     if (!amount.isFinite) return '0';
-
-    // Aagar num int hai, seedha handle
-    if (amount is int) {
-      final formatter = NumberFormat(
-        _settings.decimalPlaces > 0
-            ? '#,##0.${'0' * _settings.decimalPlaces}'
-            : '#,##0',
-        'en_US',
-      );
-      return formatter.format(amount);
-    }
-
-    final formatter = NumberFormat(
-      _settings.decimalPlaces > 0
-          ? '#,##0.${'0' * _settings.decimalPlaces}'
-          : '#,##0',
-      'en_US',
-    );
-    return formatter.format(amount);
+    return _currencySettings.formatNumber(amount.roundToDouble());
   }
 
   /// ⭐ symbol کے ساتھ — "Rs 1,234" یا "$1,234.00"
   static String formatAmountWithCurrency(num amount) {
-    return _settings.formatAmount(amount.toDouble());
+    return _currencySettings.formatAmount(amount.roundToDouble());
   }
 
   static String formatAmountWithoutCurrency(num amount) {
-    return _settings.formatNumber(amount.toDouble());
+    return _currencySettings.formatNumber(amount.roundToDouble());
   }
 
-  static double? tryParseAmount(String value) {
+  static AppSettings get _currencySettings =>
+      _settings.copyWith(decimalPlaces: 0);
+
+  static double? tryParseAmount(String value, {bool allowDecimals = false}) {
     var normalized = value.trim();
     if (_settings.currencySymbol.isNotEmpty) {
       normalized = normalized.replaceAll(_settings.currencySymbol, '');
     }
-    if (_settings.thousandSeparator.isNotEmpty) {
-      normalized = normalized.replaceAll(_settings.thousandSeparator, '');
-    }
-    if (_settings.decimalSeparator != '.') {
-      normalized = normalized.replaceAll(_settings.decimalSeparator, '.');
-    }
     normalized = normalized.replaceAll(RegExp(r'\s'), '');
-    return double.tryParse(normalized);
+    if (normalized.isEmpty ||
+        !RegExp(r'^[+-]?[0-9.,]+$').hasMatch(normalized)) {
+      return null;
+    }
+
+    var sign = '';
+    if (normalized.startsWith('-') || normalized.startsWith('+')) {
+      sign = normalized[0];
+      normalized = normalized.substring(1);
+    }
+    if (normalized.isEmpty) return null;
+
+    final dotIndex = normalized.lastIndexOf('.');
+    final commaIndex = normalized.lastIndexOf(',');
+    String? decimalSeparator;
+    String? groupingSeparator;
+    if (dotIndex >= 0 && commaIndex >= 0) {
+      decimalSeparator = dotIndex > commaIndex ? '.' : ',';
+      groupingSeparator = decimalSeparator == '.' ? ',' : '.';
+    } else if (dotIndex >= 0 || commaIndex >= 0) {
+      final separator = dotIndex >= 0 ? '.' : ',';
+      final occurrences = separator == '.'
+          ? '.'.allMatches(normalized).length
+          : ','.allMatches(normalized).length;
+      final configuredDecimal = separator == _settings.decimalSeparator;
+      final configuredGrouping = separator == _settings.thousandSeparator;
+      final isValidGrouping = _isGroupedInteger(normalized, separator);
+
+      if (configuredDecimal && occurrences == 1) {
+        decimalSeparator = separator;
+      } else if (configuredGrouping && isValidGrouping) {
+        groupingSeparator = separator;
+      } else if (occurrences == 1 &&
+          _settings.decimalPlaces > 0 &&
+          !isValidGrouping) {
+        decimalSeparator = separator;
+      } else if (isValidGrouping) {
+        groupingSeparator = separator;
+      } else {
+        return null;
+      }
+    }
+
+    if (groupingSeparator != null &&
+        decimalSeparator != null &&
+        normalized
+            .substring(0, normalized.lastIndexOf(decimalSeparator))
+            .contains(decimalSeparator)) {
+      return null;
+    }
+    if (groupingSeparator != null) {
+      final integerPart = decimalSeparator == null
+          ? normalized
+          : normalized.substring(0, normalized.lastIndexOf(decimalSeparator));
+      if (integerPart.contains(groupingSeparator) &&
+          !_isGroupedInteger(integerPart, groupingSeparator)) {
+        return null;
+      }
+      normalized = normalized.replaceAll(groupingSeparator, '');
+    }
+    if (decimalSeparator != null) {
+      final decimalIndex = normalized.lastIndexOf(decimalSeparator);
+      if (decimalIndex < 0 ||
+          normalized.indexOf(decimalSeparator) != decimalIndex) {
+        return null;
+      }
+      normalized = normalized.replaceRange(decimalIndex, decimalIndex + 1, '.');
+    }
+
+    final amount = double.tryParse('$sign$normalized');
+    if (amount == null || !amount.isFinite) return null;
+    return allowDecimals ? amount : amount.roundToDouble();
+  }
+
+  static bool _isGroupedInteger(String value, String separator) {
+    final escapedSeparator = RegExp.escape(separator);
+    return RegExp('^[0-9]{1,3}(?:$escapedSeparator[0-9]{3})+\$')
+        .hasMatch(value);
   }
 
   /// ⭐ Compact — "Rs 1.2K", "Rs 1.5M"
   static String formatCompact(double amount) {
-    return _settings.formatCompact(amount);
+    if (!amount.isFinite) return '0';
+
+    final roundedAmount = amount.round();
+    final absAmount = roundedAmount.abs();
+    if (absAmount >= 1000000) {
+      return _formatCompactCurrency(
+        roundedAmount,
+        (absAmount / 1000000).round(),
+        'M',
+      );
+    }
+    if (absAmount >= 1000) {
+      return _formatCompactCurrency(
+        roundedAmount,
+        (absAmount / 1000).round(),
+        'K',
+      );
+    }
+    return formatAmountWithCurrency(roundedAmount);
+  }
+
+  static String _formatCompactCurrency(
+    int amount,
+    int compactValue,
+    String suffix,
+  ) {
+    final sign = amount < 0 ? '-' : '';
+    final value = '$compactValue$suffix';
+    return _settings.currencyBefore
+        ? '$sign${_settings.currencySymbol} $value'
+        : '$sign$value ${_settings.currencySymbol}';
   }
 
   /// ⭐ پرانا formatCurrency — backward compatibility
   static String formatCurrency(double amount, {String? locale}) {
-    return _settings.formatAmount(amount);
+    return formatAmountWithCurrency(amount);
   }
 
   /// ⭐ پرانا formatCurrencyCompact
   static String formatCurrencyCompact(double amount, {String? locale}) {
-    return _settings.formatCompact(amount);
+    return formatCompact(amount);
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -169,24 +307,33 @@ class Formatters {
   // ═══════════════════════════════════════════════════════════
   // RELATIVE TIME
   // ═══════════════════════════════════════════════════════════
-  static String formatRelativeTime(DateTime date) {
+  static String formatRelativeTime(DateTime date, {bool isUrdu = true}) {
     final now = DateTime.now();
     final difference = now.difference(date);
 
     if (difference.inSeconds < 60) {
-      return 'ابھی';
+      return isUrdu ? 'ابھی' : 'Just now';
     } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes} منٹ پہلے';
+      return isUrdu
+          ? '${difference.inMinutes} منٹ پہلے'
+          : '${difference.inMinutes} min ago';
     } else if (difference.inHours < 24) {
-      return '${difference.inHours} گھنٹے پہلے';
+      return isUrdu
+          ? '${difference.inHours} گھنٹے پہلے'
+          : '${difference.inHours} hr ago';
     } else if (difference.inDays < 7) {
-      return '${difference.inDays} دن پہلے';
+      return isUrdu
+          ? '${difference.inDays} دن پہلے'
+          : '${difference.inDays} days ago';
     } else if (difference.inDays < 30) {
-      return '${(difference.inDays / 7).floor()} ہفتے پہلے';
+      final weeks = (difference.inDays / 7).floor();
+      return isUrdu ? '$weeks ہفتے پہلے' : '$weeks wk ago';
     } else if (difference.inDays < 365) {
-      return '${(difference.inDays / 30).floor()} مہینے پہلے';
+      final months = (difference.inDays / 30).floor();
+      return isUrdu ? '$months مہینے پہلے' : '$months mo ago';
     } else {
-      return '${(difference.inDays / 365).floor()} سال پہلے';
+      final years = (difference.inDays / 365).floor();
+      return isUrdu ? '$years سال پہلے' : '$years yr ago';
     }
   }
 
@@ -208,6 +355,12 @@ class Formatters {
           : '0$nationalFormat';
     }
     return nationalFormat;
+  }
+
+  /// صرف اسکرین پر دکھانے کے لیے، محفوظ یا موازنہ نہ کریں۔
+  static String displayPhone(String phone) {
+    final formatted = formatPhoneNumber(phone);
+    return formatted.isEmpty ? '' : '\u2066$formatted\u2069';
   }
 
   static String phoneComparisonKey(String phone) {
@@ -242,16 +395,26 @@ class Formatters {
 
   static bool phoneMatchesSearch(String phone, String query) {
     final queryDigits = query.replaceAll(RegExp(r'\D'), '');
-    if (queryDigits.isEmpty) return false;
+    if (queryDigits.length < 3) return false;
 
     final candidates = <String>{queryDigits};
-    if (queryDigits.startsWith('00')) candidates.add(queryDigits.substring(2));
-    if (queryDigits.startsWith('92')) candidates.add(queryDigits.substring(2));
-    if (queryDigits.startsWith('0')) candidates.add(queryDigits.substring(1));
+    if (queryDigits.startsWith('00') && queryDigits.length > 4) {
+      candidates.add(queryDigits.substring(2));
+    }
+    if (queryDigits.startsWith('92') && queryDigits.length > 5) {
+      candidates.add(queryDigits.substring(2));
+    }
+    if (queryDigits.startsWith('0') && queryDigits.length > 3) {
+      candidates.add(queryDigits.substring(1));
+    }
 
     final key = phoneComparisonKey(phone);
-    return candidates
-        .any((candidate) => candidate.isNotEmpty && key.contains(candidate));
+    final localDigits = formatPhoneNumber(phone).replaceAll(RegExp(r'\D'), '');
+    return candidates.any(
+      (candidate) =>
+          candidate.length >= 3 &&
+          (key.contains(candidate) || localDigits.contains(candidate)),
+    );
   }
 
   static List<String> phoneNumberLookupCandidates(String phone) {
@@ -274,38 +437,44 @@ class Formatters {
     }.toList(growable: false);
   }
 
-  static PhoneNumber? _parsePhoneNumber(String phone) {
+  static PhoneNumber? _parsePhoneNumber(
+    String phone, {
+    String defaultCountryCode = '+92',
+  }) {
     final trimmed = phone.trim();
     if (trimmed.isEmpty) return null;
 
-    var input = trimmed;
-    if (input.startsWith('00')) {
-      input = '+${input.substring(2)}';
-    } else if (!input.startsWith('+')) {
-      final digits = input.replaceAll(RegExp(r'\D'), '');
-      if (digits.startsWith('92') && digits.length == 12) {
-        input = '+$digits';
-      }
-    }
-
     PhoneNumber? tryParse(String value) {
       try {
-        final parsed = PhoneNumber.parse(value, callerCountry: IsoCode.PK);
+        final parsed = PhoneNumber.parse(value);
         return parsed.isValidLength() ? parsed : null;
       } on PhoneNumberException {
         return null;
       }
     }
 
+    var input = trimmed;
+    if (input.startsWith('00')) {
+      input = '+${input.substring(2)}';
+    } else if (!input.startsWith('+')) {
+      final digits = input.replaceAll(RegExp(r'\D'), '');
+      final countryCode = defaultCountryCode.replaceAll(RegExp(r'\D'), '');
+      if (digits.startsWith(countryCode) &&
+          digits.length > countryCode.length) {
+        input = '+$digits';
+      } else if (digits.length > 10 && !digits.startsWith('0')) {
+        final international = tryParse('+$digits');
+        if (international != null) return international;
+        input = '+$countryCode$digits';
+      } else {
+        final nationalDigits =
+            digits.startsWith('0') ? digits.substring(1) : digits;
+        input = '+$countryCode$nationalDigits';
+      }
+    }
+
     final parsed = tryParse(input);
     if (parsed != null) return parsed;
-
-    final digits = input.replaceAll(RegExp(r'\D'), '');
-    if (!input.startsWith('+') &&
-        digits.length > 10 &&
-        !digits.startsWith('0')) {
-      return tryParse('+$digits');
-    }
     return null;
   }
 
@@ -319,51 +488,19 @@ class Formatters {
   }
 
   static String toE164(String phone, {String defaultCountryCode = '+92'}) {
-    final trimmed = phone.trim();
-    String clean = trimmed.replaceAll(RegExp(r'\D'), '');
-    if (clean.isEmpty) return '';
-
-    if (clean.startsWith('00')) {
-      clean = clean.substring(2);
-    }
-
-    if (trimmed.startsWith('+')) {
-      return '+$clean';
-    }
-
-    if (clean.startsWith('0')) {
-      return '$defaultCountryCode${clean.substring(1)}';
-    }
-
-    if (clean.startsWith('92') && clean.length >= 11) {
-      return '+$clean';
-    }
-
-    return '$defaultCountryCode$clean';
+    return _parsePhoneNumber(
+          phone,
+          defaultCountryCode: defaultCountryCode,
+        )?.international ??
+        '';
   }
 
   static String? normalizePhoneNumber(String phone,
       {String defaultCountryCode = '+92'}) {
-    if (phone.trim().isEmpty) return null;
-
-    String clean = phone.replaceAll(RegExp(r'[^\d+]'), '');
-
-    if (clean.startsWith('00')) {
-      clean = '+' + clean.substring(2);
-    } else if (clean.startsWith('0')) {
-      clean = defaultCountryCode + clean.substring(1);
-    }
-
-    if (!clean.startsWith('+')) {
-      if (clean.startsWith('92') && clean.length >= 12) {
-        clean = '+' + clean;
-      } else {
-        clean = defaultCountryCode + clean;
-      }
-    }
-
-    final e164Regex = RegExp(r'^\+[1-9]\d{10,14}$');
-    return e164Regex.hasMatch(clean) ? clean : null;
+    return _parsePhoneNumber(
+      phone,
+      defaultCountryCode: defaultCountryCode,
+    )?.international;
   }
 
   static bool isValidPhoneNumber(String phone,
@@ -374,9 +511,9 @@ class Formatters {
   }
 
   static String maskPhoneNumber(String phone) {
-    String formatted = formatPhoneNumber(phone);
+    final formatted = formatPhoneNumber(phone);
     if (formatted.length < 7) return '*******';
-    return '${formatted.substring(0, 4)}*******';
+    return '\u2066${formatted.substring(0, 4)}*******\u2069';
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -398,16 +535,18 @@ class Formatters {
   // PERCENTAGE
   // ═══════════════════════════════════════════════════════════
   static String formatPercentage(double value) {
-    return '${(value * 100).toStringAsFixed(1)}%';
+    if (!value.isFinite) return '0.0%';
+    return '${value.toStringAsFixed(1)}%';
   }
 
   // ═══════════════════════════════════════════════════════════
   // COMPACT NUMBERS
   // ═══════════════════════════════════════════════════════════
   static String formatNumberCompact(int number) {
-    if (number < 1000) {
+    final absNumber = number.abs();
+    if (absNumber < 1000) {
       return number.toString();
-    } else if (number < 1000000) {
+    } else if (absNumber < 999500) {
       return '${(number / 1000).toStringAsFixed(1)}K';
     } else {
       return '${(number / 1000000).toStringAsFixed(1)}M';
@@ -438,24 +577,20 @@ class Formatters {
   }
 
   static String getInitials(String name) {
-    final parts = name.split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    } else if (name.isNotEmpty) {
-      return name[0].toUpperCase();
-    }
-    return '?';
+    final parts =
+        name.trim().split(RegExp(r'\s+')).where((part) => part.isNotEmpty);
+    final initials = parts
+        .take(2)
+        .map((part) => String.fromCharCode(part.runes.first))
+        .join();
+    return initials.isEmpty ? '?' : initials.toUpperCase();
   }
 
   // ═══════════════════════════════════════════════════════════
   // SAFE PARSING
   // ═══════════════════════════════════════════════════════════
   static double safeParseDouble(String value) {
-    try {
-      return double.parse(value);
-    } catch (e) {
-      return 0.0;
-    }
+    return tryParseAmount(value, allowDecimals: true) ?? 0.0;
   }
 
   static int safeParseInt(String value) {
@@ -475,12 +610,14 @@ class Formatters {
   // BALANCE
   // ═══════════════════════════════════════════════════════════
   static String formatBalance(double balance) {
-    final sign = balance >= 0 ? '+' : '';
-    return '$sign${_settings.currencySymbol} ${formatAmount(balance.abs())}';
+    final rounded = balance.roundToDouble();
+    final sign = rounded < 0 ? '-' : '+';
+    return '$sign${_currencySettings.formatAmount(rounded.abs())}';
   }
 
-  static String formatPendingAmount(double amount) {
-    return '${_settings.currencySymbol} ${formatAmount(amount)} بقایا';
+  static String formatPendingAmount(double amount, {bool isUrdu = true}) {
+    final suffix = isUrdu ? 'بقایا' : 'pending';
+    return '${formatAmountWithCurrency(amount)} $suffix';
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -489,35 +626,18 @@ class Formatters {
   static String sanitizeText(String text) {
     if (text.isEmpty) return text;
 
-    String sanitized = text.replaceAll(RegExp(r'<[^>]*>'), '');
-    sanitized = sanitized.replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '');
-    sanitized = sanitized.replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '');
+    var sanitized = text.replaceAll(
+      RegExp(
+        r'</?(?:script|style|iframe|object|embed|svg|math|html|body|div|span|p|br|a|img|b|i|u|strong|em|form|input|button|textarea|select|option|meta|link|title|head)(?:\s[^<>]*)?\s*/?>',
+        caseSensitive: false,
+      ),
+      '',
+    );
+    sanitized =
+        sanitized.replaceAll(RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]'), '');
+    sanitized = sanitized.replaceAll(RegExp(r'[\u200B\uFEFF]'), '');
 
     return sanitized.trim();
   }
 
-  static bool containsProhibitedContent(String text) {
-    final prohibited = [
-      'froad',
-      'fraud',
-      'جعلی',
-      'froud',
-      'ناجائز',
-      'haram',
-      'sharab',
-      'drugs',
-      'weapon',
-      'aslaha',
-      'bomb',
-      'ہیروئن',
-      'چرس',
-      'شراب'
-    ];
-    final normalized = text.toLowerCase();
-
-    return prohibited.any((word) {
-      final pattern = RegExp(RegExp.escape(word), caseSensitive: false);
-      return pattern.hasMatch(normalized);
-    });
-  }
 }

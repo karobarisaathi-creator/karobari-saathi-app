@@ -669,7 +669,7 @@ class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
                               ),
                             ),
                             subtitle: UrduAwareText(
-                              Formatters.formatPhoneNumber(phone),
+                              Formatters.displayPhone(phone),
                               style: const TextStyle(fontFamily: '', fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.bold),
                             ),
                             onTap: () => widget.onSelect(contact.displayName, phone),
