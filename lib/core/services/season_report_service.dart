@@ -73,11 +73,10 @@ class SeasonReportService {
     final netProfit = totalIncome - totalExpense;
     final profitMargin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0.0;
 
-    final area = profession.areaAcres > 0 ? profession.areaAcres : 1.0;
     final totalLease = profession.rentPerAcre * profession.areaAcres;
     final yieldPerAcre = profession.areaAcres > 0 ? profession.productionMun / profession.areaAcres : 0.0;
-    final costPerAcre = totalExpense / area;
-    final profitPerAcre = netProfit / area;
+    final costPerAcre = profession.areaAcres > 0 ? totalExpense / profession.areaAcres : 0.0;
+    final profitPerAcre = profession.areaAcres > 0 ? netProfit / profession.areaAcres : 0.0;
     final avgRatePerMun = profession.productionMun > 0 ? totalIncome / profession.productionMun : 0.0;
     final costPerMun = profession.productionMun > 0 ? totalExpense / profession.productionMun : 0.0;
 

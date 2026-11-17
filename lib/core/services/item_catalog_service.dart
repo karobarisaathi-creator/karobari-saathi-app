@@ -1,5 +1,6 @@
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
+import 'package:account_app/core/utils/account_balance_utils.dart';
 
 /// ایک آئٹم کا خلاصہ — خریداری، فروخت اور موجودہ سٹاک سب موجودہ
 /// ٹرانزیکشنز سے نکالا جاتا ہے، کہیں بھی الگ سے سیو نہیں کیا جاتا۔
@@ -47,6 +48,8 @@ class ItemCatalogService {
     final sorted = [...transactions]..sort((a, b) => a.date.compareTo(b.date));
 
     for (final tx in sorted) {
+      if (tx.category == AccountBalanceUtils.partySettlementCategory) continue;
+
       final List<TransactionItem> lineItems = tx.items.isNotEmpty
           ? tx.items
           : (tx.quantity > 0
@@ -76,13 +79,15 @@ class ItemCatalogService {
 
         if (tx.type == 'expense') {
           entry.boughtQty += item.quantity;
-          if (lastBuyDate[name] == null || tx.date.isAfter(lastBuyDate[name]!)) {
+          if (lastBuyDate[name] == null ||
+              tx.date.isAfter(lastBuyDate[name]!)) {
             entry.lastBuyRate = item.rate;
             lastBuyDate[name] = tx.date;
           }
         } else if (tx.type == 'income') {
           entry.soldQty += item.quantity;
-          if (lastSellDate[name] == null || tx.date.isAfter(lastSellDate[name]!)) {
+          if (lastSellDate[name] == null ||
+              tx.date.isAfter(lastSellDate[name]!)) {
             entry.lastSellRate = item.rate;
             lastSellDate[name] = tx.date;
           }

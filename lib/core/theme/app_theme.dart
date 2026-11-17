@@ -7,11 +7,12 @@ class AppTheme {
   static const Color lightColor = Color(0xFFFFFFFF);
   static const Color goldColor = Color(0xFF607D8B); // سرمئی رنگ (Grey/BlueGrey)
   static const Color textSecondary = Color(0xFF757575);
-  static const Color incomeColor = Color(0xFF515D11); // Green for Received (Olive Green)
+  static const Color incomeColor = Color(0xFF165D11); // Green for Received (Olive Green)
   static const Color expenseColor = Color(0xFFC83120); // گہرا سرخ رنگ (Cinnabar Red)
   static const Color verifiedGold = Color(0xFFD97706); // Richer Darker Gold
   static const Color purpleColor = Color(0xFF8B5CF6); // جامنی رنگ (Purple Accent)
   static const Color greenColor = Color(0xFF10B981); // سبز رنگ (Green Accent)
+  static const Color redColor = Color(0xFFEF4444); // سرخ رنگ (Red Accent)
   static const Color scaffoldBackground = Color(0xFFFFFFFF);
   static const Color backgroundColor = Color(0xFFE8EAF0); // ہلکا سرمئی بیک گراؤنڈ
 

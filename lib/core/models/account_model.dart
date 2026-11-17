@@ -29,6 +29,9 @@ class Account {
   @HiveField(7)
   final double balance;
 
+  @HiveField(8, defaultValue: <String, String>{})
+  final Map<String, String>? settlementNotes;
+
   @HiveField(10)
   final String? profileImage;
 
@@ -62,6 +65,7 @@ class Account {
     this.isActive = true,
     this.storeName,
     this.storeImage,
+    this.settlementNotes = const {},
   });
 
   Map<String, dynamic> toMap() {
@@ -74,6 +78,7 @@ class Account {
       'initialBalance': initialBalance,
       'balanceType': balanceType,
       'balance': balance,
+      'settlementNotes': settlementNotes ?? const <String, String>{},
       'profileImage': profileImage,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -88,7 +93,8 @@ class Account {
     DateTime parseDate(dynamic dateVal) {
       if (dateVal == null) return DateTime.now();
       if (dateVal is Timestamp) return dateVal.toDate();
-      if (dateVal is String) return DateTime.tryParse(dateVal) ?? DateTime.now();
+      if (dateVal is String)
+        return DateTime.tryParse(dateVal) ?? DateTime.now();
       return DateTime.now();
     }
 
@@ -98,9 +104,15 @@ class Account {
       phone: map['phone']?.toString() ?? '',
       address: map['address']?.toString(),
       category: map['category']?.toString() ?? 'Other',
-      initialBalance: (map['initialBalance'] is num) ? (map['initialBalance'] as num).toDouble() : 0.0,
+      initialBalance: (map['initialBalance'] is num)
+          ? (map['initialBalance'] as num).toDouble()
+          : 0.0,
       balanceType: map['balanceType']?.toString() ?? 'Receivable',
-      balance: (map['balance'] is num) ? (map['balance'] as num).toDouble() : 0.0,
+      balance:
+          (map['balance'] is num) ? (map['balance'] as num).toDouble() : 0.0,
+      settlementNotes: (map['settlementNotes'] as Map?)?.map(
+              (key, value) => MapEntry(key.toString(), value.toString())) ??
+          const {},
       profileImage: map['profileImage']?.toString(),
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
@@ -124,6 +136,7 @@ class Account {
     bool? isActive,
     String? storeName,
     String? storeImage,
+    Map<String, String>? settlementNotes,
   }) {
     return Account(
       id: id,
@@ -140,6 +153,8 @@ class Account {
       isActive: isActive ?? this.isActive,
       storeName: storeName ?? this.storeName,
       storeImage: storeImage ?? this.storeImage,
+      settlementNotes:
+          settlementNotes ?? this.settlementNotes ?? const <String, String>{},
     );
   }
 }

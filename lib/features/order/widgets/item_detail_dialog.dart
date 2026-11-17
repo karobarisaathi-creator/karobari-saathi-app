@@ -297,7 +297,7 @@ void showItemDetailDialog(BuildContext context, ShopItem item,
               UrduAwareText(
                 item.description!,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: AppTheme.darkColor,
                   fontFamily: fontFamily,

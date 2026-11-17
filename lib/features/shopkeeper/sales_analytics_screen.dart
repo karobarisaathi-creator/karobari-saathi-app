@@ -63,7 +63,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
     if (absoluteAmount >= 1000) {
       return 'Rs $sign${(absoluteAmount / 1000).toStringAsFixed(0)}K';
     }
-    return 'Rs $sign${Formatters.formatAmountWithCurrency(absoluteAmount)}';
+    return Formatters.formatAmountWithCurrency(amount);
   }
 
   String _getMonthName(int month) {
@@ -152,7 +152,9 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
         }
       } else {
         _selectedYear++;
-        _selectedMonth = DateTime.now().month;
+        _selectedMonth = _selectedYear == DateTime.now().year
+            ? DateTime.now().month
+            : 12;
       }
     });
   }
@@ -715,10 +717,12 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
                     const SizedBox(width: 3),
                     UrduAwareText(
                       '${changePercent >= 0 ? "+" : ""}${changePercent.toStringAsFixed(1)}%',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w800,
-                        color: AppTheme.incomeColor,
+                        color: changePercent >= 0
+                            ? AppTheme.incomeColor
+                            : AppTheme.expenseColor,
                         fontFamily: null,
                       ),
                     ),
@@ -1201,6 +1205,8 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
     String? fontFamily,
   ) {
     final hasUncostedSales = item.uncostedSalesQuantity > 0;
+    final displayName =
+        isUrdu && item.nameUrdu.isNotEmpty ? item.nameUrdu : item.name;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Column(
@@ -1210,7 +1216,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
             children: [
               Expanded(
                 child: UrduAwareText(
-                  item.name,
+                  displayName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -1480,6 +1486,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
             value: _formatCompact(monthStats.salesRevenue),
             valueColor: AppTheme.incomeColor,
             fontFamily: fontFamily,
+            isUrdu: isUrdu,
           ),
           const Divider(height: 1, color: Color(0xFFEEF1F5)),
           _buildYearlyRow(
@@ -1491,6 +1498,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
             value: _formatCompact(monthStats.purchaseValue),
             valueColor: AppTheme.themeColor,
             fontFamily: fontFamily,
+            isUrdu: isUrdu,
           ),
           const Divider(height: 1, color: Color(0xFFEEF1F5)),
           _buildYearlyRow(
@@ -1586,6 +1594,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
             value: _formatCompact(yearly.salesRevenue),
             valueColor: AppTheme.incomeColor,
             fontFamily: fontFamily,
+            isUrdu: isUrdu,
           ),
           const Divider(height: 1, color: Color(0xFFEEF1F5)),
           _buildYearlyRow(
@@ -1597,6 +1606,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
             value: _formatCompact(yearly.purchaseValue),
             valueColor: AppTheme.themeColor,
             fontFamily: fontFamily,
+            isUrdu: isUrdu,
           ),
           const Divider(height: 1, color: Color(0xFFEEF1F5)),
           _buildYearlyRow(
@@ -1658,7 +1668,7 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
             iconBg: const Color(0xFF607D8B).withValues(alpha: 0.10),
             name: isUrdu ? 'ماہانہ اوسط فروخت' : 'Average Monthly Sales',
             meta: isUrdu
-                ? 'جنوری تا ${_getFullMonthName(monthsElapsed)} · $monthsElapsed ماہ'
+                ? 'جنوری تا ${_getUrduMonthName(monthsElapsed)} · $monthsElapsed ماہ'
                 : 'Jan–${_getFullMonthName(monthsElapsed).substring(0, 3)} · $monthsElapsed months',
             value: _formatCompact(avgMonthly),
             valueColor: AppTheme.darkColor,
@@ -1722,11 +1732,11 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
                 const SizedBox(height: 2),
                 UrduAwareText(
                   meta,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textSecondary,
-                    fontFamily: null,
+                    fontFamily: isUrdu ? fontFamily : null,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

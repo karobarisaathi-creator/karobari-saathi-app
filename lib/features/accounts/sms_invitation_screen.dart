@@ -4,8 +4,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
+import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
+import 'package:account_app/core/utils/account_balance_utils.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
@@ -32,6 +34,7 @@ class BalanceAlertDialog extends StatefulWidget {
 class _BalanceAlertDialogState extends State<BalanceAlertDialog> {
   final UrduAwareTextEditingController _messageController =
       UrduAwareTextEditingController();
+  late final double _finalBalance;
 
   @override
   void dispose() {
@@ -42,28 +45,44 @@ class _BalanceAlertDialogState extends State<BalanceAlertDialog> {
   @override
   void initState() {
     super.initState();
+    final databaseService =
+        Provider.of<DatabaseService>(context, listen: false);
+    final openingBalance =
+        widget.party.balanceType.trim().toLowerCase() == 'payable'
+            ? -widget.party.initialBalance
+            : widget.party.initialBalance;
+    _finalBalance = AccountBalanceUtils.ledgerBalance(
+      databaseService.getTransactions(widget.party.id),
+      initialBalance: openingBalance,
+    );
+
     // Initial Message Setup
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final languageService =
           Provider.of<LanguageService>(context, listen: false);
       final isUrdu = languageService.isUrdu;
-      final balance = widget.party.balance.abs().toStringAsFixed(0);
-      final status = widget.party.balance.abs() < 0.01
-          ? (isUrdu ? "حساب صاف" : "Settled")
-          : widget.party.balance > 0
-              ? (isUrdu ? "آپ کو دینے ہیں" : "Payable")
-              : (isUrdu ? "آپ نے لینے ہیں" : "Receivable");
+      final balance = Formatters.formatAmount(_finalBalance.abs());
 
       String initialMessage;
       if (isUrdu) {
+        final balanceLine = _finalBalance.abs() < 0.01
+            ? 'آپ کا حساب صاف ہے (RS $balance)۔'
+            : _finalBalance > 0
+                ? 'مجھے آپ سے RS $balance لینے ہیں۔'
+                : 'مجھے آپ کو RS $balance دینے ہیں۔';
         initialMessage = """السلام علیکم!
 محترم ${widget.party.name}،
-آپ کا موجودہ بیلنس RS $balance ($status) ہے۔
+$balanceLine
 براہ مہربانی تصدیق کریں۔ شکریہ۔""";
       } else {
+        final balanceLine = _finalBalance.abs() < 0.01
+            ? 'Your account is settled (RS $balance).'
+            : _finalBalance > 0
+                ? 'I need to receive RS $balance from you.'
+                : 'I need to pay you RS $balance.';
         initialMessage = """Assalam-o-Alaikum!
 Dear ${widget.party.name},
-Your current balance is RS $balance ($status).
+$balanceLine
 Please verify. Thanks.""";
       }
 
@@ -180,12 +199,12 @@ Please verify. Thanks.""";
                                                 fontFamily: fontFamily,
                                                 fontWeight: fontWeight)),
                                         UrduAwareText(
-                                          'RS ${widget.party.balance.abs().toStringAsFixed(0)}',
+                                          'RS ${Formatters.formatAmount(_finalBalance.abs())}',
                                           style: TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.bold,
                                             fontFamily: '',
-                                            color: widget.party.balance >= 0
+                                            color: _finalBalance >= 0
                                                 ? AppTheme.incomeColor
                                                 : AppTheme.expenseColor,
                                           ),

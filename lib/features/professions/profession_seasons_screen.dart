@@ -1633,7 +1633,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
           child: FittedBox(
             fit: BoxFit.scaleDown,
             child: UrduAwareText(
-              amount.abs().toStringAsFixed(0),
+              Formatters.formatAmountWithCurrency(amount.abs()),
               style: TextStyle(
                 fontSize: 13,
                 color: color,

@@ -28,6 +28,49 @@ class SeasonComparisonScreen extends StatefulWidget {
 
 class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // ═════════════════════════════════════════════════════════
+  // Cached Reports
+  // ═════════════════════════════════════════════════════════
+  late bool _hasTwo;
+  late Profession _newSeason;
+  Profession? _oldSeason;
+  late SeasonReportData _newReport;
+  SeasonReportData? _oldReport;
+  bool _reportBuilt = false;
+
+  void _buildReports(DatabaseService db) {
+    if (_reportBuilt) return;
+
+    _hasTwo = widget.seasonB != null;
+
+    if (_hasTwo) {
+      if (widget.seasonA.createdAt.isAfter(widget.seasonB!.createdAt)) {
+        _newSeason = widget.seasonA;
+        _oldSeason = widget.seasonB;
+      } else {
+        _newSeason = widget.seasonB!;
+        _oldSeason = widget.seasonA;
+      }
+    } else {
+      _newSeason = widget.seasonA;
+    }
+
+    final allTx = db.getAllTransactions();
+    _newReport = SeasonReportService.buildReport(
+      profession: _newSeason,
+      transactions: allTx,
+    );
+
+    _oldReport = _hasTwo
+        ? SeasonReportService.buildReport(
+            profession: _oldSeason!,
+            transactions: allTx,
+          )
+        : null;
+
+    _reportBuilt = true;
+  }
+
+  // ═════════════════════════════════════════════════════════
   // Helpers
   // ═════════════════════════════════════════════════════════
   String _formatMoney(double amount) {
@@ -43,13 +86,14 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   }
 
   String _formatFull(double amount) {
-    final str = amount.toStringAsFixed(0);
+    final isNegative = amount < 0;
+    final str = amount.abs().toStringAsFixed(0);
     final buffer = StringBuffer();
     for (int i = 0; i < str.length; i++) {
       if (i > 0 && (str.length - i) % 3 == 0) buffer.write(',');
       buffer.write(str[i]);
     }
-    return buffer.toString();
+    return '${isNegative ? '-' : ''}${buffer.toString()}';
   }
 
   String _formatQty(double qty) {
@@ -63,37 +107,14 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
     final db = Provider.of<DatabaseService>(context);
 
-    // ─── Determine what to show ───
-    final hasTwo = widget.seasonB != null;
+    // Build reports only once (cached)
+    _buildReports(db);
 
-    // Sort newer vs older
-    Profession? newSeason;
-    Profession? oldSeason;
-    if (hasTwo) {
-      if (widget.seasonA.createdAt.isAfter(widget.seasonB!.createdAt)) {
-        newSeason = widget.seasonA;
-        oldSeason = widget.seasonB;
-      } else {
-        newSeason = widget.seasonB;
-        oldSeason = widget.seasonA;
-      }
-    } else {
-      newSeason = widget.seasonA;
-    }
-
-    // ─── Build reports ───
-    final allTx = db.getAllTransactions();
-    final newReport = SeasonReportService.buildReport(
-      profession: newSeason!,
-      transactions: allTx,
-    );
-
-    final oldReport = hasTwo
-        ? SeasonReportService.buildReport(
-      profession: oldSeason!,
-      transactions: allTx,
-    )
-        : null;
+    final hasTwo = _hasTwo;
+    final newSeason = _newSeason;
+    final oldSeason = _oldSeason;
+    final newReport = _newReport;
+    final oldReport = _oldReport;
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
@@ -323,8 +344,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
       bool isUrdu,
       String? fontFamily,
       ) {
-    final displayName =
-    isUrdu && season.name.isNotEmpty ? season.name : season.name;
+    final displayName = season.name;
     final crop = season.cropType.isNotEmpty
         ? '${isUrdu ? 'فصل' : 'Crop'}: ${season.cropType}'
         : '';
@@ -834,6 +854,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         bool isPercent = false,
       }) {
     final diff = newVal - oldVal;
+    final isNeutral = diff == 0;
     final isGood = lowerIsBetter ? diff < 0 : diff > 0;
 
     final newText = isPercent
@@ -908,7 +929,9 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 2),
               decoration: BoxDecoration(
-                color: (isGood ? AppTheme.incomeColor : AppTheme.expenseColor)
+                color: (isNeutral
+                    ? AppTheme.textSecondary
+                    : (isGood ? AppTheme.incomeColor : AppTheme.expenseColor))
                     .withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(6),
               ),
@@ -920,9 +943,11 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w900,
-                    color: isGood
-                        ? AppTheme.incomeColor
-                        : AppTheme.expenseColor,
+                    color: isNeutral
+                        ? AppTheme.textSecondary
+                        : (isGood
+                            ? AppTheme.incomeColor
+                            : AppTheme.expenseColor),
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                   maxLines: 1,
@@ -1169,8 +1194,8 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         if (report.benchmarkCostPerUnit > 0)
           _targetBar(
             label: isUrdu ? 'لاگت کا معیار' : 'Cost Benchmark',
-            value: report.benchmarkCostPerUnit,
-            target: report.costPerMun > 0 ? report.costPerMun : 1,
+            value: report.costPerMun,
+            target: report.benchmarkCostPerUnit,
             isInverse: true,
             unit: 'Rs',
             fontFamily: fontFamily,
@@ -1191,7 +1216,8 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   }) {
     double percent;
     if (isInverse) {
-      percent = target > 0 ? (value / target * 100).clamp(0, 100) : 0;
+      // Inverse: benchmark ÷ actual — اگر اصل لاگت بینچ مارک سے کم ہے تو اچھا
+      percent = value > 0 ? (target / value * 100).clamp(0, 100) : 0;
     } else {
       percent = target > 0 ? (value / target * 100).clamp(0, 100) : 0;
     }

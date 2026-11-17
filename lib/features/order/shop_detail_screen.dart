@@ -16,8 +16,9 @@ import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 import 'package:account_app/features/order/order_preview_screen.dart';
-import 'package:account_app/features/order/widgets/shop_item_card_widget.dart';
 import 'package:account_app/features/order/widgets/trust_popup_dialog.dart';
+import 'package:account_app/features/order/widgets/shop_catalog_item_card.dart';
+import 'package:account_app/features/order/widgets/item_detail_dialog.dart';
 
 class ShopDetailScreen extends StatefulWidget {
   final Shop shop;
@@ -195,6 +196,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
+      bottomNavigationBar: _buildBottomCartBar(context, isUrdu),
       body: SafeArea(
         top: false,
         child: Column(
@@ -331,19 +333,21 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                                         ? 'دوسری کیٹیگری آزمائیں'
                                         : 'Try another category',
                                   )
-                                : ListView.builder(
+                                : GridView.builder(
                                     padding:
-                                        const EdgeInsets.fromLTRB(8, 4, 8, 100),
+                                        const EdgeInsets.fromLTRB(12, 10, 12, 100),
+                                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      childAspectRatio: 0.72,
+                                      crossAxisSpacing: 10,
+                                      mainAxisSpacing: 10,
+                                    ),
                                     itemCount: filtered.length,
                                     itemBuilder: (context, i) {
                                       final item = filtered[i];
-                                      return ShopItemCardWidget(
+                                      return ShopCatalogItemCard(
                                         item: item,
-                                        shop: _shop,
-                                        showStepper: false,
-                                        onQuantityIncrement: () {},
-                                        onQuantityDecrement: () {},
-                                        onQuantitySet: (_) {},
+                                        onTap: () => _showItemDetailModal(context, item),
                                       );
                                     },
                                   ),
@@ -781,6 +785,10 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
         ],
       ),
     );
+  }
+
+  void _showItemDetailModal(BuildContext context, ShopItem item) {
+    showItemDetailDialog(context, item);
   }
 
   Widget _buildShimmerCatalogGrid() {

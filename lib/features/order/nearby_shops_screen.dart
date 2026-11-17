@@ -782,7 +782,7 @@ class _ShopSectionWidgetState extends State<_ShopSectionWidget> {
                       }
                       final item = _items[index - 1];
                       return SizedBox(
-                        width: 145,
+                        width: 165,
                         height: 270,
                         child: ShopCatalogItemCard(
                           item: item,

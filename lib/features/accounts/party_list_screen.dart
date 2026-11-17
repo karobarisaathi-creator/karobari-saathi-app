@@ -11,10 +11,10 @@ import 'package:account_app/features/accounts/party_detail_screen.dart';
 import 'package:account_app/features/accounts/add_party_screen.dart';
 import 'package:account_app/core/widgets/party_card.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
+import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/account_balance_utils.dart';
 import 'package:account_app/core/utils/formatters.dart';
-import 'package:account_app/core/widgets/simple_spinning_ring.dart';
 import 'package:account_app/features/accounts/sms_invitation_screen.dart';
 
 class PartyListScreen extends StatefulWidget {
@@ -89,10 +89,7 @@ class _PartyListScreenState extends State<PartyListScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(
-              child:
-                  SimpleSpinningRing(size: 60, duration: Duration(seconds: 2)),
-            )
+          ? _buildShimmerLoading()
           : Consumer<DatabaseService>(
               builder: (context, databaseService, child) {
                 final allAccounts = databaseService.getAccounts();
@@ -149,6 +146,136 @@ class _PartyListScreenState extends State<PartyListScreen> {
                 );
               },
             ),
+    );
+  }
+
+  Widget _buildShimmerLoading() {
+    return Container(
+      color: AppTheme.backgroundColor,
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          Container(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              MediaQuery.of(context).padding.top + 60,
+              16,
+              16,
+            ),
+            decoration: const BoxDecoration(
+              color: AppTheme.darkColor,
+              borderRadius: BorderRadius.vertical(
+                bottom: Radius.circular(15),
+              ),
+            ),
+            child: Row(
+              children: List.generate(
+                3,
+                (index) => Expanded(
+                  child: Container(
+                    margin: EdgeInsets.only(right: index == 2 ? 0 : 8),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Column(
+                      children: [
+                        SkeletonShimmer(
+                          width: 72,
+                          height: 14,
+                          borderRadius: 5,
+                        ),
+                        SizedBox(height: 8),
+                        SkeletonShimmer(
+                          width: 58,
+                          height: 11,
+                          borderRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: Column(
+              children: List.generate(
+                5,
+                (index) => SkeletonCard(
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          const SkeletonShimmer(
+                            width: 42,
+                            height: 42,
+                            borderRadius: 8,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                SkeletonShimmer(
+                                  width: 140,
+                                  height: 14,
+                                  borderRadius: 5,
+                                ),
+                                SizedBox(height: 8),
+                                SkeletonShimmer(
+                                  width: 92,
+                                  height: 11,
+                                  borderRadius: 4,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SkeletonShimmer(
+                            width: 72,
+                            height: 16,
+                            borderRadius: 5,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      const Row(
+                        children: [
+                          Expanded(
+                            child: SkeletonShimmer(
+                              width: double.infinity,
+                              height: 22,
+                              borderRadius: 8,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: SkeletonShimmer(
+                              width: double.infinity,
+                              height: 22,
+                              borderRadius: 8,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: SkeletonShimmer(
+                              width: double.infinity,
+                              height: 22,
+                              borderRadius: 8,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

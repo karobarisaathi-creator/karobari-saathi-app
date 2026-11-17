@@ -139,16 +139,12 @@ class PartyTrustPopup extends StatelessWidget {
     return [
       Row(
         mainAxisAlignment: MainAxisAlignment.center,
+        textDirection: TextDirection.ltr,
         children: [
           shieldAt(0),
           const SizedBox(width: 8),
           shieldAt(1),
-        ],
-      ),
-      const SizedBox(height: 6),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
+          const SizedBox(width: 8),
           shieldAt(2),
           const SizedBox(width: 8),
           shieldAt(3),

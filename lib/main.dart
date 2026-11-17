@@ -40,7 +40,8 @@ import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/security_service.dart';
 import 'package:account_app/core/services/offline_queue_service.dart';
 import 'package:account_app/core/services/settings_service.dart';
-import 'package:account_app/core/widgets/simple_spinning_ring.dart';
+import 'package:account_app/core/widgets/profile_info_widget.dart';
+import 'package:account_app/core/widgets/startup_loading_gallery.dart';
 import './helpers/migration_helper.dart'; // ✅ یہ import کریں
 
 // Screens
@@ -418,49 +419,121 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
 
     return Scaffold(
       backgroundColor: _themeColor,
-      body: Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Image.asset(
-                'assets/images/icons/zalooq.png',
-                width: 120,
-                height: 120,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Icon(Icons.account_balance_wallet,
-                      size: 80, color: Colors.white70);
-                },
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Center(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    'assets/images/icons/zalooq.png',
+                    width: 120,
+                    height: 120,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Icon(Icons.account_balance_wallet,
+                          size: 80, color: Colors.white70);
+                    },
+                  ),
+                  const SizedBox(height: 40),
+                  UrduAwareText(
+                    isUrdu ? 'کاروباری ساتھی' : 'Karobari Sathi',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      fontFamily: fontFamily,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  UrduAwareText(
+                    isUrdu ? 'ڈیٹا لوڈ ہو رہا ہے...' : 'Loading Data...',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontFamily: fontFamily,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Consumer2<DatabaseService, StockService>(
+                    builder: (context, databaseService, stockService, _) {
+                      final parties = databaseService
+                          .getAccounts()
+                          .where((account) =>
+                              account.isActive &&
+                              account.category.trim().toLowerCase() !=
+                                  'partner')
+                          .take(3)
+                          .toList();
+                      final items = stockService.items
+                          .where((item) => !item.isArchived)
+                          .take(3)
+                          .toList();
+                      final partyImages = parties
+                          .map(
+                            (party) => ProfileInfoWidget(
+                              name: party.name,
+                              phone: '',
+                              profileImage: party.profileImage,
+                              showText: false,
+                              customSize: 32,
+                              borderRadius: 8,
+                            ),
+                          )
+                          .toList();
+                      final itemImages = items.map((item) {
+                        final images = item.allImages;
+                        return StartupLoadingPhoto(
+                          imagePath: images.isEmpty ? null : images.first,
+                          placeholderIcon: Icons.inventory_2_outlined,
+                        );
+                      }).toList();
+
+                      if (partyImages.isEmpty) {
+                        partyImages.add(
+                          const ProfileInfoWidget(
+                            name: '',
+                            phone: '',
+                            profileImage: 'assets/avatars/avatar.svg',
+                            showText: false,
+                            customSize: 32,
+                            borderRadius: 8,
+                          ),
+                        );
+                      }
+                      if (itemImages.isEmpty) {
+                        itemImages.add(
+                          const StartupLoadingPhoto(
+                            imagePath: null,
+                            placeholderIcon: Icons.inventory_2_outlined,
+                          ),
+                        );
+                      }
+
+                      final thumbnails = <Widget>[];
+                      for (var index = 0;
+                          index < partyImages.length ||
+                              index < itemImages.length;
+                          index++) {
+                        if (index < partyImages.length) {
+                          thumbnails.add(partyImages[index]);
+                        }
+                        if (index < itemImages.length) {
+                          thumbnails.add(itemImages[index]);
+                        }
+                      }
+
+                      return StartupLoadingGallery(images: thumbnails);
+                    },
+                  ),
+                ],
               ),
-              const SizedBox(height: 40),
-              UrduAwareText(
-                isUrdu ? 'کاروباری ساتھی' : 'Karobari Sathi',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  fontFamily: fontFamily,
-                  letterSpacing: 1.0,
-                ),
-              ),
-              const SizedBox(height: 15),
-              UrduAwareText(
-                isUrdu ? 'ڈیٹا لوڈ ہو رہا ہے...' : 'Loading Data...',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white.withValues(alpha: 0.5),
-                  fontFamily: fontFamily,
-                ),
-              ),
-              const SizedBox(height: 30),
-              const SimpleSpinningRing(
-                size: 60,
-                duration: Duration(seconds: 2),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

@@ -116,7 +116,7 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     final statusColor =
-        _isOffline ? AppTheme.expenseColor : AppTheme.greenColor;
+        _isOffline ? AppTheme.redColor : AppTheme.greenColor;
 
     return Container(
       padding: EdgeInsets.only(bottom: bottomPadding),
@@ -260,13 +260,6 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
             decoration: BoxDecoration(
               color: AppTheme.verifiedGold,
               borderRadius: BorderRadius.circular(999),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.verifiedGold.withValues(alpha: 0.35),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
             ),
             padding: const EdgeInsets.symmetric(
               horizontal: 20,

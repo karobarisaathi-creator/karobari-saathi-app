@@ -160,7 +160,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       }
     } else {
       _addNewItem();
-      if (widget.initialDescription != null || widget.initialAmount != null) {
+      if (widget.isPartySettlement) {
+        if (widget.initialAmount != null) {
+          _amountController.text =
+              Formatters.formatAmountWithoutCurrency(widget.initialAmount!);
+        }
+      } else if (widget.initialDescription != null ||
+          widget.initialAmount != null) {
         final entry = _itemEntries.first;
         if (widget.initialDescription != null) {
           entry.descriptionController.text = widget.initialDescription!;
@@ -522,7 +528,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   Align(
                     alignment: AlignmentDirectional.centerStart,
                     child: UrduAwareText(
-                      isUrdu ? 'ادائیگی کا طریقہ' : 'Payment Method',
+                      widget.fixedTransactionType == 'income'
+                          ? (isUrdu ? 'وصولی کا طریقہ' : 'Receipt Method')
+                          : (isUrdu ? 'ادائیگی کا طریقہ' : 'Payment Method'),
                       style: TextStyle(
                         fontFamily: fontFamily,
                         fontSize: 13,
@@ -1700,6 +1708,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       List<TransactionItem> items = [];
       String mainDescription = "";
       for (var entry in _itemEntries) {
+        if (widget.isPartySettlement) continue;
         final desc = entry.descriptionController.text;
         final total =
             Formatters.tryParseAmount(entry.totalController.text) ?? 0;
@@ -1782,8 +1791,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 ? 'دیگر'
                 : mainDescription,
         date: _selectedDate,
-        quantity: 1,
-        rate: grandTotal,
+        quantity: isPartySettlement ? 0 : 1,
+        rate: isPartySettlement ? 0 : grandTotal,
         createdAt: widget.transactionToEdit?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
         billImage: _billImages.isNotEmpty

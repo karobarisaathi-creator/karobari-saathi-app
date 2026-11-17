@@ -628,17 +628,11 @@ class _CombinedHeader extends StatelessWidget {
     String transactionType,
     double outstandingAmount,
   ) async {
-    final isReceipt = transactionType == 'income';
-    final description = isReceipt
-        ? (isUrdu ? 'پارٹی سے وصولی - نقد' : 'Receipt from party - Cash')
-        : (isUrdu ? 'پارٹی کو ادائیگی - نقد' : 'Payment to party - Cash');
-
     final transaction = await Navigator.push<model.Transaction>(
       context,
       MaterialPageRoute(
         builder: (_) => AddTransactionScreen(
           account: party,
-          initialDescription: description,
           initialAmount: outstandingAmount > 0.01 ? outstandingAmount : null,
           fixedTransactionType: transactionType,
           isPartySettlement: true,
@@ -1068,14 +1062,63 @@ class _TransactionsTabState extends State<_TransactionsTab> {
     );
   }
 
+  Future<void> _editSettlementNote(
+    String cycleId,
+    Account party,
+    String currentNote,
+  ) async {
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
+
+    try {
+      final note = await showDialog<String>(
+        context: context,
+        builder: (_) => _SettlementNoteEditorDialog(
+          initialNote: currentNote,
+          isUrdu: isUrdu,
+          fontFamily: fontFamily,
+        ),
+      );
+
+      if (note == null || !mounted) return;
+
+      final settlementNotes =
+          Map<String, String>.from(party.settlementNotes ?? const {});
+      if (note.isEmpty) {
+        settlementNotes.remove(cycleId);
+      } else {
+        settlementNotes[cycleId] = note;
+      }
+
+      final updatedParty = party.copyWith(settlementNotes: settlementNotes);
+      await Provider.of<DatabaseService>(context, listen: false)
+          .updateAccount(updatedParty);
+      if (mounted) setState(() {});
+    } catch (error, stackTrace) {
+      debugPrint('Failed to save settlement note: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (mounted) {
+        AppToast.error(
+          context,
+          isUrdu ? 'نوٹ محفوظ نہیں ہو سکا' : 'Could not save note',
+        );
+      }
+    }
+  }
+
   Widget _buildSettlementCard(Map<String, dynamic> data, bool expanded) {
     final df = DateFormat('dd MMM yyyy');
     final start = df.format(data['startDate']);
     final end = df.format(data['endDate']);
     final days = data['days'];
-    final id = data['id'];
+    final id = data['id'] as String;
     final totalCredit = (data['totalCredit'] as num?)?.toDouble() ?? 0;
     final totalDebit = (data['totalDebit'] as num?)?.toDouble() ?? 0;
+    final databaseService =
+        Provider.of<DatabaseService>(context, listen: false);
+    final currentParty =
+        databaseService.getAccount(widget.party.id) ?? widget.party;
+    final settlementNote = currentParty.settlementNotes?[id]?.trim() ?? '';
 
     return InkWell(
       onTap: () {
@@ -1087,6 +1130,9 @@ class _TransactionsTabState extends State<_TransactionsTab> {
           }
         });
       },
+      onLongPress: widget.isReadOnly
+          ? null
+          : () => _editSettlementNote(id, currentParty, settlementNote),
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -1137,32 +1183,22 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                UrduAwareText(
-                  widget.isUrdu ? "حساب برابر" : "Balanced",
-                  style: TextStyle(
-                    fontFamily: widget.fontFamily,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13,
-                    color: AppTheme.darkColor,
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppTheme.themeColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                Expanded(
                   child: UrduAwareText(
-                    "$days ${widget.isUrdu ? 'دن' : 'days'}",
+                    settlementNote.isEmpty
+                        ? (widget.isUrdu ? "حساب برابر" : "Balanced")
+                        : settlementNote,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.themeColor,
+                      fontFamily: widget.fontFamily,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                      color: AppTheme.darkColor,
                     ),
                   ),
                 ),
+                // Edit button and days count removed from header
               ],
             ),
             if (expanded) ...[
@@ -1174,11 +1210,17 @@ class _TransactionsTabState extends State<_TransactionsTab> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  UrduAwareText("$start → $end",
+                  Directionality(
+                    textDirection: ui.TextDirection.ltr,
+                    child: UrduAwareText(
+                      "$start → $end  ($days ${widget.isUrdu ? 'دن' : 'days'})",
                       style: const TextStyle(
-                          fontSize: 11.5,
-                          color: AppTheme.textSecondary,
-                          fontWeight: FontWeight.w600)),
+                        fontSize: 11.5,
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                   Row(
                     children: [
                       if (totalDebit > 0)
@@ -1768,5 +1810,71 @@ class _AnalysisTabState extends State<_AnalysisTab> {
     if (v >= 100000) return '${(v / 100000).toStringAsFixed(1)} لاکھ';
     if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)} ہزار';
     return v.toStringAsFixed(0);
+  }
+}
+
+class _SettlementNoteEditorDialog extends StatefulWidget {
+  final String initialNote;
+  final bool isUrdu;
+  final String? fontFamily;
+
+  const _SettlementNoteEditorDialog({
+    required this.initialNote,
+    required this.isUrdu,
+    required this.fontFamily,
+  });
+
+  @override
+  State<_SettlementNoteEditorDialog> createState() =>
+      _SettlementNoteEditorDialogState();
+}
+
+class _SettlementNoteEditorDialogState
+    extends State<_SettlementNoteEditorDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialNote);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: UrduAwareText(
+        widget.isUrdu ? 'لین دین کا نوٹ' : 'Transaction note',
+        style: TextStyle(fontFamily: widget.fontFamily),
+      ),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLines: 3,
+        style: TextStyle(fontFamily: widget.fontFamily),
+        decoration: InputDecoration(
+          hintText: widget.isUrdu
+              ? 'یہ لین دین کس کام کے لیے تھا؟'
+              : 'What was this transaction for?',
+          hintStyle: TextStyle(fontFamily: widget.fontFamily),
+          border: const OutlineInputBorder(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: UrduAwareText(widget.isUrdu ? 'منسوخ' : 'Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _controller.text.trim()),
+          child: UrduAwareText(widget.isUrdu ? 'محفوظ کریں' : 'Save'),
+        ),
+      ],
+    );
   }
 }
