@@ -654,9 +654,106 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.verifiedGold,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              ),
+              icon: Icon(
+                PhosphorIcons.tag(PhosphorIconsStyle.fill),
+                size: 16,
+                color: AppTheme.verifiedGold,
+              ),
+              label: UrduAwareText(
+                isUrdu ? 'ڈسکاونٹ' : 'Discount',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.verifiedGold,
+                  fontFamily: fontFamily,
+                ),
+              ),
+              onPressed: () {
+                setState(() {
+                  _isDiscountExpanded = !_isDiscountExpanded;
+                });
+              },
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
+          // Collapsible Discount Strip right below App Bar
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 250),
+            crossFadeState: _isDiscountExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            firstChild: const SizedBox.shrink(),
+            secondChild: Container(
+              margin: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFAF5EC),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: const Color(0xFFD97706).withValues(alpha: 0.35),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFD97706).withValues(alpha: 0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 10, 0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(PhosphorIcons.tag(PhosphorIconsStyle.fill), size: 14, color: const Color(0xFFD97706)),
+                              const SizedBox(width: 6),
+                              UrduAwareText(
+                                isUrdu ? 'ڈسکاونٹ سیٹنگ' : 'Discount Setting',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: const Color(0xFFD97706),
+                                  fontFamily: fontFamily,
+                                ),
+                              ),
+                            ],
+                          ),
+                          InkWell(
+                            onTap: () => setState(() => _isDiscountExpanded = false),
+                            borderRadius: BorderRadius.circular(20),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(Icons.close, size: 16, color: Color(0xFFD97706)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _buildDiscountCard(isUrdu, fontFamily),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
@@ -1137,56 +1234,17 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
   }) {
     return Column(
       children: [
-        // Type toggle
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEEF1F5),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildDiscountTypeBtn(
-                    label: isUrdu ? 'فیصد (%)' : 'Percentage',
-                    icon: PhosphorIcons.percent(),
-                    isActive: _discountType == _DiscountType.percentage,
-                    onTap: () => _updateDiscountState(
-                      () => _discountType = _DiscountType.percentage,
-                      popupSetState: popupSetState,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: _buildDiscountTypeBtn(
-                    label: isUrdu ? 'رقم (Rs)' : 'Amount (Rs)',
-                    icon: PhosphorIcons.money(),
-                    isActive: _discountType == _DiscountType.amount,
-                    onTap: () => _updateDiscountState(
-                      () => _discountType = _DiscountType.amount,
-                      popupSetState: popupSetState,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // Presets (only in percentage mode)
-        if (_discountType == _DiscountType.percentage)
-          SizedBox(
-            height: 40,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              itemCount: _discountPresets.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 6),
-              itemBuilder: (context, index) {
-                final preset = _discountPresets[index];
+        const SizedBox(height: 8),
+        // Presets
+        SizedBox(
+          height: 40,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            itemCount: _discountPresets.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 6),
+            itemBuilder: (context, index) {
+              final preset = _discountPresets[index];
                 final isActive = _discountInputValue == preset &&
                     _discountType == _DiscountType.percentage;
                 return GestureDetector(
@@ -1321,55 +1379,6 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
     );
   }
 
-  Widget _buildDiscountTypeBtn({
-    required String label,
-    required IconData icon,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: isActive ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(9),
-          boxShadow: isActive
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 13,
-              color:
-                  isActive ? const Color(0xFFD97706) : AppTheme.textSecondary,
-            ),
-            const SizedBox(width: 6),
-            UrduAwareText(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color:
-                    isActive ? const Color(0xFFD97706) : AppTheme.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ═════════════════════════════════════════════════════════
   // Party Picker Placeholder — نمایاں نارنجی
   // ═════════════════════════════════════════════════════════
@@ -1476,75 +1485,6 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Expanded discount card (opens upwards)
-              if (_isDiscountExpanded) ...[
-                Container(
-                  margin: const EdgeInsets.symmetric(vertical: 4),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFAF5EC),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: const Color(0xFFD97706).withValues(alpha: 0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: _buildDiscountCard(isUrdu, fontFamily),
-                ),
-              ],
-
-              // Discount control
-              InkWell(
-                onTap: () =>
-                    setState(() => _isDiscountExpanded = !_isDiscountExpanded),
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        PhosphorIcons.tag(),
-                        size: 14,
-                        color: const Color(0xFFD97706),
-                      ),
-                      const SizedBox(width: 6),
-                      UrduAwareText(
-                        isUrdu ? 'ڈسکاونٹ' : 'Discount',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w800,
-                          color: AppTheme.darkColor,
-                          fontFamily: fontFamily,
-                        ),
-                      ),
-                      if (_discountAmount > 0) ...[
-                        const SizedBox(width: 6),
-                        UrduAwareText(
-                          _discountType == _DiscountType.percentage
-                              ? '${_discountPercent.toStringAsFixed(0)}%'
-                              : 'Rs ${_discountAmount.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            color: Color(0xFFD97706),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(width: 6),
-                      Icon(
-                        _isDiscountExpanded
-                            ? PhosphorIcons.caretUp()
-                            : PhosphorIcons.caretDown(),
-                        size: 14,
-                        color: AppTheme.textSecondary,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-
               // Pay tabs
               Row(
                 children: [

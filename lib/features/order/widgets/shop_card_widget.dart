@@ -21,6 +21,20 @@ class ShopCardWidget extends StatelessWidget {
     required this.onTap,
   });
 
+  Color _getBadgeColor(int percent) {
+    if (percent >= 80) return const Color(0xFF16A34A);
+    if (percent >= 60) return const Color(0xFFD97706);
+    if (percent >= 40) return const Color(0xFFEA580C);
+    return const Color(0xFFDC2626);
+  }
+
+  Color _getBgColor(int percent) {
+    if (percent >= 80) return const Color(0xFFECFDF5);
+    if (percent >= 60) return const Color(0xFFFFFBEB);
+    if (percent >= 40) return const Color(0xFFFFF7ED);
+    return const Color(0xFFFEF2F2);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isUrdu = Provider.of<LanguageService>(context).isUrdu;
@@ -170,7 +184,7 @@ class ShopCardWidget extends StatelessWidget {
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                        color: const Color(0xFFECFDF5),
+                                        color: _getBgColor(shop.satisfiedCustomerPercent),
                                         borderRadius: BorderRadius.circular(6)),
                                     child: Row(
                                         mainAxisSize: MainAxisSize.min,
@@ -179,15 +193,14 @@ class ShopCardWidget extends StatelessWidget {
                                               PhosphorIcons.shieldCheck(
                                                   PhosphorIconsStyle.fill),
                                               size: 11,
-                                              color: const Color(0xFF059669)),
+                                              color: _getBadgeColor(shop.satisfiedCustomerPercent)),
                                           const SizedBox(width: 3),
                                           UrduAwareText(
                                               '${shop.satisfiedCustomerPercent}%',
                                               style: TextStyle(
                                                   fontSize: 10,
                                                   fontWeight: FontWeight.w900,
-                                                  color:
-                                                      const Color(0xFF047857),
+                                                  color: _getBadgeColor(shop.satisfiedCustomerPercent),
                                                   fontFamily: fontFamily)),
                                         ]),
                                   ),

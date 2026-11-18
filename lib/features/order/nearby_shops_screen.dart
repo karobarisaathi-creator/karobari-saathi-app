@@ -338,51 +338,8 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
     return Column(
       children: [
         const SizedBox(height: 10),
-        // Sort chips
-        SizedBox(
-          height: 38,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            children: [
-              _buildSortChip(
-                'recent',
-                isUrdu ? 'نئی دکانیں' : 'Recent',
-                PhosphorIcons.mapPin(),
-                fontFamily: fontFamily,
-              ),
-              const SizedBox(width: 8),
-              _buildSortChip(
-                'nearest',
-                isUrdu ? 'قریبی ترین' : 'Nearest',
-                PhosphorIcons.navigationArrow(),
-                fontFamily: fontFamily,
-              ),
-              const SizedBox(width: 8),
-              _buildSortChip(
-                'rating',
-                isUrdu ? 'زیادہ دوبارہ گاہک' : 'Most repeat customers',
-                PhosphorIcons.shieldCheck(),
-                fontFamily: fontFamily,
-              ),
-              const SizedBox(width: 8),
-              _buildSortChip(
-                'time',
-                isUrdu ? 'جلد ڈیلیوری' : 'Fast delivery',
-                PhosphorIcons.clock(),
-                fontFamily: fontFamily,
-              ),
-              const SizedBox(width: 8),
-              _buildSortChip(
-                'open',
-                isUrdu ? 'کھلی دکانیں' : 'Open shops',
-                PhosphorIcons.storefront(),
-                isOpenFilter: true,
-                fontFamily: fontFamily,
-              ),
-            ],
-          ),
-        ),
+        // Sort Connected Segmented Bar (Matching Quick Bill Category Strip Design)
+        _buildSortSegmentedBar(isUrdu, fontFamily),
 
         const SizedBox(height: 8),
 
@@ -416,52 +373,85 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
     );
   }
 
-  Widget _buildSortChip(
-    String value,
-    String label,
-    IconData icon, {
-    bool isOpenFilter = false,
-    String? fontFamily,
-  }) {
-    final isActive = isOpenFilter ? _openShopsOnly : _sortBy == value;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => setState(() {
-          if (isOpenFilter) {
-            _openShopsOnly = !_openShopsOnly;
-          } else {
-            _sortBy = value;
-          }
-        }),
-        borderRadius: BorderRadius.circular(999),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isActive ? AppTheme.darkColor : Colors.white,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: isActive ? AppTheme.darkColor : AppTheme.backgroundColor,
-              width: 1.5,
+  Widget _buildSortSegmentedBar(bool isUrdu, String? fontFamily) {
+    final sortOptions = [
+      ('recent', isUrdu ? 'نئی دکانیں' : 'Recent', PhosphorIcons.mapPin(), false),
+      ('nearest', isUrdu ? 'قریبی ترین' : 'Nearest', PhosphorIcons.navigationArrow(), false),
+      ('rating', isUrdu ? 'زیادہ دوبارہ گاہک' : 'Most repeat customers', PhosphorIcons.shieldCheck(), false),
+      ('time', isUrdu ? 'جلد ڈیلیوری' : 'Fast delivery', PhosphorIcons.clock(), false),
+      ('open', isUrdu ? 'کھلی دکانیں' : 'Open shops', PhosphorIcons.storefront(), true),
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Container(
+        height: 38,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(11),
+          child: IntrinsicHeight(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (int i = 0; i < sortOptions.length; i++) ...[
+                  if (i > 0)
+                    Container(width: 1, color: const Color(0xFFE2E8F0)),
+                  _buildCategorySegment(
+                    label: sortOptions[i].$2,
+                    icon: sortOptions[i].$3,
+                    isActive: sortOptions[i].$4 ? _openShopsOnly : _sortBy == sortOptions[i].$1,
+                    fontFamily: fontFamily,
+                    onTap: () => setState(() {
+                      if (sortOptions[i].$4) {
+                        _openShopsOnly = !_openShopsOnly;
+                      } else {
+                        _sortBy = sortOptions[i].$1;
+                      }
+                    }),
+                  ),
+                ],
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategorySegment({
+    required String label,
+    required IconData icon,
+    required bool isActive,
+    required String? fontFamily,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: isActive ? AppTheme.themeColor : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          alignment: Alignment.center,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 icon,
-                size: 15,
+                size: 14,
                 color: isActive ? Colors.white : AppTheme.textSecondary,
               ),
               const SizedBox(width: 6),
               UrduAwareText(
                 label,
                 style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: isActive ? Colors.white : AppTheme.textSecondary,
+                  fontSize: 12,
+                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                  color: isActive ? Colors.white : AppTheme.darkColor,
                   fontFamily: fontFamily,
                 ),
               ),

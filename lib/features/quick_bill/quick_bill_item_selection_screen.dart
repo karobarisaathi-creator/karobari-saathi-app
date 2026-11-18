@@ -8,7 +8,6 @@ import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/models/stock_movement_model.dart';
-import 'package:account_app/core/models/shop_model.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
@@ -18,7 +17,7 @@ import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/utils/formatters.dart';
-import 'package:account_app/features/order/widgets/shop_item_card_widget.dart';
+import 'package:account_app/features/quick_bill/widgets/quick_bill_item_grid_card.dart';
 import 'quick_bill_preview_screen.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -515,13 +514,13 @@ class _QuickBillItemSelectionScreenState
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
+        padding: const EdgeInsets.only(bottom: 24),
         child: Column(
           children: [
             // ═══ Slide-Down Custom Item Card Panel (AddEditStockItemScreen style) ═══
             if (_isCustomItemExpanded)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -802,72 +801,117 @@ class _QuickBillItemSelectionScreenState
             // ═══ Search Bar (Conditional) ═══
             if (_showSearch)
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
                 child: _buildSearchBar(isUrdu, fontFamily),
               ),
 
-            // ═══ Category Chips ═══
+            // ═══ Category Strip ═══
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-              child: SizedBox(
-                height: 36,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: categories.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final cat = categories[index];
-                    final active = cat == _activeCategory;
-                    final label = _formatCategoryLabel(cat, isUrdu);
-                    return _buildCategoryChip(
-                      label: label,
-                      isActive: active,
-                      fontFamily: fontFamily,
-                      onTap: () => setState(() => _activeCategory = cat),
-                    );
-                  },
-                ),
-              ),
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+              child: _buildCategoryStrip(categories, catalogList, isUrdu, fontFamily),
             ),
+            const SizedBox(height: 7),
 
             // ═══ Items List ═══
             stockService.isLoading
-                ? _buildShimmerItemList()
+                ? _buildShimmerItemList(entries.length + _manualItems.length)
                 : (entries.isEmpty && _manualItems.isEmpty)
                     ? _buildEmptyState(isUrdu, fontFamily)
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        itemCount: _manualItems.length + entries.length,
-                        itemBuilder: (context, index) {
-                          // Manual / Custom Items
-                          if (index < _manualItems.length) {
-                            final manualItem = _manualItems[index];
-                            return _buildManualItemCard(
-                              manualItem,
-                              isUrdu,
-                              fontFamily,
-                            );
-                          }
-                          // Stock Catalog Items
-                          final e = entries[index - _manualItems.length];
-                          return _buildItemCard(
-                            e,
-                            isUrdu,
-                          );
-                        },
-                      ),
+                    : ((_manualItems.length + entries.length) <= 2
+                        ? ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            itemCount: _manualItems.length + entries.length,
+                            itemBuilder: (context, index) {
+                              if (index < _manualItems.length) {
+                                final manualItem = _manualItems[index];
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: AspectRatio(
+                                    aspectRatio: 1.0,
+                                    child: _buildManualItemCard(
+                                      manualItem,
+                                      isUrdu,
+                                      fontFamily,
+                                    ),
+                                  ),
+                                );
+                              }
+                              final e = entries[index - _manualItems.length];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: AspectRatio(
+                                  aspectRatio: 1.0,
+                                  child: _buildItemCard(
+                                    e,
+                                    isUrdu,
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        : GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: 0.74,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
+                            itemCount: _manualItems.length + entries.length,
+                            itemBuilder: (context, index) {
+                              // Manual / Custom Items
+                              if (index < _manualItems.length) {
+                                final manualItem = _manualItems[index];
+                                return _buildManualItemCard(
+                                  manualItem,
+                                  isUrdu,
+                                  fontFamily,
+                                );
+                              }
+                              // Stock Catalog Items
+                              final e = entries[index - _manualItems.length];
+                              return _buildItemCard(
+                                e,
+                                isUrdu,
+                              );
+                            },
+                          )),
           ],
         ),
       ),
-      bottomNavigationBar: totalSelectedCount > 0
-          ? _buildBottomBar(
-              totalSelectedCount,
-              total,
-              isUrdu,
-              fontFamily,
-              () => _openPreview(stockSelected, isUrdu),
+      floatingActionButton: totalSelectedCount > 0
+          ? FloatingActionButton.extended(
+              onPressed: () => _openPreview(stockSelected, isUrdu),
+              backgroundColor: AppTheme.goldColor,
+              elevation: 6,
+              icon: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  shape: BoxShape.circle,
+                ),
+                child: UrduAwareText(
+                  '$totalSelectedCount',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              label: UrduAwareText(
+                Formatters.formatAmountWithCurrency(total),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+              ),
             )
           : null,
     );
@@ -881,48 +925,19 @@ class _QuickBillItemSelectionScreenState
     bool isUrdu,
     String? fontFamily,
   ) {
-    final visualItem = ShopItem(
-      id: line.stockItemId ?? line.name,
+    return QuickBillItemGridCard(
       name: line.name,
-      description: null,
+      imageUrl: null,
       rate: line.rate,
-      oldRate: line.oldRate,
       unit: line.unit ?? '',
-      emoji: '📦',
-      category: isUrdu ? 'مزدوری / کسٹم' : 'Custom Service',
       stock: 1000000000,
       quantity: line.quantity,
-      badge: isUrdu ? 'Manual' : 'Manual',
-    );
-
-    const quickBillShop = Shop(
-      id: 'quick_bill',
-      name: 'فوری بل',
-      logoEmoji: '📦',
-      owner: '',
-      area: '',
-      distance: '',
-      distanceVal: 0,
-      deliveryTime: '',
-      timeVal: 0,
-      minOrder: '',
-      deliveryFee: '',
-      isOpen: true,
-      tags: [],
-      items: [],
-    );
-
-    return ShopItemCardWidget(
-      item: visualItem,
-      shop: quickBillShop,
-      quickBillMode: true,
-      showStockQuantity: false,
-      onQuantityEdit: () =>
-          _openManualEntryDialog(isUrdu, fontFamily, editLine: line),
-      onQuantityIncrement: () {
+      stopWhenOut: false,
+      accentColor: AppTheme.verifiedGold,
+      onIncrement: () {
         setState(() => line.quantity += 1);
       },
-      onQuantityDecrement: () {
+      onDecrement: () {
         setState(() {
           line.quantity = (line.quantity - 1).clamp(0, double.infinity);
           if (line.quantity <= 0) {
@@ -930,14 +945,8 @@ class _QuickBillItemSelectionScreenState
           }
         });
       },
-      onQuantitySet: (quantity) {
-        setState(() {
-          line.quantity = quantity;
-          if (line.quantity <= 0) {
-            _manualItems.remove(line);
-          }
-        });
-      },
+      onQuantityTap: () =>
+          _openManualEntryDialog(isUrdu, fontFamily, editLine: line),
     );
   }
 
@@ -953,49 +962,98 @@ class _QuickBillItemSelectionScreenState
   }
 
   // ═════════════════════════════════════════════════════════════
-  // Category Chip
+  // Category Strip (Connected Segmented Bar)
   // ═════════════════════════════════════════════════════════════
-  Widget _buildCategoryChip({
+  Widget _buildCategoryStrip(
+    List<String> categories,
+    List<_QuickBillCatalogItem> catalogList,
+    bool isUrdu,
+    String? fontFamily,
+  ) {
+    if (categories.isEmpty) return const SizedBox.shrink();
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Container(
+        height: 36,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(11),
+          child: IntrinsicHeight(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (int i = 0; i < categories.length; i++) ...[
+                  if (i > 0)
+                    Container(width: 1, color: const Color(0xFFE2E8F0)),
+                  _buildCategorySegment(
+                    label: _formatCategoryLabel(categories[i], isUrdu),
+                    count: categories[i] == _allCategories
+                        ? catalogList.length
+                        : catalogList.where((x) => x.category == categories[i]).length,
+                    isActive: categories[i] == _activeCategory,
+                    fontFamily: fontFamily,
+                    onTap: () =>
+                        setState(() => _activeCategory = categories[i]),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategorySegment({
     required String label,
+    required int count,
     required bool isActive,
     required String? fontFamily,
     required VoidCallback onTap,
   }) {
     return Material(
-      color: Colors.transparent,
+      color: isActive ? AppTheme.goldColor : Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isActive ? AppTheme.goldColor : Colors.white,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: isActive ? AppTheme.goldColor : AppTheme.backgroundColor,
-              width: 1.5,
-            ),
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: AppTheme.goldColor.withValues(alpha: 0.25),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
-          ),
-          child: UrduAwareText(
-            label,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: isActive ? FontWeight.w800 : FontWeight.w700,
-              color: isActive ? Colors.white : AppTheme.darkColor,
-              fontFamily: fontFamily,
-              letterSpacing: 0.1,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              UrduAwareText(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                  color: isActive ? Colors.white : AppTheme.darkColor,
+                  fontFamily: fontFamily,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? Colors.white.withValues(alpha: 0.25)
+                      : AppTheme.darkColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: UrduAwareText(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w900,
+                    color: isActive ? Colors.white : AppTheme.textSecondary,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1032,218 +1090,27 @@ class _QuickBillItemSelectionScreenState
       ),
     );
     final maximum = line.availableStock;
-    final visualItem = ShopItem(
-      id: e.key,
+    return QuickBillItemGridCard(
       name: e.displayName(isUrdu),
-      nameUrdu: e.nameUrdu,
-      description: '',
-      rate: line.rate,
-      oldRate: e.oldRate,
-      unit: e.unit ?? '',
-      emoji: '??',
-      category: e.category,
-      stock: maximum ?? 1000000000,
       imageUrl: e.imageUrl,
+      rate: line.rate,
+      unit: e.unit ?? '',
+      stock: maximum ?? 1000000000,
       quantity: line.quantity,
-    );
-    const quickBillShop = Shop(
-      id: 'quick_bill',
-      name: '???? ??',
-      logoEmoji: '??',
-      owner: '',
-      area: '',
-      distance: '',
-      distanceVal: 0,
-      deliveryTime: '',
-      timeVal: 0,
-      minOrder: '',
-      deliveryFee: '',
-      isOpen: true,
-      tags: [],
-      items: [],
-    );
-
-    return ShopItemCardWidget(
-      item: visualItem,
-      shop: quickBillShop,
-      quickBillMode: true,
-      showStockQuantity: maximum != null,
-      allowOutOfStockSelection: !line.stopWhenOut,
-      onQuantityEdit: () => _editQuantity(line, isUrdu),
-      onQuantityIncrement: () {
+      stopWhenOut: line.stopWhenOut,
+      accentColor: AppTheme.goldColor,
+      onIncrement: () {
         setState(() {
           line.quantity = !line.stopWhenOut || maximum == null
               ? line.quantity + 1
               : (line.quantity + 1).clamp(0.0, maximum);
         });
       },
-      onQuantityDecrement: () {
+      onDecrement: () {
         setState(() =>
             line.quantity = (line.quantity - 1).clamp(0.0, double.infinity));
       },
-      onQuantitySet: (quantity) {
-        setState(() {
-          line.quantity = !line.stopWhenOut || maximum == null
-              ? quantity
-              : quantity.clamp(0.0, maximum);
-        });
-      },
-    );
-  }
-
-  // ═════════════════════════════════════════════════════════════
-  // Bottom Bar — Redesigned with goldColor
-  // ═════════════════════════════════════════════════════════════
-  Widget _buildBottomBar(
-    int count,
-    double total,
-    bool isUrdu,
-    String? fontFamily,
-    VoidCallback onViewBill,
-  ) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppTheme.goldColor,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.20),
-              width: 1.2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.goldColor.withValues(alpha: 0.35),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onViewBill,
-              borderRadius: BorderRadius.circular(18),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                child: Row(
-                  children: [
-                    // Quantity / Count box
-                    Container(
-                      height: 44,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.20),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.45),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            PhosphorIcons.shoppingBag(PhosphorIconsStyle.fill),
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 6),
-                          UrduAwareText(
-                            '$count',
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-
-                    // Total Amount & Label
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          UrduAwareText(
-                            isUrdu ? 'اشیاء منتخب' : 'items selected',
-                            style: const TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xEEFFFFFF),
-                            ),
-                          ),
-                          const SizedBox(height: 1),
-                          UrduAwareText(
-                            Formatters.formatAmountWithCurrency(total),
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // View Bill button
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.darkColor,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.20),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          UrduAwareText(
-                            isUrdu ? 'بل دیکھیں' : 'View Bill',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              fontFamily: fontFamily,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Icon(
-                            isUrdu
-                                ? PhosphorIcons.arrowLeft()
-                                : PhosphorIcons.arrowRight(),
-                            size: 15,
-                            color: Colors.white,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+      onQuantityTap: () => _editQuantity(line, isUrdu),
     );
   }
 
@@ -1290,36 +1157,77 @@ class _QuickBillItemSelectionScreenState
     );
   }
 
-  Widget _buildShimmerItemList() {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: 5,
-      itemBuilder: (_, __) => Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
-        ),
-        child: Row(
-          children: [
-            const SkeletonShimmer(width: 44, height: 44, borderRadius: 12),
-            const SizedBox(width: 12),
-            Expanded(
+  Widget _buildShimmerItemList([int count = 0]) {
+    if (count > 0 && count <= 2) {
+      return ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        itemCount: count,
+        itemBuilder: (_, __) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: AspectRatio(
+            aspectRatio: 1.0,
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+              ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: const [
-                  SkeletonShimmer(width: 130, height: 14, borderRadius: 6),
-                  SizedBox(height: 6),
-                  SkeletonShimmer(width: 80, height: 12, borderRadius: 4),
+                  Expanded(
+                    child: SkeletonShimmer(
+                      width: double.infinity,
+                      height: double.infinity,
+                      borderRadius: 12,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  SkeletonShimmer(width: 140, height: 16, borderRadius: 6),
+                  SizedBox(height: 8),
+                  SkeletonShimmer(width: 90, height: 14, borderRadius: 6),
+                  SizedBox(height: 10),
+                  SkeletonShimmer(
+                    width: double.infinity,
+                    height: 36,
+                    borderRadius: 8,
+                  ),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
-            const SkeletonShimmer(width: 60, height: 16, borderRadius: 6),
+          ),
+        ),
+      );
+    }
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.74,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: 6,
+      itemBuilder: (_, __) => Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: const [
+            SkeletonShimmer(width: double.infinity, height: 90, borderRadius: 12),
+            SizedBox(height: 7),
+            SkeletonShimmer(width: 100, height: 13, borderRadius: 6),
+            SizedBox(height: 6),
+            SkeletonShimmer(width: 60, height: 12, borderRadius: 6),
           ],
         ),
       ),

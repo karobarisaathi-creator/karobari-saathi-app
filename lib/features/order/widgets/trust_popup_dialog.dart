@@ -63,345 +63,237 @@ class TrustPopupDialog extends StatelessWidget {
     );
   }
 
-  String _fmt(int n) {
-    if (isUrdu) {
-      if (n >= 100000) {
-        return '${(n / 100000).toStringAsFixed(1).replaceAll('.0', '')} لاکھ';
-      }
-      if (n >= 1000) {
-        return '${(n / 1000).toStringAsFixed(1).replaceAll('.0', '')} ہزار';
-      }
-      return '$n';
-    } else {
-      if (n >= 1000) {
-        return '${(n / 1000).toStringAsFixed(1).replaceAll('.0', '')}k';
-      }
-      return '$n';
+  String _getColorClass() {
+    final score = satisfiedCustomerPercent.toDouble();
+    if (score >= 80) return 'green';
+    if (score >= 60) return 'amber';
+    if (score >= 40) return 'orange';
+    return 'red';
+  }
+
+  Color _getBadgeColor() {
+    switch (_getColorClass()) {
+      case 'green':
+        return const Color(0xFF16A34A);
+      case 'amber':
+        return const Color(0xFFD97706);
+      case 'orange':
+        return const Color(0xFFEA580C);
+      case 'red':
+        return const Color(0xFFDC2626);
+      default:
+        return AppTheme.textSecondary;
     }
+  }
+
+  Color _getBgStart() {
+    switch (_getColorClass()) {
+      case 'green':
+        return const Color(0xFFECFDF5);
+      case 'amber':
+        return const Color(0xFFFFFBEB);
+      case 'orange':
+        return const Color(0xFFFFF7ED);
+      case 'red':
+        return const Color(0xFFFEF2F2);
+      default:
+        return const Color(0xFFF9FAFB);
+    }
+  }
+
+  Color _getBgEnd() {
+    switch (_getColorClass()) {
+      case 'green':
+        return const Color(0xFFD1FAE5);
+      case 'amber':
+        return const Color(0xFFFEF3C7);
+      case 'orange':
+        return const Color(0xFFFFEDD5);
+      case 'red':
+        return const Color(0xFFFEE2E2);
+      default:
+        return const Color(0xFFF3F4F6);
+    }
+  }
+
+  Color _getBorderColor() {
+    switch (_getColorClass()) {
+      case 'green':
+        return const Color(0xFFA7F3D0);
+      case 'amber':
+        return const Color(0xFFFDE68A);
+      case 'orange':
+        return const Color(0xFFFDBA74);
+      case 'red':
+        return const Color(0xFFFECACA);
+      default:
+        return const Color(0xFFE5E7EB);
+    }
+  }
+
+  List<Widget> _buildShields() {
+    final color = _getBadgeColor();
+    final score = satisfiedCustomerPercent.toDouble();
+    final exactShields = score / 20;
+    final fullShields = exactShields.floor();
+    final remainder = exactShields - fullShields;
+    final hasHalf = remainder >= 0.5;
+
+    Widget shieldAt(int index) {
+      if (index < fullShields) {
+        return _shieldWidget(color: color, isFilled: true);
+      } else if (index == fullShields && hasHalf) {
+        return _shieldWidget(color: color, isHalf: true);
+      } else {
+        return _shieldWidget(color: color, isEmpty: true);
+      }
+    }
+
+    return [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        textDirection: TextDirection.ltr,
+        children: [
+          shieldAt(0),
+          const SizedBox(width: 8),
+          shieldAt(1),
+          const SizedBox(width: 8),
+          shieldAt(2),
+          const SizedBox(width: 8),
+          shieldAt(3),
+          const SizedBox(width: 8),
+          shieldAt(4),
+        ],
+      ),
+    ];
+  }
+
+  Widget _shieldWidget({
+    required Color color,
+    bool isFilled = false,
+    bool isHalf = false,
+    bool isEmpty = false,
+  }) {
+    return SizedBox(
+      width: 34,
+      height: 34,
+      child: Stack(
+        children: [
+          ShaderMask(
+            shaderCallback: (bounds) => const LinearGradient(
+              colors: [Color(0x1A000000), Color(0x1A000000)],
+            ).createShader(bounds),
+            child: Icon(
+              PhosphorIcons.shield(PhosphorIconsStyle.fill),
+              size: 34,
+              color: Colors.white,
+            ),
+          ),
+          if (isFilled)
+            ShaderMask(
+              shaderCallback: (bounds) => LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [color.withValues(alpha: 0.85), color],
+              ).createShader(bounds),
+              child: Icon(
+                PhosphorIcons.shield(PhosphorIconsStyle.fill),
+                size: 34,
+                color: Colors.white,
+              ),
+            ),
+          if (isHalf)
+            ShaderMask(
+              shaderCallback: (bounds) => LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                stops: const [0.5, 0.5],
+                colors: [color, Colors.black.withValues(alpha: 0.10)],
+              ).createShader(bounds),
+              child: Icon(
+                PhosphorIcons.shield(PhosphorIconsStyle.fill),
+                size: 34,
+                color: Colors.white,
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
+    final badgeColor = _getBadgeColor();
     final satisfactionPercent = satisfiedCustomerPercent.clamp(0, 100);
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-      child: Directionality(
-        textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 420),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.darkColor.withValues(alpha: 0.2),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 420),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [_getBgStart(), _getBgEnd()],
           ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // ─── Header (Green gradient) ───
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF059669), Color(0xFF10B981)],
-                  ),
-                ),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      top: 0,
-                      right: isUrdu ? null : 0,
-                      left: isUrdu ? 0 : null,
-                      child: InkWell(
-                        onTap: () => Navigator.of(context).pop(),
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            PhosphorIcons.x(PhosphorIconsStyle.bold),
-                            size: 14,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.only(
-                        right: isUrdu ? 0 : 36,
-                        left: isUrdu ? 36 : 0,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          UrduAwareText(
-                            shopName,
-                            textAlign: TextAlign.start,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              fontFamily: fontFamily,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          UrduAwareText(
-                            isUrdu
-                                ? 'از $ownerName · $area'
-                                : 'by $ownerName · $area',
-                            textAlign: TextAlign.start,
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontFamily: fontFamily,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: isUrdu
-                                ? [
-                                    UrduAwareText(
-                                      'کل خریدار',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white
-                                            .withValues(alpha: 0.92),
-                                        fontFamily: fontFamily,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    UrduAwareText(
-                                      _fmt(customerCount),
-                                      style: TextStyle(
-                                        fontSize: 30,
-                                        fontWeight: FontWeight.w800,
-                                        color: Colors.white,
-                                        fontFamily: fontFamily,
-                                        height: 1,
-                                      ),
-                                    ),
-                                  ]
-                                : [
-                                    UrduAwareText(
-                                      _fmt(customerCount),
-                                      style: TextStyle(
-                                        fontSize: 30,
-                                        fontWeight: FontWeight.w800,
-                                        color: Colors.white,
-                                        fontFamily: fontFamily,
-                                        height: 1,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    UrduAwareText(
-                                      'total buyers',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white
-                                            .withValues(alpha: 0.92),
-                                        fontFamily: fontFamily,
-                                      ),
-                                    ),
-                                  ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // ─── Body ───
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _sectionTitle(
-                        isUrdu ? 'مطمئن خریدار' : 'Satisfied buyers',
-                        fontFamily,
-                      ),
-                      const SizedBox(height: 7),
-                      Row(
-                        children: isUrdu
-                            ? [
-                                UrduAwareText(
-                                  customerCount == 0
-                                      ? '—'
-                                      : '$satisfactionPercent%',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppTheme.greenColor,
-                                    fontFamily: fontFamily,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(999),
-                                    child: LinearProgressIndicator(
-                                      value: customerCount == 0
-                                          ? 0
-                                          : satisfactionPercent / 100,
-                                      minHeight: 8,
-                                      backgroundColor: AppTheme.backgroundColor,
-                                      valueColor: AlwaysStoppedAnimation(
-                                        AppTheme.greenColor,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ]
-                            : [
-                                Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(999),
-                                    child: LinearProgressIndicator(
-                                      value: customerCount == 0
-                                          ? 0
-                                          : satisfactionPercent / 100,
-                                      minHeight: 8,
-                                      backgroundColor: AppTheme.backgroundColor,
-                                      valueColor: AlwaysStoppedAnimation(
-                                        AppTheme.greenColor,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                UrduAwareText(
-                                  customerCount == 0
-                                      ? '—'
-                                      : '$satisfactionPercent%',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppTheme.greenColor,
-                                    fontFamily: fontFamily,
-                                  ),
-                                ),
-                              ],
-                      ),
-                      const SizedBox(height: 14),
-                      _sectionTitle(
-                        isUrdu ? 'کاروباری سرگرمی' : 'Business activity',
-                        fontFamily,
-                      ),
-                      const SizedBox(height: 7),
-                      GridView.count(
-                        crossAxisCount: 2,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        mainAxisSpacing: 6,
-                        crossAxisSpacing: 6,
-                        childAspectRatio: 2.4,
-                        children: [
-                          _statCard(
-                            _fmt(customerCount),
-                            isUrdu ? 'کل خریدار' : 'Total buyers',
-                            fontFamily,
-                          ),
-                          _statCard(
-                            '$itemsCount',
-                            isUrdu ? 'دستیاب اشیاء' : 'Items available',
-                            fontFamily,
-                          ),
-                          _statCard(
-                            '$billCount',
-                            isUrdu ? 'فوری بل' : 'Quick Bills',
-                            fontFamily,
-                          ),
-                          if (showRepeatProductCustomerCount)
-                            _statCard(
-                              '$repeatProductCustomerCount',
-                              isUrdu
-                                  ? 'وہی آئٹم دوبارہ'
-                                  : 'Repurchased same item',
-                              fontFamily,
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _getBorderColor(), width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.darkColor.withValues(alpha: 0.25),
+              blurRadius: 35,
+              offset: const Offset(0, 12),
+            ),
+          ],
         ),
-      ),
-    );
-  }
-
-  Widget _sectionTitle(String text, String? fontFamily) {
-    return UrduAwareText(
-      text.toUpperCase(),
-      style: TextStyle(
-        fontSize: 9.5,
-        fontWeight: FontWeight.w800,
-        color: AppTheme.textSecondary,
-        letterSpacing: 0.5,
-        fontFamily: fontFamily,
-      ),
-    );
-  }
-
-  Widget _statCard(String num, String lbl, String? fontFamily) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppTheme.backgroundColor.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          UrduAwareText(
-            num,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.darkColor,
-              fontFamily: fontFamily,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (shopName.isNotEmpty) ...[
+              UrduAwareText(
+                shopName,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.darkColor,
+                  fontFamily: fontFamily,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+            ],
+            UrduAwareText(
+              isUrdu ? 'بھروسہ پوائنٹ' : 'Trust Point',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: badgeColor,
+                fontFamily: fontFamily,
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          UrduAwareText(
-            lbl,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 8.5,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textSecondary,
-              fontFamily: fontFamily,
+            const SizedBox(height: 8),
+            // ═══ BIG NUMBER ═══
+            UrduAwareText(
+              '$satisfactionPercent%',
+              style: TextStyle(
+                fontSize: 40,
+                fontWeight: FontWeight.w900,
+                color: badgeColor,
+                height: 1,
+                letterSpacing: -1.5,
+                fontFamily: null,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+
+            // ═══ 5 Shields ═══
+            Column(children: _buildShields()),
+          ],
+        ),
       ),
     );
   }

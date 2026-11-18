@@ -182,6 +182,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final isUrdu = Provider.of<LanguageService>(context).isUrdu;
+    final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
     final categories = <String>[
       '__all__',
       ..._shop.items.map((i) => i.category).toSet()
@@ -222,93 +223,12 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
             Expanded(
               child: Column(
                 children: [
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
 
-                  // Category chips
-                  SizedBox(
-                    height: 38,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      itemCount: categories.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, i) {
-                        final cat = categories[i];
-                        final isActive = cat == _activeCategory;
-                        final count = cat == '__all__'
-                            ? _shop.items.length
-                            : _shop.items
-                                .where((x) => x.category == cat)
-                                .length;
-                        final label = _formatCategory(cat, isUrdu);
+                  // Category Connected Segmented Bar (Matching Quick Bill / Nearby Shops Design)
+                  _buildCategoryStrip(isUrdu, fontFamily, categories),
 
-                        return Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () => setState(() => _activeCategory = cat),
-                            borderRadius: BorderRadius.circular(999),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 14),
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: isActive
-                                    ? AppTheme.darkColor
-                                    : Colors.white,
-                                borderRadius: BorderRadius.circular(999),
-                                border: Border.all(
-                                  color: isActive
-                                      ? AppTheme.darkColor
-                                      : AppTheme.backgroundColor,
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  UrduAwareText(
-                                    label,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: isActive
-                                          ? Colors.white
-                                          : AppTheme.textSecondary,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: isActive
-                                          ? Colors.white.withValues(alpha: 0.22)
-                                          : Colors.black
-                                              .withValues(alpha: 0.06),
-                                      borderRadius: BorderRadius.circular(999),
-                                    ),
-                                    child: UrduAwareText(
-                                      '$count',
-                                      style: TextStyle(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.w900,
-                                        color: isActive
-                                            ? Colors.white
-                                            : AppTheme.textSecondary,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
 
                   // Items list
                   Expanded(
@@ -335,7 +255,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                                   )
                                 : GridView.builder(
                                     padding:
-                                        const EdgeInsets.fromLTRB(12, 10, 12, 100),
+                                        const EdgeInsets.fromLTRB(12, 0, 12, 100),
                                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                                       crossAxisCount: 2,
                                       childAspectRatio: 0.72,
@@ -617,8 +537,12 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.18),
+                            color: _getBgColor(shop.satisfiedCustomerPercent),
                             borderRadius: BorderRadius.circular(7),
+                            border: Border.all(
+                              color: _getBadgeColor(shop.satisfiedCustomerPercent).withValues(alpha: 0.3),
+                              width: 1,
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -626,16 +550,16 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                               Icon(
                                 PhosphorIcons.shieldCheck(
                                     PhosphorIconsStyle.fill),
-                                size: 11,
-                                color: const Color(0xFF10B981),
+                                size: 12,
+                                color: _getBadgeColor(shop.satisfiedCustomerPercent),
                               ),
-                              const SizedBox(width: 3),
+                              const SizedBox(width: 4),
                               UrduAwareText(
                                 '${shop.satisfiedCustomerPercent}%',
-                                style: const TextStyle(
-                                  fontSize: 11,
+                                style: TextStyle(
+                                  fontSize: 11.5,
                                   fontWeight: FontWeight.w900,
-                                  color: Colors.white,
+                                  color: _getBadgeColor(shop.satisfiedCustomerPercent),
                                 ),
                               ),
                             ],
@@ -787,8 +711,113 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     );
   }
 
+  Color _getBadgeColor(int percent) {
+    if (percent >= 80) return const Color(0xFF16A34A);
+    if (percent >= 60) return const Color(0xFFD97706);
+    if (percent >= 40) return const Color(0xFFEA580C);
+    return const Color(0xFFDC2626);
+  }
+
+  Color _getBgColor(int percent) {
+    if (percent >= 80) return const Color(0xFFECFDF5);
+    if (percent >= 60) return const Color(0xFFFFFBEB);
+    if (percent >= 40) return const Color(0xFFFFF7ED);
+    return const Color(0xFFFEF2F2);
+  }
+
   void _showItemDetailModal(BuildContext context, ShopItem item) {
     showItemDetailDialog(context, item);
+  }
+
+  Widget _buildCategoryStrip(bool isUrdu, String? fontFamily, List<String> categories) {
+    if (categories.isEmpty) return const SizedBox.shrink();
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Container(
+        height: 38,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(11),
+          child: IntrinsicHeight(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (int i = 0; i < categories.length; i++) ...[
+                  if (i > 0)
+                    Container(width: 1, color: const Color(0xFFE2E8F0)),
+                  _buildCategorySegment(
+                    label: _formatCategory(categories[i], isUrdu),
+                    count: categories[i] == '__all__'
+                        ? _shop.items.length
+                        : _shop.items.where((x) => x.category == categories[i]).length,
+                    isActive: categories[i] == _activeCategory,
+                    fontFamily: fontFamily,
+                    onTap: () => setState(() => _activeCategory = categories[i]),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategorySegment({
+    required String label,
+    required int count,
+    required bool isActive,
+    required String? fontFamily,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: isActive ? AppTheme.themeColor : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              UrduAwareText(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                  color: isActive ? Colors.white : AppTheme.darkColor,
+                  fontFamily: fontFamily,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? Colors.white.withValues(alpha: 0.25)
+                      : AppTheme.darkColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: UrduAwareText(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w900,
+                    color: isActive ? Colors.white : AppTheme.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildShimmerCatalogGrid() {
