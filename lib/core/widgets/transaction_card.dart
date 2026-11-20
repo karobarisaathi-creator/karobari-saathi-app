@@ -58,7 +58,7 @@ class TransactionCard extends StatelessWidget {
           transaction.description,
           style: TextStyle(
             fontFamily: fontFamily,
-            fontWeight: fontWeight,
+            fontWeight: FontWeight.normal,
           ),
         ),
         subtitle: Column(

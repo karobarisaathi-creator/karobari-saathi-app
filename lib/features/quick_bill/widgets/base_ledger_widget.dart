@@ -255,8 +255,9 @@ class BaseLedgerWidget extends StatelessWidget {
   // Date + Bill Number
   // ═════════════════════════════════════════════════════════════
   Widget _buildDateAmountRow(bool isUrdu, String? fontFamily) {
-    final billNo = (transaction.referenceNumber != null &&
-            transaction.referenceNumber!.trim().isNotEmpty)
+    final billNo = !transaction.isWorkerPayrollTransaction &&
+            transaction.referenceNumber != null &&
+            transaction.referenceNumber!.trim().isNotEmpty
         ? '#${transaction.referenceNumber!.trim()}'
         : '—';
 

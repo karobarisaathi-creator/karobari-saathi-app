@@ -1,5 +1,3 @@
-
-
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
@@ -150,7 +148,7 @@ class WorkerPayrollService extends ChangeNotifier {
       type: 'income',
       category: 'حاضری کی واجب اجرت',
       description:
-          'حاضری کی واجب اجرت - ${_dayKey(record.date)}${record.note.isEmpty ? '' : ' - ${record.note}'}',
+          'حاضری کی واجب اجرت${record.note.isEmpty ? '' : ' - ${record.note}'}',
       date: record.date,
       quantity: 1,
       rate: amount,

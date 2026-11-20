@@ -11,7 +11,7 @@ import 'package:account_app/features/accounts/party_list_screen.dart';
 import 'package:account_app/features/notifications/notifications_screen.dart';
 import 'package:account_app/features/professions/professions_screen.dart';
 import 'package:account_app/features/quick_bill/quick_bill_item_selection_screen.dart';
-import 'package:account_app/features/shopkeeper/shopkeeper_dashboard_screen.dart';
+import 'package:account_app/features/shopkeeper/home_screen.dart';
 
 class AppShellScreen extends StatefulWidget {
   const AppShellScreen({super.key});
@@ -35,7 +35,7 @@ class AppShellScreenState extends State<AppShellScreen> {
   int _selectedIndex = 0;
 
   List<Widget> get _screens => [
-        const ShopkeeperDashboardScreen(isEmbedded: true),
+        const HomeScreen(isEmbedded: true),
         const PartyListScreen(),
         const QuickBillItemSelectionScreen(),
         ProfessionsScreen(),

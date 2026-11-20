@@ -193,7 +193,7 @@ lib/
 │       ├── low_stock_items_screen.dart
 │       ├── sales_analytics_screen.dart
 │       ├── shop_settings_screen.dart
-│       ├── shopkeeper_dashboard_screen.dart
+│       ├── home_screen.dart
 │       ├── stock_adjustment_dialog.dart
 │       ├── stock_detail_screen.dart
 │       ├── stock_history_screen.dart

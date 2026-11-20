@@ -1291,7 +1291,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                         : (widget.isUrdu ? 'نقد لین دین' : 'Cash'),
                     style: TextStyle(
                       color: AppTheme.darkColor,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.normal,
                       fontSize: 15,
                       fontFamily: widget.fontFamily,
                     ),

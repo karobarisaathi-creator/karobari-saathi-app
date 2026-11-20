@@ -33,25 +33,25 @@ import 'widgets/shopkeeper_tools_grid.dart';
 // ═══════════════════════════════════════════
 // SHOPKEEPER DASHBOARD SCREEN
 // ═══════════════════════════════════════════
-class ShopkeeperDashboardScreen extends StatefulWidget {
+class HomeScreen extends StatefulWidget {
   final bool isEmbedded;
 
-  const ShopkeeperDashboardScreen({
+  const HomeScreen({
     super.key,
     this.isEmbedded = false,
   });
 
   @override
-  State<ShopkeeperDashboardScreen> createState() =>
-      _ShopkeeperDashboardScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
+class _HomeScreenState extends State<HomeScreen> {
   String _shopName = '';
   String _userName = '';
   String _address = '';
   String? _bannerImageUrl;
   String? _profileImageUrl;
+  bool _isShopkeeper = false;
   bool _isMenuExpanded = false;
   int _nearbyShopsCount = 0;
 
@@ -80,6 +80,10 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
             _userName =
                 (data?['displayName'] ?? user.displayName ?? '').toString();
             _address = (data?['businessAddress'] ?? '').toString();
+            final hasCoordinates =
+                data?['latitude'] != null && data?['longitude'] != null;
+            _isShopkeeper = _shopName.trim().isNotEmpty &&
+                (_address.trim().isNotEmpty || hasCoordinates);
             _bannerImageUrl = (data?['bannerImage'] ??
                     data?['bannerImageUrl'] ??
                     data?['bannerUrl'] ??
@@ -136,9 +140,9 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
       databaseService.getAllTransactions(),
     );
 
-    final appBarTitle = _shopName.isNotEmpty
-        ? _shopName
-        : (isUrdu ? 'شاپ کیپر ڈیش بورڈ' : 'Shopkeeper Dashboard');
+    final appBarTitle = _isShopkeeper
+        ? (isUrdu ? 'ہوم سکرین' : 'Home Screen')
+        : (isUrdu ? 'کاروباری ساتھی' : 'Karobari Saathi');
     final showBackButton = !widget.isEmbedded && Navigator.canPop(context);
     final showTrustTag = databaseService.isInitialized;
 
@@ -165,7 +169,8 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                       ),
                     if (showTrustTag)
                       Padding(
-                        padding: const EdgeInsetsDirectional.only(start: 16, end: 4),
+                        padding:
+                            const EdgeInsetsDirectional.only(start: 16, end: 4),
                         child: InkWell(
                           onTap: () => TrustPopupDialog.show(
                             context: context,
@@ -193,7 +198,8 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
                               vertical: 5,
                             ),
                             decoration: BoxDecoration(
-                              color: AppTheme.greenColor.withValues(alpha: 0.18),
+                              color:
+                                  AppTheme.greenColor.withValues(alpha: 0.18),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Row(

@@ -11,7 +11,7 @@ import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/features/dashboard/app_shell_screen.dart';
 import 'package:account_app/features/profile/controllers/profile_controller.dart';
-import 'package:account_app/features/shopkeeper/shopkeeper_dashboard_screen.dart';
+import 'package:account_app/features/shopkeeper/home_screen.dart';
 
 class MasterProfileScreen extends StatefulWidget {
   const MasterProfileScreen({super.key});
@@ -342,8 +342,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) =>
-                                      const ShopkeeperDashboardScreen(),
+                                  builder: (_) => const HomeScreen(),
                                 ),
                               );
                             },
