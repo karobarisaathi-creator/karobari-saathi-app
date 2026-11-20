@@ -17,6 +17,7 @@ import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/models/contract_model.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/features/quick_bill/widgets/customer_picker_sheet.dart';
+import 'package:account_app/features/accounts/add_party_screen.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // مقامی رنگ — AppTheme تھیم فائل سے ماخوذ
@@ -111,6 +112,7 @@ class _AddEditContractScreenState extends State<AddEditContractScreen> {
   /// ٹھیکہ محفوظ کرنے کا مرکزی فنکشن — باٹم والے بٹن کے لیے
   Future<void> _saveWithStatus({required bool isIncoming}) async {
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    final contractDirection = widget.contractToEdit?.isIncoming ?? isIncoming;
 
     final title = _titleController.text.trim();
     final partyName = _partyNameController.text.trim().isNotEmpty
@@ -132,6 +134,16 @@ class _AddEditContractScreenState extends State<AddEditContractScreen> {
           isUrdu
               ? 'برائے مہربانی پارٹی کا نام درج یا منتخب کریں'
               : 'Please select or enter party name');
+      return;
+    }
+
+    if (_selectedParty == null) {
+      AppToast.warning(
+        context,
+        isUrdu
+            ? 'قسطوں کو کھاتے میں درج کرنے کے لیے کھاتے سے پارٹی منتخب کریں'
+            : 'Select a party account so installments can be recorded in its ledger',
+      );
       return;
     }
 
@@ -225,7 +237,7 @@ class _AddEditContractScreenState extends State<AddEditContractScreen> {
           title: title,
           description: description,
           totalAmount: amount,
-          isIncoming: isIncoming,
+          isIncoming: contractDirection,
           startDate: _startDate,
           documents: documents,
           createdAt: now,
@@ -241,7 +253,7 @@ class _AddEditContractScreenState extends State<AddEditContractScreen> {
           title: title,
           description: description,
           totalAmount: amount,
-          isIncoming: isIncoming,
+          isIncoming: contractDirection,
           startDate: _startDate,
           documents: documents,
         );
@@ -509,6 +521,23 @@ class _AddEditContractScreenState extends State<AddEditContractScreen> {
     }
   }
 
+  Future<void> _openAddNewParty() async {
+    final newParty = await Navigator.push<Account>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AddPartyScreen(),
+      ),
+    );
+    if (newParty != null && mounted) {
+      setState(() {
+        _selectedParty = newParty;
+        _partyNameController.text = newParty.name;
+        _partyPhoneController.text =
+            Formatters.formatPhoneNumber(newParty.phone);
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final languageService = Provider.of<LanguageService>(context);
@@ -562,7 +591,12 @@ class _AddEditContractScreenState extends State<AddEditContractScreen> {
                     ),
                   ),
                   // ── پارٹی سلیکشن ایریا (باٹم شیٹ کارڈ + مینول انپٹ) ──
-                  _buildPartySelectionArea(isUrdu, fontFamily),
+                  _buildPartySelectionArea(
+                    isUrdu,
+                    fontFamily,
+                    allowPartyChange: widget.contractToEdit == null ||
+                        widget.contractToEdit!.payments.isEmpty,
+                  ),
                   const SizedBox(height: 16),
 
                   // ── انپٹ فیلڈز کارڈ ──
@@ -592,32 +626,6 @@ class _AddEditContractScreenState extends State<AddEditContractScreen> {
                           validator: (v) => (v == null || v.trim().isEmpty)
                               ? (isUrdu ? 'عنوان درج کریں' : 'Title required')
                               : null,
-                        ),
-                        const Divider(height: 1, color: Color(0xFFE5E7EB)),
-
-                        // مینول پارٹی نام
-                        _buildProfileStyleField(
-                          controller: _partyNameController,
-                          label: isUrdu ? 'پارٹی کا نام *' : 'Party Name *',
-                          icon: PhosphorIcons.user(),
-                          fontFamily: fontFamily,
-                          validator: (v) => (v == null || v.trim().isEmpty)
-                              ? (isUrdu
-                                  ? 'پارٹی کا نام درج کریں'
-                                  : 'Party name required')
-                              : null,
-                        ),
-                        const Divider(height: 1, color: Color(0xFFE5E7EB)),
-
-                        // مینول فون نمبر
-                        _buildProfileStyleField(
-                          controller: _partyPhoneController,
-                          label: isUrdu
-                              ? 'فون نمبر (اختیاری)'
-                              : 'Phone Number (Optional)',
-                          icon: PhosphorIcons.phone(),
-                          fontFamily: fontFamily,
-                          isPhone: true,
                         ),
                         const Divider(height: 1, color: Color(0xFFE5E7EB)),
 
@@ -668,33 +676,45 @@ class _AddEditContractScreenState extends State<AddEditContractScreen> {
             ],
           ),
           child: SafeArea(
-            child: Row(
-              children: [
-                Expanded(
-                  child: AppButton(
-                    text: isUrdu ? 'ٹھیکہ لیا' : 'Take Contract',
-                    icon: PhosphorIcons.arrowDownLeft(),
-                    color: AppTheme.incomeColor,
+            child: widget.contractToEdit == null
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: AppButton(
+                          text: isUrdu ? 'ٹھیکہ لیا' : 'Take Contract',
+                          icon: PhosphorIcons.arrowDownLeft(),
+                          color: AppTheme.incomeColor,
+                          size: AppButtonSize.large,
+                          isFullWidth: true,
+                          isLoading: _isSaving,
+                          onPressed: () => _saveWithStatus(isIncoming: true),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: AppButton(
+                          text: isUrdu ? 'ٹھیکہ دیا' : 'Give Contract',
+                          icon: PhosphorIcons.arrowUpRight(),
+                          color: AppTheme.expenseColor,
+                          size: AppButtonSize.large,
+                          isFullWidth: true,
+                          isLoading: _isSaving,
+                          onPressed: () => _saveWithStatus(isIncoming: false),
+                        ),
+                      ),
+                    ],
+                  )
+                : AppButton(
+                    text: isUrdu ? 'محفوظ کریں' : 'Save Changes',
+                    icon: Icons.save_outlined,
+                    color: AppTheme.themeColor,
                     size: AppButtonSize.large,
                     isFullWidth: true,
                     isLoading: _isSaving,
-                    onPressed: () => _saveWithStatus(isIncoming: true),
+                    onPressed: () => _saveWithStatus(
+                      isIncoming: widget.contractToEdit!.isIncoming,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: AppButton(
-                    text: isUrdu ? 'ٹھیکہ دیا' : 'Give Contract',
-                    icon: PhosphorIcons.arrowUpRight(),
-                    color: AppTheme.expenseColor,
-                    size: AppButtonSize.large,
-                    isFullWidth: true,
-                    isLoading: _isSaving,
-                    onPressed: () => _saveWithStatus(isIncoming: false),
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ),
@@ -702,7 +722,11 @@ class _AddEditContractScreenState extends State<AddEditContractScreen> {
   }
 
   /// پارٹی سلیکشن کا ایریا — اگر پارٹی سلیکٹ ہو تو PartyCard شو کرتا ہے
-  Widget _buildPartySelectionArea(bool isUrdu, String? fontFamily) {
+  Widget _buildPartySelectionArea(
+    bool isUrdu,
+    String? fontFamily, {
+    required bool allowPartyChange,
+  }) {
     if (_selectedParty != null) {
       return Container(
         decoration: BoxDecoration(
@@ -732,32 +756,45 @@ class _AddEditContractScreenState extends State<AddEditContractScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               child: Row(
                 children: [
-                  TextButton.icon(
-                    onPressed: _pickPartyFromBottomSheet,
-                    icon: const Icon(Icons.swap_horiz_rounded,
-                        size: 16, color: AppTheme.themeColor),
-                    label: UrduAwareText(
-                      isUrdu ? 'پارٹی تبدیل کریں' : 'Change Party',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.themeColor,
-                        fontWeight: FontWeight.bold,
+                  if (allowPartyChange) ...[
+                    TextButton.icon(
+                      onPressed: _pickPartyFromBottomSheet,
+                      icon: const Icon(Icons.swap_horiz_rounded,
+                          size: 16, color: AppTheme.themeColor),
+                      label: UrduAwareText(
+                        isUrdu ? 'پارٹی تبدیل کریں' : 'Change Party',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.themeColor,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded,
-                        size: 18, color: AppTheme.expenseColor),
-                    tooltip: isUrdu ? 'پارٹی ہٹائیں' : 'Remove Party',
-                    onPressed: () {
-                      setState(() {
-                        _selectedParty = null;
-                        _partyNameController.clear();
-                        _partyPhoneController.clear();
-                      });
-                    },
-                  ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded,
+                          size: 18, color: AppTheme.expenseColor),
+                      tooltip: isUrdu ? 'پارٹی ہٹائیں' : 'Remove Party',
+                      onPressed: () {
+                        setState(() {
+                          _selectedParty = null;
+                          _partyNameController.clear();
+                          _partyPhoneController.clear();
+                        });
+                      },
+                    ),
+                  ] else
+                    Expanded(
+                      child: UrduAwareText(
+                        isUrdu
+                            ? 'قسط درج ہونے کے بعد پارٹی تبدیل نہیں ہو سکتی'
+                            : 'Party cannot be changed after installments are recorded',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -766,68 +803,136 @@ class _AddEditContractScreenState extends State<AddEditContractScreen> {
       );
     }
 
-    return InkWell(
-      onTap: _pickPartyFromBottomSheet,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
+    return Column(
+      children: [
+        InkWell(
+          onTap: _pickPartyFromBottomSheet,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: AppTheme.themeColor.withValues(alpha: 0.35), width: 1.2),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.darkColor.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color: AppTheme.themeColor.withValues(alpha: 0.35), width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.darkColor.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.themeColor.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(PhosphorIcons.userPlus(),
-                  color: AppTheme.themeColor, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  UrduAwareText(
-                    isUrdu
-                        ? 'پارٹی / کلائنٹ منتخب کریں'
-                        : 'Select Party / Client',
-                    style: TextStyle(
-                      fontFamily: fontFamily,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.darkColor,
-                    ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.themeColor.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
                   ),
-                  UrduAwareText(
-                    isUrdu
-                        ? 'کھاتے داروں کی باٹم شیٹ میں سے چنیں'
-                        : 'Choose from customer picker sheet',
-                    style: TextStyle(
-                      fontFamily: fontFamily,
-                      fontSize: 11,
-                      color: AppTheme.textSecondary,
-                    ),
+                  child: Icon(PhosphorIcons.userPlus(),
+                      color: AppTheme.themeColor, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      UrduAwareText(
+                        isUrdu
+                            ? 'پارٹی / کلائنٹ منتخب کریں'
+                            : 'Select Party / Client',
+                        style: TextStyle(
+                          fontFamily: fontFamily,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkColor,
+                        ),
+                      ),
+                      UrduAwareText(
+                        isUrdu
+                            ? 'کھاتے داروں کی باٹم شیٹ میں سے چنیں'
+                            : 'Choose from customer picker sheet',
+                        style: TextStyle(
+                          fontFamily: fontFamily,
+                          fontSize: 11,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: AppTheme.themeColor),
+              ],
             ),
-            const Icon(Icons.chevron_right_rounded, color: AppTheme.themeColor),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(height: 10),
+        InkWell(
+          onTap: _openAddNewParty,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color: AppTheme.themeColor.withValues(alpha: 0.35), width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.darkColor.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.themeColor.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(PhosphorIcons.userCirclePlus(),
+                      color: AppTheme.themeColor, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      UrduAwareText(
+                        isUrdu
+                            ? 'نیا پارٹی بنائیں'
+                            : 'Add New Party',
+                        style: TextStyle(
+                          fontFamily: fontFamily,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkColor,
+                        ),
+                      ),
+                      UrduAwareText(
+                        isUrdu
+                            ? 'نئی پارٹی درج کرنے کی سکرین کھولیں'
+                            : 'Open new party creation screen',
+                        style: TextStyle(
+                          fontFamily: fontFamily,
+                          fontSize: 11,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: AppTheme.themeColor),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 

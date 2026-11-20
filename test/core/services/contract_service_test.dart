@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:account_app/core/models/contract_model.dart';
+import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/services/contract_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -124,7 +125,7 @@ void main() {
     final now = DateTime(2026, 11, 20);
     final contract = ContractModel(
       id: 'completed-contract',
-      partyId: '',
+      partyId: 'customer',
       partyName: 'Customer',
       title: 'Finished project',
       totalAmount: 10000,
@@ -157,9 +158,82 @@ void main() {
       throwsA(isA<StateError>()),
     );
   });
+
+  test('editing a given contract preserves direction and paid amount limits',
+      () async {
+    final now = DateTime(2026, 11, 20);
+    final contract = ContractModel(
+      id: 'given-contract',
+      partyId: 'contractor',
+      partyName: 'Contractor',
+      title: 'Roof repair',
+      totalAmount: 10000,
+      isIncoming: false,
+      startDate: now,
+      payments: [
+        ContractPayment(
+          id: 'installment-1',
+          amount: 3000,
+          date: now,
+          note: 'Advance',
+        ),
+      ],
+      createdAt: now,
+      updatedAt: now,
+    );
+    await contractService.addContract(contract);
+
+    await expectLater(
+      contractService.updateContract(contract.copyWith(isIncoming: true)),
+      throwsA(isA<StateError>()),
+    );
+    await expectLater(
+      contractService.updateContract(contract.copyWith(partyId: 'another')),
+      throwsA(isA<StateError>()),
+    );
+    await expectLater(
+      contractService.updateContract(contract.copyWith(totalAmount: 2500)),
+      throwsA(isA<StateError>()),
+    );
+
+    final unchanged =
+        contractService.contracts.singleWhere((item) => item.id == contract.id);
+    expect(unchanged.isIncoming, isFalse);
+    expect(unchanged.totalAmount, 10000);
+  });
+
+  test('cannot record a contract installment without a linked party account',
+      () async {
+    final now = DateTime(2026, 11, 20);
+    await contractService.addContract(
+      ContractModel(
+        id: 'unlinked-contract',
+        partyId: '',
+        partyName: 'Unlinked Party',
+        title: 'Unlinked work',
+        totalAmount: 10000,
+        startDate: now,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    await expectLater(
+      contractService.addClientPayment(
+        contractId: 'unlinked-contract',
+        amount: 1000,
+        note: 'Advance',
+        databaseService: _NoopDatabaseService(),
+      ),
+      throwsA(isA<StateError>()),
+    );
+  });
 }
 
 class _NoopDatabaseService implements DatabaseService {
+  @override
+  Future<bool> addTransaction(Transaction transaction) async => true;
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

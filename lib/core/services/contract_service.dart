@@ -260,10 +260,25 @@ class ContractService extends ChangeNotifier {
 
   Future<void> updateContract(ContractModel contract) async {
     await _ensureInitialized();
-    _requireContract(contract.id);
+    final existing = _requireContract(contract.id);
     if (!contract.totalAmount.isFinite || contract.totalAmount <= 0) {
       throw ArgumentError.value(contract.totalAmount, 'totalAmount',
           'Must be a positive finite amount.');
+    }
+    if (contract.totalAmount < existing.totalPaid) {
+      throw StateError(
+          'Contract amount cannot be less than the installments already paid.');
+    }
+    if (existing.partyId.isNotEmpty &&
+        contract.partyId != existing.partyId &&
+        existing.payments.isNotEmpty) {
+      throw StateError(
+          'The party account cannot change after installments are recorded.');
+    }
+    if (contract.isIncoming != existing.isIncoming &&
+        (existing.payments.isNotEmpty || existing.laborPayments.isNotEmpty)) {
+      throw StateError(
+          'Contract direction cannot change after payments are recorded.');
     }
     final updated = contract.copyWith(updatedAt: DateTime.now());
     await _box!.put(updated.id, updated.toMap());
@@ -297,6 +312,10 @@ class ContractService extends ChangeNotifier {
     await _ensureInitialized();
     _validatePaymentAmount(amount);
     final contract = _requireContract(contractId);
+    if (contract.partyId.trim().isEmpty) {
+      throw StateError(
+          'A party account is required before recording contract installments.');
+    }
     if (amount > contract.remainingBalance) {
       throw StateError('Payment exceeds the remaining contract balance.');
     }

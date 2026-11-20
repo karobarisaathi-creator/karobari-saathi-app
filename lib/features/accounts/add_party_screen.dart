@@ -581,6 +581,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
 
       String? finalImagePath = _remoteImageUrl ?? _profileImage?.path ?? widget.partyToEdit?.profileImage;
 
+      Account? savedParty;
       if (widget.partyToEdit != null) {
         // Edit Mode
         final updatedParty = widget.partyToEdit!.copyWith(
@@ -595,6 +596,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
         await databaseService.updateAccount(updatedParty);
 
         AppToast.success(context, l10n.updatedSuccessfully);
+        savedParty = updatedParty;
       } else {
         // Add Mode
         final party = Account(
@@ -630,9 +632,10 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                   ? 'پارٹی محفوظ ہوگئی (آف لائن)'
                   : 'Party saved locally (Offline)'),
         );
+        savedParty = party;
       }
 
-      Navigator.pop(context);
+      Navigator.pop(context, savedParty);
     } catch (e) {
       AppToast.error(context, '${l10n.error}: $e');
     } finally {

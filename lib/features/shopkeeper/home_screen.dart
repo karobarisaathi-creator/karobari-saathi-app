@@ -31,7 +31,7 @@ import 'package:account_app/features/contracts/contracts_list_screen.dart';
 import 'widgets/shopkeeper_tools_grid.dart';
 
 // ═══════════════════════════════════════════
-// SHOPKEEPER DASHBOARD SCREEN
+// HOME SCREEN
 // ═══════════════════════════════════════════
 class HomeScreen extends StatefulWidget {
   final bool isEmbedded;
