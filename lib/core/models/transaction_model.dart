@@ -7,6 +7,12 @@ part 'transaction_model.g.dart';
 
 @HiveType(typeId: 1)
 class Transaction extends HiveObject {
+  static const String workerPayrollReferencePrefix = 'WORKER_PAYROLL:';
+  static const String workerWageAccrualReference =
+      '${workerPayrollReferencePrefix}ACCRUAL';
+  static const String workerWagePaymentReference =
+      '${workerPayrollReferencePrefix}PAYMENT';
+
   @HiveField(0)
   final String id;
 
@@ -217,6 +223,8 @@ class Transaction extends HiveObject {
 
   // ✅ FINAL: amount ہمیشہ effective ہے (AddTransaction اور QuickBill دونوں میں)
   double get accountBalanceAmount => amount;
+  bool get isWorkerPayrollTransaction =>
+      referenceNumber?.startsWith(workerPayrollReferencePrefix) ?? false;
 
   String get formattedDate => DateFormat('dd/MM/yyyy').format(date);
   String get formattedTime => DateFormat('hh:mm a').format(date);

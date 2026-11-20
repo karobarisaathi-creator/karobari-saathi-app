@@ -1,0 +1,25 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    match /users/{userId}/contracts/{contractId}/documents/{fileName} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.size > 0
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+
+    match /users/{userId}/stock_items/{itemId}/{fileName} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /users/{userId}/{assetName} {
+      allow read, write: if isOwner(userId)
+        && assetName.matches('(profile|banner)\\.[A-Za-z0-9]+');
+    }
+  }
+}

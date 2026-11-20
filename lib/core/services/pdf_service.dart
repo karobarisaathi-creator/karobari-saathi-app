@@ -959,11 +959,11 @@ class PdfService with ChangeNotifier {
 
   pw.Widget _buildSummarySection(List<Transaction> transactions, bool isUrdu) {
     final totalIncome = transactions
-        .where((t) => t.type == 'income')
+        .where((t) => t.type == 'income' && !t.isWorkerPayrollTransaction)
         .fold(0.0, (sum, t) => sum + t.amount);
 
     final totalExpense = transactions
-        .where((t) => t.type == 'expense')
+        .where((t) => t.type == 'expense' && !t.isWorkerPayrollTransaction)
         .fold(0.0, (sum, t) => sum + t.amount);
 
     final netProfit = totalIncome - totalExpense;

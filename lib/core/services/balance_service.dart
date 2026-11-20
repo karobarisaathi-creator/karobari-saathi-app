@@ -13,11 +13,11 @@ class BalanceService with ChangeNotifier {
 
   Future<void> _init() async {
     try {
-      _accountsBox = Hive.isBoxOpen('accounts') 
-          ? Hive.box<Account>('accounts') 
+      _accountsBox = Hive.isBoxOpen('accounts')
+          ? Hive.box<Account>('accounts')
           : await Hive.openBox<Account>('accounts');
-      _transactionsBox = Hive.isBoxOpen('transactions') 
-          ? Hive.box<Transaction>('transactions') 
+      _transactionsBox = Hive.isBoxOpen('transactions')
+          ? Hive.box<Transaction>('transactions')
           : await Hive.openBox<Transaction>('transactions');
       notifyListeners();
     } catch (e) {
@@ -26,8 +26,11 @@ class BalanceService with ChangeNotifier {
   }
 
   // Helper to ensure boxes are ready
-  bool get _isReady => _accountsBox != null && _accountsBox!.isOpen && 
-                       _transactionsBox != null && _transactionsBox!.isOpen;
+  bool get _isReady =>
+      _accountsBox != null &&
+      _accountsBox!.isOpen &&
+      _transactionsBox != null &&
+      _transactionsBox!.isOpen;
 
   // Getters for direct access
   double get totalBalance => calculateTotalBalance();
@@ -47,7 +50,9 @@ class BalanceService with ChangeNotifier {
     if (!_isReady) return 0.0;
     final transactions = _transactionsBox!.values.toList();
     return transactions
-        .where((transaction) => transaction.type == 'income')
+        .where((transaction) =>
+            transaction.type == 'income' &&
+            !transaction.isWorkerPayrollTransaction)
         .fold(0.0, (sum, transaction) => sum + transaction.amount);
   }
 
@@ -56,7 +61,9 @@ class BalanceService with ChangeNotifier {
     if (!_isReady) return 0.0;
     final transactions = _transactionsBox!.values.toList();
     return transactions
-        .where((transaction) => transaction.type == 'expense')
+        .where((transaction) =>
+            transaction.type == 'expense' &&
+            !transaction.isWorkerPayrollTransaction)
         .fold(0.0, (sum, transaction) => sum + transaction.amount);
   }
 
@@ -118,9 +125,14 @@ class BalanceService with ChangeNotifier {
 
   // Calculate monthly summary
   Map<String, double> calculateMonthlySummary(int year, int month) {
-    if (!_isReady) return {'income': 0.0, 'expense': 0.0, 'pending': 0.0, 'net': 0.0};
+    if (!_isReady) {
+      return {'income': 0.0, 'expense': 0.0, 'pending': 0.0, 'net': 0.0};
+    }
     final transactions = _transactionsBox!.values
-        .where((t) => t.date.year == year && t.date.month == month)
+        .where((t) =>
+            t.date.year == year &&
+            t.date.month == month &&
+            !t.isWorkerPayrollTransaction)
         .toList();
 
     final income = transactions
@@ -150,7 +162,11 @@ class BalanceService with ChangeNotifier {
     if (!_isReady) return {};
     final transactions = _transactionsBox!.values
         .where(
-          (t) => t.type == type && t.date.year == year && t.date.month == month,
+          (t) =>
+              t.type == type &&
+              t.date.year == year &&
+              t.date.month == month &&
+              !t.isWorkerPayrollTransaction,
         )
         .toList();
 
@@ -193,7 +209,7 @@ class BalanceService with ChangeNotifier {
 
       professionTotals[professionId]![transaction.type] =
           professionTotals[professionId]![transaction.type]! +
-          transaction.amount;
+              transaction.amount;
     }
 
     return professionTotals;
@@ -208,13 +224,17 @@ class BalanceService with ChangeNotifier {
   // Get accounts with negative balance (debt)
   List<Account> getAccountsWithDebt() {
     if (!_isReady) return [];
-    return _accountsBox!.values.where((account) => account.balance < 0).toList();
+    return _accountsBox!.values
+        .where((account) => account.balance < 0)
+        .toList();
   }
 
   // Get accounts with positive balance (credit)
   List<Account> getAccountsWithCredit() {
     if (!_isReady) return [];
-    return _accountsBox!.values.where((account) => account.balance > 0).toList();
+    return _accountsBox!.values
+        .where((account) => account.balance > 0)
+        .toList();
   }
 
   // Calculate average transaction amount
@@ -247,7 +267,8 @@ class BalanceService with ChangeNotifier {
     }
 
     // Deduct for too many debt accounts
-    final debtRatio = totalAccounts == 0 ? 0.0 : accountsWithDebt / totalAccounts;
+    final debtRatio =
+        totalAccounts == 0 ? 0.0 : accountsWithDebt / totalAccounts;
     if (debtRatio > 0.3) {
       score -= (debtRatio * 50);
     }

@@ -26,6 +26,7 @@ class CategoryChip extends StatelessWidget {
   
   static final List<AppCategory> partyCategories = [
     AppCategory(id: 'general', labelEn: 'General', labelUr: 'عام', icon: PhosphorIcons.user()),
+    AppCategory(id: 'worker', labelEn: 'Worker', labelUr: 'مزدور', icon: PhosphorIcons.userGear()),
     AppCategory(id: 'customer', labelEn: 'Customer', labelUr: 'گاہک', icon: PhosphorIcons.shoppingCart()),
     AppCategory(id: 'supplier', labelEn: 'Supplier', labelUr: 'سپلائر', icon: PhosphorIcons.package()),
     AppCategory(id: 'wholesaler', labelEn: 'Wholesaler', labelUr: 'ہول سیلر', icon: PhosphorIcons.buildings()),

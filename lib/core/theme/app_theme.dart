@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class AppTheme {
   // آپ کے بتائے ہوئے رنگ
-  static const Color themeColor = Color(0xFF1D6ED6); // ZALOOQ Account Theme Color
+  static const Color themeColor = Color(0xFF0B81F1); // ZALOOQ Account Theme Color
   static const Color darkColor = Color(0xFF123248);
   static const Color lightColor = Color(0xFFFFFFFF);
   static const Color goldColor = Color(0xFF607D8B); // سرمئی رنگ (Grey/BlueGrey)

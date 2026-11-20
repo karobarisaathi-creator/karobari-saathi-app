@@ -27,6 +27,7 @@ import 'package:account_app/features/shopkeeper/sales_analytics_screen.dart';
 import 'package:account_app/features/shopkeeper/stock_detail_screen.dart';
 import 'package:account_app/features/order/nearby_shops_screen.dart';
 import 'package:account_app/features/order/widgets/trust_popup_dialog.dart';
+import 'package:account_app/features/contracts/contracts_list_screen.dart';
 import 'widgets/shopkeeper_tools_grid.dart';
 
 // ═══════════════════════════════════════════
@@ -773,6 +774,33 @@ class _ShopkeeperDashboardScreenState extends State<ShopkeeperDashboardScreen> {
               ],
             );
           },
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _quickActionCard(
+                isUrdu: isUrdu,
+                fontFamily: fontFamily,
+                title: isUrdu ? 'ٹھیکے اور پراجیکٹس' : 'Contracts & Projects',
+                sub: isUrdu
+                    ? 'ٹھیکے اور مزدوروں کی مزدوری'
+                    : 'Contracts & worker wages',
+                icon: PhosphorIcons.fileText(),
+                color: AppTheme.themeColor,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ContractsListScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(child: SizedBox.shrink()),
+          ],
         ),
       ],
     );

@@ -85,10 +85,8 @@ class AccountService extends BaseService {
               .where((t) => t.accountId == accountId)
               .toList() ??
           [];
-      final isParty = switch (account.category.trim().toLowerCase()) {
-        'customer' || 'supplier' => true,
-        _ => false,
-      };
+      final isParty =
+          AccountBalanceUtils.isPartyAccountCategory(account.category);
       if (isParty) {
         double openingBalance = account.initialBalance;
         if (account.balanceType.toLowerCase() == 'payable') {

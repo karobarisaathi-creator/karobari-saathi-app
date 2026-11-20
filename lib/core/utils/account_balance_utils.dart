@@ -44,6 +44,18 @@ class AccountBalanceUtils {
     return normalized == 'supplier' || normalized == 'سپلائر';
   }
 
+  static bool isPartyAccountCategory(String category) {
+    final normalized = category.trim().toLowerCase();
+    return normalized == 'customer' ||
+        normalized == 'supplier' ||
+        normalized == 'worker' ||
+        normalized == 'employee' ||
+        normalized == 'technician' ||
+        normalized == 'سپلائر' ||
+        normalized == 'گاہک' ||
+        normalized == 'مزدور';
+  }
+
   static String partySettlementDescription({
     required String type,
     required String paymentMethod,

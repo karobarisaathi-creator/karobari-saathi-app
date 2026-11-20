@@ -103,6 +103,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         .toList();
 
     for (var tx in filtered) {
+      if (tx.isWorkerPayrollTransaction) continue;
       if (tx.professionSide != _selectedType) continue;
 
       String category = _getEffectiveCategory(tx, isUrdu);

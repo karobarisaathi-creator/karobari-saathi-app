@@ -8,6 +8,7 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/category_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
+import 'package:account_app/core/services/contract_service.dart';
 
 class BackupService with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -17,6 +18,8 @@ class BackupService with ChangeNotifier {
   static const String _stockSnapshotsCollection = 'stockSnapshots';
   static const String _stockItemsCollection = 'stock_items';
   static const String _stockMovementsCollection = 'stock_movements';
+  static const String _contractSnapshotsCollection = 'contractSnapshots';
+  static const String _contractsCollection = 'contracts';
   static const int _firestoreBatchLimit = 400;
 
   // Helper to get user profile email
@@ -60,14 +63,27 @@ class BackupService with ChangeNotifier {
     final categoriesBox = await Hive.openBox<Category>('categories');
     final professionsBox = await Hive.openBox<Profession>('professions');
     final settingsBox = await Hive.openBox('settings');
+    final contractsBox = await Hive.openBox(ContractService.boxName);
+    final contractRecords = contractsBox.values
+        .whereType<Map>()
+        .map((record) => _normalizeMap(record))
+        .toList();
+    _validateContractDocumentOwners(contractRecords, user.uid);
     final stockRecords = await _loadStockRecords(user.uid);
     final backupRef = _firestore.collection('backups').doc(user.uid);
     final previousBackup = await backupRef.get();
     final previousSnapshotId =
         previousBackup.data()?['stockBackupId']?.toString();
+    final previousContractSnapshotId =
+        previousBackup.data()?['contractBackupId']?.toString();
     final snapshotId = backupRef.collection(_stockSnapshotsCollection).doc().id;
     final snapshotRef =
         backupRef.collection(_stockSnapshotsCollection).doc(snapshotId);
+    final contractSnapshotId =
+        backupRef.collection(_contractSnapshotsCollection).doc().id;
+    final contractSnapshotRef = backupRef
+        .collection(_contractSnapshotsCollection)
+        .doc(contractSnapshotId);
 
     try {
       await snapshotRef.set({
@@ -95,6 +111,27 @@ class BackupService with ChangeNotifier {
       rethrow;
     }
 
+    try {
+      await contractSnapshotRef.set({
+        'createdAt': DateTime.now(),
+        'contractCount': contractRecords.length,
+      });
+      await _writeDocuments(
+        contractSnapshotRef.collection(_contractsCollection),
+        contractRecords,
+      );
+    } catch (error) {
+      try {
+        await _deleteContractSnapshot(contractSnapshotRef);
+      } catch (cleanupError) {
+        debugPrint(
+          'BackupService: Could not remove incomplete contract snapshot: '
+          '$cleanupError',
+        );
+      }
+      rethrow;
+    }
+
     final backupData = {
       'accounts': accountsBox.values.map((a) => a.toMap()).toList(),
       'transactions': transactionsBox.values.map((t) => t.toMap()).toList(),
@@ -107,6 +144,8 @@ class BackupService with ChangeNotifier {
       'stockBackupId': snapshotId,
       'totalStockItems': stockRecords[_stockItemsCollection]!.length,
       'totalStockMovements': stockRecords[_stockMovementsCollection]!.length,
+      'contractBackupId': contractSnapshotId,
+      'totalContracts': contractRecords.length,
     };
 
     // Stock is stored in a versioned subcollection to avoid the Firestore
@@ -124,6 +163,20 @@ class BackupService with ChangeNotifier {
         );
       } catch (e) {
         debugPrint('BackupService: Could not remove old stock snapshot: $e');
+      }
+    }
+    if (previousContractSnapshotId != null &&
+        previousContractSnapshotId.isNotEmpty &&
+        previousContractSnapshotId != contractSnapshotId) {
+      try {
+        await _deleteContractSnapshot(
+          backupRef
+              .collection(_contractSnapshotsCollection)
+              .doc(previousContractSnapshotId),
+        );
+      } catch (error) {
+        debugPrint(
+            'BackupService: Could not remove old contract snapshot: $error');
       }
     }
 
@@ -155,6 +208,8 @@ class BackupService with ChangeNotifier {
     );
     final stockSnapshotId = backupData['stockBackupId']?.toString();
     Map<String, List<Map<String, dynamic>>>? stockRecords;
+    final contractSnapshotId = backupData['contractBackupId']?.toString();
+    List<Map<String, dynamic>>? contractRecords;
 
     if (stockSnapshotId != null && stockSnapshotId.isNotEmpty) {
       final snapshotRef = _firestore
@@ -169,6 +224,21 @@ class BackupService with ChangeNotifier {
       stockRecords = await _loadStockSnapshot(snapshotRef);
     }
 
+    if (contractSnapshotId != null && contractSnapshotId.isNotEmpty) {
+      final snapshotRef = _firestore
+          .collection('backups')
+          .doc(user.uid)
+          .collection(_contractSnapshotsCollection)
+          .doc(contractSnapshotId);
+      final snapshot = await snapshotRef.get();
+      if (!snapshot.exists) {
+        throw StateError(
+            'The contract data for this backup could not be found.');
+      }
+      contractRecords = await _loadContractSnapshot(snapshotRef);
+      _validateContractDocumentOwners(contractRecords, user.uid);
+    }
+
     if (stockRecords != null) {
       await _replaceStockRecords(
         user.uid,
@@ -179,6 +249,9 @@ class BackupService with ChangeNotifier {
 
     // Clear existing data after all remote stock records have been read.
     await _clearLocalData();
+    if (contractRecords != null) {
+      await _replaceContractRecords(contractRecords);
+    }
 
     // Restore accounts
     final accountsBox = await Hive.openBox<Account>('accounts');
@@ -228,11 +301,17 @@ class BackupService with ChangeNotifier {
         await Hive.openBox<model.Transaction>('transactions');
     final categoriesBox = await Hive.openBox<Category>('categories');
     final professionsBox = await Hive.openBox<Profession>('professions');
+    final contractsBox = await Hive.openBox(ContractService.boxName);
     final user = _auth.currentUser;
     if (user == null) {
       throw StateError('Sign in to export stock data.');
     }
     final stockRecords = await _loadStockRecords(user.uid);
+    final contractRecords = contractsBox.values
+        .whereType<Map>()
+        .map((record) => _normalizeMap(record))
+        .toList();
+    _validateContractDocumentOwners(contractRecords, user.uid);
 
     final exportData = {
       'exportDate': DateTime.now().toIso8601String(),
@@ -242,6 +321,7 @@ class BackupService with ChangeNotifier {
         'transactions': transactionsBox.values.map((t) => t.toMap()).toList(),
         'categories': categoriesBox.values.map((c) => c.toMap()).toList(),
         'professions': professionsBox.values.map((p) => p.toMap()).toList(),
+        'contracts': contractRecords,
         'stockItems': stockRecords[_stockItemsCollection],
         'stockMovements': stockRecords[_stockMovementsCollection],
       },
@@ -262,6 +342,23 @@ class BackupService with ChangeNotifier {
         _readRecordList(data['transactions'], 'transactions');
     final categoriesData = _readRecordList(data['categories'], 'categories');
     final professionsData = _readRecordList(data['professions'], 'professions');
+    final contractsData = data.containsKey('contracts')
+        ? _readRecordList(data['contracts'], 'contracts')
+        : null;
+    if (contractsData != null) {
+      final user = _auth.currentUser;
+      final hasDocuments = contractsData.any(
+        (contract) =>
+            contract['documents'] is List &&
+            (contract['documents'] as List).isNotEmpty,
+      );
+      if (hasDocuments && user == null) {
+        throw StateError('Sign in before importing contract documents.');
+      }
+      if (user != null) {
+        _validateContractDocumentOwners(contractsData, user.uid);
+      }
+    }
     final includesStock =
         data.containsKey('stockItems') || data.containsKey('stockMovements');
 
@@ -279,6 +376,9 @@ class BackupService with ChangeNotifier {
 
     // Clear existing data
     await _clearLocalData();
+    if (contractsData != null) {
+      await _replaceContractRecords(contractsData);
+    }
 
     // Import accounts
     final accountsBox = await Hive.openBox<Account>('accounts');
@@ -422,6 +522,15 @@ class BackupService with ChangeNotifier {
     };
   }
 
+  Future<List<Map<String, dynamic>>> _loadContractSnapshot(
+    DocumentReference<Map<String, dynamic>> snapshotRef,
+  ) async {
+    final contracts = await snapshotRef.collection(_contractsCollection).get();
+    return contracts.docs
+        .map((doc) => _documentData(doc.id, doc.data()))
+        .toList();
+  }
+
   Map<String, dynamic> _documentData(
     String id,
     Map<String, dynamic> data,
@@ -463,6 +572,29 @@ class BackupService with ChangeNotifier {
     }).toList();
   }
 
+  void _validateContractDocumentOwners(
+    List<Map<String, dynamic>> contracts,
+    String uid,
+  ) {
+    final expectedPathPrefix = 'users/$uid/contracts/';
+    for (final contract in contracts) {
+      final documents = contract['documents'];
+      if (documents == null) continue;
+      if (documents is! List) {
+        throw const FormatException('Invalid contract documents in backup.');
+      }
+      for (final document in documents) {
+        if (document is! Map ||
+            document['ownerId'] != uid ||
+            !(document['storagePath']?.toString() ?? '')
+                .startsWith(expectedPathPrefix)) {
+          throw StateError(
+              'A contract document belongs to a different account.');
+        }
+      }
+    }
+  }
+
   Future<void> _writeDocuments(
     CollectionReference<Map<String, dynamic>> collection,
     List<Map<String, dynamic>> records,
@@ -476,7 +608,7 @@ class BackupService with ChangeNotifier {
       for (final record in records.sublist(offset, end)) {
         final id = record['id']?.toString();
         if (id == null || id.isEmpty) {
-          throw const FormatException('A stock record is missing its ID.');
+          throw const FormatException('A backup record is missing its ID.');
         }
         batch.set(collection.doc(id), record);
       }
@@ -518,6 +650,28 @@ class BackupService with ChangeNotifier {
     );
   }
 
+  Future<void> _replaceContractRecords(
+    List<Map<String, dynamic>> contracts,
+  ) async {
+    final uniqueContracts = <String, Map<String, dynamic>>{};
+    for (final contract in contracts) {
+      final id = contract['id']?.toString();
+      if (id == null || id.isEmpty) {
+        throw const FormatException('A contract backup record is missing ID.');
+      }
+      if (uniqueContracts.containsKey(id)) {
+        throw FormatException('Duplicate contract backup record: $id');
+      }
+      uniqueContracts[id] = contract;
+    }
+
+    final box = await Hive.openBox(ContractService.boxName);
+    await box.clear();
+    for (final entry in uniqueContracts.entries) {
+      await box.put(entry.key, entry.value);
+    }
+  }
+
   Future<void> _replaceCollection(
     CollectionReference<Map<String, dynamic>> collection,
     List<Map<String, dynamic>> records,
@@ -546,6 +700,13 @@ class BackupService with ChangeNotifier {
   ) async {
     await _deleteCollection(snapshotRef.collection(_stockItemsCollection));
     await _deleteCollection(snapshotRef.collection(_stockMovementsCollection));
+    await snapshotRef.delete();
+  }
+
+  Future<void> _deleteContractSnapshot(
+    DocumentReference<Map<String, dynamic>> snapshotRef,
+  ) async {
+    await _deleteCollection(snapshotRef.collection(_contractsCollection));
     await snapshotRef.delete();
   }
 

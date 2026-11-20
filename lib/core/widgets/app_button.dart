@@ -17,6 +17,8 @@ class AppButton extends StatefulWidget {
   final AppButtonVariant variant;
   final AppButtonSize size;
   final Color? color;
+  final Color? textColor;
+  final Color? borderColor;
   final bool isLoading;
   final bool isFullWidth;
 
@@ -32,6 +34,8 @@ class AppButton extends StatefulWidget {
     this.variant = AppButtonVariant.primary,
     this.size = AppButtonSize.small,
     this.color,
+    this.textColor,
+    this.borderColor,
     this.isLoading = false,
     this.isFullWidth = false,
     this.loadingText,
@@ -233,12 +237,14 @@ class _AppButtonState extends State<AppButton> {
 
     Widget buildBaseButton() {
       if (widget.variant == AppButtonVariant.outlined) {
+        final fgColor = widget.textColor ?? themeColor;
+        final sideColor = widget.borderColor ?? themeColor;
         return OutlinedButton(
           onPressed: widget.isLoading ? null : widget.onPressed,
           style: OutlinedButton.styleFrom(
-            foregroundColor: themeColor,
-            disabledForegroundColor: themeColor,
-            side: BorderSide(color: themeColor),
+            foregroundColor: fgColor,
+            disabledForegroundColor: fgColor,
+            side: BorderSide(color: sideColor),
             shape: RoundedRectangleBorder(borderRadius: borderRadiusObj),
             minimumSize: Size(widget.isFullWidth ? double.infinity : 0, height),
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
@@ -248,11 +254,12 @@ class _AppButtonState extends State<AppButton> {
       }
 
       if (widget.variant == AppButtonVariant.ghost) {
+        final fgColor = widget.textColor ?? themeColor;
         return TextButton(
           onPressed: widget.isLoading ? null : widget.onPressed,
           style: TextButton.styleFrom(
-            foregroundColor: themeColor,
-            disabledForegroundColor: themeColor,
+            foregroundColor: fgColor,
+            disabledForegroundColor: fgColor,
             shape: RoundedRectangleBorder(borderRadius: borderRadiusObj),
             minimumSize: Size(widget.isFullWidth ? double.infinity : 0, height),
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
@@ -261,13 +268,14 @@ class _AppButtonState extends State<AppButton> {
         );
       }
 
+      final fgColor = widget.textColor ?? Colors.white;
       return ElevatedButton(
         onPressed: widget.isLoading ? null : widget.onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: themeColor,
           disabledBackgroundColor: themeColor,
-          foregroundColor: Colors.white,
-          disabledForegroundColor: Colors.white,
+          foregroundColor: fgColor,
+          disabledForegroundColor: fgColor,
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: borderRadiusObj),
           minimumSize: Size(widget.isFullWidth ? double.infinity : 0, height),

@@ -461,16 +461,13 @@ class _PartyListScreenState extends State<PartyListScreen> {
             .where((t) => t.accountId == party.id)
             .toList();
 
-        double partyTaken = 0;
-        double partyGiven = 0;
-        for (var t in partyTransactions) {
-          if (t.type == 'income') {
-            partyTaken += t.amount;
-          } else {
-            partyGiven += t.amount;
-          }
-        }
-        final liveBalance = partyTaken - partyGiven;
+        final openingBalance = party.balanceType.toLowerCase() == 'payable'
+            ? -party.initialBalance
+            : party.initialBalance;
+        final liveBalance = AccountBalanceUtils.ledgerBalance(
+          partyTransactions,
+          initialBalance: openingBalance,
+        );
         final updatedParty = party.copyWith(balance: liveBalance);
 
         return PartyCard(

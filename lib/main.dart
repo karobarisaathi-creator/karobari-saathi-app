@@ -37,6 +37,9 @@ import 'package:account_app/core/services/pdf_service.dart';
 import 'package:account_app/core/services/excel_service.dart'; // Added ExcelService
 import 'package:account_app/core/services/backup_service.dart';
 import 'package:account_app/core/services/stock_service.dart';
+import 'package:account_app/core/services/contract_service.dart';
+import 'package:account_app/core/services/worker_service.dart';
+import 'package:account_app/core/services/worker_payroll_service.dart';
 import 'package:account_app/core/services/security_service.dart';
 import 'package:account_app/core/services/offline_queue_service.dart';
 import 'package:account_app/core/services/settings_service.dart';
@@ -203,6 +206,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => StockService()),
         ChangeNotifierProvider(create: (_) => SecurityService()),
         ChangeNotifierProvider(create: (_) => OfflineQueueService()),
+        ChangeNotifierProvider(create: (_) => ContractService()),
+        ChangeNotifierProvider(create: (_) => WorkerService()),
+        ChangeNotifierProvider(create: (_) => WorkerPayrollService()),
         ChangeNotifierProvider(
             create: (_) => SettingsService()..loadSettings()),
       ],

@@ -1310,7 +1310,8 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                             fontSize: 11,
                           ),
                         ),
-                        if (t.referenceNumber != null &&
+                        if (!t.isWorkerPayrollTransaction &&
+                            t.referenceNumber != null &&
                             t.referenceNumber!.isNotEmpty) ...[
                           const SizedBox(width: 8),
                           UrduAwareText(
@@ -1530,7 +1531,9 @@ class _AnalysisTabState extends State<_AnalysisTab> {
 
     final itemCount = <String, int>{};
 
-    for (var tx in allTx) {
+    final tradeTransactions =
+        allTx.where((transaction) => !transaction.isWorkerPayrollTransaction);
+    for (var tx in tradeTransactions) {
       if (tx.isQuickBill) {
         final subtotal = tx.subtotal > 0 ? tx.subtotal : tx.amount;
         final billTotal =
@@ -1587,7 +1590,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
       ..sort((a, b) => b.value.first.date.compareTo(a.value.first.date)));
 
     _totalVolume = _totalIn + _totalOut;
-    _totalDeals = allTx.length;
+    _totalDeals = tradeTransactions.length;
     _transactions = List.from(allTx)..sort((a, b) => b.date.compareTo(a.date));
 
     setState(() => _itemHistory = sorted);
