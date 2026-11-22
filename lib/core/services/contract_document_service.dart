@@ -79,6 +79,11 @@ class ContractDocumentService {
     return bytes;
   }
 
+  Future<String> getDownloadUrl(ContractDocument document) {
+    _requireOwnerPath(document);
+    return _storage.ref(document.storagePath).getDownloadURL();
+  }
+
   Future<void> deleteDocument(ContractDocument document) async {
     _requireOwnerPath(document);
     await _storage.ref(document.storagePath).delete();

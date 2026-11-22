@@ -5,8 +5,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:account_app/core/models/bottom_bar_profile_type.dart';
 import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/widgets/main_bottom_nav_bar.dart';
+import 'package:account_app/features/contracts/contracts_list_screen.dart';
 import 'package:account_app/features/accounts/party_list_screen.dart';
 import 'package:account_app/features/notifications/notifications_screen.dart';
 import 'package:account_app/features/professions/professions_screen.dart';
@@ -33,12 +35,16 @@ class AppShellScreen extends StatefulWidget {
 
 class AppShellScreenState extends State<AppShellScreen> {
   int _selectedIndex = 0;
+  BottomBarProfileType _profileType = BottomBarProfileType.simple;
 
   List<Widget> get _screens => [
-        const HomeScreen(isEmbedded: true),
+        HomeScreen(
+          isEmbedded: true,
+        ),
         const PartyListScreen(),
         const QuickBillItemSelectionScreen(),
         ProfessionsScreen(),
+        const ContractsListScreen(),
         const NotificationsScreen(),
       ];
 
@@ -57,7 +63,20 @@ class AppShellScreenState extends State<AppShellScreen> {
           .collection('users')
           .doc(user.uid)
           .get();
-      if (doc.exists && mounted) setState(() {});
+      if (doc.exists && mounted) {
+        final data = doc.data() ?? {};
+        final hasShop = data['role'] == 'shopkeeper' ||
+            (data['shopName'] ?? '').toString().trim().isNotEmpty;
+        final hasCompany =
+            (data['businessName'] ?? '').toString().trim().isNotEmpty;
+        setState(() {
+          _profileType = hasShop
+              ? BottomBarProfileType.shopkeeper
+              : hasCompany
+                  ? BottomBarProfileType.contractor
+                  : BottomBarProfileType.simple;
+        });
+      }
     } catch (error, stackTrace) {
       FlutterError.reportError(
         FlutterErrorDetails(
@@ -106,6 +125,7 @@ class AppShellScreenState extends State<AppShellScreen> {
       bottomNavigationBar: MainBottomNavBar(
         selectedIndex: _selectedIndex,
         onItemTapped: onItemTapped,
+        profileType: _profileType,
       ),
     );
   }

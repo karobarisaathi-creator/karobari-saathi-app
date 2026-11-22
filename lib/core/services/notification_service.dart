@@ -420,7 +420,13 @@ class NotificationService with ChangeNotifier {
               return PartyDetailScreen(party: snapshot.data!);
             } else {
               return Scaffold(
-                appBar: AppBar(title: UrduAwareText('Details')),
+                appBar: AppBar(
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => Navigator.maybePop(context),
+                  ),
+                  title: UrduAwareText('Details'),
+                ),
                 body:
                     Center(child: UrduAwareText('Account details not found.')),
               );

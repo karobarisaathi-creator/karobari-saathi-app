@@ -14,8 +14,8 @@ import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/features/order/services/shop_order_service.dart';
 import 'package:account_app/core/services/database/profile_service.dart';
 
@@ -241,8 +241,9 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
+      appBar: ScreenAppBar(
         title: isUrdu ? 'میرے آرڈرز' : 'My Orders',
+        isUrdu: isUrdu,
       ),
       body: user == null
           ? Center(

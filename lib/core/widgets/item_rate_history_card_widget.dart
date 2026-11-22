@@ -88,14 +88,14 @@ class _ItemRateHistoryCardWidgetState extends State<ItemRateHistoryCardWidget> {
     final Color changeBg;
     final Color changeFg;
     if (isSame) {
-      changeBg = Colors.white.withValues(alpha: 0.15);
-      changeFg = Colors.white.withValues(alpha: 0.7);
+      changeBg = Colors.grey.shade200;
+      changeFg = AppTheme.textSecondary;
     } else if (isDecrease) {
-      changeBg = AppTheme.incomeColor.withValues(alpha: 0.30);
-      changeFg = const Color(0xFFB8C74A);
+      changeBg = AppTheme.incomeColor.withValues(alpha: 0.12);
+      changeFg = AppTheme.incomeColor;
     } else {
-      changeBg = AppTheme.expenseColor.withValues(alpha: 0.25);
-      changeFg = const Color(0xFFFCA58E);
+      changeBg = AppTheme.expenseColor.withValues(alpha: 0.12);
+      changeFg = AppTheme.expenseColor;
     }
 
     return Container(
@@ -123,111 +123,91 @@ class _ItemRateHistoryCardWidgetState extends State<ItemRateHistoryCardWidget> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ═══════════════════════════════════════════════
-            // TOP — Dark gradient header (tap to toggle)
+            // TOP — White header (tap to toggle)
             // ═══════════════════════════════════════════════
             InkWell(
               onTap: () => setState(() => _isExpanded = !_isExpanded),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               child: Container(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      const Color(0xFF1A4560),
-                      AppTheme.darkColor,
-                    ],
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  border: Border(
+                    bottom: BorderSide(color: Color(0xFFE5E7EB)),
                   ),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 ),
-                child: Stack(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Decorative circle
-                    Positioned(
-                      top: -40,
-                      right: -40,
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.05),
+                    // ═══ Icon box ═══
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppTheme.themeColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.themeColor.withValues(alpha: 0.2),
+                          width: 1,
                         ),
                       ),
+                      child: Icon(
+                        PhosphorIcons.package(),
+                        color: AppTheme.themeColor,
+                        size: 22,
+                      ),
                     ),
-                    // Content
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                    const SizedBox(width: 12),
+
+                    // ═══ Name + count ═══
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          UrduAwareText(
+                            widget.itemName,
+                            style: TextStyle(
+                              fontFamily: widget.fontFamily,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.darkColor,
+                              height: 1.3,
+                              letterSpacing: -0.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          UrduAwareText(
+                            '${widget.history.length} ${widget.isUrdu ? "ریٹ تبدیلیاں" : "price changes"}',
+                            style: TextStyle(
+                              fontFamily: widget.fontFamily,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // ═══ Latest price + change ═══
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        // ═══ Icon box ═══
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.15),
-                              width: 1,
-                            ),
-                          ),
-                          child: Icon(
-                            PhosphorIcons.package(),
-                            color: Colors.white,
-                            size: 22,
+                        UrduAwareText(
+                          'Rs ${latest.price.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: AppTheme.darkColor,
+                            height: 1.1,
+                            letterSpacing: -0.3,
                           ),
                         ),
-                        const SizedBox(width: 12),
-
-                        // ═══ Name + count ═══
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              UrduAwareText(
-                                widget.itemName,
-                                style: TextStyle(
-                                  fontFamily: widget.fontFamily,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                  height: 1.3,
-                                  letterSpacing: -0.2,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 2),
-                              UrduAwareText(
-                                '${widget.history.length} ${widget.isUrdu ? "ریٹ تبدیلیاں" : "price changes"}',
-                                style: TextStyle(
-                                  fontFamily: widget.fontFamily,
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white.withValues(alpha: 0.65),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-
-                        // ═══ Latest price + change ═══
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            UrduAwareText(
-                              'Rs ${latest.price.toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                height: 1.1,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
                             const SizedBox(height: 4),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -274,10 +254,8 @@ class _ItemRateHistoryCardWidgetState extends State<ItemRateHistoryCardWidget> {
                         ),
                       ],
                     ),
-                  ],
                 ),
               ),
-            ),
 
             // ═══════════════════════════════════════════════
             // SPARKLINE — Rate trend
@@ -450,13 +428,13 @@ class _ItemRateHistoryCardWidgetState extends State<ItemRateHistoryCardWidget> {
             ),
           ),
 
-          // ═══ Bottom action — Item Options (Set Unit / Merge) ═══
+          // ═══ Bottom action — Set Unit ═══
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () => _showItemOptionsPopup(context),
+                onTap: () => _showSetUnitDialog(context),
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
                   width: double.infinity,
@@ -476,15 +454,15 @@ class _ItemRateHistoryCardWidgetState extends State<ItemRateHistoryCardWidget> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        PhosphorIcons.sliders(),
+                        PhosphorIcons.scales(),
                         size: 14,
                         color: Colors.white,
                       ),
                       const SizedBox(width: 6),
                       UrduAwareText(
                         widget.isUrdu
-                            ? 'آئٹم آپشنز (اکائی / مرج)'
-                            : 'Item Options (Unit / Merge)',
+                            ? 'اکائی سیٹ کریں'
+                            : 'Set Unit',
                         style: TextStyle(
                           fontFamily: widget.fontFamily,
                           fontSize: 11.5,
@@ -821,51 +799,6 @@ class _ItemRateHistoryCardWidgetState extends State<ItemRateHistoryCardWidget> {
               onTap: () {
                 Navigator.pop(popupCtx);
                 _showSetUnitDialog(context);
-              },
-            ),
-
-            const SizedBox(height: 10),
-
-            // Option 2: Merge Item (آئٹم مرج کریں)
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              tileColor: const Color(0xFFF8FAFC),
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  PhosphorIcons.gitMerge(),
-                  color: const Color(0xFF8B5CF6),
-                  size: 20,
-                ),
-              ),
-              title: UrduAwareText(
-                isUrdu ? 'آئٹم مرج (ضم) کریں' : 'Merge Item',
-                style: TextStyle(
-                  fontFamily: fontFamily,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.darkColor,
-                ),
-              ),
-              subtitle: UrduAwareText(
-                isUrdu
-                    ? 'اس آئٹم کو کسی دوسرے آئٹم کے ساتھ ملائیں'
-                    : 'Combine this item into another existing item',
-                style: TextStyle(
-                  fontFamily: fontFamily,
-                  fontSize: 11,
-                  color: AppTheme.textSecondary,
-                ),
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.textSecondary),
-              onTap: () {
-                Navigator.pop(popupCtx);
-                _showMergeItemDialog(context);
               },
             ),
           ],

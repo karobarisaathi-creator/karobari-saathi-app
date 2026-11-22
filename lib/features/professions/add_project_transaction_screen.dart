@@ -5,28 +5,36 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/transaction_item_model.dart' as model;
 import 'package:account_app/core/models/profession_model.dart';
+import 'package:account_app/core/models/contract_model.dart';
+import 'package:account_app/core/models/category_model.dart';
 import 'package:account_app/core/config/professions_config.dart';
+import 'package:account_app/features/professions/categories_management_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:uuid/uuid.dart';
+
+const String _contractExpenseCategoryParentId = 'contract_expenses';
 
 class AddProjectTransactionScreen extends StatefulWidget {
-  final Profession profession;
+  final Profession? profession;
+  final ContractModel? contract;
   final model.Transaction? transactionToEdit;
 
   const AddProjectTransactionScreen({
     super.key,
-    required this.profession,
+    this.profession,
+    this.contract,
     this.transactionToEdit,
-  });
+  }) : assert(profession != null || contract != null);
 
   @override
   State<AddProjectTransactionScreen> createState() =>
@@ -263,140 +271,153 @@ class _AddProjectTransactionScreenState
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
     final fontWeight = isUrdu ? FontWeight.bold : FontWeight.normal;
-    final isEditing = widget.transactionToEdit != null;
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: isEditing
-            ? (isUrdu ? 'ترمیم' : 'Edit')
-            : (isUrdu ? 'نیا لین دین' : 'New Transaction'),
+      appBar: ScreenAppBar(
+        title: widget.contract != null
+            ? (isUrdu ? 'ٹھیکہ خرچ' : 'Contract Expense')
+            : (isUrdu ? 'پروجیکٹ لین دین' : 'Project Transaction'),
+        isUrdu: isUrdu,
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(color: AppTheme.darkColor.withValues(alpha: 0.1)),
+            ),
+          ),
+          child: Row(
+            children: [
+              if (widget.contract == null) ...[
+                Expanded(
+                  child: AppButton(
+                    text: isUrdu ? 'آمدن' : 'Income',
+                    isLoading: _isLoading && _activeActionType == 'income',
+                    loadingText: (_isLoading && _activeActionType == 'income')
+                        ? (isUrdu ? 'محفوظ ہو رہا ہے...' : 'Saving...')
+                        : null,
+                    icon: PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold),
+                    color: AppTheme.incomeColor,
+                    size: AppButtonSize.large,
+                    onPressed:
+                        _isLoading ? null : () => _saveTransaction('income'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: AppButton(
+                  text: widget.contract != null
+                      ? (isUrdu ? 'خرچ محفوظ کریں' : 'Save Expense')
+                      : (isUrdu ? 'خرچ' : 'Expense'),
+                  isLoading: _isLoading && _activeActionType == 'expense',
+                  loadingText: (_isLoading && _activeActionType == 'expense')
+                      ? (isUrdu ? 'محفوظ ہو رہا ہے...' : 'Saving...')
+                      : null,
+                  icon: PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold),
+                  color: AppTheme.expenseColor,
+                  size: AppButtonSize.large,
+                  onPressed:
+                      _isLoading ? null : () => _saveTransaction('expense'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
         child: Column(
-                children: [
-                  // 1. Basic Info
-                  _buildSectionCard(
-                    children: [
-                      _buildSectionHeader(
-                          isUrdu ? 'بنیادی معلومات' : 'Basic Information',
-                          fontFamily,
-                          isUrdu,
-                          topPadding: 0),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildTextField(
-                              controller: _referenceNumberController,
-                              label: isUrdu ? 'بل نمبر' : 'Bill Number',
-                              isNumber: true,
-                              icon: PhosphorIcons.hash(),
-                              fontFamily: '',
-                              fontWeight: fontWeight,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                              child: _buildEditableDateSelector(
-                                  isUrdu, fontFamily, fontWeight)),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      _buildCategorySelector(isUrdu, fontFamily, fontWeight),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-
-                  // 2. Items & Total
-                  _buildSectionCard(
-                    children: [
-                      _buildSectionHeader(
-                          isUrdu ? 'ایٹمز اور کل رقم' : 'Items & Total Amount',
-                          fontFamily,
-                          isUrdu,
-                          topPadding: 0),
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _itemEntries.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 8),
-                        itemBuilder: (context, index) => _buildItemRow(
-                            index, isUrdu, fontFamily, fontWeight),
-                      ),
-                      const SizedBox(height: 8),
-                      _buildTextField(
-                        controller: _amountController,
-                        label: isUrdu ? 'کل رقم' : 'Grand Total',
+          children: [
+            // 1. Basic Info
+            _buildSectionCard(
+              children: [
+                _buildSectionHeader(
+                    isUrdu ? 'بنیادی معلومات' : 'Basic Information',
+                    fontFamily,
+                    isUrdu,
+                    topPadding: 0),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _referenceNumberController,
+                        label: isUrdu ? 'بل نمبر' : 'Bill Number',
                         isNumber: true,
-                        isCurrency: true,
-                        icon: PhosphorIcons.wallet(),
-                        fontFamily: fontFamily,
-                        fontWeight: FontWeight.bold,
-                        readOnly: _itemEntries.any((item) =>
-                            item.quantityController.text.trim().isNotEmpty ||
-                            item.subQuantityController.text.trim().isNotEmpty ||
-                            item.rateController.text.trim().isNotEmpty),
+                        icon: PhosphorIcons.hash(),
+                        fontFamily: '',
+                        fontWeight: fontWeight,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: _buildEditableDateSelector(
+                            isUrdu, fontFamily, fontWeight)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                _buildCategorySelector(isUrdu, fontFamily, fontWeight),
+              ],
+            ),
+            const SizedBox(height: 4),
 
-                  // 3. Attachments
-                  _buildSectionCard(
-                    children: [
-                      _buildSectionHeader(isUrdu ? 'منسلکات' : 'Attachments',
-                          fontFamily, isUrdu,
-                          topPadding: 0),
-                      ImageSelectorField(
-                        selectedFiles: _billImages,
-                        onFilesChanged: (newList) =>
-                            setState(() => _billImages = newList),
-                        maxTotal: 1,
-                        isVertical: true,
-                        isFullWidth: true,
-                        aspectRatio: 3,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
+            // 2. Items & Total
+            _buildSectionCard(
+              children: [
+                _buildSectionHeader(
+                    isUrdu ? 'ایٹمز اور کل رقم' : 'Items & Total Amount',
+                    fontFamily,
+                    isUrdu,
+                    topPadding: 0),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _itemEntries.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 8),
+                  itemBuilder: (context, index) =>
+                      _buildItemRow(index, isUrdu, fontFamily, fontWeight),
+                ),
+                const SizedBox(height: 8),
+                _buildTextField(
+                  controller: _amountController,
+                  label: isUrdu ? 'کل رقم' : 'Grand Total',
+                  isNumber: true,
+                  isCurrency: true,
+                  icon: PhosphorIcons.wallet(),
+                  fontFamily: fontFamily,
+                  fontWeight: FontWeight.bold,
+                  readOnly: _itemEntries.any((item) =>
+                      item.quantityController.text.trim().isNotEmpty ||
+                      item.subQuantityController.text.trim().isNotEmpty ||
+                      item.rateController.text.trim().isNotEmpty),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
 
-                  Row(
-                    children: [
-                      Expanded(
-                        child: AppButton(
-                          text: isUrdu ? 'آمدن' : 'Income',
-                          isLoading: _isLoading && _activeActionType == 'income',
-                          loadingText: (_isLoading && _activeActionType == 'income')
-                              ? (isUrdu ? 'محفوظ ہو رہا ہے...' : 'Saving...')
-                              : null,
-                          icon: PhosphorIcons.arrowDownLeft(
-                              PhosphorIconsStyle.bold),
-                          color: AppTheme.incomeColor,
-                          size: AppButtonSize.large,
-                          onPressed: _isLoading ? null : () => _saveTransaction('income'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: AppButton(
-                          text: isUrdu ? 'خرچ' : 'Expense',
-                          isLoading: _isLoading && _activeActionType == 'expense',
-                          loadingText: (_isLoading && _activeActionType == 'expense')
-                              ? (isUrdu ? 'محفوظ ہو رہا ہے...' : 'Saving...')
-                              : null,
-                          icon: PhosphorIcons.arrowUpRight(
-                              PhosphorIconsStyle.bold),
-                          color: AppTheme.expenseColor,
-                          size: AppButtonSize.large,
-                          onPressed: _isLoading ? null : () => _saveTransaction('expense'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+            // 3. Attachments
+            _buildSectionCard(
+              children: [
+                _buildSectionHeader(
+                    isUrdu ? 'منسلکات' : 'Attachments', fontFamily, isUrdu,
+                    topPadding: 0),
+                ImageSelectorField(
+                  selectedFiles: _billImages,
+                  onFilesChanged: (newList) =>
+                      setState(() => _billImages = newList),
+                  maxTotal: 1,
+                  isVertical: true,
+                  isFullWidth: true,
+                  aspectRatio: 3,
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -404,12 +425,104 @@ class _AddProjectTransactionScreenState
 
   Widget _buildCategorySelector(
       bool isUrdu, String fontFamily, FontWeight fontWeight) {
+    if (widget.contract != null) {
+      final db = Provider.of<DatabaseService>(context, listen: false);
+      final categories = db
+          .getCategories()
+          .where((category) =>
+              category.parentId == _contractExpenseCategoryParentId &&
+              category.isExpense &&
+              category.isActive)
+          .toList()
+        ..sort((a, b) => a.name.compareTo(b.name));
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: UrduAwareText(
+                  isUrdu ? 'ٹھیکہ خرچ کا زمرہ' : 'Contract expense category',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: fontWeight,
+                    fontFamily: fontFamily,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: isUrdu ? 'زمرے منظم کریں' : 'Manage categories',
+                onPressed: () => _manageContractExpenseCategories(isUrdu),
+                icon: Icon(
+                  PhosphorIcons.gear(),
+                  color: AppTheme.themeColor,
+                ),
+              ),
+            ],
+          ),
+          if (categories.isEmpty)
+            UrduAwareText(
+              isUrdu
+                  ? 'خرچ درج کرنے سے پہلے زمرے منظم کریں'
+                  : 'Manage categories before recording an expense',
+              style: TextStyle(
+                fontSize: 12,
+                fontFamily: fontFamily,
+                color: Colors.grey.shade600,
+              ),
+            )
+          else
+            SizedBox(
+              height: 40,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: categories.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final category = categories[index];
+                  final selected = _selectedCategory == category.name;
+                  return InkWell(
+                    onTap: () =>
+                        setState(() => _selectedCategory = category.name),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: selected ? AppTheme.themeColor : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: selected
+                              ? AppTheme.themeColor
+                              : Colors.grey.shade300,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: UrduAwareText(
+                        category.name,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: selected ? Colors.white : AppTheme.darkColor,
+                          fontFamily: fontFamily,
+                          fontWeight:
+                              selected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      );
+    }
+
     // ہمیشہ ماسٹر ریکارڈ سے زمرے حاصل کریں تاکہ وہی لسٹ ملے جو مینجمنٹ اسکرین پر ہے
     final db = Provider.of<DatabaseService>(context, listen: false);
-    final masterId = widget.profession.parentId ?? widget.profession.id;
+    final profession = widget.profession!;
+    final masterId = profession.parentId ?? profession.id;
     final masterProf = db.getProfession(masterId);
 
-    final rawCategories = masterProf?.categories ?? widget.profession.categories;
+    final rawCategories = masterProf?.categories ?? profession.categories;
 
     List<String> filteredRaw = rawCategories.where((c) {
       if (_selectedType == 'income') {
@@ -435,7 +548,7 @@ class _AddProjectTransactionScreenState
     // اگر لسٹ خالی ہو تو وہی ڈیفالٹ لسٹ دکھائیں جو مینجمنٹ اسکرین پر ہے
     if (cats.isEmpty) {
       cats = ProfessionsConfig.defaultCategories(
-        ProfessionsConfig.categoryTypeFor(masterProf ?? widget.profession),
+        ProfessionsConfig.categoryTypeFor(masterProf ?? profession),
         isUrdu: isUrdu,
       );
     }
@@ -779,7 +892,7 @@ class _AddProjectTransactionScreenState
 
   Future<void> _saveTransaction(String type) async {
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-    if (widget.profession.isActive == false) {
+    if (widget.contract == null && widget.profession?.isActive == false) {
       AppToast.error(
         context,
         isUrdu
@@ -792,6 +905,13 @@ class _AddProjectTransactionScreenState
     double grandTotal = Formatters.tryParseAmount(_amountController.text) ?? 0;
     if (grandTotal <= 0) {
       AppToast.error(context, isUrdu ? 'رقم درج کریں' : 'Please enter amount');
+      return;
+    }
+    if (widget.contract != null && _selectedCategory == null) {
+      AppToast.error(
+        context,
+        isUrdu ? 'خرچ کا زمرہ منتخب کریں' : 'Select an expense category',
+      );
       return;
     }
 
@@ -809,7 +929,8 @@ class _AddProjectTransactionScreenState
       String mainDesc = "";
       for (var entry in _itemEntries) {
         final desc = entry.descriptionController.text;
-        final total = Formatters.tryParseAmount(entry.totalController.text) ?? 0;
+        final total =
+            Formatters.tryParseAmount(entry.totalController.text) ?? 0;
         if (total > 0 || desc.isNotEmpty) {
           items.add(model.TransactionItem(
             description: desc,
@@ -830,8 +951,9 @@ class _AddProjectTransactionScreenState
         amount: grandTotal,
         pendingAmount: grandTotal,
         type: type,
-        category:
-            '${type == 'income' ? 'INC:' : 'EXP:'}${_selectedCategory ?? 'دیگر'}',
+        category: widget.contract != null
+            ? 'EXP:${_selectedCategory ?? 'دیگر'}'
+            : '${type == 'income' ? 'INC:' : 'EXP:'}${_selectedCategory ?? 'دیگر'}',
         description: mainDesc.isEmpty ? 'دیگر' : mainDesc,
         date: _selectedDate,
         createdAt: widget.transactionToEdit?.createdAt ?? DateTime.now(),
@@ -841,8 +963,9 @@ class _AddProjectTransactionScreenState
             : null,
         referenceNumber: _referenceNumberController.text.trim(),
         items: items,
-        professionId: widget.profession.id,
-        professionName: widget.profession.name,
+        professionId: widget.profession?.id,
+        professionName: widget.profession?.name,
+        contractId: widget.contract?.id,
       );
 
       if (widget.transactionToEdit != null) {
@@ -856,8 +979,79 @@ class _AddProjectTransactionScreenState
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
+        AppToast.error(
+          context,
+          isUrdu ? 'خرچ محفوظ نہیں ہو سکا' : 'Could not save expense',
+          subtitle: e.toString(),
+        );
       }
     }
+  }
+
+  Future<void> _manageContractExpenseCategories(bool isUrdu) async {
+    final db = Provider.of<DatabaseService>(context, listen: false);
+    final categories = db
+        .getCategories()
+        .where(
+            (category) => category.parentId == _contractExpenseCategoryParentId)
+        .toList();
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CategoriesManagementScreen(
+          categories: categories.map((category) => category.name).toList(),
+          isUrdu: isUrdu,
+          categoryType: ProfessionCategory.general,
+          title: isUrdu ? 'ٹھیکہ خرچ کے زمرے' : 'Contract Expense Categories',
+          description: isUrdu
+              ? 'یہ زمرے صرف ٹھیکے کے اخراجات کے لیے ہیں، پیشوں سے الگ۔'
+              : 'These categories are only for contract expenses, separate from professions.',
+          useDefaultCategories: false,
+          onCategoriesUpdated: (updatedNames) async {
+            final currentByName = {
+              for (final category in categories)
+                category.name.toLowerCase(): category,
+            };
+            final updatedNamesLower =
+                updatedNames.map((name) => name.toLowerCase()).toSet();
+            for (final category in categories) {
+              if (!updatedNamesLower.contains(category.name.toLowerCase())) {
+                await db.deleteCategory(category.id);
+              }
+            }
+            for (final name in updatedNames) {
+              if (currentByName.containsKey(name.toLowerCase())) continue;
+              final now = DateTime.now();
+              await db.addCategory(
+                Category(
+                  id: 'contract_expense_${const Uuid().v4()}',
+                  name: name,
+                  type: CategoryType.expense,
+                  parentId: _contractExpenseCategoryParentId,
+                  color: '#D97706',
+                  icon: 'package',
+                  createdAt: now,
+                  updatedAt: now,
+                ),
+              );
+            }
+          },
+        ),
+      ),
+    );
+    if (!mounted) return;
+    final remaining = db
+        .getCategories()
+        .where((category) =>
+            category.parentId == _contractExpenseCategoryParentId &&
+            category.isActive)
+        .map((category) => category.name)
+        .toSet();
+    setState(() {
+      if (_selectedCategory != null && !remaining.contains(_selectedCategory)) {
+        _selectedCategory = null;
+      }
+    });
   }
 
   @override

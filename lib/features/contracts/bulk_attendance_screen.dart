@@ -14,6 +14,7 @@ import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 
 class BulkAttendanceScreen extends StatefulWidget {
@@ -55,31 +56,12 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen> {
     try {
       final dbService = Provider.of<DatabaseService>(context, listen: false);
       final workerService = Provider.of<WorkerService>(context, listen: false);
-      final payrollService = Provider.of<WorkerPayrollService>(context, listen: false);
+      final payrollService =
+          Provider.of<WorkerPayrollService>(context, listen: false);
 
-      await workerService.ensureInitialized();
-      final accounts = dbService.accounts;
-      final List<Account> combined = [];
+      final combined = await workerService.ensureWorkerAccounts(dbService);
 
-      for (final worker in workerService.workers) {
-        final exists = accounts.any((a) =>
-            a.name.trim().toLowerCase() == worker.name.trim().toLowerCase());
-        if (!exists && worker.name.trim().isNotEmpty) {
-          combined.add(Account(
-            id: worker.id,
-            name: worker.name,
-            phone: worker.phone,
-            category: 'worker',
-            initialBalance: 0,
-            balanceType: 'Receivable',
-            balance: 0,
-            createdAt: worker.createdAt,
-            updatedAt: worker.createdAt,
-          ));
-        }
-      }
-
-      for (var a in accounts) {
+      for (var a in dbService.accounts) {
         if (a.category == 'worker' ||
             a.category == 'technician' ||
             a.category == 'employee') {
@@ -141,13 +123,13 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen> {
   Future<void> _saveAll() async {
     setState(() => _isSaving = true);
     try {
-      final dbService =
-          Provider.of<DatabaseService>(context, listen: false);
+      final dbService = Provider.of<DatabaseService>(context, listen: false);
       final payrollService =
           Provider.of<WorkerPayrollService>(context, listen: false);
 
       for (final worker in _workers) {
-        final status = _attendanceMap[worker.id] ?? WorkerAttendanceStatus.present;
+        final status =
+            _attendanceMap[worker.id] ?? WorkerAttendanceStatus.present;
         await payrollService.saveAttendance(
           workerId: worker.id,
           date: _selectedDate,
@@ -188,37 +170,13 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen> {
       textDirection: language.textDirection,
       child: Scaffold(
         backgroundColor: AppTheme.backgroundColor,
+        appBar: ScreenAppBar(
+          title: isUrdu ? 'متعدد مزدوروں کی حاضری' : 'Bulk Attendance',
+          isUrdu: isUrdu,
+        ),
         body: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        isUrdu
-                            ? PhosphorIcons.arrowRight()
-                            : PhosphorIcons.arrowLeft(),
-                        color: AppTheme.darkColor,
-                      ),
-                      onPressed: () => Navigator.pop(context),
-                      tooltip: isUrdu ? 'پیچھے جائیں' : 'Back',
-                    ),
-                    Expanded(
-                      child: UrduAwareText(
-                        isUrdu ? 'متعدد مزدوروں کی حاضری' : 'Bulk Attendance',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: fontFamily,
-                          color: AppTheme.darkColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               Container(
                 margin: const EdgeInsets.all(8),
                 padding: const EdgeInsets.all(12),
@@ -263,12 +221,14 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen> {
                 child: _isLoading
                     ? const Center(
                         child: CircularProgressIndicator(
-                            color: AppTheme.goldColor),
+                            color: AppTheme.slateColor),
                       )
                     : _workers.isEmpty
                         ? Center(
                             child: UrduAwareText(
-                              isUrdu ? 'کوئی مزدور موجود نہیں' : 'No workers found',
+                              isUrdu
+                                  ? 'کوئی مزدور موجود نہیں'
+                                  : 'No workers found',
                               style: TextStyle(
                                 fontFamily: fontFamily,
                                 color: AppTheme.textSecondary,
@@ -282,8 +242,8 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen> {
                               final worker = _workers[index];
                               final currentStatus = _attendanceMap[worker.id] ??
                                   WorkerAttendanceStatus.present;
-                              final isPresent =
-                                  currentStatus == WorkerAttendanceStatus.present;
+                              final isPresent = currentStatus ==
+                                  WorkerAttendanceStatus.present;
 
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 8),
@@ -324,7 +284,8 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen> {
                                             color: AppTheme.incomeColor,
                                             onPressed: () => setState(() {
                                               _attendanceMap[worker.id] =
-                                                  WorkerAttendanceStatus.present;
+                                                  WorkerAttendanceStatus
+                                                      .present;
                                             }),
                                           ),
                                         ),
@@ -332,7 +293,8 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen> {
                                         SizedBox(
                                           width: 85,
                                           child: AppButton(
-                                            text: isUrdu ? 'غیر حاضر' : 'Absent',
+                                            text:
+                                                isUrdu ? 'غیر حاضر' : 'Absent',
                                             size: AppButtonSize.small,
                                             variant: !isPresent
                                                 ? AppButtonVariant.primary
@@ -341,7 +303,7 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen> {
                                             onPressed: () => setState(() {
                                               _attendanceMap[worker.id] =
                                                   WorkerAttendanceStatus.absent;
-                                          }),
+                                            }),
                                           ),
                                         ),
                                       ],
@@ -368,7 +330,7 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen> {
                     icon: PhosphorIcons.floppyDisk(),
                     size: AppButtonSize.large,
                     isFullWidth: true,
-                    color: AppTheme.goldColor,
+                    color: AppTheme.slateColor,
                     isLoading: _isSaving,
                     onPressed: !_hasAttendanceChanges ? null : _saveAll,
                   ),

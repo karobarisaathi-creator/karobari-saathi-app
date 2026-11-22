@@ -8,6 +8,7 @@ Transaction _transaction({
   required double pendingAmount,
   String type = 'income',
   String category = 'Sale',
+  String? contractId,
 }) {
   final now = DateTime(2026, 10, 6);
   return Transaction(
@@ -22,6 +23,7 @@ Transaction _transaction({
     pendingAmount: pendingAmount,
     createdAt: now,
     updatedAt: now,
+    contractId: contractId,
   );
 }
 
@@ -87,6 +89,25 @@ void main() {
       final restored = Transaction.fromMap(imported.toMap());
 
       expect(restored.receiptFromCounterparty, isTrue);
+    });
+
+    test('preserves contract link through serialized data', () {
+      final transaction = _transaction(
+        description: 'Contract material expense',
+        amount: 1250,
+        receivedAmount: 0,
+        pendingAmount: 1250,
+        type: 'expense',
+        category: 'EXP:Materials',
+        contractId: 'contract-1',
+      );
+
+      final restored = Transaction.fromMap(transaction.toMap());
+      final legacy = Map<String, dynamic>.from(transaction.toMap())
+        ..remove('contractId');
+
+      expect(restored.contractId, 'contract-1');
+      expect(Transaction.fromMap(legacy).contractId, isNull);
     });
   });
 

@@ -6,12 +6,12 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/models/stock_movement_model.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/features/shopkeeper/stock_detail_screen.dart';
 
@@ -59,9 +59,9 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
     if (stockService.isLoading) {
       return Scaffold(
         backgroundColor: AppTheme.backgroundColor,
-        appBar: CustomAppBar(
-          title: isUrdu ? 'انوینٹری صحت' : 'Inventory Health',
-          showBackButton: true,
+        appBar: ScreenAppBar(
+          title: isUrdu ? 'اسٹاک کی صورتحال' : 'Inventory Health',
+          isUrdu: isUrdu,
         ),
         body: Center(
           child: CircularProgressIndicator(color: AppTheme.themeColor),
@@ -192,9 +192,9 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: isUrdu ? 'انوینٹری صحت' : 'Inventory Health',
-        showBackButton: true,
+      appBar: ScreenAppBar(
+        title: isUrdu ? 'اسٹاک کی صورتحال' : 'Inventory Health',
+        isUrdu: isUrdu,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(12),

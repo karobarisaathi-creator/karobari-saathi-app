@@ -6,13 +6,13 @@ import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/models/stock_movement_model.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'add_edit_stock_item_screen.dart';
@@ -97,8 +97,9 @@ class StockDetailScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: isUrdu ? 'آئٹم تفصیل' : 'Item Details',
+      appBar: ScreenAppBar(
+        title: isUrdu ? 'اسٹاک کی تفصیل' : 'Stock Detail',
+        isUrdu: isUrdu,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(8, 12, 8, 24),
@@ -173,9 +174,9 @@ class StockDetailScreen extends StatelessWidget {
   ) {
     if (!item.trackStock) {
       return _StatusData(
-        color: AppTheme.goldColor,
-        bg: AppTheme.goldColor.withValues(alpha: 0.10),
-        border: AppTheme.goldColor.withValues(alpha: 0.20),
+        color: AppTheme.slateColor,
+        bg: AppTheme.slateColor.withValues(alpha: 0.10),
+        border: AppTheme.slateColor.withValues(alpha: 0.20),
         text: isUrdu ? 'ٹریک نہیں' : 'Not Tracked',
         icon: PhosphorIcons.infinity(),
       );
@@ -205,9 +206,9 @@ class StockDetailScreen extends StatelessWidget {
       );
     } else {
       return _StatusData(
-        color: AppTheme.goldColor,
-        bg: AppTheme.goldColor.withValues(alpha: 0.10),
-        border: AppTheme.goldColor.withValues(alpha: 0.25),
+        color: AppTheme.slateColor,
+        bg: AppTheme.slateColor.withValues(alpha: 0.10),
+        border: AppTheme.slateColor.withValues(alpha: 0.25),
         text: isUrdu ? 'اسٹاک موجود' : 'In Stock',
         icon: PhosphorIcons.checkCircle(PhosphorIconsStyle.fill),
       );
@@ -575,7 +576,7 @@ class StockDetailScreen extends StatelessWidget {
                                       totalStockCost)
                                   : '—',
                               label: isUrdu ? 'اسٹاک لاگت' : 'STOCK COST',
-                              valueColor: AppTheme.goldColor,
+                              valueColor: AppTheme.slateColor,
                               fontFamily: fontFamily,
                             ),
                           ),

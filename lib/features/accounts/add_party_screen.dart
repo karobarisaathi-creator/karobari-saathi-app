@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:image_cropper/image_cropper.dart';
 import 'package:flutter_contacts/flutter_contacts.dart' hide Account;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import 'dart:async';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/auto_sync_service.dart';
@@ -15,7 +15,6 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/utils/helpers.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/category_chip.dart';
 import 'package:account_app/core/widgets/app_filter_chip.dart';
@@ -162,23 +161,49 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: widget.partyToEdit != null ? l10n.editParty : l10n.addParty,
-      ),
       body: SafeArea(
         child: Column(
           children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      isUrdu ? PhosphorIcons.arrowRight() : PhosphorIcons.arrowLeft(),
+                      color: AppTheme.darkColor,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    tooltip: isUrdu ? 'پیچھے جائیں' : 'Back',
+                  ),
+                  Expanded(
+                    child: UrduAwareText(
+                      widget.partyToEdit != null ? l10n.editParty : l10n.addParty,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: fontFamily,
+                        color: AppTheme.darkColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Profile Image Selector
+                      // Profile Image Selector (Even Larger Custom Size)
                       ImageSelectorField(
                         isProfile: true,
+                        customSize: 190.0,
                         selectedFiles: _profileImage != null ? [_profileImage!] : [],
                         remoteUrls: _remoteImageUrl != null && _remoteImageUrl!.isNotEmpty ? [_remoteImageUrl!] : [],
                         onFilesChanged: (files) {
@@ -217,26 +242,29 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                               padding: const EdgeInsets.all(16),
                               child: Column(
                                 children: [
-                                  ProfileInfoWidget(
-                                    name: (_foundProfile != null && _nameController.text.isEmpty)
-                                        ? (_foundProfile!['name'] ?? l10n.partyName)
-                                        : (_nameController.text.isEmpty ? l10n.partyName : _nameController.text),
-                                    phone: _phoneController.text.isEmpty ? '03000000000' : _phoneController.text,
-                                    profileImage: _remoteImageUrl ?? (_foundProfile != null && _profileImage == null ? _foundProfile!['photoUrl'] : null) ?? _profileImage?.path ?? widget.partyToEdit?.profileImage,
-                                    category: _foundProfile != null 
-                                        ? (_foundProfile!['profession']?.isNotEmpty == true 
-                                            ? _foundProfile!['profession'] 
-                                            : (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account'))
-                                        : (isUrdu ? 'نیا کھاتہ' : 'New Account'),
-                                    address: _foundProfile != null 
-                                        ? (_foundProfile!['address']?.isNotEmpty == true 
-                                            ? _foundProfile!['address'] 
-                                            : (isUrdu ? 'پہلے سے موجود اکاؤنٹ' : 'Existing Account')) 
-                                        : (_addressController.text.isNotEmpty ? _addressController.text : null),
-                                    isLarge: true,
-                                    isVerticalCategory: true,
-                                    customSize: 90,
-                                  ),
+                                  (() {
+                                    final selectedCatData = _partyCategories.firstWhere(
+                                      (cat) => cat.id == _selectedCategory,
+                                      orElse: () => _partyCategories.first,
+                                    );
+                                    final categoryDisplay = isUrdu ? selectedCatData.labelUr : selectedCatData.labelEn;
+                                    return ProfileInfoWidget(
+                                      name: (_foundProfile != null && _nameController.text.isEmpty)
+                                          ? (_foundProfile!['name'] ?? l10n.partyName)
+                                          : (_nameController.text.isEmpty ? l10n.partyName : _nameController.text),
+                                      phone: _phoneController.text.isEmpty ? '03000000000' : _phoneController.text,
+                                      profileImage: _remoteImageUrl ?? (_foundProfile != null && _profileImage == null ? _foundProfile!['photoUrl'] : null) ?? _profileImage?.path ?? widget.partyToEdit?.profileImage,
+                                      category: categoryDisplay,
+                                      address: _foundProfile != null
+                                          ? (_foundProfile!['address']?.isNotEmpty == true
+                                              ? _foundProfile!['address']
+                                              : (isUrdu ? 'پہلے سے موجود اکاؤنٹ' : 'Existing Account'))
+                                          : (_addressController.text.isNotEmpty ? _addressController.text : null),
+                                      isLarge: true,
+                                      isVerticalCategory: true,
+                                      customSize: 90,
+                                    );
+                                  })(),
                                   if (_foundProfile != null) ...[
                                     const Divider(height: 24, thickness: 0.5),
                                     AppButton(
@@ -280,34 +308,8 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-
-                      // Category Selector Chips
-                      SizedBox(
-                        height: 42,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _partyCategories.length,
-                          itemBuilder: (context, index) {
-                            final cat = _partyCategories[index];
-                            final isSelected = _selectedCategory == cat.id;
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
-                              child: CategoryChip(
-                                categoryData: cat,
-                                isSelected: isSelected,
-                                onTap: () {
-                                  setState(() {
-                                    _selectedCategory = cat.id;
-                                  });
-                                },
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 16),
                 
-                      // Fields Container Card (Profile Screen style)
+                      // Fields Container Card (Profile Screen style with embedded Category Chips)
                       Container(
                         clipBehavior: Clip.antiAlias,
                         decoration: BoxDecoration(
@@ -325,6 +327,34 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                         ),
                         child: Column(
                           children: [
+                            // Category Selector Chips inside Card (Left-Right Scrolling)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              child: SizedBox(
+                                height: 42,
+                                child: ListView.builder(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: _partyCategories.length,
+                                  itemBuilder: (context, index) {
+                                    final cat = _partyCategories[index];
+                                    final isSelected = _selectedCategory == cat.id;
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                                      child: CategoryChip(
+                                        categoryData: cat,
+                                        isSelected: isSelected,
+                                        onTap: () {
+                                          setState(() {
+                                            _selectedCategory = cat.id;
+                                          });
+                                        },
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                            const Divider(height: 1, color: Color(0xFFE5E7EB)),
                             // Phone Field Row
                             Row(
                               children: [

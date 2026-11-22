@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
-import 'package:account_app/core/utils/quick_bill_trust_metrics.dart';
 import 'base_service.dart';
 import 'account_service.dart';
 import 'profession_service.dart';
@@ -12,31 +11,6 @@ class TransactionService extends BaseService {
   final AccountService _accountService = AccountService();
   final ProfessionService _professionService = ProfessionService();
 
-  Future<void> updateQuickBillTrustMetrics() async {
-    final user = auth.currentUser;
-    if (user == null) return;
-
-    try {
-      final metrics =
-          QuickBillTrustMetrics.fromTransactions(getAllTransactions());
-      final shopRef = firestore.collection('public_shops').doc(user.uid);
-      final shopSnapshot = await shopRef.get();
-      if (!shopSnapshot.exists) return;
-
-      await shopRef.update({
-        'customerCount': metrics.customerCount,
-        'quickBillSatisfactionPercent': metrics.satisfiedCustomerPercent,
-        'satisfaction': metrics.satisfiedCustomerPercent,
-        'quickBillCount': metrics.billCount,
-        'trustMetricSource': 'quick_bill',
-        'trustCount': FieldValue.delete(),
-        'returning': FieldValue.delete(),
-      });
-    } catch (error, stackTrace) {
-      debugPrint('Error updating quick bill trust metrics: $error');
-      debugPrintStack(stackTrace: stackTrace);
-    }
-  }
 
   Future<void> addTransaction(model.Transaction transaction) async {
     final box = transactionsBox;
@@ -47,10 +21,6 @@ class TransactionService extends BaseService {
     // 1. Save locally first
     await box.put(transaction.id, transaction);
     await _accountService.recalculateAccountBalance(transaction.accountId);
-
-    if (transaction.isQuickBill) {
-      unawaited(updateQuickBillTrustMetrics());
-    }
 
     // Recalculate profession finance (this helper now handles master/season hierarchy)
     if (transaction.professionId != null) {
@@ -120,7 +90,6 @@ class TransactionService extends BaseService {
     notifyListeners();
 
     if (transaction.isQuickBill || oldTransaction?.isQuickBill == true) {
-      unawaited(updateQuickBillTrustMetrics());
     }
 
     // 2. Background Cloud Update
@@ -145,7 +114,6 @@ class TransactionService extends BaseService {
         await _professionService
             .recalculateProfessionFinance(transaction.professionId!);
       if (transaction.isQuickBill) {
-        unawaited(updateQuickBillTrustMetrics());
       }
       if (auth.currentUser != null) {
         firestore

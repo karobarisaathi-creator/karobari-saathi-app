@@ -93,9 +93,9 @@ class StockCard extends StatelessWidget {
     IconData statusIcon;
 
     if (!item.trackStock) {
-      statusColor = AppTheme.goldColor;
-      statusBg = AppTheme.goldColor.withValues(alpha: 0.10);
-      statusBorder = AppTheme.goldColor.withValues(alpha: 0.20);
+      statusColor = AppTheme.slateColor;
+      statusBg = AppTheme.slateColor.withValues(alpha: 0.10);
+      statusBorder = AppTheme.slateColor.withValues(alpha: 0.20);
       statusText = isUrdu ? 'ٹریک نہیں' : 'Not Tracked';
       statusIcon = PhosphorIcons.infinity();
     } else if (isInvalidStock) {
@@ -117,9 +117,9 @@ class StockCard extends StatelessWidget {
       statusText = isUrdu ? 'کم' : 'Low Stock';
       statusIcon = PhosphorIcons.warning(PhosphorIconsStyle.fill);
     } else {
-      statusColor = AppTheme.goldColor;
-      statusBg = AppTheme.goldColor.withValues(alpha: 0.10);
-      statusBorder = AppTheme.goldColor.withValues(alpha: 0.25);
+      statusColor = AppTheme.slateColor;
+      statusBg = AppTheme.slateColor.withValues(alpha: 0.10);
+      statusBorder = AppTheme.slateColor.withValues(alpha: 0.25);
       statusText = isUrdu ? 'موجود' : 'In Stock';
       statusIcon = PhosphorIcons.checkCircle(PhosphorIconsStyle.fill);
     }
@@ -447,7 +447,7 @@ class StockCard extends StatelessWidget {
                               ? Formatters.formatAmountWithCurrency(stockCost)
                               : '—',
                           label: isUrdu ? 'اسٹاک لاگت' : 'STOCK COST',
-                          valueColor: AppTheme.goldColor,
+                          valueColor: AppTheme.slateColor,
                           fontFamily: fontFamily,
                         ),
                       ),

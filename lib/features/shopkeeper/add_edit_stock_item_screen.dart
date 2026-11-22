@@ -8,11 +8,11 @@ import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 
@@ -315,10 +315,11 @@ class _AddEditStockItemScreenState extends State<AddEditStockItemScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: isEdit
-            ? (isUrdu ? 'آئٹم میں ترمیم' : 'Edit Stock Item')
-            : (isUrdu ? 'نیا آئٹم شامل کریں' : 'Add Stock Item'),
+      appBar: ScreenAppBar(
+        title: isUrdu
+            ? (isEdit ? 'آئٹم میں ترمیم' : 'نئی آئٹم')
+            : (isEdit ? 'Edit Item' : 'New Item'),
+        isUrdu: isUrdu,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(8, 12, 8, 24),

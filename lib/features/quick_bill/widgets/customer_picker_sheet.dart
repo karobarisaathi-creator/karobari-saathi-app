@@ -6,10 +6,10 @@ import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/party_card.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/features/accounts/add_party_screen.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// گاہک منتخب کرنے کی شیٹ — نقد گاہک یا موجودہ پارٹیوں میں سے کوئی ایک۔
@@ -69,23 +69,30 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CustomAppBar(
-              title: isUrdu ? 'گاہک منتخب کریں' : 'Select customer',
-              showBackButton: false,
-              backgroundColor: AppTheme.darkColor,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              centerTitle: true,
-              shape: const RoundedRectangleBorder(
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: const BoxDecoration(
+                color: AppTheme.darkColor,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
               ),
-              actions: [
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                  tooltip: isUrdu ? 'بند کریں' : 'Close',
-                ),
-              ],
+              child: Row(
+                children: [
+                  Expanded(
+                    child: UrduAwareText(
+                      isUrdu ? 'گاہک منتخب کریں' : 'Select customer',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                ],
+              ),
             ),
             Flexible(
               child: SingleChildScrollView(
@@ -100,14 +107,69 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Add New Party List Button (above Search Bar)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: AppTheme.themeColor.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppTheme.themeColor.withValues(alpha: 0.2),
+                                width: 1,
+                              ),
+                            ),
+                            child: ListTile(
+                              dense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 2),
+                              leading: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.themeColor,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  PhosphorIcons.userPlus(PhosphorIconsStyle.bold),
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                              title: UrduAwareText(
+                                isUrdu
+                                    ? 'نیا پارٹی / اکاؤنٹ شامل کریں'
+                                    : 'Add New Party / Account',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.darkColor,
+                                ),
+                              ),
+                              trailing: Icon(
+                                isUrdu
+                                    ? Icons.chevron_left_rounded
+                                    : Icons.chevron_right_rounded,
+                                color: AppTheme.themeColor,
+                              ),
+                              onTap: () async {
+                                Navigator.pop(context);
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const AddPartyScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
                           SearchSortBar(
                             controller: _searchController,
+                            padding: EdgeInsets.zero,
                             hintText: isUrdu
                                 ? 'نام یا فون نمبر سے تلاش کریں'
                                 : 'Search by name or phone',
                             onSearchChanged: (v) => setState(() => _query = v),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
                             child: UrduAwareText(

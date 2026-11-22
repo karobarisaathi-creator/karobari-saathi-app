@@ -33,7 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final Color _lightColor = AppTheme.lightColor;
   final Color _themeColor = AppTheme.themeColor;
   final Color _darkColor = AppTheme.darkColor;
-  final Color _goldColor = const Color(0xFFDAAD51);
+  final Color _slateColor = const Color(0xFFDAAD51);
 
   @override
   void dispose() {

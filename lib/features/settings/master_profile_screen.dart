@@ -4,7 +4,6 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/language_service.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
@@ -151,11 +150,6 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
       child: Consumer<ProfileController>(
         builder: (context, controller, _) => Scaffold(
           backgroundColor: AppTheme.backgroundColor,
-          appBar: CustomAppBar(
-            title: controller.isEditing
-                ? (isUrdu ? 'پروفائل کی ترتیبات' : 'Profile Settings')
-                : (isUrdu ? 'نیا پروفائل' : 'New Profile'),
-          ),
           body: controller.isLoading
               ? const Center(child: CircularProgressIndicator())
               : SingleChildScrollView(

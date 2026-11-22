@@ -7,8 +7,8 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/features/order/services/shop_order_service.dart';
 
 class OrderPreviewScreen extends StatefulWidget {
@@ -56,9 +56,9 @@ class _OrderPreviewScreenState extends State<OrderPreviewScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: isUrdu ? 'آرڈر کا جائزہ' : 'Order Preview',
-        showBackButton: true,
+      appBar: ScreenAppBar(
+        title: isUrdu ? 'آرڈر کی تفصیل' : 'Order Details',
+        isUrdu: isUrdu,
       ),
       body: Column(
         children: [

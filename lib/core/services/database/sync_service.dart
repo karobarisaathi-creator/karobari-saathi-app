@@ -67,7 +67,6 @@ class SyncService extends BaseService {
               .recalculateProfessionFinance(t.professionId!);
       }
       if (quickBillMetricsChanged) {
-        await _transactionService.updateQuickBillTrustMetrics();
       }
       notifyListeners();
     });
@@ -133,7 +132,6 @@ class SyncService extends BaseService {
         batch.set(userDoc.collection('categories').doc(c.id), c.toMap());
     }
     await batch.commit();
-    await _transactionService.updateQuickBillTrustMetrics();
   }
 
   Future<void> fetchFromFirebase() async {
@@ -164,7 +162,6 @@ class SyncService extends BaseService {
     for (final profession in professionsBox?.values ?? <Profession>[]) {
       await _professionService.recalculateProfessionFinance(profession.id);
     }
-    await _transactionService.updateQuickBillTrustMetrics();
     _hasCompletedInitialFetch = true;
     notifyListeners();
   }

@@ -3,12 +3,12 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 
@@ -242,19 +242,9 @@ class _BulkPartyTransactionScreenState extends State<BulkPartyTransactionScreen>
     return Scaffold(
       resizeToAvoidBottomInset: true,
       backgroundColor: AppTheme.lightColor,
-      appBar: CustomAppBar(
-        centerTitle: true,
-        backgroundColor: AppTheme.darkColor,
-        foregroundColor: Colors.white,
-        title: UrduAwareText(
-          '${isUrdu ? 'بیچ انٹری:' : 'Bulk Entry:'} ${widget.party?.name ?? ''}',
-          style: TextStyle(
-            fontFamily: fontFamily,
-            fontSize: isUrdu ? 20 : 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
+      appBar: ScreenAppBar(
+        title: isUrdu ? 'متعدد لین دین' : 'Bulk Transactions',
+        isUrdu: isUrdu,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.themeColor))

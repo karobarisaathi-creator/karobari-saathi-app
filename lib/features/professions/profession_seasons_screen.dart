@@ -17,6 +17,7 @@ import 'complete_season_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/utils/receipt_dialog_helper.dart';
 import 'package:account_app/features/professions/add_project_transaction_screen.dart';
 import 'package:account_app/core/utils/formatters.dart';
@@ -109,28 +110,16 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: AppTheme.darkColor,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: UrduAwareText(
-          widget.masterProfession.name,
-          style: TextStyle(
-              color: Colors.white,
-              fontFamily: fontFamily,
-              fontWeight: FontWeight.bold,
-              fontSize: 18),
-        ),
+      appBar: ScreenAppBar(
+        title: widget.masterProfession.name,
+        isUrdu: isUrdu,
         actions: [
           IconButton(
-            icon: Icon(PhosphorIcons.gear(), color: Colors.white),
+            icon: Icon(PhosphorIcons.gear()),
             onPressed: () => _navigateToCategoriesScreen(context, isUrdu),
             tooltip: isUrdu ? 'زمرے مینج کریں' : 'Manage Categories',
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Consumer<DatabaseService>(
@@ -155,12 +144,8 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
 
           return Column(
             children: [
-              _buildCompactStatsHeader(context, headerIncome, headerExpense,
+              _buildSlateStatsCard(context, headerIncome, headerExpense,
                   netProfit, isUrdu, fontFamily),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-                child: _buildComparisonButton(context, isUrdu, fontFamily),
-              ),
               Expanded(
                 child: CustomScrollView(
                   slivers: [
@@ -171,12 +156,16 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                                color: const Color(0xFFD1D5DB), width: 1.2),
                             boxShadow: [
                               BoxShadow(
-                                  color: AppTheme.themeColor
-                                      .withValues(alpha: 0.05),
-                                  blurRadius: 10)
+                                color: AppTheme.darkColor
+                                    .withValues(alpha: 0.04),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
                             ],
                           ),
                           child: Column(
@@ -465,8 +454,9 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
         if (activeSeason == null) return const SizedBox.shrink();
 
         return FloatingActionButton(
+          heroTag: 'professionSeasonTransaction',
           onPressed: () => _navigateToAddTransaction(context, activeSeason),
-          backgroundColor: AppTheme.darkColor,
+          backgroundColor: AppTheme.slateColor,
           shape: const CircleBorder(),
           tooltip: isUrdu ? 'نیا اندراج' : 'Add Transaction',
           child: Icon(PhosphorIcons.plus(), color: Colors.white, size: 30),
@@ -475,46 +465,117 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
     );
   }
 
-  Widget _buildCompactStatsHeader(BuildContext context, double income,
+  Widget _buildSlateStatsCard(BuildContext context, double income,
       double expense, double netProfit, bool isUrdu, String fontFamily) {
     final netLabel = _getProfitLabel(income, netProfit, isUrdu);
 
     return Container(
-      padding: const EdgeInsets.only(
-        top: 10,
-        bottom: 16,
-        left: 16,
-        right: 16,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.slateColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.slateColor.withValues(alpha: 0.25),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      decoration: const BoxDecoration(
-        color: AppTheme.darkColor,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(15)),
-      ),
-      child: Row(
+      child: Column(
         children: [
-          _buildHeaderStatItem(
-            isUrdu ? "آمدنی" : "Income",
-            income,
-            Colors.white70,
-            fontFamily,
-            PhosphorIcons.arrowDownLeft(),
+          Row(
+            children: [
+              _buildHeaderStatItem(
+                isUrdu ? "آمدنی" : "Income",
+                income,
+                Colors.white70,
+                fontFamily,
+                PhosphorIcons.arrowDownLeft(),
+              ),
+              const SizedBox(width: 8),
+              _buildHeaderStatItem(
+                isUrdu ? "خرچ" : "Expense",
+                expense,
+                Colors.white70,
+                fontFamily,
+                PhosphorIcons.arrowUpRight(),
+              ),
+              const SizedBox(width: 8),
+              _buildHeaderStatItem(
+                netLabel,
+                netProfit.abs(),
+                Colors.white70,
+                fontFamily,
+                PhosphorIcons.trendUp(),
+                isBold: true,
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          _buildHeaderStatItem(
-            isUrdu ? "خرچ" : "Expense",
-            expense,
-            Colors.white70,
-            fontFamily,
-            PhosphorIcons.arrowUpRight(),
-          ),
-          const SizedBox(width: 8),
-          _buildHeaderStatItem(
-            netLabel,
-            netProfit.abs(),
-            Colors.white70,
-            fontFamily,
-            PhosphorIcons.trendUp(),
-            isBold: true,
+          const SizedBox(height: 12),
+          Divider(color: Colors.white.withValues(alpha: 0.2), height: 1),
+          const SizedBox(height: 10),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                final dbService =
+                    Provider.of<DatabaseService>(context, listen: false);
+                final seasons = dbService.getSeasons(widget.masterProfession.id);
+                if (seasons.isNotEmpty) {
+                  _openComparison(context, seasons);
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SeasonComparisonScreen(
+                        seasonA: widget.masterProfession,
+                      ),
+                    ),
+                  );
+                }
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      PhosphorIcons.chartLineUp(PhosphorIconsStyle.bold),
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 8),
+                    UrduAwareText(
+                      isUrdu
+                          ? 'تفصیلی سیزن رپورٹ / موازنہ'
+                          : 'Detailed Season Report / Comparison',
+                      style: TextStyle(
+                        fontFamily: fontFamily,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),

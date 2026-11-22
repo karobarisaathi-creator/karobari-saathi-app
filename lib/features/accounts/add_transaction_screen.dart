@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
@@ -15,8 +16,9 @@ import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/config/professions_config.dart';
 import 'package:account_app/core/services/stock_service.dart';
+import 'package:account_app/core/services/contract_service.dart';
+import 'package:account_app/core/services/worker_payroll_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
@@ -33,6 +35,9 @@ class AddTransactionScreen extends StatefulWidget {
   final Profession? forcedProfession;
   final String? fixedTransactionType;
   final bool isPartySettlement;
+  final bool isWorkerWagePayment;
+  final bool isContractInstallment;
+  final String? initialContractId;
 
   const AddTransactionScreen({
     this.account,
@@ -42,6 +47,9 @@ class AddTransactionScreen extends StatefulWidget {
     this.forcedProfession,
     this.fixedTransactionType,
     this.isPartySettlement = false,
+    this.isWorkerWagePayment = false,
+    this.isContractInstallment = false,
+    this.initialContractId,
   });
 
   @override
@@ -82,6 +90,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final TextEditingController _dateInputController = TextEditingController();
   final List<_ItemEntry> _itemEntries = [];
   String? _selectedAccountId;
+  String? _selectedContractId;
   String? _selectedProfessionId;
   String? _selectedCategory;
   String? _professionSyncType; // 'income' or 'expense'
@@ -103,6 +112,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedContractId = widget.initialContractId;
     _stockService = Provider.of<StockService>(context, listen: false);
     _stockService.addListener(_loadData);
 
@@ -164,6 +174,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         if (widget.initialAmount != null) {
           _amountController.text =
               Formatters.formatAmountWithoutCurrency(widget.initialAmount!);
+        }
+        if ((widget.isWorkerWagePayment || widget.isContractInstallment) &&
+            widget.initialDescription != null) {
+          _itemEntries.first.descriptionController.text =
+              widget.initialDescription!;
         }
       } else if (widget.initialDescription != null ||
           widget.initialAmount != null) {
@@ -434,10 +449,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: isEditing
-            ? (isUrdu ? 'لین دین میں ترمیم' : 'Edit Transaction')
-            : (isUrdu ? 'نیا لین دین' : 'New Transaction'),
+      appBar: ScreenAppBar(
+        title: isUrdu
+            ? (isEditing ? 'لین دین میں ترمیم' : 'نیا لین دین')
+            : (isEditing ? 'Edit Transaction' : 'New Transaction'),
+        isUrdu: isUrdu,
       ),
       bottomNavigationBar: SafeArea(
         top: false,
@@ -570,6 +586,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       ),
                     ],
                   ),
+                  if (widget.isWorkerWagePayment) ...[
+                    const SizedBox(height: 12),
+                    _buildWorkerContractSelector(isUrdu, fontFamily),
+                  ],
                 ],
               ],
             ),
@@ -665,6 +685,47 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildWorkerContractSelector(bool isUrdu, String fontFamily) {
+    final contracts = Provider.of<ContractService>(context)
+        .contracts
+        .where(
+            (contract) => contract.isIncoming && contract.status != 'completed')
+        .toList();
+    final selectedContractId =
+        contracts.any((contract) => contract.id == _selectedContractId)
+            ? _selectedContractId
+            : null;
+
+    return DropdownButtonFormField<String?>(
+      value: selectedContractId,
+      decoration: InputDecoration(
+        labelText: isUrdu ? 'متعلقہ ٹھیکہ' : 'Related contract',
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      items: [
+        DropdownMenuItem<String?>(
+          value: null,
+          child: UrduAwareText(
+            isUrdu
+                ? 'پرانا بقایا / ٹھیکے سے منسلک نہیں'
+                : 'Old due / Not linked to a contract',
+            style: TextStyle(fontFamily: fontFamily),
+          ),
+        ),
+        ...contracts.map(
+          (contract) => DropdownMenuItem<String?>(
+            value: contract.id,
+            child: UrduAwareText(
+              contract.title,
+              style: TextStyle(fontFamily: fontFamily),
+            ),
+          ),
+        ),
+      ],
+      onChanged: (value) => setState(() => _selectedContractId = value),
     );
   }
 
@@ -1699,6 +1760,64 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _activeActionType = type;
       _saveStage = 'local';
     });
+    if (widget.isWorkerWagePayment || widget.isContractInstallment) {
+      try {
+        final databaseService =
+            Provider.of<DatabaseService>(context, listen: false);
+        final contractService =
+            Provider.of<ContractService>(context, listen: false);
+        final note = _itemEntries
+            .map((entry) => entry.descriptionController.text.trim())
+            .where((description) => description.isNotEmpty)
+            .join(', ');
+        if (widget.isWorkerWagePayment) {
+          final payrollService =
+              Provider.of<WorkerPayrollService>(context, listen: false);
+          await payrollService.addWagePayment(
+            workerId: _selectedAccountId!,
+            amount: grandTotal,
+            note: note,
+            contractId: _selectedContractId,
+            contractService: contractService,
+            databaseService: databaseService,
+            date: _selectedDate,
+            paymentMethod: _selectedPaymentMethod,
+          );
+        } else {
+          final contractId = widget.initialContractId;
+          if (contractId == null) {
+            throw StateError('A contract is required for this installment.');
+          }
+          await contractService.addClientPayment(
+            contractId: contractId,
+            amount: grandTotal,
+            note: note,
+            databaseService: databaseService,
+            date: _selectedDate,
+            paymentMethod: _selectedPaymentMethod,
+          );
+        }
+        if (!mounted) return;
+        AppToast.success(
+          context,
+          isUrdu ? 'مزدوری کی ادائیگی محفوظ ہو گئی' : 'Wage payment saved',
+        );
+        Navigator.pop(context, true);
+      } catch (error) {
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _activeActionType = null;
+        });
+        AppToast.error(
+          context,
+          isUrdu ? 'ادائیگی محفوظ نہیں ہو سکی' : 'Could not save payment',
+          subtitle: error.toString(),
+        );
+      }
+      return;
+    }
+
     try {
       final databaseService =
           Provider.of<DatabaseService>(context, listen: false);
@@ -1804,6 +1923,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         professionName: profName,
         receiptFromCounterparty:
             widget.transactionToEdit?.receiptFromCounterparty ?? false,
+        contractId: existingTransaction?.contractId,
       );
 
       final isEditing = widget.transactionToEdit != null;

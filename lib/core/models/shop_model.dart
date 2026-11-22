@@ -10,9 +10,6 @@ class Shop {
   final String area;
   final String distance;
   final double distanceVal;
-  final int customerCount;
-  final int satisfiedCustomerPercent;
-  final int billCount;
   final String deliveryTime;
   final int timeVal;
   final String minOrder;
@@ -25,7 +22,6 @@ class Shop {
   final bool showArea;
   final bool showDistance;
   final bool showDeliveryInfo;
-  final bool showTrust;
   final bool showItemsCount;
   final bool showTags;
   final double? latitude;
@@ -41,9 +37,6 @@ class Shop {
     required this.area,
     required this.distance,
     required this.distanceVal,
-    this.customerCount = 0,
-    this.satisfiedCustomerPercent = 0,
-    this.billCount = 0,
     required this.deliveryTime,
     required this.timeVal,
     required this.minOrder,
@@ -56,7 +49,6 @@ class Shop {
     this.showArea = true,
     this.showDistance = true,
     this.showDeliveryInfo = true,
-    this.showTrust = true,
     this.showItemsCount = true,
     this.showTags = true,
     this.latitude,
@@ -68,10 +60,6 @@ class Shop {
   Shop copyWith({
     List<ShopItem>? items,
     int? itemCount,
-    bool? showTrust,
-    int? customerCount,
-    int? satisfiedCustomerPercent,
-    int? billCount,
   }) =>
       Shop(
         id: id,
@@ -83,10 +71,6 @@ class Shop {
         area: area,
         distance: distance,
         distanceVal: distanceVal,
-        customerCount: customerCount ?? this.customerCount,
-        satisfiedCustomerPercent:
-            satisfiedCustomerPercent ?? this.satisfiedCustomerPercent,
-        billCount: billCount ?? this.billCount,
         deliveryTime: deliveryTime,
         timeVal: timeVal,
         minOrder: minOrder,
@@ -99,7 +83,6 @@ class Shop {
         showArea: showArea,
         showDistance: showDistance,
         showDeliveryInfo: showDeliveryInfo,
-        showTrust: showTrust ?? this.showTrust,
         showItemsCount: showItemsCount,
         showTags: showTags,
         latitude: latitude,

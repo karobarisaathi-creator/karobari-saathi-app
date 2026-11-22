@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/stock_service.dart';
@@ -15,7 +15,6 @@ import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/utils/receipt_dialog_helper.dart';
 import 'package:account_app/core/utils/party_ledger_metrics.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
-import 'package:account_app/core/utils/quick_bill_trust_metrics.dart';
 
 class CustomerBillsScreen extends StatefulWidget {
   const CustomerBillsScreen({super.key});
@@ -32,6 +31,9 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -42,7 +44,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
 
   double _getTxDisplayAmount(Transaction tx) {
     if (tx.isQuickBill) {
-      return QuickBillTrustMetrics.billTotal(tx);
+      return tx.amount > 0 ? tx.amount : (tx.receivedAmount + tx.pendingAmount);
     }
     return tx.amount > 0 ? tx.amount : (tx.receivedAmount + tx.pendingAmount);
   }
@@ -480,61 +482,143 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen>
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
+      appBar: ScreenAppBar(
         title: isUrdu ? 'سیل ریکارڈ' : 'Sales Record',
+        isUrdu: isUrdu,
       ),
-      body: Column(
-        children: [
-          Container(
-            color: Colors.white,
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: AppTheme.themeColor,
-              labelColor: AppTheme.themeColor,
-              unselectedLabelColor: AppTheme.textSecondary,
-              labelStyle: TextStyle(
-                fontFamily: fontFamily,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── Sliding Button Toggle Strip ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppTheme.slateColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          _tabController.animateTo(0);
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _tabController.index == 0
+                                ? Colors.white
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: _tabController.index == 0
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.12),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    )
+                                  ]
+                                : [],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                PhosphorIcons.money(),
+                                size: 16,
+                                color: _tabController.index == 0
+                                    ? AppTheme.incomeColor
+                                    : Colors.white,
+                              ),
+                              const SizedBox(width: 6),
+                              UrduAwareText(
+                                isUrdu ? 'نقد سیل' : 'Cash Sales',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: fontFamily,
+                                  color: _tabController.index == 0
+                                      ? AppTheme.incomeColor
+                                      : Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          _tabController.animateTo(1);
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _tabController.index == 1
+                                ? Colors.white
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: _tabController.index == 1
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.12),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    )
+                                  ]
+                                : [],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                PhosphorIcons.creditCard(),
+                                size: 16,
+                                color: _tabController.index == 1
+                                    ? AppTheme.expenseColor
+                                    : Colors.white,
+                              ),
+                              const SizedBox(width: 6),
+                              UrduAwareText(
+                                isUrdu ? 'ادھار سیل' : 'Credit Sales',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: fontFamily,
+                                  color: _tabController.index == 1
+                                      ? AppTheme.expenseColor
+                                      : Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              tabs: [
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(PhosphorIcons.money(), size: 14),
-                      const SizedBox(width: 4),
-                      Text(isUrdu ? 'نقد سیل' : 'Cash Sales'),
-                    ],
-                  ),
-                ),
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(PhosphorIcons.creditCard(), size: 14),
-                      const SizedBox(width: 4),
-                      Text(isUrdu ? 'ادھار سیل' : 'Credit Sales'),
-                    ],
-                  ),
-                ),
-              ],
             ),
-          ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildBillsList(context, cashSales, isUrdu, fontFamily,
-                    stockService, databaseService),
-                _buildBillsList(context, creditSales, isUrdu, fontFamily,
-                    stockService, databaseService,
-                    showOutstanding: true,
-                    outstandingByBill: outstandingByBill),
-              ],
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildBillsList(context, cashSales, isUrdu, fontFamily,
+                      stockService, databaseService),
+                  _buildBillsList(context, creditSales, isUrdu, fontFamily,
+                      stockService, databaseService,
+                      showOutstanding: true,
+                      outstandingByBill: outstandingByBill),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

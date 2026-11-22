@@ -9,11 +9,9 @@ import 'package:account_app/core/services/contract_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/models/contract_model.dart';
-import 'package:account_app/features/accounts/add_party_screen.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'add_edit_contract_screen.dart';
 import 'contract_detail_screen.dart';
-import 'workers_list_screen.dart';
-import 'bulk_attendance_screen.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // مقامی رنگ — AppTheme تھیم فائل سے ماخوذ
@@ -44,7 +42,7 @@ class _ContractsListScreenState extends State<ContractsListScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
@@ -73,130 +71,151 @@ class _ContractsListScreenState extends State<ContractsListScreen>
       textDirection: languageService.textDirection,
       child: Scaffold(
         backgroundColor: _C.bg,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          leading: IconButton(
-            icon: Icon(
-              isUrdu ? PhosphorIcons.arrowRight() : PhosphorIcons.arrowLeft(),
-              color: AppTheme.darkColor,
-            ),
-            onPressed: () => Navigator.pop(context),
-          ),
-          actions: [
-            IconButton(
-              tooltip: isUrdu ? 'متعدد حاضری' : 'Bulk Attendance',
-              icon: Icon(PhosphorIcons.calendarCheck(), color: AppTheme.goldColor),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const BulkAttendanceScreen(),
+        appBar: ScreenAppBar(
+          title: isUrdu ? 'ٹھیکے' : 'Contracts',
+          isUrdu: isUrdu,
+          showBackButton: false,
+        ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Sliding Button Toggle Strip
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.slateColor,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                );
-              },
-            ),
-          ],
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(48),
-            child: Container(
-              color: Colors.white,
-              child: TabBar(
-                controller: _tabController,
-                labelColor: _C.accent,
-                unselectedLabelColor: _C.textSecondary,
-                indicatorColor: _C.accent,
-                indicatorWeight: 3,
-                tabs: [
-                  Tab(
-                    child: UrduAwareText(
-                      isUrdu ? 'جاری ٹھیکہ' : 'Ongoing',
-                      style: TextStyle(
-                        fontFamily: fontFamily,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                  child: Row(
+                    children: [
+                      // Tab 0: Ongoing ("جاری ٹھیکہ")
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            _tabController.animateTo(0);
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _tabController.index == 0
+                                  ? Colors.white
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: _tabController.index == 0
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.12),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      )
+                                    ]
+                                  : [],
+                            ),
+                            child: Center(
+                              child: UrduAwareText(
+                                isUrdu ? 'جاری ٹھیکہ' : 'Ongoing',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: fontFamily,
+                                  color: _tabController.index == 0
+                                      ? AppTheme.themeColor
+                                      : Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  Tab(
-                    child: UrduAwareText(
-                      isUrdu ? 'مکمل ٹھیکہ' : 'Completed',
-                      style: TextStyle(
-                        fontFamily: fontFamily,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                      // Tab 1: Completed ("مکمل ٹھیکہ")
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            _tabController.animateTo(1);
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _tabController.index == 1
+                                  ? Colors.white
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: _tabController.index == 1
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.12),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      )
+                                    ]
+                                  : [],
+                            ),
+                            child: Center(
+                              child: UrduAwareText(
+                                isUrdu ? 'مکمل ٹھیکہ' : 'Completed',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: fontFamily,
+                                  color: _tabController.index == 1
+                                      ? AppTheme.incomeColor
+                                      : Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                  Tab(
-                    child: UrduAwareText(
-                      isUrdu ? 'مزدوروں کی لسٹ' : 'Workers',
-                      style: TextStyle(
-                        fontFamily: fontFamily,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
+              Expanded(
+                child: contractService.isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(color: _C.accent))
+                    : TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildContractsList(
+                              ongoingContracts, isUrdu, fontFamily),
+                          _buildContractsList(
+                              completedContracts, isUrdu, fontFamily),
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          heroTag: 'contractsAdd',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const AddEditContractScreen(),
+              ),
+            );
+          },
+          backgroundColor: AppTheme.slateColor,
+          foregroundColor: Colors.white,
+          icon: const Icon(Icons.add_rounded, color: Colors.white),
+          label: UrduAwareText(
+            isUrdu ? 'نیا ٹھیکہ' : 'New Contract',
+            style: TextStyle(
+              fontFamily: fontFamily,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ),
-        body: contractService.isLoading
-            ? const Center(child: CircularProgressIndicator(color: _C.accent))
-            : TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildContractsList(ongoingContracts, isUrdu, fontFamily),
-                  _buildContractsList(completedContracts, isUrdu, fontFamily),
-                  const WorkersListScreen(isEmbedded: true),
-                ],
-              ),
-        floatingActionButton: _tabController.index == 2
-            ? FloatingActionButton.extended(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          const AddPartyScreen(initialCategory: 'worker'),
-                    ),
-                  );
-                },
-                backgroundColor: _C.accent,
-                foregroundColor: Colors.white,
-                icon: const Icon(Icons.person_add_rounded, color: Colors.white),
-                label: UrduAwareText(
-                  isUrdu ? 'نیا مزدور' : 'New Worker',
-                  style: TextStyle(
-                    fontFamily: fontFamily,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              )
-            : FloatingActionButton.extended(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const AddEditContractScreen(),
-                    ),
-                  );
-                },
-                backgroundColor: _C.accent,
-                foregroundColor: Colors.white,
-                icon: const Icon(Icons.add_rounded, color: Colors.white),
-                label: UrduAwareText(
-                  isUrdu ? 'نیا ٹھیکہ' : 'New Contract',
-                  style: TextStyle(
-                    fontFamily: fontFamily,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
       ),
     );
   }

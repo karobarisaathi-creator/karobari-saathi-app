@@ -129,27 +129,27 @@ class _SearchSortBarState extends State<SearchSortBar> with SingleTickerProvider
     final inactiveColor = AppTheme.darkColor;
 
     return Padding(
-      padding: widget.padding ?? const EdgeInsets.symmetric(horizontal: 12),
+      padding: widget.padding ?? EdgeInsets.zero,
       child: Row(
         children: [
-          // Full Rounded Search Box
+          // Full Rounded Search Box matching standard card radius
           Expanded(
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              height: 40,
+              height: 42,
               clipBehavior: Clip.antiAlias, // Ensures internal components don't overlap rounded corners
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: _isFocused ? activeColor : inactiveColor.withOpacity(0.15),
-                  width: 1.5,
+                  color: _isFocused ? activeColor : const Color(0xFFD1D5DB),
+                  width: 1.2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                    color: AppTheme.darkColor.withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),

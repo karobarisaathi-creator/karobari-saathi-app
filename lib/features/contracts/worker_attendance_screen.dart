@@ -14,6 +14,8 @@ import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
+import 'package:account_app/features/accounts/add_transaction_screen.dart';
 
 class WorkerAttendanceScreen extends StatefulWidget {
   final Account worker;
@@ -69,21 +71,13 @@ class _WorkerAttendanceScreenState extends State<WorkerAttendanceScreen> {
       textDirection: language.textDirection,
       child: Scaffold(
         backgroundColor: AppTheme.backgroundColor,
-        appBar: AppBar(
-          title: UrduAwareText(
-            isUrdu ? 'حاضری اور اجرت' : 'Attendance & Payroll',
-            style: const TextStyle(
-              color: AppTheme.darkColor,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          backgroundColor: AppTheme.backgroundColor,
-          foregroundColor: AppTheme.darkColor,
-          elevation: 0,
+        appBar: ScreenAppBar(
+          title: isUrdu ? 'حاضری اور اجرت' : 'Attendance & Payroll',
+          isUrdu: isUrdu,
         ),
         body: service.isLoading
             ? const Center(
-                child: CircularProgressIndicator(color: AppTheme.goldColor))
+                child: CircularProgressIndicator(color: AppTheme.slateColor))
             : _buildContent(service, isUrdu),
       ),
     );
@@ -190,7 +184,7 @@ class _WorkerAttendanceScreenState extends State<WorkerAttendanceScreen> {
                 icon: PhosphorIcons.floppyDisk(),
                 size: AppButtonSize.large,
                 isFullWidth: true,
-                color: AppTheme.goldColor,
+                color: AppTheme.slateColor,
                 isLoading: _isSaving,
                 onPressed: !_hasAttendanceChanged(dateRecord)
                     ? null
@@ -241,7 +235,7 @@ class _WorkerAttendanceScreenState extends State<WorkerAttendanceScreen> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [AppTheme.goldColor, Color(0xFFB77B18)],
+            colors: [AppTheme.slateColor, Color(0xFFB77B18)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -444,7 +438,7 @@ class _WorkerAttendanceScreenState extends State<WorkerAttendanceScreen> {
           children: [
             Row(
               children: [
-                Icon(icon, size: 18, color: AppTheme.goldColor),
+                Icon(icon, size: 18, color: AppTheme.slateColor),
                 const SizedBox(width: 8),
                 UrduAwareText(
                   title,
@@ -561,11 +555,10 @@ class _WorkerAttendanceScreenState extends State<WorkerAttendanceScreen> {
                             i < WorkerPayrollPeriod.values.length;
                             i++) ...[
                           if (i > 0)
-                            Container(
-                                width: 1, color: const Color(0xFFE2E8F0)),
+                            Container(width: 1, color: const Color(0xFFE2E8F0)),
                           Material(
                             color: WorkerPayrollPeriod.values[i] == _period
-                                ? AppTheme.goldColor
+                                ? AppTheme.slateColor
                                 : Colors.transparent,
                             child: InkWell(
                               onTap: () => setState(
@@ -622,6 +615,10 @@ class _WorkerAttendanceScreenState extends State<WorkerAttendanceScreen> {
           ...attendance.map((record) {
             final earned = WorkerPayrollCalculator.earningFor(record, rates);
             final present = record.status == WorkerAttendanceStatus.present;
+            final dayName = Formatters.getDayName(
+              record.date.weekday == 7 ? 1 : record.date.weekday + 1,
+              isUrdu: isUrdu,
+            );
             return ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(
@@ -629,7 +626,8 @@ class _WorkerAttendanceScreenState extends State<WorkerAttendanceScreen> {
                 color: present ? AppTheme.incomeColor : AppTheme.expenseColor,
               ),
               title: UrduAwareText(
-                  '${Formatters.formatDate(record.date)} · ${present ? (isUrdu ? 'حاضر' : 'Present') : (isUrdu ? 'غیر حاضر' : 'Absent')}'),
+                '$dayName${isUrdu ? '،' : ','} ${Formatters.formatDate(record.date)} · ${present ? (isUrdu ? 'حاضر' : 'Present') : (isUrdu ? 'غیر حاضر' : 'Absent')}',
+              ),
               trailing: UrduAwareText(
                 Formatters.formatAmountWithCurrency(earned),
                 style: TextStyle(
@@ -640,46 +638,54 @@ class _WorkerAttendanceScreenState extends State<WorkerAttendanceScreen> {
               dense: true,
             );
           }),
-          ...payments.map((payment) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading:
-                    Icon(PhosphorIcons.handCoins(), color: AppTheme.themeColor),
-                title: UrduAwareText(
-                  payment.note.isEmpty
-                      ? (isUrdu ? 'اجرت کی ادائیگی' : 'Wage payment')
-                      : payment.note,
-                ),
-                subtitle: UrduAwareText(Formatters.formatDate(payment.date)),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    UrduAwareText(
-                      Formatters.formatAmountWithCurrency(payment.amount),
-                      style: const TextStyle(
-                        color: AppTheme.incomeColor,
-                        fontWeight: FontWeight.w800,
-                      ),
+          ...payments.map((payment) {
+            final dayName = Formatters.getDayName(
+              payment.date.weekday == 7 ? 1 : payment.date.weekday + 1,
+              isUrdu: isUrdu,
+            );
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading:
+                  Icon(PhosphorIcons.handCoins(), color: AppTheme.themeColor),
+              title: UrduAwareText(
+                payment.note.isEmpty
+                    ? (isUrdu ? 'اجرت کی ادائیگی' : 'Wage payment')
+                    : payment.note,
+              ),
+              subtitle: UrduAwareText(
+                '$dayName${isUrdu ? '،' : ','} ${Formatters.formatDate(payment.date)}',
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  UrduAwareText(
+                    Formatters.formatAmountWithCurrency(payment.amount),
+                    style: const TextStyle(
+                      color: AppTheme.incomeColor,
+                      fontWeight: FontWeight.w800,
                     ),
-                    IconButton(
-                      tooltip: isUrdu ? 'ترمیم کریں' : 'Edit',
-                      onPressed: () => _showPaymentDialog(
-                        isUrdu,
-                        paymentToEdit: payment,
-                      ),
-                      icon: Icon(PhosphorIcons.pencilSimple(),
-                          size: 17, color: AppTheme.themeColor),
+                  ),
+                  IconButton(
+                    tooltip: isUrdu ? 'ترمیم کریں' : 'Edit',
+                    onPressed: () => _showPaymentDialog(
+                      isUrdu,
+                      paymentToEdit: payment,
                     ),
-                    IconButton(
-                      tooltip: isUrdu ? 'حذف کریں' : 'Delete',
-                      onPressed: () =>
-                          _confirmDeletePayment(service, payment, isUrdu),
-                      icon: Icon(PhosphorIcons.trash(),
-                          size: 17, color: AppTheme.expenseColor),
-                    ),
-                  ],
-                ),
-                dense: true,
-              )),
+                    icon: Icon(PhosphorIcons.pencilSimple(),
+                        size: 17, color: AppTheme.themeColor),
+                  ),
+                  IconButton(
+                    tooltip: isUrdu ? 'حذف کریں' : 'Delete',
+                    onPressed: () =>
+                        _confirmDeletePayment(service, payment, isUrdu),
+                    icon: Icon(PhosphorIcons.trash(),
+                        size: 17, color: AppTheme.expenseColor),
+                  ),
+                ],
+              ),
+              dense: true,
+            );
+          }),
         ],
       ),
     );
@@ -718,8 +724,29 @@ class _WorkerAttendanceScreenState extends State<WorkerAttendanceScreen> {
     final contractService =
         Provider.of<ContractService>(context, listen: false);
     final eligibleContracts = contractService.contracts
-        .where((contract) => contract.isIncoming)
+        .where(
+            (contract) => contract.isIncoming && contract.status != 'completed')
         .toList();
+    if (paymentToEdit == null) {
+      await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AddTransactionScreen(
+            account: widget.worker,
+            fixedTransactionType: 'expense',
+            isPartySettlement: true,
+            isWorkerWagePayment: true,
+            initialDescription:
+                isUrdu ? 'مزدوری کی ادائیگی' : 'Worker wage payment',
+            initialContractId: eligibleContracts.length == 1
+                ? eligibleContracts.single.id
+                : null,
+          ),
+        ),
+      );
+      return;
+    }
+
     final initialContractId = paymentToEdit == null
         ? (eligibleContracts.length == 1 ? eligibleContracts.single.id : null)
         : contractService.contractIdForPayrollPayment(paymentToEdit.id);
@@ -1016,11 +1043,10 @@ class _WorkerWagePaymentDialogState extends State<WorkerWagePaymentDialog> {
                                 i++) ...[
                               if (i > 0)
                                 Container(
-                                    width: 1,
-                                    color: const Color(0xFFE2E8F0)),
+                                    width: 1, color: const Color(0xFFE2E8F0)),
                               Material(
                                 color: widget.contracts[i].id == _contractId
-                                    ? AppTheme.goldColor
+                                    ? AppTheme.slateColor
                                     : Colors.transparent,
                                 child: InkWell(
                                   onTap: _isSaving
@@ -1037,11 +1063,12 @@ class _WorkerWagePaymentDialogState extends State<WorkerWagePaymentDialog> {
                                       widget.contracts[i].title,
                                       style: TextStyle(
                                         fontSize: 12,
-                                        fontWeight:
-                                            widget.contracts[i].id == _contractId
-                                                ? FontWeight.w800
-                                                : FontWeight.w600,
-                                        color: widget.contracts[i].id == _contractId
+                                        fontWeight: widget.contracts[i].id ==
+                                                _contractId
+                                            ? FontWeight.w800
+                                            : FontWeight.w600,
+                                        color: widget.contracts[i].id ==
+                                                _contractId
                                             ? Colors.white
                                             : AppTheme.darkColor,
                                       ),
@@ -1062,14 +1089,13 @@ class _WorkerWagePaymentDialogState extends State<WorkerWagePaymentDialog> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border:
-                      Border.all(color: const Color(0xFFE2E8F0), width: 1),
+                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
                 ),
                 child: Column(
                   children: [
                     Padding(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 2),
                       child: TextField(
                         controller: _amountController,
                         enabled: !_isSaving,
@@ -1090,13 +1116,14 @@ class _WorkerWagePaymentDialogState extends State<WorkerWagePaymentDialog> {
                     ),
                     const Divider(height: 1, color: Color(0xFFE2E8F0)),
                     Padding(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 2),
                       child: TextField(
                         controller: _noteController,
                         enabled: !_isSaving,
                         decoration: InputDecoration(
-                          labelText: isUrdu ? 'نوٹ (اختیاری)' : 'Note (optional)',
+                          labelText:
+                              isUrdu ? 'نوٹ (اختیاری)' : 'Note (optional)',
                           labelStyle: TextStyle(
                             fontFamily: isUrdu ? 'NooriNastaleeq' : '',
                             color: AppTheme.textSecondary,
@@ -1130,7 +1157,7 @@ class _WorkerWagePaymentDialogState extends State<WorkerWagePaymentDialog> {
                       text: isUrdu ? 'محفوظ کریں' : 'Save payment',
                       variant: AppButtonVariant.primary,
                       size: AppButtonSize.large,
-                      color: AppTheme.goldColor,
+                      color: AppTheme.slateColor,
                       isLoading: _isSaving,
                       onPressed: _isSaving ? null : _submit,
                     ),
@@ -1247,8 +1274,7 @@ class _WorkerWageRateDialogState extends State<_WorkerWageRateDialog> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border:
-                      Border.all(color: const Color(0xFFE2E8F0), width: 1),
+                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
                 ),
                 child: Column(
                   children: [
@@ -1270,7 +1296,7 @@ class _WorkerWageRateDialogState extends State<_WorkerWageRateDialog> {
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
                                   color: _type == WorkerWageType.daily
-                                      ? AppTheme.goldColor
+                                      ? AppTheme.slateColor
                                       : const Color(0xFFF1F5F9),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -1305,7 +1331,7 @@ class _WorkerWageRateDialogState extends State<_WorkerWageRateDialog> {
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
                                   color: _type == WorkerWageType.monthly
-                                      ? AppTheme.goldColor
+                                      ? AppTheme.slateColor
                                       : const Color(0xFFF1F5F9),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -1330,8 +1356,8 @@ class _WorkerWageRateDialogState extends State<_WorkerWageRateDialog> {
                     ),
                     const Divider(height: 1, color: Color(0xFFE2E8F0)),
                     Padding(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 2),
                       child: TextField(
                         controller: _amountController,
                         enabled: !_isSaving,
@@ -1401,7 +1427,7 @@ class _WorkerWageRateDialogState extends State<_WorkerWageRateDialog> {
                       text: isUrdu ? 'محفوظ کریں' : 'Save',
                       variant: AppButtonVariant.primary,
                       size: AppButtonSize.large,
-                      color: AppTheme.goldColor,
+                      color: AppTheme.slateColor,
                       isLoading: _isSaving,
                       onPressed: _isSaving ? null : _submit,
                     ),

@@ -458,7 +458,7 @@ class _AddEditContractScreenState extends State<AddEditContractScreen> {
                 dense: true,
                 contentPadding: EdgeInsets.zero,
                 leading:
-                    const Icon(Icons.image_outlined, color: AppTheme.goldColor),
+                    const Icon(Icons.image_outlined, color: AppTheme.slateColor),
                 title: UrduAwareText(image.name),
                 subtitle: UrduAwareText(
                     isUrdu ? 'اپلوڈ کے لیے تیار' : 'Ready to upload'),
@@ -548,6 +548,20 @@ class _AddEditContractScreenState extends State<AddEditContractScreen> {
       textDirection: languageService.textDirection,
       child: Scaffold(
         backgroundColor: _C.bg,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: Icon(isUrdu ? Icons.arrow_forward : Icons.arrow_back),
+            onPressed: () => Navigator.maybePop(context),
+          ),
+          title: UrduAwareText(
+            widget.contractToEdit == null
+                ? (isUrdu ? 'نیا ٹھیکہ شامل کریں' : 'Add New Contract')
+                : (isUrdu ? 'ٹھیکے میں ترمیم' : 'Edit Contract'),
+          ),
+          backgroundColor: AppTheme.backgroundColor,
+          foregroundColor: AppTheme.darkColor,
+          elevation: 0,
+        ),
         body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(8),
@@ -556,40 +570,6 @@ class _AddEditContractScreenState extends State<AddEditContractScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 4, 4, 12),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            isUrdu
-                                ? PhosphorIcons.arrowRight()
-                                : PhosphorIcons.arrowLeft(),
-                            color: AppTheme.darkColor,
-                          ),
-                          onPressed: () => Navigator.pop(context),
-                          tooltip: isUrdu ? 'پیچھے جائیں' : 'Back',
-                        ),
-                        Expanded(
-                          child: UrduAwareText(
-                            widget.contractToEdit == null
-                                ? (isUrdu
-                                    ? 'نیا ٹھیکہ شامل کریں'
-                                    : 'Add New Contract')
-                                : (isUrdu
-                                    ? 'ٹھیکے میں ترمیم'
-                                    : 'Edit Contract'),
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: fontFamily,
-                              color: AppTheme.darkColor,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                   // ── پارٹی سلیکشن ایریا (باٹم شیٹ کارڈ + مینول انپٹ) ──
                   _buildPartySelectionArea(
                     isUrdu,

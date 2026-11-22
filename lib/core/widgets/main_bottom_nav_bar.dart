@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:account_app/core/models/bottom_bar_profile_type.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/notification_service.dart';
@@ -11,11 +12,13 @@ import 'package:account_app/core/theme/app_theme.dart';
 class MainBottomNavBar extends StatefulWidget {
   final int selectedIndex;
   final ValueChanged<int> onItemTapped;
+  final BottomBarProfileType profileType;
 
   const MainBottomNavBar({
     super.key,
     required this.selectedIndex,
     required this.onItemTapped,
+    this.profileType = BottomBarProfileType.shopkeeper,
   });
 
   @override
@@ -115,8 +118,7 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    final statusColor =
-        _isOffline ? AppTheme.redColor : AppTheme.greenColor;
+    final statusColor = _isOffline ? AppTheme.redColor : AppTheme.greenColor;
 
     return Container(
       padding: EdgeInsets.only(bottom: bottomPadding),
@@ -168,36 +170,32 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // ═══ Shopkeeper Dashboard (Tab 0) ═══
                 Expanded(
-                  flex: 2,
                   child: _buildNavItem(
                     index: 0,
-                    icon: PhosphorIcons.shoppingBag(),
-                    activeIcon:
-                        PhosphorIcons.shoppingBag(PhosphorIconsStyle.fill),
+                    icon: PhosphorIcons.circle(),
+                    activeIcon: PhosphorIcons.circle(PhosphorIconsStyle.fill),
                   ),
                 ),
-
-                // ═══ Parties / Accounts (Tab 1) ═══
                 Expanded(
-                  flex: 2,
                   child: _buildNavItem(
-                    index: 1,
-                    icon: PhosphorIcons.users(),
-                    activeIcon: PhosphorIcons.users(PhosphorIconsStyle.fill),
+                    index: widget.profileType == BottomBarProfileType.simple
+                        ? 2
+                        : 1,
+                    icon: widget.profileType == BottomBarProfileType.simple
+                        ? PhosphorIcons.receipt()
+                        : PhosphorIcons.users(),
+                    activeIcon:
+                        widget.profileType == BottomBarProfileType.simple
+                            ? PhosphorIcons.receipt(PhosphorIconsStyle.fill)
+                            : PhosphorIcons.users(PhosphorIconsStyle.fill),
                   ),
                 ),
-
-                // ═══ Quick Bill (Center Pill) (Tab 2) ═══
-                Expanded(
-                  flex: 5,
-                  child: _buildQuickBillPill(isUrdu, fontFamily),
-                ),
-
-                // ═══ Professions / Projects (Tab 3) ═══
                 Expanded(
                   flex: 2,
+                  child: _buildRolePill(isUrdu, fontFamily),
+                ),
+                Expanded(
                   child: _buildNavItem(
                     index: 3,
                     icon: PhosphorIcons.briefcase(),
@@ -205,11 +203,12 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
                         PhosphorIcons.briefcase(PhosphorIconsStyle.fill),
                   ),
                 ),
-
-                // ═══ Notifications (Tab 4) ═══
                 Expanded(
-                  flex: 2,
-                  child: _buildNotificationItem(index: 4),
+                  child: _buildNavItem(
+                    index: 4,
+                    icon: PhosphorIcons.clipboardText(),
+                    activeIcon: PhosphorIcons.clipboardText(PhosphorIconsStyle.fill),
+                  ),
                 ),
               ],
             ),
@@ -246,11 +245,26 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
     );
   }
 
-  Widget _buildQuickBillPill(bool isUrdu, String? fontFamily) {
+  Widget _buildRolePill(bool isUrdu, String? fontFamily) {
+    final destinationIndex = switch (widget.profileType) {
+      BottomBarProfileType.contractor => 5,
+      BottomBarProfileType.shopkeeper => 2,
+      BottomBarProfileType.simple => 1,
+    };
+    final label = switch (widget.profileType) {
+      BottomBarProfileType.contractor => isUrdu ? 'ٹھیکے' : 'Contracts',
+      BottomBarProfileType.shopkeeper => isUrdu ? 'فوری بل' : 'Bill',
+      BottomBarProfileType.simple => isUrdu ? 'پارٹیز' : 'Parties',
+    };
+    final icon = switch (widget.profileType) {
+      BottomBarProfileType.contractor => PhosphorIcons.briefcase(),
+      BottomBarProfileType.shopkeeper => PhosphorIcons.lightning(),
+      BottomBarProfileType.simple => PhosphorIcons.users(),
+    };
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => widget.onItemTapped(2),
+        onTap: () => widget.onItemTapped(destinationIndex),
         borderRadius: BorderRadius.circular(999),
         child: Container(
           height: 66,
@@ -262,7 +276,7 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
               borderRadius: BorderRadius.circular(999),
             ),
             padding: const EdgeInsets.symmetric(
-              horizontal: 20,
+              horizontal: 10,
               vertical: 12,
             ),
             child: Row(
@@ -270,16 +284,16 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  PhosphorIcons.lightning(),
+                  icon,
                   size: 18,
                   color: Colors.white,
                 ),
                 const SizedBox(width: 8),
                 Flexible(
                   child: UrduAwareText(
-                    isUrdu ? 'فوری بل' : 'Bill',
+                    label,
                     style: TextStyle(
-                      fontSize: 12.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
                       fontFamily: fontFamily,

@@ -10,13 +10,13 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/location_chip_widget.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/models/shop_model.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 import 'package:account_app/features/order/order_preview_screen.dart';
-import 'package:account_app/features/order/widgets/trust_popup_dialog.dart';
 import 'package:account_app/features/order/widgets/shop_catalog_item_card.dart';
 import 'package:account_app/features/order/widgets/item_detail_dialog.dart';
 
@@ -42,44 +42,11 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
 
   final TextEditingController _searchCtrl = TextEditingController();
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _itemsSubscription;
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
-      _shopRatingSubscription;
-
   @override
   void initState() {
     super.initState();
     _shop = widget.shop;
     _listenToPublicItems();
-    _listenToShopTrust();
-  }
-
-  void _listenToShopTrust() {
-    final shopRef =
-        FirebaseFirestore.instance.collection('public_shops').doc(_shop.id);
-    _shopRatingSubscription = shopRef.snapshots().listen(
-      (snapshot) {
-        final data = snapshot.data();
-        if (!mounted) return;
-        setState(() {
-          if (data != null) {
-            _shop = _shop.copyWith(
-              customerCount: (data['customerCount'] as num?)?.toInt() ??
-                  _shop.customerCount,
-              satisfiedCustomerPercent:
-                  (data['quickBillSatisfactionPercent'] as num?)?.toInt() ??
-                      _shop.satisfiedCustomerPercent,
-              billCount:
-                  (data['quickBillCount'] as num?)?.toInt() ?? _shop.billCount,
-              showTrust: data['showTrust'] != false,
-            );
-          }
-        });
-      },
-      onError: (Object error) {
-        if (!mounted) return;
-        debugPrint('Could not load shop trust info: $error');
-      },
-    );
   }
 
   void _listenToPublicItems() {
@@ -153,7 +120,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   @override
   void dispose() {
     _itemsSubscription?.cancel();
-    _shopRatingSubscription?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -198,6 +164,28 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       bottomNavigationBar: _buildBottomCartBar(context, isUrdu),
+      appBar: ScreenAppBar(
+        title: _shop.name,
+        isUrdu: isUrdu,
+        actions: [
+          IconButton(
+            icon: Icon(
+              _isSearchVisible
+                  ? PhosphorIcons.x()
+                  : PhosphorIcons.magnifyingGlass(),
+            ),
+            onPressed: () {
+              setState(() {
+                _isSearchVisible = !_isSearchVisible;
+                if (!_isSearchVisible) {
+                  _searchCtrl.clear();
+                  _itemQuery = '';
+                }
+              });
+            },
+          ),
+        ],
+      ),
       body: SafeArea(
         top: false,
         child: Column(
@@ -389,56 +377,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Navigation Row (matching CustomAppBar)
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(
-                  Icons.arrow_back,
-                  color: Colors.white,
-                ),
-                onPressed: () => Navigator.pop(context),
-                tooltip: isUrdu ? 'پیچھے جائیں' : 'Back',
-              ),
-              Expanded(
-                child: UrduAwareText(
-                  _shop.name,
-                  style: TextStyle(
-                    fontSize: isUrdu ? 20 : 18,
-                    fontWeight: isUrdu ? FontWeight.bold : FontWeight.normal,
-                    color: Colors.white,
-                    fontFamily: fontFamily,
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              IconButton(
-                icon: Icon(
-                  _isSearchVisible
-                      ? PhosphorIcons.x()
-                      : PhosphorIcons.magnifyingGlass(),
-                  color: Colors.white,
-                ),
-                tooltip: _isSearchVisible
-                    ? (isUrdu ? 'بند کریں' : 'Close search')
-                    : (isUrdu ? 'تلاش کریں' : 'Search'),
-                onPressed: () {
-                  setState(() {
-                    _isSearchVisible = !_isSearchVisible;
-                    if (!_isSearchVisible) {
-                      _searchCtrl.clear();
-                      _itemQuery = '';
-                    }
-                  });
-                },
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 10),
-
           // Shop Header Card INSIDE Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -519,53 +457,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      InkWell(
-                        onTap: () => TrustPopupDialog.show(
-                          context: context,
-                          shopName: shop.name,
-                          ownerName: shop.owner,
-                          area: shop.area,
-                          customerCount: shop.customerCount,
-                          satisfiedCustomerPercent:
-                              shop.satisfiedCustomerPercent,
-                          billCount: shop.billCount,
-                          itemsCount: shop.availableItemCount,
-                          isUrdu: isUrdu,
-                        ),
-                        borderRadius: BorderRadius.circular(7),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: _getBgColor(shop.satisfiedCustomerPercent),
-                            borderRadius: BorderRadius.circular(7),
-                            border: Border.all(
-                              color: _getBadgeColor(shop.satisfiedCustomerPercent).withValues(alpha: 0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                PhosphorIcons.shieldCheck(
-                                    PhosphorIconsStyle.fill),
-                                size: 12,
-                                color: _getBadgeColor(shop.satisfiedCustomerPercent),
-                              ),
-                              const SizedBox(width: 4),
-                              UrduAwareText(
-                                '${shop.satisfiedCustomerPercent}%',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w900,
-                                  color: _getBadgeColor(shop.satisfiedCustomerPercent),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                     ],
                   ),
 

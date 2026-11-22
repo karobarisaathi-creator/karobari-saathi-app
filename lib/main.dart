@@ -292,7 +292,7 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
 
   // Colors for loading screen (Matches AppTheme)
   final Color _themeColor = const Color(0xFF123248); // AppTheme.darkColor
-  final Color _greyColor = const Color(0xFF607D8B); // AppTheme.goldColor (Grey)
+  final Color _greyColor = const Color(0xFF607D8B); // AppTheme.slateColor (Grey)
 
   @override
   void initState() {

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/models/stock_analytics_model.dart';
 import 'package:account_app/core/models/stock_item_model.dart';
 import 'package:account_app/core/models/stock_movement_model.dart';
@@ -13,7 +14,6 @@ import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/stock_analytics_service.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
 
@@ -256,9 +256,9 @@ class _SalesAnalyticsScreenState extends State<SalesAnalyticsScreen>
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: isUrdu ? 'خرید و فروخت رپورٹ' : 'Purchase & Sales',
-        showBackButton: true,
+      appBar: ScreenAppBar(
+        title: isUrdu ? 'فروخت کا تجزیہ' : 'Sales Analytics',
+        isUrdu: isUrdu,
       ),
       body: stockService.isLoading
           ? _buildShimmerAnalytics()

@@ -45,6 +45,10 @@ class _ContractDocumentsScreenState extends State<ContractDocumentsScreen> {
       textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
         appBar: AppBar(
+          leading: IconButton(
+            icon: Icon(isUrdu ? Icons.arrow_forward : Icons.arrow_back),
+            onPressed: () => Navigator.maybePop(context),
+          ),
           title: Text(widget.contractTitle),
           actions: [
             if (widget.documents.isNotEmpty)

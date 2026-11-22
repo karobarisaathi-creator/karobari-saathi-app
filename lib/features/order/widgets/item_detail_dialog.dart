@@ -115,7 +115,7 @@ void showItemDetailDialog(BuildContext context, ShopItem item,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
-                        color: AppTheme.goldColor,
+                        color: AppTheme.slateColor,
                       ),
                     ),
                     if (item.hasDiscount) ...[

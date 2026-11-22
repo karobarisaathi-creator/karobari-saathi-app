@@ -45,13 +45,14 @@ class TransactionAdapter extends TypeAdapter<Transaction> {
       discountReason: fields[25] as String?,
       receiptFromCounterparty: fields[26] as bool? ?? false,
       customerPhone: fields[27] as String?,
+      contractId: fields[28] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Transaction obj) {
     writer
-      ..writeByte(28)
+      ..writeByte(29)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -107,7 +108,9 @@ class TransactionAdapter extends TypeAdapter<Transaction> {
       ..writeByte(26)
       ..write(obj.receiptFromCounterparty)
       ..writeByte(27)
-      ..write(obj.customerPhone);
+      ..write(obj.customerPhone)
+      ..writeByte(28)
+      ..write(obj.contractId);
   }
 
   @override

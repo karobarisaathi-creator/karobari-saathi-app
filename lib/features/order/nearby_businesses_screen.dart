@@ -1,4 +1,4 @@
-// lib/features/order/nearby_shops_screen.dart
+// lib/features/order/nearby_businesses_screen.dart
 
 import 'dart:async';
 
@@ -10,57 +10,41 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/models/shop_model.dart';
+import 'package:account_app/core/models/contractor_company_model.dart';
 import 'package:account_app/core/services/location_service.dart';
 import 'package:account_app/core/widgets/skeleton_shimmer.dart';
 import 'package:account_app/features/order/shop_detail_screen.dart';
 import 'package:account_app/features/order/widgets/shop_card_widget.dart';
-import 'package:account_app/features/order/widgets/shop_catalog_item_card.dart';
-import 'package:account_app/features/order/widgets/item_detail_dialog.dart';
+import 'package:account_app/features/order/widgets/contractor_company_card_widget.dart';
 
 // ═══════════════════════════════════════════════════════════════
-// IN-MEMORY CACHE FOR NEARBY SHOPS & ITEMS (COST & PERFORMANCE OPTIMIZATION)
+// IN-MEMORY CACHE FOR NEARBY BUSINESSES
 // ═══════════════════════════════════════════════════════════════
 class _NearbyShopsCache {
   static List<Shop>? cachedShops;
   static DateTime? lastShopsFetchTime;
-  static final Map<String, List<ShopItem>> cachedShopItems = {};
-  static final Map<String, DateTime> lastItemsFetchTime = {};
 
   static bool isShopsCacheValid({Duration ttl = const Duration(minutes: 5)}) {
     if (cachedShops == null || lastShopsFetchTime == null) return false;
     return DateTime.now().difference(lastShopsFetchTime!) < ttl;
   }
-
-  static bool isItemsCacheValid(String shopId,
-      {Duration ttl = const Duration(minutes: 5)}) {
-    if (!cachedShopItems.containsKey(shopId) ||
-        !lastItemsFetchTime.containsKey(shopId)) return false;
-    return DateTime.now().difference(lastItemsFetchTime[shopId]!) < ttl;
-  }
-
-  static void clear() {
-    cachedShops = null;
-    lastShopsFetchTime = null;
-    cachedShopItems.clear();
-    lastItemsFetchTime.clear();
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MAIN SCREEN: NEARBY SHOPS LIST
+// MAIN SCREEN: NEARBY BUSINESSES LIST
 // ═══════════════════════════════════════════════════════════════
-class OrderSelectionScreen extends StatefulWidget {
-  const OrderSelectionScreen({super.key});
+class NearbyBusinessesScreen extends StatefulWidget {
+  const NearbyBusinessesScreen({super.key});
 
   @override
-  State<OrderSelectionScreen> createState() => _OrderSelectionScreenState();
+  State<NearbyBusinessesScreen> createState() => _NearbyBusinessesScreenState();
 }
 
-class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
+class _NearbyBusinessesScreenState extends State<NearbyBusinessesScreen> {
   String _shopQuery = '';
   String _sortBy = 'recent';
   bool _isSearchVisible = false;
@@ -74,12 +58,48 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   List<Shop> _shops = const [];
+  List<ContractorCompany> _contractorCompanies = const [];
+  String? _contractorLoadError;
 
   @override
   void initState() {
     super.initState();
     _loadPublicShops();
+    _loadPublicContractors();
     unawaited(_loadCurrentLocation());
+  }
+
+  Future<void> _loadPublicContractors() async {
+    try {
+      final snapshot = await _firestore
+          .collection('public_contractors')
+          .orderBy('updatedAt', descending: true)
+          .limit(30)
+          .get();
+      if (!mounted) return;
+
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      final companies = snapshot.docs
+          .where((doc) => doc.id != currentUserId)
+          .map((doc) => ContractorCompany.fromMap(doc.id, doc.data()))
+          .where((company) =>
+              company.name.isNotEmpty && company.businessArea.isNotEmpty)
+          .toList();
+      setState(() {
+        _contractorCompanies = companies;
+        _contractorLoadError = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _contractorLoadError = error.toString());
+    }
+  }
+
+  Future<void> _refreshNearbyBusinesses() async {
+    await Future.wait([
+      _loadPublicShops(forceRefresh: true),
+      _loadPublicContractors(),
+    ]);
   }
 
   Future<void> _loadCurrentLocation() async {
@@ -166,10 +186,6 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
       distanceVal: (data['distanceVal'] is num)
           ? (data['distanceVal'] as num).toDouble()
           : double.infinity,
-      customerCount: (data['customerCount'] as num?)?.toInt() ?? 0,
-      satisfiedCustomerPercent:
-          (data['quickBillSatisfactionPercent'] as num?)?.toInt() ?? 0,
-      billCount: (data['quickBillCount'] as num?)?.toInt() ?? 0,
       deliveryTime: (data['deliveryTime'] ?? '').toString(),
       timeVal: (data['timeVal'] is num) ? (data['timeVal'] as num).toInt() : 0,
       minOrder: (data['minOrder'] ?? '').toString(),
@@ -182,7 +198,6 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
       showArea: data['showArea'] != false,
       showDistance: data['showDistance'] != false,
       showDeliveryInfo: data['showDeliveryInfo'] != false,
-      showTrust: data['showTrust'] != false,
       showItemsCount: data['showItemsCount'] != false,
       showTags: data['showTags'] == true,
       latitude: (data['latitude'] is num)
@@ -246,19 +261,19 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: isUrdu ? 'قریبی دکاندار' : 'Nearby Shops',
-        showBackButton: Navigator.canPop(context),
+      appBar: ScreenAppBar(
+        title: isUrdu ? 'قریبی کاروبار' : 'Nearby Businesses',
+        isUrdu: isUrdu,
         actions: [
           IconButton(
+            tooltip: _isSearchVisible
+                ? (isUrdu ? 'تلاش بند کریں' : 'Close search')
+                : (isUrdu ? 'تلاش کریں' : 'Search'),
             icon: Icon(
               _isSearchVisible
                   ? PhosphorIcons.x()
                   : PhosphorIcons.magnifyingGlass(),
             ),
-            tooltip: _isSearchVisible
-                ? (isUrdu ? 'بند کریں' : 'Close search')
-                : (isUrdu ? 'تلاش کریں' : 'Search'),
             onPressed: () {
               setState(() {
                 _isSearchVisible = !_isSearchVisible;
@@ -272,39 +287,46 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
         ],
       ),
       body: SafeArea(
-        top: false,
         child: Column(
           children: [
-            if (_isSearchVisible)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                child: SearchSortBar(
-                  controller: _searchCtrl,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  hintText: isUrdu
-                      ? 'دکان، مالک یا علاقہ تلاش کریں...'
-                      : 'Search shops, owners, or areas...',
-                  onSearchChanged: (v) {
-                    setState(() => _shopQuery = v);
-                  },
-                ),
-              ),
             Expanded(
-              child: _isLoading
-                  ? _buildShimmerLoadingList()
-                  : _loadError != null
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: UrduAwareText(
-                              isUrdu
-                                  ? 'دکاندار لوڈ نہیں ہو سکے: $_loadError'
-                                  : 'Could not load shops: $_loadError',
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        )
-                      : _buildShopListScreen(isUrdu, fontFamily),
+              child: Column(
+                children: [
+                  if (_isSearchVisible)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                      child: SearchSortBar(
+                        controller: _searchCtrl,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        hintText: isUrdu
+                            ? 'دکان، کمپنی یا علاقہ تلاش کریں...'
+                            : 'Search shops, companies, or areas...',
+                        onSearchChanged: (value) {
+                          setState(() => _shopQuery = value);
+                        },
+                      ),
+                    ),
+                  Expanded(
+                    child: _isLoading
+                        ? _buildShimmerLoadingList()
+                        : _loadError != null &&
+                                _shops.isEmpty &&
+                                _contractorCompanies.isEmpty
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: UrduAwareText(
+                                    isUrdu
+                                        ? 'دکاندار لوڈ نہیں ہو سکے: $_loadError'
+                                        : 'Could not load shops: $_loadError',
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              )
+                            : _buildShopListScreen(isUrdu, fontFamily),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -325,15 +347,22 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
           s.area.contains(_shopQuery);
     }).toList();
 
-    if (_sortBy == 'rating') {
-      filtered.sort((a, b) =>
-          b.satisfiedCustomerPercent.compareTo(a.satisfiedCustomerPercent));
-    } else if (_sortBy == 'time') {
+    if (_sortBy == 'time') {
       filtered.sort((a, b) => a.timeVal.compareTo(b.timeVal));
     } else if (_sortBy == 'nearest') {
       filtered
           .sort((a, b) => _distanceForShop(a).compareTo(_distanceForShop(b)));
     }
+
+    final filteredCompanies = _contractorCompanies.where((company) {
+      if (_shopQuery.isEmpty) return true;
+      return company.name.contains(_shopQuery) ||
+          company.businessArea.contains(_shopQuery);
+    }).toList();
+    final hasContent = filtered.isNotEmpty ||
+        filteredCompanies.isNotEmpty ||
+        _contractorLoadError != null ||
+        _loadError != null;
 
     return Column(
       children: [
@@ -343,29 +372,82 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
 
         const SizedBox(height: 8),
 
-        // List using ShopSectionWidget (Shop Card + Horizontal Item Cards)
+        // Full-width shop cards
         Expanded(
-          child: filtered.isEmpty
+          child: !hasContent
               ? _buildEmptyState(
                   icon: PhosphorIcons.magnifyingGlass(),
-                  title: isUrdu ? 'کوئی دکان نہیں ملی' : 'No shops found',
+                  title: isUrdu
+                      ? 'کوئی دکان یا کمپنی نہیں ملی'
+                      : 'No shops or companies found',
                   sub: isUrdu ? 'دوسرا نام آزمائیں' : 'Try another search',
                   fontFamily: fontFamily,
                 )
               : RefreshIndicator(
                   color: AppTheme.themeColor,
-                  onRefresh: () => _loadPublicShops(forceRefresh: true),
-                  child: ListView.builder(
+                  onRefresh: _refreshNearbyBusinesses,
+                  child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(8, 4, 8, 24),
-                    itemCount: filtered.length,
-                    itemBuilder: (context, i) => _ShopSectionWidget(
-                      key: ValueKey(filtered[i].id),
-                      shop: filtered[i],
-                      isUrdu: isUrdu,
-                      fontFamily: fontFamily,
-                      onTap: () => _openShopDetail(filtered[i]),
-                    ),
+                    children: [
+                      if (_loadError != null)
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: UrduAwareText(
+                            isUrdu
+                                ? 'دکانیں لوڈ نہیں ہو سکیں: $_loadError'
+                                : 'Could not load shops: $_loadError',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppTheme.expenseColor,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ...filtered.map(
+                        (shop) => _ShopSectionWidget(
+                          key: ValueKey(shop.id),
+                          shop: shop,
+                          onTap: () => _openShopDetail(shop),
+                        ),
+                      ),
+                      if (filteredCompanies.isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
+                          child: UrduAwareText(
+                            isUrdu
+                                ? 'قریبی ٹھیکہ دار کمپنیاں'
+                                : 'Contractor Companies',
+                            style: TextStyle(
+                              fontFamily: fontFamily,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.darkColor,
+                            ),
+                          ),
+                        ),
+                        ...filteredCompanies.map(
+                          (company) => ContractorCompanyCardWidget(
+                            key: ValueKey('contractor-${company.id}'),
+                            company: company,
+                          ),
+                        ),
+                      ],
+                      if (_contractorLoadError != null)
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: UrduAwareText(
+                            isUrdu
+                                ? 'ٹھیکہ دار کمپنیاں لوڈ نہیں ہو سکیں: $_contractorLoadError'
+                                : 'Could not load contractor companies: $_contractorLoadError',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppTheme.expenseColor,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
         ),
@@ -375,11 +457,30 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
 
   Widget _buildSortSegmentedBar(bool isUrdu, String? fontFamily) {
     final sortOptions = [
-      ('recent', isUrdu ? 'نئی دکانیں' : 'Recent', PhosphorIcons.mapPin(), false),
-      ('nearest', isUrdu ? 'قریبی ترین' : 'Nearest', PhosphorIcons.navigationArrow(), false),
-      ('rating', isUrdu ? 'زیادہ دوبارہ گاہک' : 'Most repeat customers', PhosphorIcons.shieldCheck(), false),
-      ('time', isUrdu ? 'جلد ڈیلیوری' : 'Fast delivery', PhosphorIcons.clock(), false),
-      ('open', isUrdu ? 'کھلی دکانیں' : 'Open shops', PhosphorIcons.storefront(), true),
+      (
+        'recent',
+        isUrdu ? 'نئی دکانیں' : 'Recent',
+        PhosphorIcons.mapPin(),
+        false
+      ),
+      (
+        'nearest',
+        isUrdu ? 'قریبی ترین' : 'Nearest',
+        PhosphorIcons.navigationArrow(),
+        false
+      ),
+      (
+        'time',
+        isUrdu ? 'جلد ڈیلیوری' : 'Fast delivery',
+        PhosphorIcons.clock(),
+        false
+      ),
+      (
+        'open',
+        isUrdu ? 'کھلی دکانیں' : 'Open shops',
+        PhosphorIcons.storefront(),
+        true
+      ),
     ];
 
     return SingleChildScrollView(
@@ -404,7 +505,9 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
                   _buildCategorySegment(
                     label: sortOptions[i].$2,
                     icon: sortOptions[i].$3,
-                    isActive: sortOptions[i].$4 ? _openShopsOnly : _sortBy == sortOptions[i].$1,
+                    isActive: sortOptions[i].$4
+                        ? _openShopsOnly
+                        : _sortBy == sortOptions[i].$1,
                     fontFamily: fontFamily,
                     onTap: () => setState(() {
                       if (sortOptions[i].$4) {
@@ -600,194 +703,26 @@ class _OrderSelectionScreenState extends State<OrderSelectionScreen> {
   }
 }
 
-class _ShopSectionWidget extends StatefulWidget {
+class _ShopSectionWidget extends StatelessWidget {
   final Shop shop;
-  final bool isUrdu;
-  final String? fontFamily;
   final VoidCallback onTap;
 
   const _ShopSectionWidget({
     super.key,
     required this.shop,
-    required this.isUrdu,
-    required this.fontFamily,
     required this.onTap,
   });
 
   @override
-  State<_ShopSectionWidget> createState() => _ShopSectionWidgetState();
-}
-
-class _ShopSectionWidgetState extends State<_ShopSectionWidget> {
-  List<ShopItem> _items = [];
-  bool _isLoadingItems = true;
-
-  static const Map<String, String> _categoryNamesUrdu = {
-    'General': 'عمومی',
-    'Grocery': 'کریانہ',
-    'Food': 'خوراک',
-    'Beverages': 'مشروبات',
-    'Clothing': 'کپڑے',
-    'Electronics': 'الیکٹرانکس',
-    'Household': 'گھریلو سامان',
-    'Personal Care': 'ذاتی استعمال',
-    'Medicine': 'ادویات',
-    'Other': 'دیگر',
-    'عام': 'عام',
-  };
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchItems();
-  }
-
-  void _fetchItems({bool forceRefresh = false}) async {
-    final shopId = widget.shop.id;
-
-    if (!forceRefresh && _NearbyShopsCache.isItemsCacheValid(shopId)) {
-      if (mounted) {
-        setState(() {
-          _items = _NearbyShopsCache.cachedShopItems[shopId]!;
-          _isLoadingItems = false;
-        });
-      }
-      return;
-    }
-
-    if (_NearbyShopsCache.cachedShopItems.containsKey(shopId)) {
-      _items = _NearbyShopsCache.cachedShopItems[shopId]!;
-      _isLoadingItems = false;
-    }
-
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('public_shops')
-          .doc(shopId)
-          .collection('items')
-          .limit(10)
-          .get();
-
-      if (!mounted) return;
-      final items = snapshot.docs
-          .map((doc) {
-            final data = doc.data();
-            final quantity = (data['availableQuantity'] as num?)?.toDouble();
-            final tracksStock = data['trackStock'] != false;
-            final brandVal = (data['brand'] ?? '').toString();
-            final modelVal = (data['model'] ?? '').toString();
-            final allowReturnVal = data['allowReturn'] == true;
-            final rawImages = data['images'];
-            List<String> imagesList = [];
-            if (rawImages is List) {
-              imagesList = rawImages
-                  .map((e) => e.toString().trim())
-                  .where((e) => e.isNotEmpty && e.length > 4)
-                  .toList();
-            }
-            return ShopItem(
-              id: doc.id,
-              stockItemId: doc.id,
-              name: (data['name'] ?? '').toString(),
-              nameUrdu: (data['nameUrdu'] ?? '').toString(),
-              description: (data['description'] ?? '').toString(),
-              brand: brandVal.isNotEmpty ? brandVal : null,
-              model: modelVal.isNotEmpty ? modelVal : null,
-              allowReturn: allowReturnVal,
-              rate: (data['rate'] as num?)?.toDouble() ?? 0,
-              oldRate: (data['oldRate'] as num?)?.toDouble(),
-              unit: (data['unit'] ?? '').toString(),
-              emoji: '📦',
-              category: (data['category'] ?? 'عام').toString(),
-              imageUrl: (data['imageUrl'] ?? '').toString(),
-              images: imagesList,
-              rating: (data['rating'] as num?)?.toDouble() ?? 4.5,
-              stock: tracksStock ? (quantity ?? 0) : 1000000000,
-            );
-          })
-          .where((item) => item.name.trim().isNotEmpty)
-          .toList();
-
-      _NearbyShopsCache.cachedShopItems[shopId] = items;
-      _NearbyShopsCache.lastItemsFetchTime[shopId] = DateTime.now();
-
-      if (mounted) {
-        setState(() {
-          _items = items;
-          _isLoadingItems = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingItems = false);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final totalCount =
-        _items.isNotEmpty ? _items.length : widget.shop.availableItemCount;
-
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Row(
-              children: [
-                UrduAwareText(
-                  '🏪 ${widget.shop.name} · $totalCount ${widget.isUrdu ? 'اشیاء' : 'items'}',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textSecondary,
-                    fontFamily: widget.fontFamily,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 270,
-            child: _isLoadingItems
-                ? const SizedBox.shrink()
-                : ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    itemCount: 1 + _items.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return SizedBox(
-                          width: 290,
-                          height: 270,
-                          child: ShopCardWidget(
-                            shop: widget.shop
-                                .copyWith(items: _items, itemCount: totalCount),
-                            onTap: widget.onTap,
-                          ),
-                        );
-                      }
-                      final item = _items[index - 1];
-                      return SizedBox(
-                        width: 165,
-                        height: 270,
-                        child: ShopCatalogItemCard(
-                          item: item,
-                          onTap: () => _showItemDetailModal(context, item),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
+      margin: const EdgeInsets.only(bottom: 12),
+      width: double.infinity,
+      height: 270,
+      child: ShopCardWidget(
+        shop: shop,
+        onTap: onTap,
       ),
     );
-  }
-
-  void _showItemDetailModal(BuildContext context, ShopItem item) {
-    showItemDetailDialog(context, item);
   }
 }

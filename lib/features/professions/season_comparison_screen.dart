@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/season_report_model.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/season_report_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 
 class SeasonComparisonScreen extends StatefulWidget {
   final Profession seasonA;
@@ -118,11 +118,9 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: hasTwo
-            ? (isUrdu ? 'سیزن کا موازنہ' : 'Season Comparison')
-            : (isUrdu ? 'سیزن رپورٹ' : 'Season Report'),
-        showBackButton: true,
+      appBar: ScreenAppBar(
+        title: isUrdu ? 'موسموں کا موازنہ' : 'Season Comparison',
+        isUrdu: isUrdu,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),

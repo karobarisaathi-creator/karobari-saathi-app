@@ -11,8 +11,8 @@ import 'package:account_app/core/services/location_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/models/shop_model.dart';
 import 'package:account_app/features/order/widgets/shop_card_widget.dart';
 
@@ -33,7 +33,6 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
   bool _showArea = true;
   bool _showDistance = true;
   bool _showDeliveryInfo = true;
-  bool _showTrust = true;
   bool _showItemsCount = true;
   bool _showTags = true;
   double? _latitude;
@@ -110,7 +109,6 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
         _showArea = settings['showArea'] != false;
         _showDistance = settings['showDistance'] == true;
         _showDeliveryInfo = settings['showDeliveryInfo'] == true;
-        _showTrust = settings['showTrust'] != false;
         _showItemsCount = settings['showItemsCount'] != false;
         _showTags = settings['showTags'] == true;
         final tags = settings['tags'];
@@ -228,7 +226,6 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
       showArea: _showArea,
       showDistance: _showDistance,
       showDeliveryInfo: _showDeliveryInfo,
-      showTrust: _showTrust,
       showItemsCount: _showItemsCount,
       showTags: _showTags,
     );
@@ -313,7 +310,6 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
           'showArea': _showArea,
           'showDistance': _showDistance,
           'showDeliveryInfo': _showDeliveryInfo,
-          'showTrust': _showTrust,
           'showItemsCount': _showItemsCount,
           'showTags': _showTags,
           'updatedAt': FieldValue.serverTimestamp(),
@@ -373,10 +369,9 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: isUrdu ? 'شاپ سیٹنگز' : 'Shop Settings',
-        backgroundColor: AppTheme.darkColor,
-        foregroundColor: Colors.white,
+      appBar: ScreenAppBar(
+        title: isUrdu ? 'دکان کی ترتیبات' : 'Shop Settings',
+        isUrdu: isUrdu,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
@@ -540,19 +535,6 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
                   ),
                 ),
               ],
-              const Divider(height: 1),
-              _buildSwitchTile(
-                title: isUrdu
-                    ? 'اعتماد اور اطمینان دکھائیں'
-                    : 'Show Trust & Satisfaction',
-                subtitle: isUrdu
-                    ? 'کارڈ پر گاہکوں اور دوبارہ آنے والے خریداروں کے اعداد دکھائیں'
-                    : 'Show customer and repeat-buyer statistics on card',
-                value: _showTrust,
-                onChanged: (v) => setState(() => _showTrust = v),
-                fontFamily: fontFamily,
-                icon: PhosphorIcons.shieldCheck(),
-              ),
               const Divider(height: 1),
               _buildSwitchTile(
                 title: isUrdu

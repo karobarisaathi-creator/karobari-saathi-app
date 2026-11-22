@@ -18,7 +18,6 @@ import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/widgets/party_card.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 
 class StockAdjustmentDialog extends StatefulWidget {
   final StockItem item;
@@ -1448,22 +1447,30 @@ class _MatchingPartyPickerSheetState extends State<_MatchingPartyPickerSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CustomAppBar(
-              title: widget.isUrdu ? 'پارٹی منتخب کریں' : 'Select party',
-              showBackButton: false,
-              backgroundColor: AppTheme.darkColor,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              centerTitle: true,
-              shape: const RoundedRectangleBorder(
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: const BoxDecoration(
+                color: AppTheme.darkColor,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
               ),
-              actions: [
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
+              child: Row(
+                children: [
+                  Expanded(
+                    child: UrduAwareText(
+                      widget.isUrdu ? 'پارٹی منتخب کریں' : 'Select party',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                ],
+              ),
             ),
             Flexible(
               child: SingleChildScrollView(

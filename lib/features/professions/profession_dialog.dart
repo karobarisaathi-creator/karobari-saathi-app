@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/config/professions_config.dart';
@@ -84,27 +84,17 @@ class _ProfessionDialogState extends State<ProfessionDialog> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: widget.profession == null
-            ? (widget.isUrdu ? 'نیا پیشہ' : 'New Profession')
-            : (widget.isUrdu ? 'پیشہ ترمیم کریں' : 'Edit Profession'),
+      appBar: ScreenAppBar(
+        title: widget.isUrdu
+            ? (widget.profession == null ? 'پیشہ شامل کریں' : 'پیشہ میں ترمیم')
+            : (widget.profession == null ? 'Add Profession' : 'Edit Profession'),
+        isUrdu: widget.isUrdu,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            UrduAwareText(
-              widget.isUrdu ? 'تفصیلات درج کریں' : 'Enter Details',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                fontFamily: fontFamily,
-                color: AppTheme.darkColor,
-              ),
-            ),
-            const SizedBox(height: 16),
-
             // Profession description
             Column(
               children: [

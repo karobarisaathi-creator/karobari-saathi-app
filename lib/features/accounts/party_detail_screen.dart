@@ -8,7 +8,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
-import 'package:account_app/core/services/pdf_service.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/utils/account_balance_utils.dart';
@@ -19,10 +18,9 @@ import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/profile_update_dialog.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/widgets/item_rate_history_card_widget.dart';
 import 'package:account_app/features/accounts/add_transaction_screen.dart';
-import 'package:account_app/features/accounts/add_party_screen.dart';
-import 'package:account_app/features/accounts/bulk_party_transaction_screen.dart';
 import 'package:account_app/features/accounts/sms_invitation_screen.dart';
 import 'package:account_app/features/accounts/widgets/party_tools_grid_widget.dart';
 import 'package:account_app/features/dashboard/app_shell_screen.dart';
@@ -82,6 +80,9 @@ class _PartyCombinedScreenState extends State<PartyCombinedScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _checkForUpdate();
   }
 
@@ -133,6 +134,28 @@ class _PartyCombinedScreenState extends State<PartyCombinedScreen>
         },
         child: Scaffold(
           backgroundColor: AppTheme.scaffoldBackground,
+          appBar: ScreenAppBar(
+            title: isUrdu ? 'پارٹی ڈیٹیل' : 'Party Detail',
+            isUrdu: isUrdu,
+            actions: [
+              IconButton(
+                icon: Icon(
+                  _showSearch
+                      ? PhosphorIcons.x()
+                      : PhosphorIcons.magnifyingGlass(),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _showSearch = !_showSearch;
+                    if (!_showSearch) {
+                      _searchController.clear();
+                      _searchQuery = '';
+                    }
+                  });
+                },
+              ),
+            ],
+          ),
           body: Column(
             children: [
               // ═══════════════════════════════════════════
@@ -158,46 +181,7 @@ class _PartyCombinedScreenState extends State<PartyCombinedScreen>
                   });
                 },
                 remoteProfileMap: _remoteProfileMap,
-              ),
-
-              // ═══════════════════════════════════════════
-              // TAB BAR (بالکل اسٹاک اسکرین جیسا)
-              // ═══════════════════════════════════════════
-              Container(
-                color: Colors.white,
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorColor: AppTheme.themeColor,
-                  labelColor: AppTheme.themeColor,
-                  unselectedLabelColor: AppTheme.textSecondary,
-                  labelStyle: TextStyle(
-                    fontFamily: fontFamily,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                  tabs: [
-                    Tab(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(PhosphorIcons.receipt(), size: 14),
-                          const SizedBox(width: 4),
-                          Text(isUrdu ? 'لین دین' : 'Transactions'),
-                        ],
-                      ),
-                    ),
-                    Tab(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(PhosphorIcons.wrench(), size: 14),
-                          const SizedBox(width: 4),
-                          Text(isUrdu ? 'ٹولز اور ہسٹری' : 'Tools & History'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                tabController: _tabController,
               ),
 
               // ═══════════════════════════════════════════
@@ -269,6 +253,7 @@ class _CombinedHeader extends StatelessWidget {
   final bool showSearch;
   final VoidCallback onToggleSearch;
   final Map<String, String>? remoteProfileMap;
+  final TabController tabController;
 
   const _CombinedHeader({
     required this.party,
@@ -279,6 +264,7 @@ class _CombinedHeader extends StatelessWidget {
     required this.showSearch,
     required this.onToggleSearch,
     this.remoteProfileMap,
+    required this.tabController,
   });
 
   @override
@@ -333,65 +319,35 @@ class _CombinedHeader extends StatelessWidget {
                     remoteProf != localProf) ||
                 (remoteAddress.isNotEmpty && remoteAddress != localAddress));
 
-        return Container(
-          decoration: const BoxDecoration(
-            color: AppTheme.darkColor,
-            borderRadius: BorderRadius.vertical(bottom: Radius.circular(15)),
-          ),
-          child: SafeArea(
-            bottom: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // ═══ TOP ROW: Back + Title + Search Icon + Menu ═══
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 2),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back,
-                            color: Colors.white, size: 24),
-                        onPressed: () {
-                          AppShellScreen.switchTab(1);
-                          Navigator.pop(context);
-                        },
-                      ),
-                      Expanded(
-                        child: UrduAwareText(
-                          isUrdu ? 'پارٹی ڈیٹیل' : 'Party Detail',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: fontFamily,
-                            fontSize: isUrdu ? 20 : 18,
-                            fontWeight:
-                                isUrdu ? FontWeight.bold : FontWeight.normal,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-
-                      // سرچ آئیکن بٹن (تین ڈاٹ کے سامنے)
-                      IconButton(
-                        icon: Icon(
-                          showSearch
-                              ? PhosphorIcons.x()
-                              : PhosphorIcons.magnifyingGlass(),
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                        onPressed: onToggleSearch,
-                        tooltip: isUrdu ? 'تلاش' : 'Search',
-                      ),
-                    ],
-                  ),
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Top Slate Gradient Card (With generous top padding for Profile Picture & Name)
+            Container(
+              margin: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppTheme.slateColor, AppTheme.verifiedGold],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-
-                // ═══ PROFILE + STATS (مختصر اونچائی) ═══
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.slateColor.withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
                   child: Column(
                     children: [
-                      // Profile
+                      // Profile Info
                       ProfileInfoWidget(
                         name: party.name,
                         phone: party.phone,
@@ -403,7 +359,7 @@ class _CombinedHeader extends StatelessWidget {
                         textColor: Colors.white,
                         subtitleColor: Colors.white70,
                         categoryColor: Colors.white,
-                        customSize: 38,
+                        customSize: 42,
                         borderRadius: 8,
                         hasUpdate: hasUpdate,
                         onAvatarTap: (hasUpdate && remoteProfileMap != null)
@@ -418,7 +374,7 @@ class _CombinedHeader extends StatelessWidget {
                             : null,
                       ),
 
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
 
                       // ═══ Stats Row (Credit | Debit | Balance) ═══
                       Row(
@@ -459,7 +415,7 @@ class _CombinedHeader extends StatelessWidget {
                         ],
                       ),
 
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
 
                       // ═══ Action Buttons (Call | Remind | Settle) ═══
                       Row(
@@ -496,9 +452,116 @@ class _CombinedHeader extends StatelessWidget {
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+
+            // ═══ Bottom White Card Section for Button Tabs (Matching ContractDetailScreen Design) ═══
+            Container(
+              margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: AppTheme.lightColor,
+                borderRadius:
+                    const BorderRadius.vertical(bottom: Radius.circular(16)),
+                border: Border.all(color: const Color(0xFFD1D5DB), width: 1.2),
+              ),
+              child: Row(
+                children: [
+                  // Tab 0: Transactions ("لین دین")
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        tabController.animateTo(0);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: tabController.index == 0
+                              ? AppTheme.slateColor
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            UrduAwareText(
+                              isUrdu ? 'لین دین' : 'Transactions',
+                              style: TextStyle(
+                                fontFamily: fontFamily,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: tabController.index == 0
+                                    ? Colors.white
+                                    : AppTheme.darkColor,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: tabController.index == 0
+                                    ? Colors.white.withValues(alpha: 0.3)
+                                    : AppTheme.slateColor
+                                        .withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: UrduAwareText(
+                                '${allTx.length}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: tabController.index == 0
+                                      ? Colors.white
+                                      : AppTheme.slateColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  // Tab 1: Tools & History ("ٹولز اور ہسٹری")
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        tabController.animateTo(1);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: tabController.index == 1
+                              ? AppTheme.slateColor
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            UrduAwareText(
+                              isUrdu ? 'ٹولز اور ہسٹری' : 'Tools & History',
+                              style: TextStyle(
+                                fontFamily: fontFamily,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: tabController.index == 1
+                                    ? Colors.white
+                                    : AppTheme.darkColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         );
       },
     );
@@ -755,9 +818,6 @@ class _TransactionsTabState extends State<_TransactionsTab> {
       children: [
         Column(
           children: [
-            // ═══ FILTER CHIPS ═══
-            _buildFilterChips(),
-
             // ═══ LIST LABELS ═══
             _buildListLabels(),
 
@@ -796,7 +856,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                 if (!mounted) return;
                 _load();
               },
-              backgroundColor: AppTheme.darkColor,
+              backgroundColor: AppTheme.slateColor,
               shape: const CircleBorder(),
               elevation: 4,
               child: const Icon(
@@ -810,54 +870,6 @@ class _TransactionsTabState extends State<_TransactionsTab> {
     );
   }
 
-  // ═══ Filter Chips ═══
-  Widget _buildFilterChips() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Row(
-        children: [
-          _filterChip('all', widget.isUrdu ? 'سب' : 'All'),
-          const SizedBox(width: 28),
-          _filterChip(
-            'payables',
-            widget.isUrdu ? 'واجب الادا' : 'Payables',
-          ),
-          const SizedBox(width: 28),
-          _filterChip(
-            'receivables',
-            widget.isUrdu ? 'واجب الوصول' : 'Receivables',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _filterChip(String value, String label) {
-    final isSelected = _selectedFilter == value;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedFilter = value),
-      child: Column(
-        children: [
-          UrduAwareText(
-            label,
-            style: TextStyle(
-              color: isSelected ? AppTheme.darkColor : AppTheme.textSecondary,
-              fontSize: 13.5,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              fontFamily: widget.fontFamily,
-            ),
-          ),
-          if (isSelected)
-            Container(
-              margin: const EdgeInsets.only(top: 4),
-              height: 2,
-              width: 24,
-              color: AppTheme.darkColor,
-            ),
-        ],
-      ),
-    );
-  }
 
   // ═══ List Labels ═══
   Widget _buildListLabels() {
@@ -1656,8 +1668,6 @@ class _AnalysisTabState extends State<_AnalysisTab> {
             const SizedBox(height: 8),
             _build3Stats(),
             const SizedBox(height: 8),
-            _buildSubFilter(),
-            const SizedBox(height: 8),
             if (_itemHistory.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 30),
@@ -1700,98 +1710,78 @@ class _AnalysisTabState extends State<_AnalysisTab> {
   }
 
   Widget _build3Stats() {
-    return Row(
+    return Column(
       children: [
-        _statCard(_getRelationshipPeriod(),
-            widget.isUrdu ? 'تعلق کو' : 'Relationship'),
-        const SizedBox(width: 8),
-        _statCard('$_totalDeals', widget.isUrdu ? 'کل اندراج' : 'Total Deals'),
-        const SizedBox(width: 8),
-        _statCard(
-            _formatVolume(_totalVolume), widget.isUrdu ? 'حجم' : 'Volume'),
+        _fullWidthStatCard(
+          _getRelationshipPeriod(),
+          widget.isUrdu ? 'تعلق کے دن/دورانیہ' : 'Relationship Duration',
+          PhosphorIcons.calendar(),
+        ),
+
+        const SizedBox(height: 8),
+        _fullWidthStatCard(
+          _formatVolume(_totalVolume),
+          widget.isUrdu ? 'کل کاروبار کا حجم' : 'Total Business Volume',
+          PhosphorIcons.chartBar(),
+        ),
       ],
     );
   }
 
-  Widget _statCard(String value, String label) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.backgroundColor),
-        ),
-        child: Column(
-          children: [
-            UrduAwareText(
-              value,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-                color: AppTheme.darkColor,
-              ),
-            ),
-            const SizedBox(height: 4),
-            UrduAwareText(
-              label,
-              style: TextStyle(
-                fontFamily: widget.fontFamily,
-                fontSize: 11,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-          ],
-        ),
+  Widget _fullWidthStatCard(String value, String label, IconData icon) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFD1D5DB), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.darkColor.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildSubFilter() {
-    return Row(
-      children: [
-        _subChip('all', widget.isUrdu ? 'سب' : 'All'),
-        const SizedBox(width: 8),
-        _subChip('chg', widget.isUrdu ? 'ریٹ بدلا' : 'Rate Changed'),
-        const Spacer(),
-        Flexible(
-          child: UrduAwareText(
-            widget.isUrdu ? 'ٹچ کریں، ہسٹری کھلے گی' : 'Tap to see history',
-            style: TextStyle(
-              fontFamily: widget.fontFamily,
-              fontSize: 10.5,
-              fontStyle: FontStyle.italic,
-              color: Colors.grey.shade400,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.themeColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  icon,
+                  size: 18,
+                  color: AppTheme.themeColor,
+                ),
+              ),
+              const SizedBox(width: 12),
+              UrduAwareText(
+                label,
+                style: TextStyle(
+                  fontFamily: widget.fontFamily,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.darkColor,
+                ),
+              ),
+            ],
+          ),
+          UrduAwareText(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: AppTheme.darkColor,
             ),
-            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _subChip(String val, String label) {
-    final active = _rateFilter == val;
-    return GestureDetector(
-      onTap: () => setState(() => _rateFilter = val),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: active ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: active ? AppTheme.darkColor : Colors.grey.shade300,
-          ),
-        ),
-        child: UrduAwareText(
-          label,
-          style: TextStyle(
-            fontFamily: widget.fontFamily,
-            fontSize: 11.5,
-            fontWeight: active ? FontWeight.bold : FontWeight.normal,
-            color: active ? AppTheme.darkColor : AppTheme.textSecondary,
-          ),
-        ),
+        ],
       ),
     );
   }

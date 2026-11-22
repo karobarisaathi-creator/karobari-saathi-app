@@ -12,10 +12,12 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/party_card.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/worker_model.dart';
 import 'package:account_app/features/accounts/add_party_screen.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
+import 'package:account_app/features/quick_bill/widgets/customer_picker_sheet.dart';
 import 'worker_attendance_screen.dart';
 
 class WorkersListScreen extends StatefulWidget {
@@ -58,29 +60,10 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
       }
     }
 
-    final accounts = dbService.accounts;
     final List<Account> combined = [];
 
     try {
-      await workerService.ensureInitialized();
-      for (final WorkerModel worker in workerService.workers) {
-        final exists = accounts.any((account) =>
-            account.name.trim().toLowerCase() ==
-            worker.name.trim().toLowerCase());
-        if (!exists && worker.name.trim().isNotEmpty) {
-          combined.add(Account(
-            id: worker.id,
-            name: worker.name,
-            phone: worker.phone,
-            category: 'worker',
-            initialBalance: 0,
-            balanceType: 'Receivable',
-            balance: 0,
-            createdAt: worker.createdAt,
-            updatedAt: worker.createdAt,
-          ));
-        }
-      }
+      combined.addAll(await workerService.ensureWorkerAccounts(dbService));
     } catch (error) {
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -94,7 +77,7 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
       return;
     }
 
-    for (var a in accounts) {
+    for (var a in dbService.accounts) {
       final isWorkerCat = a.category == 'worker' ||
           a.category == 'technician' ||
           a.category == 'employee';
@@ -126,83 +109,11 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
     final Widget bodyContent = SafeArea(
       child: Column(
         children: [
-          if (!widget.isEmbedded)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      isUrdu
-                          ? PhosphorIcons.arrowRight()
-                          : PhosphorIcons.arrowLeft(),
-                      color: AppTheme.darkColor,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                    tooltip: isUrdu ? 'پیچھے جائیں' : 'Back',
-                  ),
-                  Expanded(
-                    child: UrduAwareText(
-                      isUrdu ? 'مزدوروں کی فہرست' : 'Workers Directory',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: fontFamily,
-                        color: AppTheme.darkColor,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(PhosphorIcons.userPlus(),
-                        color: AppTheme.goldColor),
-                    onPressed: () =>
-                        _showAddWorkerOptions(context, isUrdu, fontFamily),
-                    tooltip: isUrdu ? 'نیا مزدور شامل کریں' : 'Add Worker',
-                  ),
-                ],
-              ),
-            ),
-          if (!widget.isEmbedded)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      isUrdu
-                          ? PhosphorIcons.arrowRight()
-                          : PhosphorIcons.arrowLeft(),
-                      color: AppTheme.darkColor,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                    tooltip: isUrdu ? 'پیچھے جائیں' : 'Back',
-                  ),
-                  Expanded(
-                    child: UrduAwareText(
-                      isUrdu ? 'مزدوروں کی فہرست' : 'Workers Directory',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: fontFamily,
-                        color: AppTheme.darkColor,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(PhosphorIcons.userPlus(),
-                        color: AppTheme.goldColor),
-                    onPressed: () =>
-                        _showAddWorkerOptions(context, isUrdu, fontFamily),
-                    tooltip: isUrdu ? 'نیا مزدور شامل کریں' : 'Add Worker',
-                  ),
-                ],
-              ),
-            ),
           Expanded(
             child: _isLoading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                        color: AppTheme.goldColor),
+                    child:
+                        CircularProgressIndicator(color: AppTheme.slateColor),
                   )
                 : _workers.isEmpty
                     ? Center(
@@ -213,12 +124,12 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                               width: 72,
                               height: 72,
                               decoration: BoxDecoration(
-                                color: AppTheme.goldColor
-                                    .withValues(alpha: 0.1),
+                                color:
+                                    AppTheme.slateColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(22),
                               ),
                               child: Icon(PhosphorIcons.users(),
-                                  size: 32, color: AppTheme.goldColor),
+                                  size: 32, color: AppTheme.slateColor),
                             ),
                             const SizedBox(height: 14),
                             UrduAwareText(
@@ -235,20 +146,16 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                             const SizedBox(height: 12),
                             ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.goldColor,
+                                backgroundColor: AppTheme.slateColor,
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(12)),
+                                    borderRadius: BorderRadius.circular(12)),
                               ),
-                              onPressed: () => _showAddWorkerOptions(
-                                  context, isUrdu, fontFamily),
-                              icon:
-                                  Icon(PhosphorIcons.userPlus(), size: 16),
+                              onPressed: () =>
+                                  _showAddWorkerPicker(context, isUrdu),
+                              icon: Icon(PhosphorIcons.userPlus(), size: 16),
                               label: UrduAwareText(
-                                isUrdu
-                                    ? 'نیا مزدور شامل کریں'
-                                    : 'Add Worker',
+                                isUrdu ? 'نیا مزدور شامل کریں' : 'Add Worker',
                                 style: TextStyle(
                                     fontFamily: fontFamily,
                                     fontWeight: FontWeight.bold),
@@ -268,8 +175,7 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                               color: AppTheme.lightColor,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                  color: const Color(0xFFD1D5DB),
-                                  width: 1.1),
+                                  color: const Color(0xFFD1D5DB), width: 1.1),
                             ),
                             child: Stack(
                               children: [
@@ -302,8 +208,7 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                                                 PhosphorIcons
                                                     .dotsThreeVertical(),
                                                 size: 18,
-                                                color:
-                                                    AppTheme.textSecondary),
+                                                color: AppTheme.textSecondary),
                                             onSelected: (val) async {
                                               if (val == 'remove') {
                                                 final updated = Account(
@@ -319,21 +224,18 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                                                   balance: worker.balance,
                                                   profileImage:
                                                       worker.profileImage,
-                                                  createdAt:
-                                                      worker.createdAt,
+                                                  createdAt: worker.createdAt,
                                                   updatedAt: DateTime.now(),
                                                   isActive: worker.isActive,
-                                                  storeName:
-                                                      worker.storeName,
-                                                  storeImage:
-                                                      worker.storeImage,
-                                                  settlementNotes: worker
-                                                      .settlementNotes,
+                                                  storeName: worker.storeName,
+                                                  storeImage: worker.storeImage,
+                                                  settlementNotes:
+                                                      worker.settlementNotes,
                                                 );
-                                                final dbService = Provider
-                                                    .of<DatabaseService>(
-                                                        context,
-                                                        listen: false);
+                                                final dbService = Provider.of<
+                                                        DatabaseService>(
+                                                    context,
+                                                    listen: false);
                                                 await dbService
                                                     .updateAccount(updated);
                                                 if (!context.mounted) {
@@ -356,8 +258,8 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                                                       ? 'مزدور کی لسٹ سے نکالیں'
                                                       : 'Remove from Workers List',
                                                   style: const TextStyle(
-                                                      color: AppTheme
-                                                          .expenseColor,
+                                                      color:
+                                                          AppTheme.expenseColor,
                                                       fontWeight:
                                                           FontWeight.bold),
                                                 ),
@@ -378,14 +280,14 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                                           icon: Icon(
                                             PhosphorIcons.calendarCheck(),
                                             size: 17,
-                                            color: AppTheme.goldColor,
+                                            color: AppTheme.slateColor,
                                           ),
                                           label: UrduAwareText(
                                             isUrdu
                                                 ? 'حاضری اور اجرت'
                                                 : 'Attendance & wages',
                                             style: const TextStyle(
-                                              color: AppTheme.goldColor,
+                                              color: AppTheme.slateColor,
                                               fontWeight: FontWeight.w800,
                                             ),
                                           ),
@@ -418,6 +320,16 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
       textDirection: languageService.textDirection,
       child: Scaffold(
         backgroundColor: AppTheme.backgroundColor,
+        appBar: ScreenAppBar(
+          title: isUrdu ? 'مزدوروں کی فہرست' : 'Workers Directory',
+          isUrdu: isUrdu,
+          actions: [
+            IconButton(
+              icon: Icon(PhosphorIcons.userPlus(), color: AppTheme.slateColor),
+              onPressed: () => _showAddWorkerPicker(context, isUrdu),
+            ),
+          ],
+        ),
         body: bodyContent,
       ),
     );
@@ -465,6 +377,20 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
     }
   }
 
+  Future<void> _showAddWorkerPicker(BuildContext context, bool isUrdu) async {
+    final result = await showCustomerPickerSheet(context);
+    if (result?.account != null && mounted) {
+      final account = result!.account!;
+      final dbService = Provider.of<DatabaseService>(context, listen: false);
+      if (account.category != 'worker' &&
+          account.category != 'technician' &&
+          account.category != 'employee') {
+        await dbService.updateAccount(account.copyWith(category: 'worker'));
+      }
+      await _loadAllWorkers();
+    }
+  }
+
   void _showAddWorkerOptions(
       BuildContext context, bool isUrdu, String? fontFamily) {
     showModalBottomSheet(
@@ -493,11 +419,11 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppTheme.goldColor.withValues(alpha: 0.15),
+                  color: AppTheme.slateColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child:
-                    Icon(PhosphorIcons.userPlus(), color: AppTheme.goldColor),
+                    Icon(PhosphorIcons.userPlus(), color: AppTheme.slateColor),
               ),
               title: UrduAwareText(
                 isUrdu ? 'نیا مزدور درج کریں (مینول)' : 'Manual Entry',
@@ -612,7 +538,7 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                     const SizedBox(width: 8),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.goldColor,
+                        backgroundColor: AppTheme.slateColor,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),

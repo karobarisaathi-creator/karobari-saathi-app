@@ -37,7 +37,7 @@ class QuickBillItemGridCard extends StatelessWidget {
     required this.quantity,
     this.stopWhenOut = true,
     this.hasImageOnly = false,
-    this.accentColor = AppTheme.goldColor,
+    this.accentColor = AppTheme.slateColor,
     required this.onIncrement,
     required this.onDecrement,
     this.onQuantityTap,

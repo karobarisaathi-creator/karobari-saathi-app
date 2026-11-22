@@ -4,12 +4,12 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -143,9 +143,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: CustomAppBar(
-        title: _buildSeasonSelector(isUrdu, fontFamily),
-        centerTitle: true,
+      appBar: ScreenAppBar(
+        title: isUrdu ? 'رپورٹس' : 'Reports',
+        isUrdu: isUrdu,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

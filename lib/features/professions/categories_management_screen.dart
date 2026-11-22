@@ -1,22 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/config/professions_config.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 
 class CategoriesManagementScreen extends StatefulWidget {
   final List<String> categories;
   final bool isUrdu;
   final ProfessionCategory categoryType;
-  final Function(List<String>) onCategoriesUpdated;
+  final Future<void> Function(List<String>) onCategoriesUpdated;
+  final String? title;
+  final String? description;
+  final bool useDefaultCategories;
 
-  const CategoriesManagementScreen(
-      {super.key,
-      required this.categories,
-      required this.isUrdu,
-      required this.categoryType,
-      required this.onCategoriesUpdated});
+  const CategoriesManagementScreen({
+    super.key,
+    required this.categories,
+    required this.isUrdu,
+    required this.categoryType,
+    required this.onCategoriesUpdated,
+    this.title,
+    this.description,
+    this.useDefaultCategories = true,
+  });
 
   @override
   _CategoriesManagementScreenState createState() =>
@@ -26,6 +34,7 @@ class CategoriesManagementScreen extends StatefulWidget {
 class _CategoriesManagementScreenState
     extends State<CategoriesManagementScreen> {
   late List<String> _categories;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -45,7 +54,7 @@ class _CategoriesManagementScreenState
         .toList();
 
     // اگر لسٹ خالی ہو تو ڈیفالٹ زمرے دکھائیں
-    if (_categories.isEmpty) {
+    if (_categories.isEmpty && widget.useDefaultCategories) {
       _categories = ProfessionsConfig.defaultCategories(
         widget.categoryType,
         isUrdu: widget.isUrdu,
@@ -60,12 +69,21 @@ class _CategoriesManagementScreenState
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: widget.isUrdu ? 'زمرے مینج کریں' : 'Manage Categories',
+      appBar: ScreenAppBar(
+        title: widget.title ?? (widget.isUrdu ? 'زمرے' : 'Categories'),
+        isUrdu: widget.isUrdu,
         actions: [
           IconButton(
-              icon: const Icon(Icons.check, color: Colors.white),
-              onPressed: _saveCategories)
+            tooltip: widget.isUrdu ? 'محفوظ کریں' : 'Save categories',
+            onPressed: _isSaving ? null : _saveCategories,
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.check),
+          ),
         ],
       ),
       body: Column(
@@ -85,9 +103,10 @@ class _CategoriesManagementScreenState
                   const SizedBox(width: 12),
                   Expanded(
                     child: UrduAwareText(
-                      widget.isUrdu
-                          ? 'یہ زمرے آپ کے پیشے کے لین دین میں استعمال ہوں گے۔'
-                          : 'These categories will be used in your profession transactions.',
+                      widget.description ??
+                          (widget.isUrdu
+                              ? 'یہ زمرے آپ کے پیشے کے لین دین میں استعمال ہوں گے۔'
+                              : 'These categories will be used in your profession transactions.'),
                       style: TextStyle(
                           fontSize: 12,
                           color: AppTheme.themeColor,
@@ -136,6 +155,7 @@ class _CategoriesManagementScreenState
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'categoryAdd',
         onPressed: _showAddCategoryDialog,
         backgroundColor: AppTheme.darkColor,
         icon: const Icon(Icons.add, color: Colors.white),
@@ -171,10 +191,20 @@ class _CategoriesManagementScreenState
               child: UrduAwareText(widget.isUrdu ? 'منسوخ' : 'Cancel')),
           ElevatedButton(
             onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                setState(() => _categories.add(controller.text.trim()));
-                Navigator.pop(context);
+              final name = controller.text.trim();
+              if (name.isEmpty) return;
+              if (_categories.any((category) =>
+                  category.trim().toLowerCase() == name.toLowerCase())) {
+                AppToast.error(
+                  context,
+                  widget.isUrdu
+                      ? 'یہ زمرہ پہلے سے موجود ہے'
+                      : 'This category already exists',
+                );
+                return;
               }
+              setState(() => _categories.add(name));
+              Navigator.pop(context);
             },
             style:
                 ElevatedButton.styleFrom(backgroundColor: AppTheme.darkColor),
@@ -185,8 +215,19 @@ class _CategoriesManagementScreenState
     );
   }
 
-  void _saveCategories() {
-    widget.onCategoriesUpdated(_categories);
-    Navigator.pop(context);
+  Future<void> _saveCategories() async {
+    setState(() => _isSaving = true);
+    try {
+      await widget.onCategoriesUpdated(_categories);
+      if (mounted) Navigator.pop(context);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      AppToast.error(
+        context,
+        widget.isUrdu ? 'زمرے محفوظ نہیں ہو سکے' : 'Could not save categories',
+        subtitle: error.toString(),
+      );
+    }
   }
 }

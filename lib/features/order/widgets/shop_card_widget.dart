@@ -9,7 +9,6 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/location_chip_widget.dart';
 import 'package:account_app/core/models/shop_model.dart';
-import 'package:account_app/features/order/widgets/trust_popup_dialog.dart';
 
 class ShopCardWidget extends StatelessWidget {
   final Shop shop;
@@ -164,48 +163,6 @@ class ShopCardWidget extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              if (shop.showTrust) ...[
-                                const SizedBox(width: 6),
-                                InkWell(
-                                  onTap: () => TrustPopupDialog.show(
-                                    context: context,
-                                    shopName: shop.name,
-                                    ownerName: shop.owner,
-                                    area: shop.area,
-                                    customerCount: shop.customerCount,
-                                    satisfiedCustomerPercent:
-                                        shop.satisfiedCustomerPercent,
-                                    billCount: shop.billCount,
-                                    itemsCount: shop.availableItemCount,
-                                    isUrdu: isUrdu,
-                                  ),
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                        color: _getBgColor(shop.satisfiedCustomerPercent),
-                                        borderRadius: BorderRadius.circular(6)),
-                                    child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                              PhosphorIcons.shieldCheck(
-                                                  PhosphorIconsStyle.fill),
-                                              size: 11,
-                                              color: _getBadgeColor(shop.satisfiedCustomerPercent)),
-                                          const SizedBox(width: 3),
-                                          UrduAwareText(
-                                              '${shop.satisfiedCustomerPercent}%',
-                                              style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w900,
-                                                  color: _getBadgeColor(shop.satisfiedCustomerPercent),
-                                                  fontFamily: fontFamily)),
-                                        ]),
-                                  ),
-                                ),
-                              ],
                             ],
                           ),
                           if ((shop.latitude != null &&

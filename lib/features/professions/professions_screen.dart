@@ -11,7 +11,7 @@ import 'package:account_app/features/professions/profession_seasons_screen.dart'
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/config/professions_config.dart';
 
 class ProfessionsScreen extends StatefulWidget {
@@ -58,18 +58,22 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
+      appBar: ScreenAppBar(
         title: isUrdu ? 'پیشے/منصوبے' : 'Professions & Categories',
+        isUrdu: isUrdu,
+        showBackButton: false,
         actions: [
           IconButton(
             onPressed: () => _showAddProfessionDialog(context, isUrdu),
-            icon: Icon(PhosphorIcons.plusCircle(), color: Colors.white, size: 26),
-            tooltip: isUrdu ? 'نیا پیشہ' : 'New Profession',
+            icon: Icon(PhosphorIcons.plusCircle()),
           ),
-          const SizedBox(width: 8),
         ],
       ),
-      body: Consumer<DatabaseService>(
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: Consumer<DatabaseService>(
         builder: (context, databaseService, child) {
           var professions = databaseService.getMasterProfessions();
           final allProfessions = databaseService.getProfessions();
@@ -136,6 +140,10 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
                   ),
                 );
         },
+      ),
+            ),
+          ],
+        ),
       ),
     );
   }

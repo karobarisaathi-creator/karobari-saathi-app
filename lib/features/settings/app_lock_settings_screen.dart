@@ -216,6 +216,10 @@ class _AppLockSettingsScreenState extends State<AppLockSettingsScreen> {
         backgroundColor: const Color(0xFFF4F7FC),
         foregroundColor: const Color(0xFF14263D),
         elevation: 0,
+        leading: IconButton(
+          icon: Icon(isUrdu ? Icons.arrow_forward : Icons.arrow_back),
+          onPressed: () => Navigator.maybePop(context),
+        ),
         title: UrduAwareText(
           isUrdu ? 'سیکیورٹی' : 'Security',
           style: TextStyle(fontWeight: FontWeight.w700, fontFamily: fontFamily),

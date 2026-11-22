@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/models/transaction_item_model.dart';
@@ -14,7 +15,6 @@ import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/app_button.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/party_card.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'package:account_app/core/utils/bill_numbering.dart';
@@ -643,45 +643,23 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: widget.transactionToEdit != null
-            ? (isUrdu ? 'بل میں ترمیم' : 'Edit bill')
-            : (isUrdu ? 'بل کا جائزہ' : 'Bill review'),
-        showBackButton: true,
-        backgroundColor: AppTheme.darkColor,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-        ),
+      appBar: ScreenAppBar(
+        title: isUrdu ? 'بل کا پریویو' : 'Bill Preview',
+        isUrdu: isUrdu,
         actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: TextButton.icon(
-              style: TextButton.styleFrom(
-                foregroundColor: AppTheme.verifiedGold,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              ),
-              icon: Icon(
-                PhosphorIcons.tag(PhosphorIconsStyle.fill),
-                size: 16,
-                color: AppTheme.verifiedGold,
-              ),
-              label: UrduAwareText(
-                isUrdu ? 'ڈسکاونٹ' : 'Discount',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.verifiedGold,
-                  fontFamily: fontFamily,
-                ),
-              ),
-              onPressed: () {
-                setState(() {
-                  _isDiscountExpanded = !_isDiscountExpanded;
-                });
-              },
+          IconButton(
+            tooltip: _isDiscountExpanded
+                ? (isUrdu ? 'رعایت بند کریں' : 'Close discount')
+                : (isUrdu ? 'رعایت' : 'Discount'),
+            icon: Icon(
+              _isDiscountExpanded
+                  ? Icons.close_rounded
+                  : PhosphorIcons.tag(),
+              color: AppTheme.themeColor,
             ),
+            onPressed: () {
+              setState(() => _isDiscountExpanded = !_isDiscountExpanded);
+            },
           ),
         ],
       ),

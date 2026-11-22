@@ -12,6 +12,7 @@ import 'package:account_app/features/accounts/add_party_screen.dart';
 import 'package:account_app/core/widgets/party_card.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/widgets/skeleton_shimmer.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/account_balance_utils.dart';
 import 'package:account_app/core/utils/formatters.dart';
@@ -59,24 +60,13 @@ class _PartyListScreenState extends State<PartyListScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: false,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        title: UrduAwareText(
-          isUrdu ? 'کاروباری ساتھی' : 'Karobari Saathi',
-          style: TextStyle(
-            color: Colors.white,
-            fontFamily: fontFamily,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
+      appBar: ScreenAppBar(
+        title: isUrdu ? 'پارٹیاں' : 'Parties',
+        isUrdu: isUrdu,
+        showBackButton: false,
         actions: [
           IconButton(
-            icon:
-                Icon(PhosphorIcons.plusCircle(), color: Colors.white, size: 26),
+            icon: Icon(PhosphorIcons.plusCircle(), size: 26),
             onPressed: () {
               Navigator.push(
                 context,
@@ -100,49 +90,15 @@ class _PartyListScreenState extends State<PartyListScreen> {
                         p.id != QuickBillConstants.cashCustomerAccountId)
                     .toList();
 
-                double totalReceivable = 0;
-                double totalPayable = 0;
-
-                for (var party in parties) {
-                  final transactions = databaseService
-                      .getAllTransactions()
-                      .where((t) => t.accountId == party.id)
-                      .toList();
-                  final cycleBalance =
-                      AccountBalanceUtils.currentCycle(transactions);
-                  final liveBalance = cycleBalance.balance;
-
-                  if (liveBalance < 0) {
-                    totalPayable += liveBalance.abs();
-                  } else if (liveBalance > 0) {
-                    totalReceivable += liveBalance;
-                  }
-                }
-
-                double netBalance = totalPayable - totalReceivable;
-
-                return Column(
-                  children: [
-                    _buildLargeDarkHeader(
-                      receivable: totalReceivable,
-                      payable: totalPayable,
-                      netBalance: netBalance,
-                      isUrdu: isUrdu,
-                      fontFamily: fontFamily,
-                    ),
-                    Expanded(
-                      child: Container(
-                        color: AppTheme.backgroundColor,
-                        child: RefreshIndicator(
-                          onRefresh: _refreshData,
-                          color: Colors.white,
-                          backgroundColor: AppTheme.themeColor,
-                          child: _buildPartyList(
-                              parties, databaseService, isUrdu, fontFamily),
-                        ),
-                      ),
-                    ),
-                  ],
+                return Container(
+                  color: AppTheme.backgroundColor,
+                  child: RefreshIndicator(
+                    onRefresh: _refreshData,
+                    color: Colors.white,
+                    backgroundColor: AppTheme.themeColor,
+                    child: _buildPartyList(
+                        parties, databaseService, isUrdu, fontFamily),
+                  ),
                 );
               },
             ),

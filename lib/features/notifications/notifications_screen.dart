@@ -21,8 +21,8 @@ import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/notification_card.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -108,13 +108,10 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         final unreadNotifCount = notificationService.unreadCount;
         return Scaffold(
           backgroundColor: AppTheme.backgroundColor,
-          appBar: _isKeyboardVisible
-              ? null
-              : CustomAppBar(
-                  title: isUrdu ? 'اطلاعات' : 'Notifications',
-                  showBackButton: false,
-                  centerTitle: true,
-                ),
+          appBar: ScreenAppBar(
+            title: isUrdu ? 'اطلاعات' : 'Notifications',
+            isUrdu: isUrdu,
+          ),
           body: Column(
             children: [
               if (_updateData != null)

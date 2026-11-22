@@ -228,11 +228,73 @@ void main() {
       throwsA(isA<StateError>()),
     );
   });
+
+  test('deleting a contract unlinks but keeps its expense transaction',
+      () async {
+    final now = DateTime(2026, 11, 20);
+    final contract = ContractModel(
+      id: 'contract-with-expense',
+      partyId: 'customer',
+      partyName: 'Customer',
+      title: 'Kitchen',
+      totalAmount: 10000,
+      startDate: now,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final databaseService = _NoopDatabaseService()
+      ..seedTransaction(
+        Transaction(
+          id: 'material-expense',
+          accountId: 'default_account',
+          amount: 1250,
+          type: 'expense',
+          category: 'EXP:Materials',
+          description: 'Cement',
+          date: now,
+          createdAt: now,
+          updatedAt: now,
+          contractId: contract.id,
+        ),
+      );
+    await contractService.addContract(contract);
+
+    await contractService.deleteContract(
+      contract.id,
+      databaseService: databaseService,
+    );
+
+    expect(
+      databaseService.transactions.single.contractId,
+      isNull,
+    );
+    expect(databaseService.transactions.single.amount, 1250);
+    expect(
+      contractService.contracts.any((item) => item.id == contract.id),
+      isFalse,
+    );
+  });
 }
 
 class _NoopDatabaseService implements DatabaseService {
+  final List<Transaction> _transactions = [];
+
+  @override
+  List<Transaction> get transactions => List.unmodifiable(_transactions);
+
+  void seedTransaction(Transaction transaction) {
+    _transactions.add(transaction);
+  }
+
   @override
   Future<bool> addTransaction(Transaction transaction) async => true;
+
+  @override
+  Future<bool> updateTransaction(Transaction transaction) async {
+    final index = _transactions.indexWhere((item) => item.id == transaction.id);
+    if (index >= 0) _transactions[index] = transaction;
+    return true;
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

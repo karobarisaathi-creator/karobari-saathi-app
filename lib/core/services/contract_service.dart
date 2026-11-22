@@ -195,6 +195,7 @@ class ContractService extends ChangeNotifier {
     ContractModel contract,
     ContractPayment payment, {
     Transaction? existing,
+    String? paymentMethod,
   }) {
     final note = payment.note.isNotEmpty ? payment.note : 'Installment';
     return Transaction(
@@ -209,7 +210,7 @@ class ContractService extends ChangeNotifier {
       rate: payment.amount,
       receivedAmount: contract.isIncoming ? payment.amount : 0,
       pendingAmount: 0,
-      paymentMethod: existing?.paymentMethod ?? 'cash',
+      paymentMethod: paymentMethod ?? existing?.paymentMethod ?? 'cash',
       isPending: false,
       createdAt: existing?.createdAt ?? payment.date,
       updatedAt: DateTime.now(),
@@ -290,14 +291,16 @@ class ContractService extends ChangeNotifier {
     required DatabaseService databaseService,
   }) async {
     await _ensureInitialized();
-    final contract = _requireContract(contractId);
-    for (final payment in contract.payments) {
-      await databaseService
-          .deleteTransaction('contract_${contract.id}_${payment.id}');
-    }
-    for (final payment in contract.laborPayments) {
-      await databaseService
-          .deleteTransaction('labor_${contract.id}_${payment.id}');
+    _requireContract(contractId);
+    final linkedTransactions = databaseService.transactions
+        .where((transaction) => transaction.contractId == contractId)
+        .toList();
+    for (final transaction in linkedTransactions) {
+      final unlinkedTransaction = Transaction.fromMap({
+        ...transaction.toMap(),
+        'contractId': null,
+      });
+      await databaseService.updateTransaction(unlinkedTransaction);
     }
     await _box!.delete(contractId);
     _loadFromBox();
@@ -308,6 +311,8 @@ class ContractService extends ChangeNotifier {
     required double amount,
     required String note,
     required DatabaseService databaseService,
+    DateTime? date,
+    String paymentMethod = 'cash',
   }) async {
     await _ensureInitialized();
     _validatePaymentAmount(amount);
@@ -323,14 +328,17 @@ class ContractService extends ChangeNotifier {
     final newPayment = ContractPayment(
       id: _uuid.v4(),
       amount: amount,
-      date: now,
+      date: date ?? now,
       note: note.isNotEmpty ? note : 'Contract Installment',
     );
     await updateContract(
         contract.copyWith(payments: [...contract.payments, newPayment]));
     if (contract.partyId.isNotEmpty) {
-      await databaseService
-          .addTransaction(_clientTransaction(contract, newPayment));
+      await databaseService.addTransaction(_clientTransaction(
+        contract,
+        newPayment,
+        paymentMethod: paymentMethod,
+      ));
     }
   }
 

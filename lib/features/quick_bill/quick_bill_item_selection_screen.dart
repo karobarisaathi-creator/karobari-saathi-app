@@ -12,10 +12,10 @@ import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/features/quick_bill/widgets/quick_bill_item_grid_card.dart';
 import 'quick_bill_preview_screen.dart';
@@ -479,38 +479,31 @@ class _QuickBillItemSelectionScreenState
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
+      appBar: ScreenAppBar(
         title: isUrdu ? 'فوری بل' : 'Quick Bill',
+        isUrdu: isUrdu,
         showBackButton: false,
-        leadingWidth: 50,
-        leading: IconButton(
-          icon: const Icon(Icons.add_circle_outline_rounded,
-              color: AppTheme.verifiedGold, size: 26),
-          tooltip: isUrdu ? 'کسٹم اشیاء شامل کریں' : 'Add Custom Item',
-          onPressed: () => setState(() {
-            _isCustomItemExpanded = !_isCustomItemExpanded;
-            if (_isCustomItemExpanded) {
-              _customNameCtrl.clear();
-              _customRateCtrl.clear();
-              _customUnit = null;
-            }
-          }),
-        ),
         actions: [
           IconButton(
+            tooltip: _isCustomItemExpanded
+                ? (isUrdu ? 'بند کریں' : 'Close custom item')
+                : (isUrdu ? 'کسٹم آئٹم شامل کریں' : 'Add custom item'),
             icon: Icon(
-              _showSearch ? PhosphorIcons.x() : PhosphorIcons.magnifyingGlass(),
-              color: Colors.white,
+              _isCustomItemExpanded
+                  ? Icons.close_rounded
+                  : Icons.add_circle_outline_rounded,
             ),
-            tooltip: isUrdu ? 'تلاش' : 'Search',
             onPressed: () {
               setState(() {
-                _showSearch = !_showSearch;
-                if (!_showSearch) _query = '';
+                if (_isCustomItemExpanded) {
+                  _customNameCtrl.clear();
+                  _customRateCtrl.clear();
+                  _customUnit = null;
+                }
+                _isCustomItemExpanded = !_isCustomItemExpanded;
               });
             },
           ),
-          const SizedBox(width: 6),
         ],
       ),
       body: SingleChildScrollView(
@@ -886,8 +879,9 @@ class _QuickBillItemSelectionScreenState
       ),
       floatingActionButton: totalSelectedCount > 0
           ? FloatingActionButton.extended(
+              heroTag: 'quickBillCart',
               onPressed: () => _openPreview(stockSelected, isUrdu),
-              backgroundColor: AppTheme.goldColor,
+              backgroundColor: AppTheme.slateColor,
               elevation: 6,
               icon: Container(
                 padding: const EdgeInsets.all(6),
@@ -1017,7 +1011,7 @@ class _QuickBillItemSelectionScreenState
     required VoidCallback onTap,
   }) {
     return Material(
-      color: isActive ? AppTheme.goldColor : Colors.transparent,
+      color: isActive ? AppTheme.slateColor : Colors.transparent,
       child: InkWell(
         onTap: onTap,
         child: Container(
@@ -1098,7 +1092,7 @@ class _QuickBillItemSelectionScreenState
       stock: maximum ?? 1000000000,
       quantity: line.quantity,
       stopWhenOut: line.stopWhenOut,
-      accentColor: AppTheme.goldColor,
+      accentColor: AppTheme.slateColor,
       onIncrement: () {
         setState(() {
           line.quantity = !line.stopWhenOut || maximum == null

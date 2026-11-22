@@ -10,7 +10,6 @@ import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/config/professions_config.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/widgets/custom_app_bar.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/utils/formatters.dart';
 
@@ -87,15 +86,6 @@ class _CompleteSeasonScreenState extends State<CompleteSeasonScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: CustomAppBar(
-        title: widget.isEditingDetails
-            ? (isUrdu
-                ? '${_workNoun(isUrdu)} کی تفصیلات'
-                : '${_workNoun(isUrdu)} Details')
-            : (isUrdu
-                ? '${_workNoun(isUrdu)} مکمل کریں'
-                : 'Complete ${_workNoun(isUrdu)}'),
-      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
         child: Column(

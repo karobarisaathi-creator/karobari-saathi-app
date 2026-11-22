@@ -98,6 +98,7 @@ class WorkerPayrollService extends ChangeNotifier {
     WorkerWagePayment payment,
     String accountId, {
     Transaction? existing,
+    String paymentMethod = 'cash',
   }) {
     return Transaction(
       id: 'worker_wage_${payment.id}',
@@ -115,7 +116,7 @@ class WorkerPayrollService extends ChangeNotifier {
       pendingAmount: 0,
       referenceNumber:
           '${Transaction.workerWagePaymentReference}:${payment.id}',
-      paymentMethod: existing?.paymentMethod ?? 'cash',
+      paymentMethod: existing?.paymentMethod ?? paymentMethod,
       isPending: false,
       createdAt: existing?.createdAt ?? payment.date,
       updatedAt: DateTime.now(),
@@ -295,6 +296,8 @@ class WorkerPayrollService extends ChangeNotifier {
     required String? contractId,
     required ContractService contractService,
     required DatabaseService databaseService,
+    DateTime? date,
+    String paymentMethod = 'cash',
   }) async {
     await _ensureInitialized();
     if (workerId.trim().isEmpty) {
@@ -308,10 +311,14 @@ class WorkerPayrollService extends ChangeNotifier {
       id: _uuid.v4(),
       workerId: workerId,
       amount: amount,
-      date: DateTime.now(),
+      date: date ?? DateTime.now(),
       note: note.trim(),
     );
-    final transaction = _wagePaymentTransaction(payment, account.id);
+    final transaction = _wagePaymentTransaction(
+      payment,
+      account.id,
+      paymentMethod: paymentMethod,
+    );
     await databaseService.addTransaction(transaction);
     try {
       await _box!.put('payment_${payment.id}', payment.toMap());
@@ -450,6 +457,48 @@ class WorkerPayrollService extends ChangeNotifier {
         contractId: previousContractId,
       );
       rethrow;
+    }
+    _loadFromBox();
+  }
+
+  Future<void> deleteWorkerRecords({
+    required String workerId,
+    required ContractService contractService,
+    required DatabaseService databaseService,
+  }) async {
+    await _ensureInitialized();
+    final workerPayments = getPaymentsForWorker(workerId);
+    for (final payment in workerPayments) {
+      final linkedContractId =
+          contractService.contractIdForPayrollPayment(payment.id);
+      if (linkedContractId != null) {
+        final account = databaseService.getAccount(workerId);
+        await contractService.syncPayrollLaborPayment(
+          paymentId: payment.id,
+          workerId: workerId,
+          workerName: account?.name ?? workerId,
+          amount: payment.amount,
+          date: payment.date,
+          note: payment.note,
+          contractId: null,
+        );
+      }
+      await _box!.delete('payment_${payment.id}');
+      await databaseService.deleteTransaction('worker_wage_${payment.id}');
+    }
+
+    for (final record in getAttendanceForWorker(workerId)) {
+      await databaseService.deleteTransaction(_attendanceTransactionId(record));
+    }
+    final workerRecords = _box!
+        .toMap()
+        .entries
+        .where((entry) =>
+            entry.value is Map && entry.value['workerId'] == workerId)
+        .map((entry) => entry.key)
+        .toList();
+    for (final key in workerRecords) {
+      await _box!.delete(key);
     }
     _loadFromBox();
   }
