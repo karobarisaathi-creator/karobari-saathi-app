@@ -1,7 +1,6 @@
 // lib/features/contracts/contract_detail_screen.dart
 
 import 'package:account_app/features/contracts/workers_list_screen.dart';
-import 'package:account_app/features/contracts/worker_attendance_screen.dart';
 import 'package:account_app/features/accounts/add_transaction_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
