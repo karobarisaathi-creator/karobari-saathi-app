@@ -3,22 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:account_app/core/models/bottom_bar_profile_type.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
-import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 
 class MainBottomNavBar extends StatefulWidget {
   final int selectedIndex;
   final ValueChanged<int> onItemTapped;
-  final BottomBarProfileType profileType;
 
   const MainBottomNavBar({
     super.key,
     required this.selectedIndex,
     required this.onItemTapped,
-    this.profileType = BottomBarProfileType.shopkeeper,
   });
 
   @override
@@ -26,17 +22,55 @@ class MainBottomNavBar extends StatefulWidget {
 }
 
 class _MainBottomNavBarState extends State<MainBottomNavBar> {
+  static const int _destinationCount = 5;
+  static const int _pageCount = 25;
+  static const int _middlePage = 10;
+  static const int _recenterThreshold = 4;
+
   bool _isOffline = true;
   bool _hasConnectivityState = false;
   bool _showConnectivityStatus = false;
   int _connectivityRevision = 0;
+  late int _centeredPage;
+  late final PageController _pageController;
   Timer? _statusDismissTimer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   @override
   void initState() {
     super.initState();
+    _centeredPage = _middlePage +
+        widget.selectedIndex.clamp(0, _destinationCount - 1).toInt();
+    _pageController = PageController(
+      initialPage: _centeredPage,
+      viewportFraction: 1 / _destinationCount,
+    );
     _initConnectivityListener();
+  }
+
+  @override
+  void didUpdateWidget(covariant MainBottomNavBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedIndex != widget.selectedIndex &&
+        _pageController.hasClients) {
+      final currentPage =
+          (_pageController.page ?? _centeredPage.toDouble()).round();
+      final currentIndex = currentPage % _destinationCount;
+      final selectedIndex =
+          widget.selectedIndex.clamp(0, _destinationCount - 1).toInt();
+      var pageDelta = (selectedIndex - currentIndex + _destinationCount) %
+          _destinationCount;
+      if (pageDelta > _destinationCount ~/ 2) {
+        pageDelta -= _destinationCount;
+      }
+      final targetPage =
+          (currentPage + pageDelta).clamp(0, _pageCount - 1).toInt();
+      _pageController.animateToPage(
+        targetPage,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   void _initConnectivityListener() {
@@ -58,6 +92,22 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
       },
     );
     _loadInitialConnectivity();
+  }
+
+  void _handlePageChanged(int page) {
+    var centeredPage = page;
+    if (page <= _middlePage - _recenterThreshold) {
+      centeredPage += _destinationCount;
+    } else if (page >= _middlePage + _recenterThreshold) {
+      centeredPage -= _destinationCount;
+    }
+
+    if (centeredPage != page && _pageController.hasClients) {
+      _pageController.jumpToPage(centeredPage);
+    }
+    if (mounted && _centeredPage != centeredPage) {
+      setState(() => _centeredPage = centeredPage);
+    }
   }
 
   Future<void> _loadInitialConnectivity() async {
@@ -108,6 +158,7 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
   void dispose() {
     _statusDismissTimer?.cancel();
     _connectivitySubscription?.cancel();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -167,50 +218,21 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
           ),
           SizedBox(
             height: 60,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: _buildNavItem(
-                    index: 0,
-                    icon: PhosphorIcons.circle(),
-                    activeIcon: PhosphorIcons.circle(PhosphorIconsStyle.fill),
-                  ),
-                ),
-                Expanded(
-                  child: _buildNavItem(
-                    index: widget.profileType == BottomBarProfileType.simple
-                        ? 2
-                        : 1,
-                    icon: widget.profileType == BottomBarProfileType.simple
-                        ? PhosphorIcons.receipt()
-                        : PhosphorIcons.users(),
-                    activeIcon:
-                        widget.profileType == BottomBarProfileType.simple
-                            ? PhosphorIcons.receipt(PhosphorIconsStyle.fill)
-                            : PhosphorIcons.users(PhosphorIconsStyle.fill),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: _buildRolePill(isUrdu, fontFamily),
-                ),
-                Expanded(
-                  child: _buildNavItem(
-                    index: 3,
-                    icon: PhosphorIcons.briefcase(),
-                    activeIcon:
-                        PhosphorIcons.briefcase(PhosphorIconsStyle.fill),
-                  ),
-                ),
-                Expanded(
-                  child: _buildNavItem(
-                    index: 4,
-                    icon: PhosphorIcons.clipboardText(),
-                    activeIcon: PhosphorIcons.clipboardText(PhosphorIconsStyle.fill),
-                  ),
-                ),
-              ],
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: _pageCount,
+              clipBehavior: Clip.none,
+              onPageChanged: _handlePageChanged,
+              itemBuilder: (context, page) {
+                final index = page % _destinationCount;
+                return _buildNavItem(
+                  index: index,
+                  isUrdu: isUrdu,
+                  fontFamily: fontFamily,
+                  isSelected: index == widget.selectedIndex,
+                  isCentered: page == _centeredPage,
+                );
+              },
             ),
           ),
         ],
@@ -220,161 +242,83 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
 
   Widget _buildNavItem({
     required int index,
-    required IconData icon,
-    required IconData activeIcon,
+    required bool isUrdu,
+    required String? fontFamily,
+    required bool isSelected,
+    required bool isCentered,
   }) {
-    final isActive = widget.selectedIndex == index;
+    final label = _navLabel(index, isUrdu);
+    final iconColor = isCentered
+        ? Colors.white
+        : isSelected
+            ? AppTheme.themeColor
+            : AppTheme.textSecondary.withValues(alpha: 0.7);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => widget.onItemTapped(index),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          height: 66,
-          alignment: Alignment.center,
-          child: Icon(
-            isActive ? activeIcon : icon,
-            size: 22,
-            color: isActive
-                ? AppTheme.themeColor
-                : AppTheme.textSecondary.withValues(alpha: 0.7),
+    return Tooltip(
+      message: label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => widget.onItemTapped(index),
+          borderRadius: BorderRadius.circular(999),
+          child: Center(
+            child: isCentered
+                ? Container(
+                    width: 108,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppTheme.verifiedGold,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildNavIcon(index, iconColor),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: UrduAwareText(
+                            label,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              fontFamily: fontFamily,
+                              height: 1.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : _buildNavIcon(index, iconColor),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildRolePill(bool isUrdu, String? fontFamily) {
-    final destinationIndex = switch (widget.profileType) {
-      BottomBarProfileType.contractor => 5,
-      BottomBarProfileType.shopkeeper => 2,
-      BottomBarProfileType.simple => 1,
+  Widget _buildNavIcon(int index, Color color) {
+    final icon = switch (index) {
+      0 => PhosphorIcons.circle(),
+      1 => PhosphorIcons.users(),
+      2 => PhosphorIcons.receipt(),
+      3 => PhosphorIcons.briefcase(),
+      _ => PhosphorIcons.clipboardText(),
     };
-    final label = switch (widget.profileType) {
-      BottomBarProfileType.contractor => isUrdu ? 'ٹھیکے' : 'Contracts',
-      BottomBarProfileType.shopkeeper => isUrdu ? 'فوری بل' : 'Bill',
-      BottomBarProfileType.simple => isUrdu ? 'پارٹیز' : 'Parties',
-    };
-    final icon = switch (widget.profileType) {
-      BottomBarProfileType.contractor => PhosphorIcons.briefcase(),
-      BottomBarProfileType.shopkeeper => PhosphorIcons.lightning(),
-      BottomBarProfileType.simple => PhosphorIcons.users(),
-    };
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => widget.onItemTapped(destinationIndex),
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          height: 66,
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppTheme.verifiedGold,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 12,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  size: 18,
-                  color: Colors.white,
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: UrduAwareText(
-                    label,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      fontFamily: fontFamily,
-                      letterSpacing: 0.2,
-                      height: 1.2,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+    return Icon(icon, size: 22, color: color);
   }
 
-  Widget _buildNotificationItem({int index = 4}) {
-    final isActive = widget.selectedIndex == index;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => widget.onItemTapped(index),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          height: 66,
-          alignment: Alignment.center,
-          child: Consumer<NotificationService>(
-            builder: (context, notifService, child) {
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Icon(
-                    isActive
-                        ? PhosphorIcons.bell(PhosphorIconsStyle.fill)
-                        : PhosphorIcons.bell(),
-                    size: 22,
-                    color: isActive
-                        ? AppTheme.themeColor
-                        : AppTheme.textSecondary.withValues(alpha: 0.7),
-                  ),
-                  if (notifService.unreadCount > 0)
-                    Positioned(
-                      top: -4,
-                      right: -6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 1,
-                        ),
-                        constraints: const BoxConstraints(minWidth: 16),
-                        decoration: BoxDecoration(
-                          color: AppTheme.expenseColor,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: UrduAwareText(
-                          notifService.unreadCount > 99
-                              ? '99+'
-                              : '${notifService.unreadCount}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            height: 1.2,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-        ),
-      ),
-    );
+  String _navLabel(int index, bool isUrdu) {
+    return switch (index) {
+      0 => isUrdu ? 'ہوم' : 'Home',
+      1 => isUrdu ? 'پارٹیز' : 'Parties',
+      2 => isUrdu ? 'فوری بل' : 'Bills',
+      3 => isUrdu ? 'پیشے' : 'Professions',
+      _ => isUrdu ? 'ٹھیکے' : 'Contracts',
+    };
   }
 }

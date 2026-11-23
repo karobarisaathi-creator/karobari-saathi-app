@@ -698,7 +698,7 @@ class _CombinedHeader extends StatelessWidget {
           account: party,
           initialAmount: outstandingAmount > 0.01 ? outstandingAmount : null,
           fixedTransactionType: transactionType,
-          isPartySettlement: true,
+          mode: AddTransactionMode.partySettlement,
         ),
       ),
     );
@@ -869,7 +869,6 @@ class _TransactionsTabState extends State<_TransactionsTab> {
       ],
     );
   }
-
 
   // ═══ List Labels ═══
   Widget _buildListLabels() {
@@ -1717,7 +1716,6 @@ class _AnalysisTabState extends State<_AnalysisTab> {
           widget.isUrdu ? 'تعلق کے دن/دورانیہ' : 'Relationship Duration',
           PhosphorIcons.calendar(),
         ),
-
         const SizedBox(height: 8),
         _fullWidthStatCard(
           _formatVolume(_totalVolume),

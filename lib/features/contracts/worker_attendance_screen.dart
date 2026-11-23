@@ -734,8 +734,7 @@ class _WorkerAttendanceScreenState extends State<WorkerAttendanceScreen> {
           builder: (_) => AddTransactionScreen(
             account: widget.worker,
             fixedTransactionType: 'expense',
-            isPartySettlement: true,
-            isWorkerWagePayment: true,
+            mode: AddTransactionMode.workerWagePayment,
             initialDescription:
                 isUrdu ? 'مزدوری کی ادائیگی' : 'Worker wage payment',
             initialContractId: eligibleContracts.length == 1

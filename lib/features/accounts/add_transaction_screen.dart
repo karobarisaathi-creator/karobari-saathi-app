@@ -26,6 +26,14 @@ import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'package:account_app/core/utils/bill_numbering.dart';
 import 'package:account_app/core/utils/account_balance_utils.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/core/utils/helpers.dart';
+
+enum AddTransactionMode {
+  standard,
+  partySettlement,
+  workerWagePayment,
+  contractInstallment,
+}
 
 class AddTransactionScreen extends StatefulWidget {
   final Account? account;
@@ -34,23 +42,25 @@ class AddTransactionScreen extends StatefulWidget {
   final double? initialAmount;
   final Profession? forcedProfession;
   final String? fixedTransactionType;
-  final bool isPartySettlement;
-  final bool isWorkerWagePayment;
-  final bool isContractInstallment;
+  final AddTransactionMode mode;
   final String? initialContractId;
 
   const AddTransactionScreen({
+    super.key,
     this.account,
     this.transactionToEdit,
     this.initialDescription,
     this.initialAmount,
     this.forcedProfession,
     this.fixedTransactionType,
-    this.isPartySettlement = false,
-    this.isWorkerWagePayment = false,
-    this.isContractInstallment = false,
+    this.mode = AddTransactionMode.standard,
     this.initialContractId,
   });
+
+  bool get isPartySettlement => mode != AddTransactionMode.standard;
+  bool get isWorkerWagePayment => mode == AddTransactionMode.workerWagePayment;
+  bool get isContractInstallment =>
+      mode == AddTransactionMode.contractInstallment;
 
   @override
   _AddTransactionScreenState createState() => _AddTransactionScreenState();
@@ -114,7 +124,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     super.initState();
     _selectedContractId = widget.initialContractId;
     _stockService = Provider.of<StockService>(context, listen: false);
-    _stockService.addListener(_loadData);
 
     if (widget.transactionToEdit != null) {
       final t = widget.transactionToEdit!;
@@ -223,6 +232,178 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     // Bill number left empty by default as requested
   }
 
+  bool _validateStockAvailability(String type, bool isUrdu) {
+    final stockService = Provider.of<StockService>(context, listen: false);
+    final requestedStockById = <String, double>{};
+    for (final entry in _itemEntries) {
+      if (widget.isPartySettlement) continue;
+      final stockItemId = entry.stockItemId;
+      if (stockItemId == null) continue;
+      final stockItem = stockService.items.firstWhere(
+        (item) => item.id == stockItemId,
+        orElse: () => StockItem(
+          id: '',
+          name: '',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+      if (stockItem.id.isEmpty) continue;
+
+      final defaultRate =
+          type == 'income' ? stockItem.sellingPrice : stockItem.purchasePrice;
+      final currentRate =
+          Formatters.tryParseAmount(entry.rateController.text) ?? 0;
+      if (defaultRate > 0 &&
+          (!entry.rateWasManuallyEdited ||
+              currentRate == entry.stockSuggestedRate)) {
+        _setSuggestedStockRate(entry, defaultRate);
+      }
+
+      if (type == 'income' && stockItem.trackStock) {
+        requestedStockById.update(
+          stockItemId,
+          (quantity) => quantity + _effectiveEntryQuantity(entry),
+          ifAbsent: () => _effectiveEntryQuantity(entry),
+        );
+      }
+    }
+
+    for (final requested in requestedStockById.entries) {
+      final stockItem = stockService.items.firstWhere(
+        (item) => item.id == requested.key,
+      );
+      final availableQuantity = stockService.availableStockForTransaction(
+        stockItem.id,
+        excludingTransactionId: widget.transactionToEdit?.id,
+      );
+      if (!StockService.canSellQuantity(
+        availableStock: availableQuantity,
+        quantity: requested.value,
+        stopWhenOut: stockItem.stopWhenOut,
+      )) {
+        _showSnackBar(
+          isUrdu
+              ? '${stockItem.name} کا دستیاب اسٹاک ${availableQuantity.toStringAsFixed(1)} ہے'
+              : 'Available ${stockItem.name} stock is ${availableQuantity.toStringAsFixed(1)}',
+          true,
+        );
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Future<void> _saveSpecialPayment(double amount, bool isUrdu) async {
+    try {
+      final databaseService =
+          Provider.of<DatabaseService>(context, listen: false);
+      final contractService =
+          Provider.of<ContractService>(context, listen: false);
+      final notificationService =
+          Provider.of<NotificationService>(context, listen: false);
+      final note = _itemEntries
+          .map((entry) => entry.descriptionController.text.trim())
+          .where((description) => description.isNotEmpty)
+          .join(', ');
+
+      if (widget.isWorkerWagePayment) {
+        final payrollService =
+            Provider.of<WorkerPayrollService>(context, listen: false);
+        await payrollService.addWagePayment(
+          workerId: _selectedAccountId!,
+          amount: amount,
+          note: note,
+          contractId: _selectedContractId,
+          contractService: contractService,
+          databaseService: databaseService,
+          date: _selectedDate,
+          paymentMethod: _selectedPaymentMethod,
+        );
+        if (!mounted) return;
+        AppToast.success(
+          context,
+          isUrdu ? 'مزدوری کی ادائیگی محفوظ ہو گئی' : 'Wage payment saved',
+        );
+        Navigator.pop(context, true);
+        return;
+      }
+
+      final contractId = widget.initialContractId!;
+      final contract = contractService.contracts
+          .where((entry) => entry.id == contractId)
+          .firstOrNull;
+      if (contract == null) {
+        throw StateError('The selected contract is unavailable.');
+      }
+      final existingPaymentIds =
+          contract.payments.map((payment) => payment.id).toSet();
+      await contractService.addClientPayment(
+        contractId: contractId,
+        amount: amount,
+        note: note,
+        databaseService: databaseService,
+        date: _selectedDate,
+        paymentMethod: _selectedPaymentMethod,
+      );
+
+      final updatedContract = contractService.contracts
+          .where((entry) => entry.id == contractId)
+          .firstOrNull;
+      final newPayment = updatedContract?.payments
+          .where((payment) => !existingPaymentIds.contains(payment.id))
+          .firstOrNull;
+      final noticeMessage = newPayment == null
+          ? (isUrdu
+              ? 'قسط محفوظ ہے، مگر اطلاع کے لیے لین دین نہیں ملا'
+              : 'Installment saved, but its transaction was unavailable for notice')
+          : await _notifyContractInstallment(
+              transactionId: 'contract_${contractId}_${newPayment.id}',
+              databaseService: databaseService,
+              notificationService: notificationService,
+              isUrdu: isUrdu,
+            );
+      if (!mounted) return;
+      if (noticeMessage == null) {
+        AppToast.success(
+          context,
+          isUrdu
+              ? 'قسط محفوظ ہو گئی اور اطلاع بھیج دی گئی'
+              : 'Installment saved and party notified',
+        );
+      } else {
+        AppToast.warning(
+          context,
+          isUrdu
+              ? 'قسط محفوظ؛ اطلاع نہ بھیجی جا سکی'
+              : 'Installment saved; notice needs attention',
+          subtitle: noticeMessage,
+        );
+      }
+      Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _activeActionType = null;
+      });
+      if (error is StateError && widget.isContractInstallment) {
+        AppToast.error(
+          context,
+          isUrdu
+              ? 'متعلقہ ٹھیکہ دستیاب نہیں'
+              : 'The selected contract is unavailable',
+        );
+      } else {
+        AppToast.error(
+          context,
+          isUrdu ? 'ادائیگی محفوظ نہیں ہو سکی' : 'Could not save payment',
+          subtitle: error.toString(),
+        );
+      }
+    }
+  }
+
   void _setupDateListener() {
     _dateInputController.addListener(() {
       String text = _dateInputController.text;
@@ -240,26 +421,108 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             TextPosition(offset: _dateInputController.text.length));
       }
 
-      // Update selectedDate when format is valid DD/MM/YY
-      if (text.length == 8) {
-        try {
-          List<String> parts = text.split('/');
-          int day = int.parse(parts[0]);
-          int month = int.parse(parts[1]);
-          int yearPart = int.parse(parts[2]);
-
-          int fullYear = yearPart < 50 ? 2000 + yearPart : 1900 + yearPart;
-
-          DateTime newDate = DateTime(fullYear, month, day);
-
-          if (newDate.day == day && newDate.month == month) {
-            _selectedDate = newDate;
-          }
-        } catch (e) {
-          debugPrint("Date parsing error: $e");
-        }
-      }
+      final parsedDate = _parseDateInput(text);
+      if (parsedDate != null) _selectedDate = parsedDate;
     });
+  }
+
+  DateTime? _parseDateInput(String text) {
+    final match = RegExp(r'^(\d{2})/(\d{2})/(\d{2})$').firstMatch(text.trim());
+    if (match == null) return null;
+
+    final day = int.parse(match.group(1)!);
+    final month = int.parse(match.group(2)!);
+    final yearPart = int.parse(match.group(3)!);
+    final year = yearPart < 50 ? 2000 + yearPart : 1900 + yearPart;
+    final date = DateTime(year, month, day);
+    if (date.year != year || date.month != month || date.day != day) {
+      return null;
+    }
+    return date;
+  }
+
+  Future<String?> _notifyContractInstallment({
+    required String transactionId,
+    required DatabaseService databaseService,
+    required NotificationService notificationService,
+    required bool isUrdu,
+  }) async {
+    final transaction = databaseService.getTransaction(transactionId);
+    if (transaction == null) {
+      return isUrdu
+          ? 'قسط محفوظ ہے، مگر اطلاع کے لیے لین دین نہیں ملا'
+          : 'Installment saved, but its transaction was unavailable for notice';
+    }
+
+    final party = databaseService.getAccount(transaction.accountId);
+    if (party == null || party.phone.trim().isEmpty) {
+      return isUrdu
+          ? 'قسط محفوظ ہے، مگر پارٹی کا فون نمبر نہیں ملا'
+          : 'Installment saved, but the party phone number is missing';
+    }
+
+    try {
+      final cloudSynced =
+          await databaseService.syncTransactionToCloud(transaction);
+      if (!cloudSynced) {
+        final queued =
+            await notificationService.enqueuePendingPartyNotification(
+          transaction: transaction,
+          partyPhoneNumber: party.phone,
+        );
+        return isUrdu
+            ? (queued
+                ? 'اطلاع انٹرنیٹ ملنے پر بھیجی جائے گی'
+                : 'قسط محفوظ ہے، اطلاع قطار میں محفوظ نہیں ہو سکی')
+            : (queued
+                ? 'Notice queued until internet is available'
+                : 'Installment saved, but its notice could not be queued');
+      }
+
+      final result = await notificationService.notifyPartyByPhone(
+        partyPhoneNumber: party.phone,
+        amount: transaction.amount,
+        transactionType: transaction.type,
+        category: transaction.category,
+        paymentMethod: transaction.paymentMethod,
+        description: transaction.description,
+        receivedAmount: transaction.receivedAmount,
+        pendingAmount: transaction.pendingAmount,
+        transactionId: transaction.id,
+        transactionDate: transaction.date,
+        referenceNumber: transaction.referenceNumber,
+      );
+      switch (result) {
+        case PartyNotificationResult.savedToInbox:
+          return null;
+        case PartyNotificationResult.recipientNotFound:
+          return isUrdu
+              ? 'پارٹی کا ایپ اکاؤنٹ نہیں ملا؛ اطلاع نہیں بھیجی گئی'
+              : 'Party app account not found; no notice was sent';
+        case PartyNotificationResult.sameUser:
+          return isUrdu
+              ? 'یہ آپ کا اپنا نمبر ہے؛ اطلاع نہیں بھیجی گئی'
+              : 'This is your own number; no notice was sent';
+        case PartyNotificationResult.notSignedIn:
+          return isUrdu
+              ? 'سائن اِن نہ ہونے کے باعث اطلاع نہیں بھیجی گئی'
+              : 'Not signed in; no notice was sent';
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Could not notify the contract party: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      final queued = await notificationService.enqueuePendingPartyNotification(
+        transaction: transaction,
+        partyPhoneNumber: party.phone,
+      );
+      return isUrdu
+          ? (queued
+              ? 'اطلاع قطار میں محفوظ؛ بعد میں بھیجی جائے گی'
+              : 'قسط محفوظ ہے، اطلاع نہیں بھیجی جا سکی')
+          : (queued
+              ? 'Notice queued for retry'
+              : 'Installment saved, but notice could not be sent');
+    }
   }
 
   void _addNewItem() {
@@ -1690,68 +1953,48 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       return;
     }
 
-    final stockService = Provider.of<StockService>(context, listen: false);
-    final requestedStockById = <String, double>{};
-    for (final entry in _itemEntries) {
-      if (widget.isPartySettlement) continue;
-      final stockItemId = entry.stockItemId;
-      if (stockItemId == null) continue;
-      final stockItem = stockService.items.firstWhere(
-        (item) => item.id == stockItemId,
-        orElse: () => StockItem(
-          id: '',
-          name: '',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ),
+    final enteredDate = _parseDateInput(_dateInputController.text);
+    if (enteredDate == null) {
+      _showSnackBar(
+        isUrdu
+            ? 'درست تاریخ درج کریں (دن/مہینہ/سال)'
+            : 'Enter a valid date (DD/MM/YY)',
+        true,
       );
-      if (stockItem.id.isEmpty) continue;
+      return;
+    }
+    _selectedDate = enteredDate;
 
-      final defaultRate =
-          type == 'income' ? stockItem.sellingPrice : stockItem.purchasePrice;
-      final currentRate =
-          Formatters.tryParseAmount(entry.rateController.text) ?? 0;
-      if (defaultRate > 0 &&
-          (!entry.rateWasManuallyEdited ||
-              currentRate == entry.stockSuggestedRate)) {
-        _setSuggestedStockRate(entry, defaultRate);
-      }
-
-      if (type == 'income' && stockItem.trackStock) {
-        requestedStockById.update(
-          stockItemId,
-          (quantity) => quantity + _effectiveEntryQuantity(entry),
-          ifAbsent: () => _effectiveEntryQuantity(entry),
-        );
-      }
+    if (widget.isWorkerWagePayment && _selectedAccountId == null) {
+      _showSnackBar(
+        isUrdu ? 'مزدور منتخب کریں' : 'Select a worker',
+        true,
+      );
+      return;
+    }
+    if (widget.isContractInstallment && widget.initialContractId == null) {
+      _showSnackBar(
+        isUrdu ? 'متعلقہ ٹھیکہ منتخب نہیں ہے' : 'No contract is selected',
+        true,
+      );
+      return;
     }
 
-    for (final requested in requestedStockById.entries) {
-      final stockItem = stockService.items.firstWhere(
-        (item) => item.id == requested.key,
-      );
-      final availableQuantity = stockService.availableStockForTransaction(
-        stockItem.id,
-        excludingTransactionId: widget.transactionToEdit?.id,
-      );
-      if (!StockService.canSellQuantity(
-        availableStock: availableQuantity,
-        quantity: requested.value,
-        stopWhenOut: stockItem.stopWhenOut,
-      )) {
-        _showSnackBar(
-          isUrdu
-              ? '${stockItem.name} کا دستیاب اسٹاک ${availableQuantity.toStringAsFixed(1)} ہے'
-              : 'Available ${stockItem.name} stock is ${availableQuantity.toStringAsFixed(1)}',
-          true,
-        );
-        return;
-      }
-    }
+    if (!_validateStockAvailability(type, isUrdu)) return;
 
     final grandTotal = Formatters.tryParseAmount(_amountController.text) ?? 0;
     if (grandTotal <= 0) {
       _showSnackBar(isUrdu ? 'رقم درج کریں' : 'Please enter amount', true);
+      return;
+    }
+    if ((widget.isWorkerWagePayment || widget.isContractInstallment) &&
+        widget.transactionToEdit != null) {
+      AppToast.error(
+        context,
+        isUrdu
+            ? 'اس ادائیگی میں ترمیم یہاں سے ممکن نہیں'
+            : 'Editing this payment is not available here',
+      );
       return;
     }
 
@@ -1761,60 +2004,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _saveStage = 'local';
     });
     if (widget.isWorkerWagePayment || widget.isContractInstallment) {
-      try {
-        final databaseService =
-            Provider.of<DatabaseService>(context, listen: false);
-        final contractService =
-            Provider.of<ContractService>(context, listen: false);
-        final note = _itemEntries
-            .map((entry) => entry.descriptionController.text.trim())
-            .where((description) => description.isNotEmpty)
-            .join(', ');
-        if (widget.isWorkerWagePayment) {
-          final payrollService =
-              Provider.of<WorkerPayrollService>(context, listen: false);
-          await payrollService.addWagePayment(
-            workerId: _selectedAccountId!,
-            amount: grandTotal,
-            note: note,
-            contractId: _selectedContractId,
-            contractService: contractService,
-            databaseService: databaseService,
-            date: _selectedDate,
-            paymentMethod: _selectedPaymentMethod,
-          );
-        } else {
-          final contractId = widget.initialContractId;
-          if (contractId == null) {
-            throw StateError('A contract is required for this installment.');
-          }
-          await contractService.addClientPayment(
-            contractId: contractId,
-            amount: grandTotal,
-            note: note,
-            databaseService: databaseService,
-            date: _selectedDate,
-            paymentMethod: _selectedPaymentMethod,
-          );
-        }
-        if (!mounted) return;
-        AppToast.success(
-          context,
-          isUrdu ? 'مزدوری کی ادائیگی محفوظ ہو گئی' : 'Wage payment saved',
-        );
-        Navigator.pop(context, true);
-      } catch (error) {
-        if (!mounted) return;
-        setState(() {
-          _isLoading = false;
-          _activeActionType = null;
-        });
-        AppToast.error(
-          context,
-          isUrdu ? 'ادائیگی محفوظ نہیں ہو سکی' : 'Could not save payment',
-          subtitle: error.toString(),
-        );
-      }
+      await _saveSpecialPayment(grandTotal, isUrdu);
       return;
     }
 
@@ -1849,27 +2039,21 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       String? targetProfessionId = _selectedProfessionId;
 
       if (_selectedProfessionId != null) {
-        try {
-          // Look up profession globally as it could be a Season ID
-          final db = Provider.of<DatabaseService>(context, listen: false);
-          Profession? prof = db.getProfession(_selectedProfessionId!);
+        // Look up profession globally as it could be a Season ID.
+        final profession =
+            databaseService.getProfession(_selectedProfessionId!);
+        if (profession != null) {
+          profName = profession.name;
 
-          if (prof != null) {
-            profName = prof.name;
-
-            // If it's a master profession, try to find an active season
-            if (prof.parentId == null) {
-              final seasons =
-                  databaseService.getSeasons(_selectedProfessionId!);
-              final activeSeason =
-                  seasons.where((s) => s.isActive ?? true).firstOrNull;
-              if (activeSeason != null) {
-                targetProfessionId = activeSeason.id;
-              }
+          // If it's a master profession, try to find an active season.
+          if (profession.parentId == null) {
+            final seasons = databaseService.getSeasons(_selectedProfessionId!);
+            final activeSeason =
+                seasons.where((season) => season.isActive ?? true).firstOrNull;
+            if (activeSeason != null) {
+              targetProfessionId = activeSeason.id;
             }
           }
-        } catch (e) {
-          debugPrint("Error setting profession data: $e");
         }
       }
 
@@ -1877,8 +2061,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       final isPartySettlement = widget.isPartySettlement;
       final paymentMethod = isPartySettlement ? _selectedPaymentMethod : 'cash';
       final transaction = Transaction(
-        id: widget.transactionToEdit?.id ??
-            DateTime.now().millisecondsSinceEpoch.toString(),
+        id: widget.transactionToEdit?.id ?? AppHelpers.generateId(),
         accountId: _selectedAccountId ?? 'default_account',
         amount: grandTotal,
         receivedAmount: isPartySettlement
@@ -2065,13 +2248,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         AppToast.success(context, toastTitle, subtitle: toastSubtitle);
       }
       Navigator.pop(context, transaction);
-    } catch (e) {
+    } catch (error, stackTrace) {
+      debugPrint('Could not save transaction: $error');
+      debugPrintStack(stackTrace: stackTrace);
       if (mounted) {
         setState(() {
           _isLoading = false;
           _activeActionType = null;
         });
-        _showSnackBar('Error: $e', true);
+        AppToast.error(
+          context,
+          isUrdu ? 'لین دین محفوظ نہیں ہو سکا' : 'Could not save transaction',
+          subtitle: error.toString(),
+        );
       }
     }
     // Removed finally to prevent setState on a popped screen

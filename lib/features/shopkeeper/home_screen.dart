@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:account_app/features/order/shop_orders_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -30,10 +29,12 @@ import 'package:account_app/features/shopkeeper/customer_bills_screen.dart';
 import 'package:account_app/features/shopkeeper/add_edit_stock_item_screen.dart';
 import 'package:account_app/features/shopkeeper/sales_analytics_screen.dart';
 import 'package:account_app/features/shopkeeper/stock_detail_screen.dart';
-import 'package:account_app/features/order/nearby_businesses_screen.dart';
+import 'package:account_app/features/marketplace/marketplace_screen.dart';
 import 'package:account_app/features/contracts/contracts_list_screen.dart';
 import 'package:account_app/features/contracts/workers_list_screen.dart';
 import 'package:account_app/features/contracts/bulk_attendance_screen.dart';
+import 'package:account_app/features/accounts/party_list_screen.dart';
+import 'package:account_app/features/accounts/reports_screen.dart';
 import 'widgets/shopkeeper_tools_grid.dart';
 
 // ═══════════════════════════════════════════
@@ -53,15 +54,11 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _shopName = '';
-  String _businessName = '';
   String _userName = '';
   String _address = '';
   String? _bannerImageUrl;
   String? _profileImageUrl;
-  bool _isShopkeeper = false;
-  bool _isContractor = false;
   bool _isMenuExpanded = false;
-  int _nearbyShopsCount = 0;
   int _financialSummaryIndex = 0;
   Timer? _financialSummaryTimer;
 
@@ -89,17 +86,8 @@ class _HomeScreenState extends State<HomeScreen> {
       const Duration(seconds: 10),
       (_) {
         if (mounted) {
-          setState(() {
-            final availableSummaries = [
-              0,
-              if (_isContractor) 1,
-              if (_isShopkeeper) 2,
-            ];
-            final currentIndex =
-                availableSummaries.indexOf(_financialSummaryIndex);
-            _financialSummaryIndex = availableSummaries[
-                (currentIndex + 1) % availableSummaries.length];
-          });
+          setState(
+              () => _financialSummaryIndex = (_financialSummaryIndex + 1) % 4);
         }
       },
     );
@@ -128,16 +116,9 @@ class _HomeScreenState extends State<HomeScreen> {
           final data = doc.data();
           setState(() {
             _shopName = (data?['shopName'] ?? '').toString();
-            _businessName = (data?['businessName'] ?? '').toString();
             _userName =
                 (data?['displayName'] ?? user.displayName ?? '').toString();
             _address = (data?['businessAddress'] ?? '').toString();
-            final hasCoordinates =
-                data?['latitude'] != null && data?['longitude'] != null;
-            _isShopkeeper = _shopName.trim().isNotEmpty &&
-                (_address.trim().isNotEmpty || hasCoordinates);
-            _isContractor = _businessName.trim().isNotEmpty;
-            _financialSummaryIndex = 0;
             _bannerImageUrl = (data?['bannerImage'] ??
                     data?['bannerImageUrl'] ??
                     data?['bannerUrl'] ??
@@ -148,24 +129,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     user.photoURL ??
                     '')
                 .toString();
-          });
-        }
-
-        final shopsSnapshot =
-            await FirebaseFirestore.instance.collection('public_shops').get();
-        final currentUid = user.uid;
-        final nearbyCount = shopsSnapshot.docs
-            .where((doc) =>
-                doc.data()['role'] == 'shopkeeper' &&
-                doc.id != currentUid &&
-                (doc.data()['shopName'] ?? doc.data()['displayName'] ?? '')
-                    .toString()
-                    .trim()
-                    .isNotEmpty)
-            .length;
-        if (mounted) {
-          setState(() {
-            _nearbyShopsCount = nearbyCount;
           });
         }
       } catch (_) {}
@@ -193,8 +156,22 @@ class _HomeScreenState extends State<HomeScreen> {
         ? null
         : _calculateInventoryHealthScore(stockService);
     final contracts = contractService.contracts;
+    final allTransactions = databaseService.getAllTransactions();
+    final professionTransactions = allTransactions.where(
+      (transaction) => transaction.professionId?.isNotEmpty == true,
+    );
+    final professionIncome = professionTransactions
+        .where((transaction) => transaction.type == 'income')
+        .fold<double>(0, (total, transaction) => total + transaction.amount);
+    final professionExpense = professionTransactions
+        .where((transaction) => transaction.type == 'expense')
+        .fold<double>(0, (total, transaction) => total + transaction.amount);
     final totalContractAmount = contracts.fold<double>(
         0, (total, contract) => total + contract.totalAmount);
+    final contractDueAmount = contracts.fold<double>(
+      0,
+      (total, contract) => total + contract.remainingBalance,
+    );
     final installmentAmount = contracts.fold<double>(
       0,
       (total, contract) => total + contract.totalPaid,
@@ -208,7 +185,6 @@ class _HomeScreenState extends State<HomeScreen> {
           .map((worker) => worker.name.trim().toLowerCase())
           .where((name) => name.isNotEmpty),
     };
-    final allTransactions = databaseService.getAllTransactions();
     final workerDueAmount = databaseService.accounts
         .where((account) =>
             const {'worker', 'technician', 'employee'}
@@ -253,7 +229,10 @@ class _HomeScreenState extends State<HomeScreen> {
               totalPurchaseValue,
               totalSalesValue,
               lowStockCount,
+              professionIncome,
+              professionExpense,
               totalContractAmount,
+              contractDueAmount,
               workerDueAmount,
               installmentAmount,
               partyAccounts.length,
@@ -262,68 +241,14 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(8, 12, 8, 30),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildQuickActions(
-                      context,
-                      isUrdu,
-                      fontFamily,
-                      totalItems,
-                      _nearbyShopsCount,
-                      inventoryHealthScore,
-                      stockService.isLoading,
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _quickActionCard(
-                            isUrdu: isUrdu,
-                            fontFamily: fontFamily,
-                            title: isUrdu ? 'متعدد حاضری' : 'Bulk Attendance',
-                            sub: isUrdu
-                                ? 'ایک ساتھ تمام مزدوروں کی حاضری'
-                                : 'Mark attendance for all workers',
-                            icon: PhosphorIcons.calendarCheck(),
-                            color: AppTheme.themeColor,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const BulkAttendanceScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _quickActionCard(
-                            isUrdu: isUrdu,
-                            fontFamily: fontFamily,
-                            title: isUrdu
-                                ? 'ٹھیکے اور پراجیکٹس'
-                                : 'Contracts & Projects',
-                            sub: isUrdu
-                                ? 'ٹھیکے اور مزدوروں کی مزدوری'
-                                : 'Contracts & worker wages',
-                            icon: PhosphorIcons.fileText(),
-                            color: AppTheme.themeColor,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const ContractsListScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+                child: _buildQuickActions(
+                  context,
+                  isUrdu,
+                  fontFamily,
+                  totalItems,
+                  inventoryHealthScore,
+                  stockService.isLoading,
                 ),
               ),
             ),
@@ -389,7 +314,10 @@ class _HomeScreenState extends State<HomeScreen> {
     double purchaseVal,
     double salesVal,
     int lowStockCount,
+    double professionIncome,
+    double professionExpense,
     double totalContractAmount,
+    double contractDueAmount,
     double workerDueAmount,
     double installmentAmount,
     int partyCount,
@@ -602,83 +530,120 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 14),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 350),
-            child: Row(
+            child: SingleChildScrollView(
               key: ValueKey(_financialSummaryIndex),
-              children: [
-                if (_financialSummaryIndex == 0) ...[
-                  _statMini(
-                    '$partyCount',
-                    isUrdu ? 'پارٹیاں' : 'Parties',
-                    const Color(0xFFA3E635),
-                    fontFamily,
-                    isUrdu,
-                  ),
-                  const SizedBox(width: 8),
-                  _statMini(
-                    Formatters.formatAmountWithCurrency(totalReceivable),
-                    isUrdu ? 'لینے ہیں' : 'To Receive',
-                    const Color(0xFF93C5FD),
-                    fontFamily,
-                    isUrdu,
-                  ),
-                  const SizedBox(width: 8),
-                  _statMini(
-                    Formatters.formatAmountWithCurrency(totalPayable),
-                    isUrdu ? 'دینے ہیں' : 'To Pay',
-                    const Color(0xFFFCA5A5),
-                    fontFamily,
-                    isUrdu,
-                  ),
-                ] else if (_financialSummaryIndex == 1) ...[
-                  _statMini(
-                    Formatters.formatAmountWithCurrency(totalContractAmount),
-                    isUrdu ? 'کل ٹھیکہ رقم' : 'Total Contract',
-                    const Color(0xFFA3E635),
-                    fontFamily,
-                    isUrdu,
-                  ),
-                  const SizedBox(width: 8),
-                  _statMini(
-                    Formatters.formatAmountWithCurrency(workerDueAmount),
-                    isUrdu ? 'مزدوروں کا بقایا' : 'Worker Dues',
-                    const Color(0xFFFCA5A5),
-                    fontFamily,
-                    isUrdu,
-                  ),
-                  const SizedBox(width: 8),
-                  _statMini(
-                    Formatters.formatAmountWithCurrency(installmentAmount),
-                    isUrdu ? 'قسطوں کی رقم' : 'Installments',
-                    const Color(0xFF93C5FD),
-                    fontFamily,
-                    isUrdu,
-                  ),
-                ] else ...[
-                  _statMini(
-                    Formatters.formatAmountWithCurrency(purchaseVal),
-                    isUrdu ? 'خرید مالیت' : 'Purchase Val',
-                    const Color(0xFFA3E635),
-                    fontFamily,
-                    isUrdu,
-                  ),
-                  const SizedBox(width: 8),
-                  _statMini(
-                    Formatters.formatAmountWithCurrency(salesVal),
-                    isUrdu ? 'فروخت مالیت' : 'Sales Val',
-                    const Color(0xFF93C5FD),
-                    fontFamily,
-                    isUrdu,
-                  ),
-                  const SizedBox(width: 8),
-                  _statMini(
-                    '$lowStockCount',
-                    isUrdu ? 'کم اسٹاک' : 'Low Stock',
-                    const Color(0xFFFBBF24),
-                    fontFamily,
-                    isUrdu,
-                  ),
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: [
+                  if (_financialSummaryIndex == 0) ...[
+                    _statMini(
+                      '$partyCount',
+                      isUrdu ? 'پارٹیاں' : 'Parties',
+                      const Color(0xFFA3E635),
+                      fontFamily,
+                      isUrdu,
+                    ),
+                    const SizedBox(width: 8),
+                    _statMini(
+                      Formatters.formatAmountWithCurrency(totalReceivable),
+                      isUrdu ? 'لینے ہیں' : 'To Receive',
+                      const Color(0xFF93C5FD),
+                      fontFamily,
+                      isUrdu,
+                    ),
+                    const SizedBox(width: 8),
+                    _statMini(
+                      Formatters.formatAmountWithCurrency(totalPayable),
+                      isUrdu ? 'دینے ہیں' : 'To Pay',
+                      const Color(0xFFFCA5A5),
+                      fontFamily,
+                      isUrdu,
+                    ),
+                  ] else if (_financialSummaryIndex == 1) ...[
+                    _statMini(
+                      Formatters.formatAmountWithCurrency(professionIncome),
+                      isUrdu ? 'پیشے کی آمدن' : 'Profession Income',
+                      const Color(0xFFA3E635),
+                      fontFamily,
+                      isUrdu,
+                    ),
+                    const SizedBox(width: 8),
+                    _statMini(
+                      Formatters.formatAmountWithCurrency(professionExpense),
+                      isUrdu ? 'پیشے کے اخراجات' : 'Profession Expenses',
+                      const Color(0xFFFCA5A5),
+                      fontFamily,
+                      isUrdu,
+                    ),
+                    const SizedBox(width: 8),
+                    _statMini(
+                      Formatters.formatAmountWithCurrency(
+                          professionIncome - professionExpense),
+                      isUrdu ? 'پیشے کا منافع' : 'Profession Profit',
+                      const Color(0xFF93C5FD),
+                      fontFamily,
+                      isUrdu,
+                    ),
+                  ] else if (_financialSummaryIndex == 2) ...[
+                    _statMini(
+                      Formatters.formatAmountWithCurrency(totalContractAmount),
+                      isUrdu ? 'کل ٹھیکہ رقم' : 'Total Contract',
+                      const Color(0xFFA3E635),
+                      fontFamily,
+                      isUrdu,
+                    ),
+                    const SizedBox(width: 8),
+                    _statMini(
+                      Formatters.formatAmountWithCurrency(contractDueAmount),
+                      isUrdu ? 'ٹھیکہ بقایا' : 'Contract Due',
+                      const Color(0xFFFCA5A5),
+                      fontFamily,
+                      isUrdu,
+                    ),
+                    const SizedBox(width: 8),
+                    _statMini(
+                      Formatters.formatAmountWithCurrency(installmentAmount),
+                      isUrdu ? 'قسطوں کی رقم' : 'Installments',
+                      const Color(0xFF93C5FD),
+                      fontFamily,
+                      isUrdu,
+                    ),
+                    const SizedBox(width: 8),
+                    _statMini(
+                      Formatters.formatAmountWithCurrency(workerDueAmount),
+                      isUrdu ? 'مزدوروں کا بقایا' : 'Worker Dues',
+                      const Color(0xFFFCA5A5),
+                      fontFamily,
+                      isUrdu,
+                    ),
+                  ] else ...[
+                    _statMini(
+                      Formatters.formatAmountWithCurrency(purchaseVal),
+                      isUrdu ? 'خرید مالیت' : 'Purchase Val',
+                      const Color(0xFFA3E635),
+                      fontFamily,
+                      isUrdu,
+                    ),
+                    const SizedBox(width: 8),
+                    _statMini(
+                      Formatters.formatAmountWithCurrency(salesVal),
+                      isUrdu ? 'فروخت مالیت' : 'Sales Val',
+                      const Color(0xFF93C5FD),
+                      fontFamily,
+                      isUrdu,
+                    ),
+                    const SizedBox(width: 8),
+                    _statMini(
+                      '$lowStockCount',
+                      isUrdu ? 'کم اسٹاک' : 'Low Stock',
+                      const Color(0xFFFBBF24),
+                      fontFamily,
+                      isUrdu,
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ],
@@ -708,7 +673,8 @@ class _HomeScreenState extends State<HomeScreen> {
     String fontFamily,
     bool isUrdu,
   ) {
-    return Expanded(
+    return SizedBox(
+      width: 124,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
@@ -820,157 +786,227 @@ class _HomeScreenState extends State<HomeScreen> {
     bool isUrdu,
     String fontFamily,
     int totalItems,
-    int nearbyShopsCount,
     int? inventoryHealthScore,
     bool isInventoryLoading,
   ) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        // ═══ MAIN GROUP CARD 1: CONTRACTS & PROJECTS ═══
+        _buildGroupCard(
+          header: _buildSectionHead(
+            isUrdu: isUrdu,
+            fontFamily: fontFamily,
+            title: isUrdu ? 'ٹھیکے اور پراجیکٹس' : 'Contracts & Projects',
+            icon: PhosphorIcons.fileText(),
+          ),
           children: [
-            Expanded(
-              child: _quickActionCard(
-                isUrdu: isUrdu,
-                fontFamily: fontFamily,
-                title: isUrdu ? 'مزدوروں کی لسٹ' : 'Workers List',
-                sub: isUrdu
-                    ? 'تمام مزدوروں اور کاریگروں کا ریکارڈ'
-                    : 'All workers & technicians record',
-                icon: PhosphorIcons.users(),
-                color: AppTheme.themeColor,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const WorkersListScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _quickActionCard(
-                isUrdu: isUrdu,
-                fontFamily: fontFamily,
-                title: isUrdu ? 'اسٹاک اشیاء' : 'Stock Items',
-                sub: isUrdu
-                    ? 'تمام اسٹاک پراڈکٹس کی لسٹ'
-                    : 'All inventory stock items',
-                icon: Icons.inventory_2_rounded,
-                color: AppTheme.themeColor,
-                badge: totalItems > 0 ? '$totalItems' : null,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const StockListScreen(),
-                    ),
-                  );
-                },
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: _quickActionCard(
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                    title: isUrdu ? 'مزدوروں کی لسٹ' : 'Workers List',
+                    sub: isUrdu
+                        ? 'تمام مزدوروں اور کاریگروں کا ریکارڈ'
+                        : 'All workers & technicians record',
+                    icon: PhosphorIcons.users(),
+                    color: AppTheme.themeColor,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const WorkersListScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _quickActionCard(
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                    title: isUrdu ? 'متعدد حاضری' : 'Bulk Attendance',
+                    sub: isUrdu
+                        ? 'ایک ساتھ تمام مزدوروں کی حاضری'
+                        : 'Mark attendance for all workers',
+                    icon: PhosphorIcons.calendarCheck(),
+                    color: AppTheme.themeColor,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const BulkAttendanceScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        Row(
+        const SizedBox(height: 8),
+
+        // ═══ MAIN GROUP CARD 2: SHOP ═══
+        _buildGroupCard(
+          header: _buildSectionHead(
+            isUrdu: isUrdu,
+            fontFamily: fontFamily,
+            title: isUrdu ? 'شاپ' : 'Shop',
+            icon: PhosphorIcons.storefront(),
+          ),
           children: [
-            Expanded(
-              child: _quickActionCard(
-                isUrdu: isUrdu,
-                fontFamily: fontFamily,
-                title: isUrdu ? 'قریبی بزنس' : 'Nearby Businesses',
-                sub: isUrdu
-                    ? 'قریبی دکانیں اور کنٹریکٹر دیکھیں'
-                    : 'Explore nearby shops and contractors',
-                icon: PhosphorIcons.storefront(),
-                color: AppTheme.themeColor,
-                badge: nearbyShopsCount > 0 ? '$nearbyShopsCount' : null,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const NearbyBusinessesScreen(),
-                    ),
-                  );
-                },
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: _quickActionCard(
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                    title: isUrdu ? 'نیا آئٹم' : 'New Item',
+                    sub: isUrdu
+                        ? 'نیا پروڈکٹ شامل کریں'
+                        : 'Add new stock product',
+                    icon: Icons.add_circle_outline_rounded,
+                    color: AppTheme.themeColor,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AddEditStockItemScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _quickActionCard(
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                    title: isUrdu ? 'اسٹاک اشیاء' : 'Stock Items',
+                    sub: isUrdu
+                        ? 'تمام اسٹاک پراڈکٹس کی لسٹ'
+                        : 'All inventory stock items',
+                    icon: Icons.inventory_2_rounded,
+                    color: AppTheme.themeColor,
+                    badge: totalItems > 0 ? '$totalItems' : null,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const StockListScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _quickActionCard(
-                isUrdu: isUrdu,
-                fontFamily: fontFamily,
-                title: isUrdu ? 'انوینٹری صحت' : 'Inventory Health',
-                sub: isUrdu
-                    ? 'کم اسٹاک، رفتار اور اشاریے'
-                    : 'Low stock, velocity & metrics',
-                icon: Icons.monitor_heart_rounded,
-                color: _inventoryHealthColor(inventoryHealthScore),
-                badge: isInventoryLoading
-                    ? '…'
-                    : inventoryHealthScore == null
-                        ? '—'
-                        : '$inventoryHealthScore%',
-                badgeColor: _inventoryHealthColor(inventoryHealthScore),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => InventoryHealthScreen(),
-                    ),
-                  );
-                },
-              ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _quickActionCard(
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                    title: isUrdu ? 'انوینٹری صحت' : 'Inventory Health',
+                    sub: isUrdu
+                        ? 'کم اسٹاک، رفتار اور اشاریے'
+                        : 'Low stock, velocity & metrics',
+                    icon: Icons.monitor_heart_rounded,
+                    color: _inventoryHealthColor(inventoryHealthScore),
+                    badge: isInventoryLoading
+                        ? '…'
+                        : inventoryHealthScore == null
+                            ? '—'
+                            : '$inventoryHealthScore%',
+                    badgeColor: _inventoryHealthColor(inventoryHealthScore),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => InventoryHealthScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _quickActionCard(
+                    isUrdu: isUrdu,
+                    fontFamily: fontFamily,
+                    title: isUrdu ? 'سیل ریکارڈ' : 'Sales Record',
+                    sub: isUrdu
+                        ? 'فوری بل سے کی گئی نقد اور ادھار سیل'
+                        : 'Quick bill cash & credit sales',
+                    icon: Icons.receipt_long_rounded,
+                    color: AppTheme.verifiedGold,
+                    badge: '$_todayQuickBillsCount',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const CustomerBillsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _quickActionCard(
-                isUrdu: isUrdu,
-                fontFamily: fontFamily,
-                title: isUrdu ? 'نیا آئٹم' : 'New Item',
-                sub: isUrdu ? 'نیا پروڈکٹ شامل کریں' : 'Add new stock product',
-                icon: Icons.add_circle_outline_rounded,
-                color: AppTheme.themeColor,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const AddEditStockItemScreen(),
-                    ),
-                  );
-                },
+        const SizedBox(height: 8),
+        _quickActionCard(
+          isUrdu: isUrdu,
+          fontFamily: fontFamily,
+          title: isUrdu ? 'خریدیں اور بیچیں' : 'Buy & Sell',
+          sub: isUrdu ? 'اپنی چیزیں فروخت کریں' : 'Buy or list personal items',
+          icon: Icons.sell_outlined,
+          color: AppTheme.verifiedGold,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const MarketplaceScreen(),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _quickActionCard(
-                isUrdu: isUrdu,
-                fontFamily: fontFamily,
-                title: isUrdu ? 'سیل ریکارڈ' : 'Sales Record',
-                sub: isUrdu
-                    ? 'فوری بل سے کی گئی نقد اور ادھار سیل'
-                    : 'Quick bill cash & credit sales',
-                icon: Icons.receipt_long_rounded,
-                color: AppTheme.verifiedGold,
-                badge: '$_todayQuickBillsCount',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const CustomerBillsScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ],
+    );
+  }
+
+  Widget _buildGroupCard({
+    required Widget header,
+    required List<Widget> children,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFD1D5DB), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.darkColor.withValues(alpha: 0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          header,
+          const SizedBox(height: 8),
+          ...children,
+        ],
+      ),
     );
   }
 
@@ -990,15 +1026,9 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.darkColor.withValues(alpha: 0.04),
-              blurRadius: 3,
-              offset: const Offset(0, 1),
-            ),
-          ],
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1008,31 +1038,27 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withValues(alpha: 0.3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, color: Colors.white, size: 20),
+                  child: Icon(icon, color: color, size: 22),
                 ),
                 if (badge != null)
-                  Transform.translate(
-                    offset: const Offset(0, -4),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: (badgeColor ?? color).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                     child: UrduAwareText(
                       badge,
                       style: TextStyle(
-                        fontFamily: fontFamily,
-                        fontSize: 18,
+                        fontSize: 10.5,
                         fontWeight: FontWeight.bold,
-                        color: badgeColor ?? AppTheme.themeColor,
+                        color: badgeColor ?? color,
                       ),
                     ),
                   ),
@@ -1046,8 +1072,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.darkColor,
-                height: 1.2,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 2),
             UrduAwareText(
@@ -1056,9 +1083,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontFamily: fontFamily,
                 fontSize: 10,
                 color: AppTheme.textSecondary,
-                height: 1.3,
               ),
-              maxLines: 2,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ],

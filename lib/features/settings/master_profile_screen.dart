@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
@@ -105,7 +106,6 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
             ? 'پروفائل کامیابی سے محفوظ ہو گیا'
             : 'Profile saved successfully',
       );
-      await AppShellScreen.refreshRole();
       if (!mounted) return;
       if (Navigator.canPop(context)) {
         Navigator.pop(context);
@@ -150,6 +150,10 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
       child: Consumer<ProfileController>(
         builder: (context, controller, _) => Scaffold(
           backgroundColor: AppTheme.backgroundColor,
+          appBar: ScreenAppBar(
+            title: isUrdu ? 'پروفائل' : 'Profile',
+            isUrdu: isUrdu,
+          ),
           body: controller.isLoading
               ? const Center(child: CircularProgressIndicator())
               : SingleChildScrollView(

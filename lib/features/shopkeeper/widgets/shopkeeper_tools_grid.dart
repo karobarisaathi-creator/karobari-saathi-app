@@ -21,7 +21,6 @@ import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/features/settings/app_lock_settings_screen.dart';
-import 'package:account_app/features/shopkeeper/shop_settings_screen.dart';
 import 'package:account_app/features/shopkeeper/sales_analytics_screen.dart';
 import 'currency_settings_dialog.dart';
 import 'package:account_app/features/settings/backup_screen.dart';
@@ -157,21 +156,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                 },
               ),
 
-              // 5. Settings
-              _buildItem(
-                context,
-                icon: PhosphorIcons.gearSix(),
-                label: isUrdu ? 'سیٹنگز' : 'Settings',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const ShopSettingsScreen()),
-                  );
-                },
-              ),
-
-              // 6. Share — with Play Store link
+              // Share — with Play Store link
               _buildItem(
                 context,
                 icon: PhosphorIcons.shareNetwork(),
@@ -179,7 +164,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                 onTap: () => _shareApp(context, isUrdu),
               ),
 
-              // 7. About — with support contact
+              // About — with support contact
               _buildItem(
                 context,
                 icon: PhosphorIcons.info(),
@@ -187,7 +172,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                 onTap: () => _showAboutAppDialog(context, isUrdu, fontFamily),
               ),
 
-              // 8. Privacy
+              // Privacy
               _buildItem(
                 context,
                 icon: PhosphorIcons.shieldCheck(),
@@ -195,7 +180,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                 onTap: () => _showPrivacyPolicy(context, isUrdu, fontFamily),
               ),
 
-              // 9. Logout — with sync warning
+              // Logout — with sync warning
               _buildItem(
                 context,
                 icon: PhosphorIcons.signOut(),

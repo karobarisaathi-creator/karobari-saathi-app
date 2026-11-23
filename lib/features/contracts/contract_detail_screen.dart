@@ -1,6 +1,5 @@
 // lib/features/contracts/contract_detail_screen.dart
 
-import 'package:account_app/features/contracts/workers_list_screen.dart';
 import 'package:account_app/features/accounts/add_transaction_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -11,7 +10,6 @@ import 'package:account_app/core/widgets/image_gallery_viewer.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/contract_service.dart';
-import 'package:account_app/core/services/worker_service.dart';
 import 'package:account_app/core/services/contract_document_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
@@ -136,8 +134,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
           builder: (_) => AddTransactionScreen(
             account: party,
             fixedTransactionType: contract.isIncoming ? 'income' : 'expense',
-            isPartySettlement: true,
-            isContractInstallment: true,
+            mode: AddTransactionMode.contractInstallment,
             initialContractId: contract.id,
             initialDescription: contract.title,
           ),
@@ -257,324 +254,6 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
       amountController.dispose();
       noteController.dispose();
     });
-  }
-
-  Future<void> _showAddLaborPaymentDialog(
-      BuildContext context, ContractModel contract, bool isUrdu,
-      {ContractLaborPayment? paymentToEdit}) {
-    if (paymentToEdit == null) {
-      return _selectWorkerForContractPayment(context, contract, isUrdu);
-    }
-
-    final amountController = TextEditingController(
-        text: paymentToEdit != null ? paymentToEdit.amount.toString() : '');
-    final noteController = TextEditingController(
-        text: paymentToEdit != null ? paymentToEdit.note : '');
-
-    return showDialog(
-      context: context,
-      builder: (dialogContext) {
-        final dbService = Provider.of<DatabaseService>(dialogContext);
-        final contractService =
-            Provider.of<ContractService>(dialogContext, listen: false);
-
-        final workers = dbService.accounts
-            .where((account) => const {'worker', 'technician', 'employee'}
-                .contains(account.category.toLowerCase()))
-            .toList();
-
-        return AlertDialog(
-          backgroundColor: AppTheme.lightColor,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Expanded(
-                child: UrduAwareText(
-                  paymentToEdit == null
-                      ? (isUrdu ? 'مزدور کی اجرت درج کریں' : 'Add Labor Wage')
-                      : (isUrdu
-                          ? 'مزدوری کی اجرت میں ترمیم کریں'
-                          : 'Edit Labor Wage'),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.darkColor,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: Icon(PhosphorIcons.users(),
-                    color: AppTheme.slateColor, size: 20),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const WorkersListScreen(),
-                    ),
-                  );
-                },
-                tooltip: isUrdu ? 'مزدوروں کی ڈائریکٹری' : 'Workers Directory',
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: MediaQuery.of(context).size.width * 0.85,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _dialogField(
-                    controller: amountController,
-                    label: isUrdu ? 'رقم (Rs)' : 'Amount (Rs)',
-                    isNumber: true,
-                  ),
-                  const SizedBox(height: 12),
-                  _dialogField(
-                    controller: noteController,
-                    label: isUrdu ? 'نوٹ / تفصیل' : 'Note',
-                  ),
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment:
-                        isUrdu ? Alignment.centerRight : Alignment.centerLeft,
-                    child: UrduAwareText(
-                      paymentToEdit == null
-                          ? (isUrdu
-                              ? 'مزدور منتخب کریں (کارڈ پر ٹیپ کریں):'
-                              : 'Tap worker card to pay:')
-                          : (isUrdu
-                              ? 'مزدور منتخب کریں (یا تبدیل کریں):'
-                              : 'Select worker to update:'),
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textSecondary),
-                    ),
-                  ),
-                  if (paymentToEdit != null) ...[
-                    const SizedBox(height: 4),
-                    Align(
-                      alignment:
-                          isUrdu ? Alignment.centerRight : Alignment.centerLeft,
-                      child: UrduAwareText(
-                        'موجودہ مزدور: ${paymentToEdit.workerName}',
-                        style: const TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.slateColor),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  workers.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: UrduAwareText(
-                            isUrdu
-                                ? 'کوئی مزدور موجود نہیں'
-                                : 'No workers found',
-                            style:
-                                const TextStyle(color: AppTheme.textSecondary),
-                          ),
-                        )
-                      : ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 220),
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: workers.length,
-                            itemBuilder: (_, index) {
-                              final w = workers[index];
-                              final isSelected =
-                                  paymentToEdit?.workerId == w.id ||
-                                      paymentToEdit?.workerName == w.name;
-                              return InkWell(
-                                onTap: () async {
-                                  final amount = Formatters.tryParseAmount(
-                                          amountController.text.trim(),
-                                          allowDecimals: true) ??
-                                      double.tryParse(
-                                          amountController.text.trim()) ??
-                                      0.0;
-                                  if (amount <= 0) {
-                                    AppToast.warning(
-                                      context,
-                                      isUrdu
-                                          ? 'پہلے درست رقم درج کریں'
-                                          : 'Enter a valid amount first',
-                                    );
-                                    return;
-                                  }
-
-                                  try {
-                                    if (paymentToEdit == null) {
-                                      await contractService.addLaborPayment(
-                                        contractId: contract.id,
-                                        workerName: w.name,
-                                        amount: amount,
-                                        note: noteController.text.trim(),
-                                        databaseService: dbService,
-                                      );
-                                    } else {
-                                      await contractService.editLaborPayment(
-                                        contractId: contract.id,
-                                        paymentId: paymentToEdit.id,
-                                        workerName: w.name,
-                                        amount: amount,
-                                        note: noteController.text.trim(),
-                                        databaseService: dbService,
-                                      );
-                                    }
-                                  } catch (error) {
-                                    if (!context.mounted) return;
-                                    AppToast.error(
-                                      context,
-                                      isUrdu
-                                          ? 'مزدوری محفوظ نہیں ہو سکی'
-                                          : 'Could not save labor payment',
-                                      subtitle: error.toString(),
-                                    );
-                                    return;
-                                  }
-                                  if (!dialogContext.mounted ||
-                                      !context.mounted) {
-                                    return;
-                                  }
-                                  Navigator.pop(dialogContext);
-                                  AppToast.success(
-                                    context,
-                                    paymentToEdit == null
-                                        ? (isUrdu
-                                            ? '${w.name} کو اجرت ادا کر دی گئی'
-                                            : 'Wage paid to ${w.name}')
-                                        : (isUrdu
-                                            ? 'مزدوری کی اجرت اپڈیٹ ہو گئی'
-                                            : 'Labor payment updated'),
-                                  );
-                                },
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  margin: const EdgeInsets.only(bottom: 6),
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? AppTheme.slateColor
-                                            .withValues(alpha: 0.15)
-                                        : AppTheme.backgroundColor,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                        color: isSelected
-                                            ? AppTheme.slateColor
-                                            : const Color(0xFFD1D5DB)),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: ProfileInfoWidget(
-                                          name: w.name,
-                                          phone: w.phone,
-                                          profileImage: w.profileImage,
-                                          category: w.category,
-                                          address: w.address,
-                                          isLarge: false,
-                                          isVerticalCategory: false,
-                                          customSize: 36,
-                                          borderRadius: 8,
-                                        ),
-                                      ),
-                                      const Icon(
-                                          Icons.arrow_forward_ios_rounded,
-                                          size: 14,
-                                          color: AppTheme.slateColor),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: UrduAwareText(isUrdu ? 'بند کریں' : 'Cancel',
-                  style: const TextStyle(color: AppTheme.textSecondary)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _selectWorkerForContractPayment(
-    BuildContext context,
-    ContractModel contract,
-    bool isUrdu,
-  ) async {
-    final databaseService =
-        Provider.of<DatabaseService>(context, listen: false);
-    final workerService = Provider.of<WorkerService>(context, listen: false);
-    await workerService.ensureWorkerAccounts(databaseService);
-    if (!context.mounted) return;
-    final workers = databaseService.accounts
-        .where((account) => const {'worker', 'technician', 'employee'}
-            .contains(account.category.toLowerCase()))
-        .toList();
-    if (workers.isEmpty) {
-      AppToast.warning(
-        context,
-        isUrdu ? 'پہلے مزدور کا کھاتہ بنائیں' : 'Create a worker account first',
-      );
-      return;
-    }
-
-    final worker = await showDialog<Account>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: UrduAwareText(isUrdu ? 'مزدور منتخب کریں' : 'Select worker'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: workers.length,
-            itemBuilder: (_, index) {
-              final account = workers[index];
-              return ListTile(
-                title: UrduAwareText(account.name),
-                subtitle:
-                    account.phone.isEmpty ? null : UrduAwareText(account.phone),
-                onTap: () => Navigator.pop(dialogContext, account),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel'),
-          ),
-        ],
-      ),
-    );
-    if (worker == null || !context.mounted) return;
-
-    await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AddTransactionScreen(
-          account: worker,
-          fixedTransactionType: 'expense',
-          isPartySettlement: true,
-          isWorkerWagePayment: true,
-          initialDescription:
-              isUrdu ? 'مزدوری کی ادائیگی' : 'Worker wage payment',
-          initialContractId: contract.id,
-        ),
-      ),
-    );
   }
 
   void _showDescriptionDialog(BuildContext context, String rawDescription,
@@ -1234,7 +913,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                color: _tabController.index == 1
+                                color: _tabController.index == 2
                                     ? AppTheme.slateColor
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(10),
@@ -1249,7 +928,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                                       fontFamily: fontFamily,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w800,
-                                      color: _tabController.index == 1
+                                      color: _tabController.index == 2
                                           ? Colors.white
                                           : AppTheme.darkColor,
                                     ),
@@ -1317,7 +996,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 5, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: _tabController.index == 2
+                                    color: _tabController.index == 1
                                         ? Colors.white.withValues(alpha: 0.3)
                                         : AppTheme.slateColor
                                             .withValues(alpha: 0.15),
@@ -1328,7 +1007,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
-                                      color: _tabController.index == 2
+                                      color: _tabController.index == 1
                                           ? Colors.white
                                           : AppTheme.slateColor,
                                     ),
@@ -1544,8 +1223,10 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
             final description =
                 expense.description == 'دیگر' ? '' : expense.description;
 
-            final primaryTitle = description.isNotEmpty ? description : category;
-            final secondaryInfo = description.isNotEmpty && category.isNotEmpty ? category : '';
+            final primaryTitle =
+                description.isNotEmpty ? description : category;
+            final secondaryInfo =
+                description.isNotEmpty && category.isNotEmpty ? category : '';
 
             return Column(
               children: [
@@ -1554,8 +1235,8 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                   minVerticalPadding: 0,
-                  onLongPress: () =>
-                      _showExpenseOptions(context, contract, expense, isUrdu, fontFamily),
+                  onLongPress: () => _showExpenseOptions(
+                      context, contract, expense, isUrdu, fontFamily),
                   leading: Container(
                     width: 34,
                     height: 34,
@@ -1670,21 +1351,28 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
               ),
               const SizedBox(height: 16),
               ListTile(
-                leading: Icon(PhosphorIcons.pencilSimple(), color: AppTheme.themeColor),
+                leading: Icon(PhosphorIcons.pencilSimple(),
+                    color: AppTheme.themeColor),
                 title: UrduAwareText(
                   isUrdu ? 'ترمیم کریں' : 'Edit',
-                  style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      fontFamily: fontFamily, fontWeight: FontWeight.bold),
                 ),
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  _openContractExpenseScreen(contract, transactionToEdit: expense);
+                  _openContractExpenseScreen(contract,
+                      transactionToEdit: expense);
                 },
               ),
               ListTile(
-                leading: Icon(PhosphorIcons.trash(), color: AppTheme.expenseColor),
+                leading:
+                    Icon(PhosphorIcons.trash(), color: AppTheme.expenseColor),
                 title: UrduAwareText(
                   isUrdu ? 'حذف کریں' : 'Delete',
-                  style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, color: AppTheme.expenseColor),
+                  style: TextStyle(
+                      fontFamily: fontFamily,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.expenseColor),
                 ),
                 onTap: () {
                   Navigator.pop(sheetContext);
@@ -1727,21 +1415,28 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
               ),
               const SizedBox(height: 16),
               ListTile(
-                leading: Icon(PhosphorIcons.pencilSimple(), color: AppTheme.themeColor),
+                leading: Icon(PhosphorIcons.pencilSimple(),
+                    color: AppTheme.themeColor),
                 title: UrduAwareText(
                   isUrdu ? 'ترمیم کریں' : 'Edit',
-                  style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      fontFamily: fontFamily, fontWeight: FontWeight.bold),
                 ),
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  _showAddPaymentDialog(context, contract, isUrdu, paymentToEdit: p);
+                  _showAddPaymentDialog(context, contract, isUrdu,
+                      paymentToEdit: p);
                 },
               ),
               ListTile(
-                leading: Icon(PhosphorIcons.trash(), color: AppTheme.expenseColor),
+                leading:
+                    Icon(PhosphorIcons.trash(), color: AppTheme.expenseColor),
                 title: UrduAwareText(
                   isUrdu ? 'حذف کریں' : 'Delete',
-                  style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, color: AppTheme.expenseColor),
+                  style: TextStyle(
+                      fontFamily: fontFamily,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.expenseColor),
                 ),
                 onTap: () {
                   Navigator.pop(sheetContext);
@@ -1751,127 +1446,6 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  void _showLaborPaymentOptions(
-    BuildContext context,
-    ContractModel contract,
-    ContractLaborPayment p,
-    bool isUrdu,
-    String? fontFamily,
-  ) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.lightColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: Icon(PhosphorIcons.pencilSimple(), color: AppTheme.themeColor),
-                title: UrduAwareText(
-                  isUrdu ? 'ترمیم کریں' : 'Edit',
-                  style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
-                ),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _showAddLaborPaymentDialog(context, contract, isUrdu, paymentToEdit: p);
-                },
-              ),
-              ListTile(
-                leading: Icon(PhosphorIcons.trash(), color: AppTheme.expenseColor),
-                title: UrduAwareText(
-                  isUrdu ? 'حذف کریں' : 'Delete',
-                  style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, color: AppTheme.expenseColor),
-                ),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _confirmDeleteLaborPayment(context, contract, p);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _confirmDeleteLaborPayment(
-    BuildContext context,
-    ContractModel contract,
-    ContractLaborPayment p,
-  ) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.lightColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: UrduAwareText(
-          Provider.of<LanguageService>(context, listen: false).isUrdu
-              ? 'مزدوری حذف کریں؟'
-              : 'Delete labor wage?',
-          style: const TextStyle(color: AppTheme.darkColor),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: UrduAwareText(
-              Provider.of<LanguageService>(context, listen: false).isUrdu ? 'نہیں' : 'No',
-              style: const TextStyle(color: AppTheme.textSecondary),
-            ),
-          ),
-          TextButton(
-            onPressed: () async {
-              try {
-                await Provider.of<ContractService>(context, listen: false)
-                    .deleteLaborPayment(
-                  contractId: contract.id,
-                  paymentId: p.id,
-                  databaseService:
-                      Provider.of<DatabaseService>(context, listen: false),
-                );
-              } catch (error) {
-                if (!context.mounted) return;
-                AppToast.error(
-                  context,
-                  Provider.of<LanguageService>(context, listen: false).isUrdu
-                      ? 'مزدوری حذف نہیں ہو سکی'
-                      : 'Could not delete labor payment',
-                  subtitle: error.toString(),
-                );
-                return;
-              }
-              if (!context.mounted || !ctx.mounted) return;
-              Navigator.pop(ctx);
-              AppToast.success(
-                context,
-                Provider.of<LanguageService>(context, listen: false).isUrdu
-                    ? 'مزدوری کی اجرت حذف کر دی گئی'
-                    : 'Labor payment deleted',
-              );
-            },
-            child: UrduAwareText(
-              Provider.of<LanguageService>(context, listen: false).isUrdu ? 'ہاں' : 'Yes',
-              style: const TextStyle(color: AppTheme.expenseColor),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1988,21 +1562,29 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
       children: [
         ListTile(
           dense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
           minVerticalPadding: 0,
-          onLongPress: () => _showPaymentOptions(context, contract, p, isUrdu, fontFamily),
+          onLongPress: () =>
+              _showPaymentOptions(context, contract, p, isUrdu, fontFamily),
           leading: Container(
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: (contract.isIncoming ? AppTheme.incomeColor : AppTheme.themeColor)
+              color: (contract.isIncoming
+                      ? AppTheme.incomeColor
+                      : AppTheme.themeColor)
                   .withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
-              contract.isIncoming ? PhosphorIcons.arrowDownLeft() : PhosphorIcons.arrowUpRight(),
+              contract.isIncoming
+                  ? PhosphorIcons.arrowDownLeft()
+                  : PhosphorIcons.arrowUpRight(),
               size: 18,
-              color: contract.isIncoming ? AppTheme.incomeColor : AppTheme.themeColor,
+              color: contract.isIncoming
+                  ? AppTheme.incomeColor
+                  : AppTheme.themeColor,
             ),
           ),
           title: UrduAwareText(
@@ -2056,7 +1638,9 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
             style: TextStyle(
               fontWeight: FontWeight.w900,
               fontSize: 13.5,
-              color: contract.isIncoming ? AppTheme.incomeColor : AppTheme.darkColor,
+              color: contract.isIncoming
+                  ? AppTheme.incomeColor
+                  : AppTheme.darkColor,
             ),
           ),
         ),
@@ -2169,17 +1753,16 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
     bool isLast = false,
   }) {
     final dbService = Provider.of<DatabaseService>(context, listen: false);
-    final workerAccount = p.workerId != null ? dbService.getAccount(p.workerId!) : null;
+    final workerAccount =
+        p.workerId != null ? dbService.getAccount(p.workerId!) : null;
 
     return Column(
       children: [
         ListTile(
           dense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
           minVerticalPadding: 0,
-          onLongPress: p.workerPayrollPaymentId == null
-              ? () => _showLaborPaymentOptions(context, contract, p, isUrdu, fontFamily)
-              : null,
           leading: SizedBox(
             width: 34,
             height: 34,
