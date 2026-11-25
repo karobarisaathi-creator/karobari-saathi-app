@@ -22,7 +22,6 @@ dependencies:
   firebase_core: ^4.2.1
   cloud_firestore: ^6.1.0
   firebase_auth: ^6.1.2
-  firebase_messaging: ^16.0.4
   firebase_storage: ^13.0.4
 
   # State Management
@@ -64,7 +63,6 @@ dependencies:
   fl_chart: ^1.1.1
 
   # Notifications
-  flutter_local_notifications: ^19.5.0
   cached_network_image: ^3.4.1
   flutter_cache_manager: ^3.4.1
   package_info_plus: ^8.0.0
@@ -76,6 +74,7 @@ dependencies:
   speech_to_text: ^7.4.0
   app_links: ^6.3.2
   flutter_svg: ^2.0.10+1
+  in_app_update: 5.0.0
 
 
 dev_dependencies:

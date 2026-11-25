@@ -7,6 +7,18 @@ import 'package:flutter/foundation.dart';
 
 import '../models/marketplace_listing.dart';
 
+class MarketplaceListingPage {
+  const MarketplaceListingPage({
+    required this.listings,
+    required this.lastDocument,
+    required this.hasMore,
+  });
+
+  final List<MarketplaceListing> listings;
+  final QueryDocumentSnapshot<Map<String, dynamic>>? lastDocument;
+  final bool hasMore;
+}
+
 class MarketplaceService {
   MarketplaceService({
     FirebaseFirestore? firestore,
@@ -23,10 +35,30 @@ class MarketplaceService {
   CollectionReference<Map<String, dynamic>> get _listings =>
       _firestore.collection('marketplace_listings');
 
-  Stream<List<MarketplaceListing>> watchActiveListings() => _listings
+  static const int activeListingPageSize = 20;
+
+  Query<Map<String, dynamic>> _activeListingsQuery() => _listings
       .where('status', isEqualTo: 'active')
-      .snapshots()
-      .map(_mapAndSortListings);
+      .orderBy('createdAt', descending: true);
+
+  Stream<MarketplaceListingPage> watchFirstActiveListingsPage({
+    int pageSize = activeListingPageSize,
+  }) =>
+      _activeListingsQuery()
+          .limit(pageSize)
+          .snapshots()
+          .map((snapshot) => _mapListingPage(snapshot, pageSize));
+
+  Future<MarketplaceListingPage> fetchNextActiveListingsPage({
+    required QueryDocumentSnapshot<Map<String, dynamic>> after,
+    int pageSize = activeListingPageSize,
+  }) async {
+    final snapshot = await _activeListingsQuery()
+        .startAfterDocument(after)
+        .limit(pageSize)
+        .get();
+    return _mapListingPage(snapshot, pageSize);
+  }
 
   Stream<List<MarketplaceListing>> watchMyListings() {
     final userId = _auth.currentUser?.uid;
@@ -54,12 +86,25 @@ class MarketplaceService {
   List<MarketplaceListing> _mapAndSortListings(
     QuerySnapshot<Map<String, dynamic>> snapshot,
   ) {
-    final listings = snapshot.docs
+    return snapshot.docs
         .map((document) =>
             MarketplaceListing.fromMap(document.id, document.data()))
         .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return listings;
+  }
+
+  MarketplaceListingPage _mapListingPage(
+    QuerySnapshot<Map<String, dynamic>> snapshot,
+    int pageSize,
+  ) {
+    return MarketplaceListingPage(
+      listings: snapshot.docs
+          .map((document) =>
+              MarketplaceListing.fromMap(document.id, document.data()))
+          .toList(),
+      lastDocument: snapshot.docs.isEmpty ? null : snapshot.docs.last,
+      hasMore: snapshot.docs.length == pageSize,
+    );
   }
 
   Future<MarketplaceListing> saveListing({
@@ -115,8 +160,8 @@ class MarketplaceService {
 
       imageUrls.addAll(uploadedUrls);
       imagePaths.addAll(uploadedPaths);
-      if (imageUrls.isEmpty || imageUrls.length != imagePaths.length) {
-        throw ArgumentError('Add at least one valid photo to your listing.');
+      if (imageUrls.length != imagePaths.length) {
+        throw ArgumentError('Listing photo URLs and paths must match.');
       }
 
       final now = DateTime.now();

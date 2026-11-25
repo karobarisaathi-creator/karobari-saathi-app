@@ -54,6 +54,23 @@ void main() {
     expect(value.text, '1,000');
   });
 
+  test('typing a fifth digit keeps the existing grouping separator', () {
+    const formatter = CurrencyInputFormatter();
+    final value = formatter.formatEditUpdate(
+      const TextEditingValue(
+        text: '1,234',
+        selection: TextSelection.collapsed(offset: 5),
+      ),
+      const TextEditingValue(
+        text: '1,2345',
+        selection: TextSelection.collapsed(offset: 6),
+      ),
+    );
+
+    expect(value.text, '12,345');
+    expect(value.selection.extentOffset, 6);
+  });
+
   test('input grouping supports large numbers without integer overflow', () {
     const formatter = CurrencyInputFormatter(allowDecimals: false);
     final value = formatter.formatEditUpdate(

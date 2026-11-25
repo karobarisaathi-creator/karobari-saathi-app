@@ -117,9 +117,6 @@ class MyApp extends StatelessWidget {
           return MaterialApp(
             title: 'Karobari Saathi',
             debugShowCheckedModeBanner: false,
-            navigatorKey: GlobalKey<
-                NavigatorState>(), // Add this if not already present and needed by NotificationService
-
             // Theme Configuration
             theme: themeService.currentThemeData,
             darkTheme: themeService.currentThemeData,
@@ -140,15 +137,6 @@ class MyApp extends StatelessWidget {
 
             // RTL/LTR Support
             builder: (context, child) {
-              // Pass navigator key to notification service if needed
-              final navigatorKey = (context as Element)
-                  .findAncestorWidgetOfExactType<MaterialApp>()
-                  ?.navigatorKey;
-              if (navigatorKey != null) {
-                Provider.of<NotificationService>(context, listen: false)
-                    .setNavigatorKey(navigatorKey);
-              }
-
               return Directionality(
                 textDirection: languageService.textDirection,
                 child: AppLockGate(child: child!),

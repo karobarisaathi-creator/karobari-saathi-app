@@ -5,10 +5,10 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'package:account_app/core/widgets/party_card.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/core/utils/party_summary_utils.dart';
 import 'package:account_app/features/accounts/add_party_screen.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -20,17 +20,22 @@ class CustomerPickResult {
   CustomerPickResult({this.account, this.isCashCustomer = false});
 }
 
-Future<CustomerPickResult?> showCustomerPickerSheet(BuildContext context) {
+Future<CustomerPickResult?> showCustomerPickerSheet(
+  BuildContext context, {
+  Set<String> excludedAccountIds = const {},
+}) {
   return showModalBottomSheet<CustomerPickResult>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => const CustomerPickerSheet(),
+    builder: (_) => CustomerPickerSheet(excludedAccountIds: excludedAccountIds),
   );
 }
 
 class CustomerPickerSheet extends StatefulWidget {
-  const CustomerPickerSheet({super.key});
+  final Set<String> excludedAccountIds;
+
+  const CustomerPickerSheet({super.key, this.excludedAccountIds = const {}});
 
   @override
   State<CustomerPickerSheet> createState() => _CustomerPickerSheetState();
@@ -43,16 +48,21 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final isUrdu = Provider.of<LanguageService>(context).isUrdu;
-    final databaseService =
-        Provider.of<DatabaseService>(context, listen: false);
+    final databaseService = Provider.of<DatabaseService>(
+      context,
+      listen: false,
+    );
 
-    final parties = databaseService
-        .getAccounts()
-        .where((a) => a.id != QuickBillConstants.cashCustomerAccountId)
-        .where((a) =>
-            _query.isEmpty ||
-            a.name.toLowerCase().contains(_query.toLowerCase()) ||
-            Formatters.phoneMatchesSearch(a.phone, _query))
+    final parties = PartySummaryUtils.filterPartyAccounts(
+      databaseService.getAccounts(),
+    )
+        .where((a) => !widget.excludedAccountIds.contains(a.id))
+        .where(
+          (a) =>
+              _query.isEmpty ||
+              a.name.toLowerCase().contains(_query.toLowerCase()) ||
+              Formatters.phoneMatchesSearch(a.phone, _query),
+        )
         .toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
@@ -111,54 +121,66 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                           Container(
                             margin: const EdgeInsets.only(bottom: 8),
                             decoration: BoxDecoration(
-                              color: AppTheme.themeColor.withValues(alpha: 0.08),
+                              color: AppTheme.themeColor.withValues(
+                                alpha: 0.08,
+                              ),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: AppTheme.themeColor.withValues(alpha: 0.2),
+                                color: AppTheme.themeColor.withValues(
+                                  alpha: 0.2,
+                                ),
                                 width: 1,
                               ),
                             ),
-                            child: ListTile(
-                              dense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 2),
-                              leading: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.themeColor,
-                                  borderRadius: BorderRadius.circular(10),
+                            child: Material(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              child: ListTile(
+                                dense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 2,
                                 ),
-                                child: Icon(
-                                  PhosphorIcons.userPlus(PhosphorIconsStyle.bold),
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                              ),
-                              title: UrduAwareText(
-                                isUrdu
-                                    ? 'نیا پارٹی / اکاؤنٹ شامل کریں'
-                                    : 'Add New Party / Account',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.darkColor,
-                                ),
-                              ),
-                              trailing: Icon(
-                                isUrdu
-                                    ? Icons.chevron_left_rounded
-                                    : Icons.chevron_right_rounded,
-                                color: AppTheme.themeColor,
-                              ),
-                              onTap: () async {
-                                Navigator.pop(context);
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const AddPartyScreen(),
+                                leading: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.themeColor,
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
-                                );
-                              },
+                                  child: Icon(
+                                    PhosphorIcons.userPlus(
+                                      PhosphorIconsStyle.bold,
+                                    ),
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ),
+                                title: UrduAwareText(
+                                  isUrdu
+                                      ? 'نیا پارٹی / اکاؤنٹ شامل کریں'
+                                      : 'Add New Party / Account',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.darkColor,
+                                  ),
+                                ),
+                                trailing: Icon(
+                                  isUrdu
+                                      ? Icons.chevron_left_rounded
+                                      : Icons.chevron_right_rounded,
+                                  color: AppTheme.themeColor,
+                                ),
+                                onTap: () async {
+                                  Navigator.pop(context);
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const AddPartyScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
                           ),
                           SearchSortBar(
@@ -188,11 +210,14 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         itemCount: parties.length,
                         itemBuilder: (context, index) {
                           final account = parties[index];
                           return PartyCard(
+                            key: ValueKey(account.id),
                             party: account,
                             onView: () => Navigator.pop(
                               context,

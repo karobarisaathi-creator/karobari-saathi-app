@@ -1,19 +1,89 @@
 const {
-  onDocumentCreated,
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
 
-function boundedText(value, fallback, maxLength) {
-  const text = typeof value === "string" && value.trim()
-    ? value.trim()
-    : fallback;
-  const characters = Array.from(text);
-  return characters.length > maxLength
-    ? `${characters.slice(0, maxLength - 1).join("")}…`
-    : text;
+const workerWageAccrualPrefix = "WORKER_PAYROLL:ACCRUAL:";
+const workerWagePaymentPrefix = "WORKER_PAYROLL:PAYMENT:";
+
+function phoneLookupCandidates(phone) {
+  const trimmed = typeof phone === "string" ? phone.trim() : "";
+  const digits = trimmed.replace(/\D/g, "");
+  if (!digits) return [];
+
+  const candidates = new Set([trimmed, digits]);
+  if (trimmed.startsWith("+")) candidates.add(`00${digits}`);
+  if (digits.startsWith("00") && digits.length > 4) {
+    candidates.add(`+${digits.slice(2)}`);
+  }
+  if (digits.startsWith("92") && digits.length >= 12) {
+    candidates.add(`+${digits}`);
+    candidates.add(`0${digits.slice(2)}`);
+    candidates.add(digits.slice(2));
+  } else if (digits.startsWith("0") && digits.length === 11) {
+    candidates.add(`+92${digits.slice(1)}`);
+    candidates.add(`92${digits.slice(1)}`);
+    candidates.add(digits.slice(1));
+  } else if (digits.startsWith("3") && digits.length === 10) {
+    candidates.add(`+92${digits}`);
+    candidates.add(`92${digits}`);
+    candidates.add(`0${digits}`);
+  }
+  return [...candidates].filter(Boolean).slice(0, 30);
+}
+
+async function findUserByPhone(db, phone) {
+  const candidates = phoneLookupCandidates(phone);
+  if (candidates.length === 0) return null;
+
+  const snapshot = await db
+    .collection("users")
+    .where("phoneNumber", "in", candidates)
+    .limit(2)
+    .get();
+  if (snapshot.size > 1) {
+    console.error(`Multiple app users match phone number ${phone}`);
+    return null;
+  }
+  return snapshot.empty ? null : snapshot.docs[0];
+}
+
+async function findAccountByPhone(accountsRef, phone) {
+  const candidates = phoneLookupCandidates(phone);
+  if (candidates.length === 0) return null;
+
+  const snapshot = await accountsRef
+    .where("phone", "in", candidates)
+    .get();
+  if (snapshot.empty) return null;
+
+  return snapshot.docs.sort((first, second) =>
+    first.id.localeCompare(second.id),
+  )[0];
+}
+
+async function removeWorkerWageMirror(db, senderUid, transactionId, mapping) {
+  const batch = db.batch();
+  if (mapping?.recipientUid && mapping?.mirrorTransactionId) {
+    const recipientRef = db.collection("users").doc(mapping.recipientUid);
+    batch.delete(
+      recipientRef.collection("transactions").doc(mapping.mirrorTransactionId),
+    );
+    if (mapping.notificationId) {
+      batch.delete(
+        recipientRef.collection("notifications").doc(mapping.notificationId),
+      );
+    }
+  }
+  batch.delete(
+    db.collection("users")
+      .doc(senderUid)
+      .collection("workerWageMirrors")
+      .doc(transactionId),
+  );
+  await batch.commit();
 }
 
 exports.aggregateShopReview = onDocumentWritten(
@@ -72,160 +142,267 @@ exports.aggregateShopReview = onDocumentWritten(
     });
   },
 );
-
-exports.sendNotificationOnCreate = onDocumentCreated(
-  "users/{userId}/notifications/{notificationId}",
+exports.syncWorkerAttendanceWage = onDocumentWritten(
+  {
+    document: "users/{senderUid}/transactions/{transactionId}",
+    retry: false,
+  },
   async (event) => {
-    const snapshot = event.data;
-    if (!snapshot) {
-      console.log("No data associated with the event");
-      return null;
-    }
+    const db = admin.firestore();
+    const {senderUid, transactionId} = event.params;
+    const transactionRef = db
+      .collection("users")
+      .doc(senderUid)
+      .collection("transactions")
+      .doc(transactionId);
+    const mappingRef = db
+      .collection("users")
+      .doc(senderUid)
+      .collection("workerWageMirrors")
+      .doc(transactionId);
+    const [transactionSnapshot, mappingSnapshot] = await Promise.all([
+      transactionRef.get(),
+      mappingRef.get(),
+    ]);
+    const mapping = mappingSnapshot.exists ? mappingSnapshot.data() : null;
+    const source = transactionSnapshot.exists
+      ? transactionSnapshot.data()
+      : null;
 
-    const notification = snapshot.data();
-    const userId = event.params.userId;
-    const userRef = admin.firestore().collection("users").doc(userId);
-    const userDoc = await userRef.get();
+    if (source?.receiptFromCounterparty === true) return null;
 
-    if (!userDoc.exists) {
-      console.log(`Notification recipient not found: ${userId}`);
-      return null;
-    }
-
-    const userData = userDoc.data();
-    const tokens = [
-      ...new Set([
-        ...(Array.isArray(userData.fcmTokens) ? userData.fcmTokens : []),
-        ...(typeof userData.fcmToken === "string" ? [userData.fcmToken] : []),
-      ]),
-    ].filter((token) => typeof token === "string" && token.length > 0);
-
-    if (tokens.length === 0) {
-      console.log(`No FCM token found for user: ${userId}`);
-      return null;
-    }
-
-    const dataPayload = {
-      click_action: "FLUTTER_NOTIFICATION_CLICK",
-      type: String(notification.type || "general"),
-      notificationId: String(event.params.notificationId),
-    };
-
-    for (const key of ["accountId", "relatedAccountId"]) {
-      const value = notification.data?.[key];
-      if (typeof value === "string" && value.trim()) {
-        dataPayload[key] = value.trim();
-      }
-    }
+    const referenceNumber = String(source?.referenceNumber || "");
+    const isWorkerWageAccrual =
+      source?.id === transactionId &&
+      source.type === "income" &&
+      source.category === "حاضری کی واجب اجرت" &&
+      referenceNumber.startsWith(workerWageAccrualPrefix);
+    const isWorkerWagePayment =
+      source?.id === transactionId &&
+      source.type === "expense" &&
+      source.category === "اجرت کی ادائیگی" &&
+      referenceNumber.startsWith(workerWagePaymentPrefix);
+    const amount = Number(source?.amount);
     if (
-      typeof notification.data?.senderName === "string" &&
-      notification.data.senderName.trim()
+      (!isWorkerWageAccrual && !isWorkerWagePayment) ||
+      !Number.isFinite(amount) ||
+      amount <= 0
     ) {
-      dataPayload.senderName = boundedText(
-        notification.data.senderName,
-        "",
-        80,
-      );
-    }
-    if (
-      typeof notification.data?.senderPhotoUrl === "string" &&
-      notification.data.senderPhotoUrl.trim()
-    ) {
-      dataPayload.senderPhotoUrl = boundedText(
-        notification.data.senderPhotoUrl,
-        "",
-        512,
-      );
+      if (mapping) {
+        await removeWorkerWageMirror(db, senderUid, transactionId, mapping);
+      }
+      return null;
     }
 
-    const message = {
-      tokens,
-      notification: {
-        title: boundedText(
-          notification.title,
-          "نیا نوٹیفیکیشن",
-          100,
-        ),
-        body: boundedText(
-          notification.message,
-          "آپ کے اکاؤنٹ میں نئی سرگرمی ہوئی ہے",
-          240,
-        ),
-      },
-      data: dataPayload,
-      android: {
-        priority: "high",
-        ttl: 24 * 60 * 60 * 1000,
-        notification: {
-          channelId: "account_channel",
-          sound: "default",
-        },
-      },
-      apns: {
-        headers: {
-          "apns-priority": "10",
-        },
-        payload: {
-          aps: {
-            sound: "default",
-          },
-        },
-      },
-    };
-
-    try {
-      const invalidTokens = [];
-      let successCount = 0;
-      let failureCount = 0;
-
-      for (let offset = 0; offset < tokens.length; offset += 500) {
-        const tokenBatch = tokens.slice(offset, offset + 500);
-        const response = await admin.messaging().sendEachForMulticast({
-          ...message,
-          tokens: tokenBatch,
-        });
-        successCount += response.successCount;
-        failureCount += response.failureCount;
-
-        response.responses.forEach((result, index) => {
-          if (result.success) return;
-
-          const code = result.error?.code;
-          console.error(
-            `FCM delivery failed for ${userId}: ${code || result.error}`,
-          );
-          if (
-            code === "messaging/invalid-registration-token" ||
-            code === "messaging/registration-token-not-registered"
-          ) {
-            invalidTokens.push(tokenBatch[index]);
-          }
-        });
-      }
-
-      if (invalidTokens.length > 0) {
-        const updates = {
-          fcmTokens: admin.firestore.FieldValue.arrayRemove(...invalidTokens),
-        };
-        if (
-          typeof userData.fcmToken === "string" &&
-          invalidTokens.includes(userData.fcmToken)
-        ) {
-          updates.fcmToken = admin.firestore.FieldValue.delete();
-        }
-        await userRef.update(updates);
-      }
-
-      console.log(
-        `FCM notification ${event.params.notificationId}: ` +
-          `${successCount} sent, ${failureCount} failed`,
-      );
-    } catch (error) {
+    const senderRef = db.collection("users").doc(senderUid);
+    const workerAccountId = String(source.accountId || "");
+    if (!workerAccountId) {
       console.error(
-        `Error sending notification ${event.params.notificationId}:`,
-        error,
+        `Worker account ID missing for wage transaction ${transactionId}`,
       );
-      throw error;
+      if (mapping) {
+        await removeWorkerWageMirror(db, senderUid, transactionId, mapping);
+      }
+      return null;
     }
+    const workerAccountRef = senderRef
+      .collection("accounts")
+      .doc(workerAccountId);
+    const [senderSnapshot, workerAccountSnapshot] = await Promise.all([
+      senderRef.get(),
+      workerAccountRef.get(),
+    ]);
+    if (!workerAccountSnapshot.exists) {
+      console.error(
+        `Worker account missing for wage transaction ${transactionId}`,
+      );
+      if (mapping) {
+        await removeWorkerWageMirror(db, senderUid, transactionId, mapping);
+      }
+      return null;
+    }
+
+    const workerAccount = workerAccountSnapshot.data();
+    const workerCategory = String(workerAccount.category || "").toLowerCase();
+    if (
+      !["worker", "technician", "employee", "مزدور"].includes(workerCategory)
+    ) {
+      console.log(`Skipping non-worker wage transaction ${transactionId}`);
+      if (mapping) {
+        await removeWorkerWageMirror(db, senderUid, transactionId, mapping);
+      }
+      return null;
+    }
+
+    const recipientSnapshot = await findUserByPhone(db, workerAccount.phone);
+    if (!recipientSnapshot) {
+      console.log(
+        `No app account found for worker in transaction ${transactionId}`,
+      );
+      if (mapping) {
+        await removeWorkerWageMirror(db, senderUid, transactionId, mapping);
+      }
+      return null;
+    }
+
+    const senderData = senderSnapshot.data() || {};
+    const [senderAuthUser, senderProfileSnapshot] = await Promise.all([
+      admin.auth().getUser(senderUid),
+      db.collection("public_profiles").doc(senderUid).get(),
+    ]);
+    const senderProfile = senderProfileSnapshot.data() || {};
+    const senderPhone = String(
+      senderAuthUser.phoneNumber ||
+        senderData.phoneNumber ||
+        senderProfile.phoneNumber ||
+        "",
+    );
+    if (!senderPhone) {
+      console.error(
+        `Sender phone missing for wage transaction ${transactionId}`,
+      );
+      if (mapping) {
+        await removeWorkerWageMirror(db, senderUid, transactionId, mapping);
+      }
+      return null;
+    }
+
+    const recipientRef = recipientSnapshot.ref;
+    const recipientAccountsRef = recipientRef.collection("accounts");
+    let counterpartyAccount = await findAccountByPhone(
+      recipientAccountsRef,
+      senderPhone,
+    );
+    const now = admin.firestore.Timestamp.now();
+    const senderName = String(
+      senderProfile.displayName ||
+        senderProfile.shopName ||
+        senderAuthUser.displayName ||
+        senderPhone,
+    );
+    const batch = db.batch();
+
+    if (!counterpartyAccount) {
+      const accountId = `employer_${senderUid}`;
+      const accountRef = recipientAccountsRef.doc(accountId);
+      const account = {
+        id: accountId,
+        name: senderName,
+        phone: senderPhone,
+        address: "",
+        category: "Customer",
+        initialBalance: 0,
+        balanceType: "none",
+        balance: 0,
+        settlementNotes: {},
+        profileImage: senderData.photoURL || senderAuthUser?.photoURL || null,
+        createdAt: now,
+        updatedAt: now,
+        isActive: true,
+      };
+      batch.set(accountRef, account, {merge: true});
+      counterpartyAccount = {id: accountId, ref: accountRef};
+    }
+
+    const mirrorTransactionId = `worker_wage_${senderUid}_${transactionId}`;
+    const notificationId = isWorkerWageAccrual
+      ? `worker_wage_${senderUid}_${transactionId}`
+      : `transaction_${senderUid}_${transactionId}`;
+    const hasExistingMapping =
+      mapping?.recipientUid && mapping.recipientUid !== recipientRef.id;
+    const mirrorTransaction = {
+      ...source,
+      id: mirrorTransactionId,
+      accountId: counterpartyAccount.id,
+      amount,
+      type: isWorkerWageAccrual ? "expense" : "income",
+      receivedAmount: 0,
+      pendingAmount: isWorkerWageAccrual ? amount : 0,
+      paymentMethod: isWorkerWageAccrual
+        ? "credit"
+        : String(source.paymentMethod || "cash"),
+      isPending: isWorkerWageAccrual,
+      receiptFromCounterparty: true,
+      updatedAt: now,
+    };
+    if (hasExistingMapping) {
+      const previousRecipientRef = db
+        .collection("users")
+        .doc(mapping.recipientUid);
+      batch.delete(
+        previousRecipientRef
+          .collection("transactions")
+          .doc(mapping.mirrorTransactionId),
+      );
+      if (mapping.notificationId) {
+        batch.delete(
+          previousRecipientRef
+            .collection("notifications")
+            .doc(mapping.notificationId),
+        );
+      }
+    }
+    batch.set(
+      recipientRef.collection("transactions").doc(mirrorTransactionId),
+      mirrorTransaction,
+    );
+    if (!mapping || hasExistingMapping) {
+      const sourceDate = source.date instanceof admin.firestore.Timestamp
+        ? source.date.toDate().toISOString()
+        : String(source.date || now.toDate().toISOString());
+      const notification = {
+        id: notificationId,
+        title: isWorkerWageAccrual
+          ? "حاضری کی اجرت درج ہوئی"
+          : "مزدوری کی ادائیگی درج ہوئی",
+        message: isWorkerWageAccrual
+          ? `${senderName} نے حاضری کی واجب اجرت Rs. ${amount.toFixed(0)} درج کی`
+          : `${senderName} نے مزدوری کی ادائیگی Rs. ${amount.toFixed(0)} درج کی`,
+        type: "transaction",
+        timestamp: now,
+        data: {
+          amount: String(amount),
+          transactionType: String(source.type),
+          category: String(source.category),
+          paymentMethod: mirrorTransaction.paymentMethod,
+          senderName,
+          senderPhone,
+          senderUid,
+          senderPhotoUrl:
+            senderData.photoURL || senderAuthUser?.photoURL || null,
+          description: String(source.description || "حاضری کی واجب اجرت"),
+          items: [],
+          receivedAmount: isWorkerWageAccrual ? "0" : String(amount),
+          pendingAmount: String(mirrorTransaction.pendingAmount),
+          transactionId: mirrorTransactionId,
+          transactionDate: sourceDate,
+          referenceNumber: source.referenceNumber,
+          subtotal: String(amount),
+          discountAmount: "0",
+          discountPercent: null,
+          discountReason: null,
+          isAdded: true,
+        },
+        relatedAccountId: counterpartyAccount.id,
+        relatedTransactionId: mirrorTransactionId,
+      };
+      batch.set(
+        recipientRef.collection("notifications").doc(notificationId),
+        {
+          ...notification,
+          isRead: false,
+        },
+        {merge: true},
+      );
+    }
+    batch.set(mappingRef, {
+      recipientUid: recipientRef.id,
+      accountId: counterpartyAccount.id,
+      mirrorTransactionId,
+      notificationId,
+      updatedAt: now,
+    });
+    await batch.commit();
+    return null;
   },
 );

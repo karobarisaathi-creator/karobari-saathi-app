@@ -13,28 +13,26 @@ import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/contract_service.dart';
 import 'package:account_app/core/services/worker_service.dart';
-import 'package:account_app/core/services/notification_service.dart';
 import 'package:intl/intl.dart';
-import 'package:account_app/core/utils/account_balance_utils.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/core/utils/party_summary_utils.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/widgets/stock_card.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/features/settings/master_profile_screen.dart';
-import 'package:account_app/features/notifications/notifications_screen.dart';
 import 'package:account_app/features/shopkeeper/inventory_health_screen.dart';
 import 'package:account_app/features/shopkeeper/customer_bills_screen.dart';
 import 'package:account_app/features/shopkeeper/add_edit_stock_item_screen.dart';
 import 'package:account_app/features/shopkeeper/sales_analytics_screen.dart';
 import 'package:account_app/features/shopkeeper/stock_detail_screen.dart';
-import 'package:account_app/features/marketplace/marketplace_screen.dart';
 import 'package:account_app/features/contracts/contracts_list_screen.dart';
 import 'package:account_app/features/contracts/workers_list_screen.dart';
 import 'package:account_app/features/contracts/bulk_attendance_screen.dart';
 import 'package:account_app/features/accounts/party_list_screen.dart';
 import 'package:account_app/features/accounts/reports_screen.dart';
+import 'widgets/home_activity_feed.dart';
 import 'widgets/shopkeeper_tools_grid.dart';
 
 // ═══════════════════════════════════════════
@@ -55,8 +53,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String _shopName = '';
   String _userName = '';
+  String _profession = '';
+  String _about = '';
   String _address = '';
-  String? _bannerImageUrl;
   String? _profileImageUrl;
   bool _isMenuExpanded = false;
   int _financialSummaryIndex = 0;
@@ -71,11 +70,26 @@ class _HomeScreenState extends State<HomeScreen> {
           .getAllTransactions()
           .where((t) =>
               t.isQuickBill &&
-              t.type == 'income' &&
               DateFormat('yyyy-MM-dd').format(t.date) == todayKey)
           .length;
     } catch (_) {
       return 0;
+    }
+  }
+
+  double get _todayQuickBillsAmount {
+    try {
+      final databaseService =
+          Provider.of<DatabaseService>(context, listen: false);
+      final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      return databaseService
+          .getAllTransactions()
+          .where((t) =>
+              t.isQuickBill &&
+              DateFormat('yyyy-MM-dd').format(t.date) == todayKey)
+          .fold(0.0, (sum, t) => sum + t.amount.abs());
+    } catch (_) {
+      return 0.0;
     }
   }
 
@@ -118,12 +132,9 @@ class _HomeScreenState extends State<HomeScreen> {
             _shopName = (data?['shopName'] ?? '').toString();
             _userName =
                 (data?['displayName'] ?? user.displayName ?? '').toString();
+            _profession = (data?['profession'] ?? '').toString();
+            _about = (data?['about'] ?? '').toString();
             _address = (data?['businessAddress'] ?? '').toString();
-            _bannerImageUrl = (data?['bannerImage'] ??
-                    data?['bannerImageUrl'] ??
-                    data?['bannerUrl'] ??
-                    '')
-                .toString();
             _profileImageUrl = (data?['profileImage'] ??
                     data?['photoURL'] ??
                     user.photoURL ??
@@ -144,7 +155,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final stockService = Provider.of<StockService>(context);
     final databaseService = Provider.of<DatabaseService>(context);
     final contractService = Provider.of<ContractService>(context);
-    final workerService = Provider.of<WorkerService>(context);
     final summary = stockService.getStockSummary();
 
     final totalPurchaseValue = summary['totalPurchaseValue'] as double? ?? 0.0;
@@ -157,8 +167,15 @@ class _HomeScreenState extends State<HomeScreen> {
         : _calculateInventoryHealthScore(stockService);
     final contracts = contractService.contracts;
     final allTransactions = databaseService.getAllTransactions();
+    final activeSeasonIds = databaseService
+        .getMasterProfessions()
+        .where((profession) => profession.isActive ?? true)
+        .expand((profession) => databaseService.getSeasons(profession.id))
+        .where((season) => season.isActive ?? true)
+        .map((season) => season.id)
+        .toSet();
     final professionTransactions = allTransactions.where(
-      (transaction) => transaction.professionId?.isNotEmpty == true,
+      (transaction) => activeSeasonIds.contains(transaction.professionId),
     );
     final professionIncome = professionTransactions
         .where((transaction) => transaction.type == 'income')
@@ -176,44 +193,10 @@ class _HomeScreenState extends State<HomeScreen> {
       0,
       (total, contract) => total + contract.totalPaid,
     );
-    final workerNames = {
-      ...contracts
-          .expand((contract) => contract.laborPayments)
-          .map((payment) => payment.workerName.trim().toLowerCase())
-          .where((name) => name.isNotEmpty),
-      ...workerService.workers
-          .map((worker) => worker.name.trim().toLowerCase())
-          .where((name) => name.isNotEmpty),
-    };
-    final workerDueAmount = databaseService.accounts
-        .where((account) =>
-            const {'worker', 'technician', 'employee'}
-                .contains(account.category.toLowerCase()) ||
-            workerNames.contains(account.name.trim().toLowerCase()))
-        .fold<double>(0, (total, account) {
-      final balance = AccountBalanceUtils.currentCycle(
-        allTransactions
-            .where((transaction) => transaction.accountId == account.id),
-      ).balance;
-      return total + (balance < 0 ? -balance : 0);
-    });
-    final partyAccounts = databaseService.accounts.where((account) =>
-        !const {'worker', 'technician', 'employee'}
-            .contains(account.category.toLowerCase()) &&
-        !workerNames.contains(account.name.trim().toLowerCase()));
-    var totalReceivable = 0.0;
-    var totalPayable = 0.0;
-    for (final account in partyAccounts) {
-      final balance = AccountBalanceUtils.currentCycle(
-        allTransactions
-            .where((transaction) => transaction.accountId == account.id),
-      ).balance;
-      if (balance > 0) {
-        totalReceivable += balance;
-      } else if (balance < 0) {
-        totalPayable += -balance;
-      }
-    }
+    final partySummary = PartySummaryUtils.calculateSummary(
+      accounts: databaseService.accounts,
+      transactions: allTransactions,
+    );
 
     return Directionality(
       textDirection: languageService.textDirection,
@@ -233,22 +216,28 @@ class _HomeScreenState extends State<HomeScreen> {
               professionExpense,
               totalContractAmount,
               contractDueAmount,
-              workerDueAmount,
               installmentAmount,
-              partyAccounts.length,
-              totalReceivable,
-              totalPayable,
+              partySummary.partyCount,
+              partySummary.totalReceivable,
+              partySummary.totalPayable,
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-                child: _buildQuickActions(
-                  context,
-                  isUrdu,
-                  fontFamily,
-                  totalItems,
-                  inventoryHealthScore,
-                  stockService.isLoading,
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildQuickActions(
+                      context,
+                      isUrdu,
+                      fontFamily,
+                      totalItems,
+                      inventoryHealthScore,
+                      stockService.isLoading,
+                    ),
+                    const SizedBox(height: 8),
+                    const HomeActivityFeed(),
+                  ],
                 ),
               ),
             ),
@@ -318,7 +307,6 @@ class _HomeScreenState extends State<HomeScreen> {
     double professionExpense,
     double totalContractAmount,
     double contractDueAmount,
-    double workerDueAmount,
     double installmentAmount,
     int partyCount,
     double totalReceivable,
@@ -329,6 +317,72 @@ class _HomeScreenState extends State<HomeScreen> {
     final locationText = _address.isNotEmpty
         ? _address
         : (isUrdu ? 'لاہور، پاکستان' : 'Pakistan');
+    final summaryStats = <Widget>[];
+
+    void addSummaryStat(String value, String label, Color color) {
+      summaryStats.add(_statMini(value, label, color, fontFamily, isUrdu));
+    }
+
+    if (_financialSummaryIndex == 0) {
+      addSummaryStat('$partyCount', isUrdu ? 'پارٹیاں' : 'Parties',
+          const Color(0xFFA3E635));
+      addSummaryStat(
+        Formatters.formatAmountWithCurrency(totalReceivable),
+        isUrdu ? 'لینے ہیں' : 'To Receive',
+        const Color(0xFF93C5FD),
+      );
+      addSummaryStat(
+        Formatters.formatAmountWithCurrency(totalPayable),
+        isUrdu ? 'دینے ہیں' : 'To Pay',
+        const Color(0xFFFCA5A5),
+      );
+    } else if (_financialSummaryIndex == 1) {
+      addSummaryStat(
+        Formatters.formatAmountWithCurrency(professionIncome),
+        isUrdu ? 'پیشے کی آمدن' : 'Profession Income',
+        const Color(0xFFA3E635),
+      );
+      addSummaryStat(
+        Formatters.formatAmountWithCurrency(professionExpense),
+        isUrdu ? 'پیشے کے اخراجات' : 'Profession Expenses',
+        const Color(0xFFFCA5A5),
+      );
+      addSummaryStat(
+        Formatters.formatAmountWithCurrency(
+            professionIncome - professionExpense),
+        isUrdu ? 'پیشے کا منافع' : 'Profession Profit',
+        const Color(0xFF93C5FD),
+      );
+    } else if (_financialSummaryIndex == 2) {
+      addSummaryStat(
+        Formatters.formatAmountWithCurrency(totalContractAmount),
+        isUrdu ? 'کل ٹھیکہ رقم' : 'Total Contract',
+        const Color(0xFFA3E635),
+      );
+      addSummaryStat(
+        Formatters.formatAmountWithCurrency(contractDueAmount),
+        isUrdu ? 'ٹھیکہ بقایا' : 'Contract Due',
+        const Color(0xFFFCA5A5),
+      );
+      addSummaryStat(
+        Formatters.formatAmountWithCurrency(installmentAmount),
+        isUrdu ? 'قسطوں کی رقم' : 'Installments',
+        const Color(0xFF93C5FD),
+      );
+    } else {
+      addSummaryStat(
+        Formatters.formatAmountWithCurrency(purchaseVal),
+        isUrdu ? 'خرید مالیت' : 'Purchase Val',
+        const Color(0xFFA3E635),
+      );
+      addSummaryStat(
+        Formatters.formatAmountWithCurrency(salesVal),
+        isUrdu ? 'فروخت مالیت' : 'Sales Val',
+        const Color(0xFF93C5FD),
+      );
+      addSummaryStat('$lowStockCount', isUrdu ? 'کم اسٹاک' : 'Low Stock',
+          const Color(0xFFFBBF24));
+    }
 
     final topPadding = MediaQuery.of(context).padding.top;
 
@@ -381,73 +435,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: () =>
                       setState(() => _isMenuExpanded = !_isMenuExpanded),
                 ),
-                const SizedBox(width: 4),
-                // Notifications Action Icon with Badge
-                Consumer<NotificationService>(
-                  builder: (context, notifService, child) {
-                    return Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            PhosphorIcons.bell(),
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                          tooltip: isUrdu ? 'اطلاعات' : 'Notifications',
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => NotificationsScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        if (notifService.unreadCount > 0)
-                          Positioned(
-                            top: 4,
-                            right: 4,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                                vertical: 1,
-                              ),
-                              constraints: const BoxConstraints(minWidth: 16),
-                              decoration: BoxDecoration(
-                                color: AppTheme.expenseColor,
-                                borderRadius: BorderRadius.circular(999),
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: UrduAwareText(
-                                notifService.unreadCount > 99
-                                    ? '99+'
-                                    : '${notifService.unreadCount}',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  height: 1,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
-                ),
               ],
             ),
           ),
           Container(
             decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.25), width: 1.2),
+                  color: Colors.white.withValues(alpha: 0.1), width: 1.2),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.15),
@@ -460,33 +456,9 @@ class _HomeScreenState extends State<HomeScreen> {
               borderRadius: BorderRadius.circular(14.5),
               child: Stack(
                 children: [
-                  // Banner Image Cover
+                  // Banner White Background
                   Positioned.fill(
-                    child: _bannerImageUrl != null &&
-                            _bannerImageUrl!.trim().isNotEmpty
-                        ? Image.network(
-                            _bannerImageUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                _buildHeaderBannerFallback(),
-                          )
-                        : _buildHeaderBannerFallback(),
-                  ),
-
-                  // Dark overlay gradient for maximum text readability
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withValues(alpha: 0.5),
-                            Colors.black.withValues(alpha: 0.8),
-                          ],
-                        ),
-                      ),
-                    ),
+                    child: _buildHeaderBannerFallback(),
                   ),
 
                   // Profile Card Info using ProfileInfoWidget
@@ -495,7 +467,28 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: ProfileInfoWidget(
                       name: profileName,
                       phone: '',
+                      category: _profession.trim().isEmpty
+                          ? null
+                          : _profession.trim(),
+                      isCategoryInline: true,
+                      categoryColor: AppTheme.greenColor,
                       address: locationText,
+                      isVerticalCategory: false,
+                      bottom: _about.trim().isEmpty
+                          ? null
+                          : Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: UrduAwareText(
+                                _about.trim(),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textSecondary,
+                                  fontFamily: fontFamily,
+                                ),
+                              ),
+                            ),
                       profileImage: _profileImageUrl,
                       isLarge: true,
                       customSize: 48,
@@ -530,120 +523,14 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 14),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 350),
-            child: SingleChildScrollView(
+            child: Row(
               key: ValueKey(_financialSummaryIndex),
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              child: Row(
-                children: [
-                  if (_financialSummaryIndex == 0) ...[
-                    _statMini(
-                      '$partyCount',
-                      isUrdu ? 'پارٹیاں' : 'Parties',
-                      const Color(0xFFA3E635),
-                      fontFamily,
-                      isUrdu,
-                    ),
-                    const SizedBox(width: 8),
-                    _statMini(
-                      Formatters.formatAmountWithCurrency(totalReceivable),
-                      isUrdu ? 'لینے ہیں' : 'To Receive',
-                      const Color(0xFF93C5FD),
-                      fontFamily,
-                      isUrdu,
-                    ),
-                    const SizedBox(width: 8),
-                    _statMini(
-                      Formatters.formatAmountWithCurrency(totalPayable),
-                      isUrdu ? 'دینے ہیں' : 'To Pay',
-                      const Color(0xFFFCA5A5),
-                      fontFamily,
-                      isUrdu,
-                    ),
-                  ] else if (_financialSummaryIndex == 1) ...[
-                    _statMini(
-                      Formatters.formatAmountWithCurrency(professionIncome),
-                      isUrdu ? 'پیشے کی آمدن' : 'Profession Income',
-                      const Color(0xFFA3E635),
-                      fontFamily,
-                      isUrdu,
-                    ),
-                    const SizedBox(width: 8),
-                    _statMini(
-                      Formatters.formatAmountWithCurrency(professionExpense),
-                      isUrdu ? 'پیشے کے اخراجات' : 'Profession Expenses',
-                      const Color(0xFFFCA5A5),
-                      fontFamily,
-                      isUrdu,
-                    ),
-                    const SizedBox(width: 8),
-                    _statMini(
-                      Formatters.formatAmountWithCurrency(
-                          professionIncome - professionExpense),
-                      isUrdu ? 'پیشے کا منافع' : 'Profession Profit',
-                      const Color(0xFF93C5FD),
-                      fontFamily,
-                      isUrdu,
-                    ),
-                  ] else if (_financialSummaryIndex == 2) ...[
-                    _statMini(
-                      Formatters.formatAmountWithCurrency(totalContractAmount),
-                      isUrdu ? 'کل ٹھیکہ رقم' : 'Total Contract',
-                      const Color(0xFFA3E635),
-                      fontFamily,
-                      isUrdu,
-                    ),
-                    const SizedBox(width: 8),
-                    _statMini(
-                      Formatters.formatAmountWithCurrency(contractDueAmount),
-                      isUrdu ? 'ٹھیکہ بقایا' : 'Contract Due',
-                      const Color(0xFFFCA5A5),
-                      fontFamily,
-                      isUrdu,
-                    ),
-                    const SizedBox(width: 8),
-                    _statMini(
-                      Formatters.formatAmountWithCurrency(installmentAmount),
-                      isUrdu ? 'قسطوں کی رقم' : 'Installments',
-                      const Color(0xFF93C5FD),
-                      fontFamily,
-                      isUrdu,
-                    ),
-                    const SizedBox(width: 8),
-                    _statMini(
-                      Formatters.formatAmountWithCurrency(workerDueAmount),
-                      isUrdu ? 'مزدوروں کا بقایا' : 'Worker Dues',
-                      const Color(0xFFFCA5A5),
-                      fontFamily,
-                      isUrdu,
-                    ),
-                  ] else ...[
-                    _statMini(
-                      Formatters.formatAmountWithCurrency(purchaseVal),
-                      isUrdu ? 'خرید مالیت' : 'Purchase Val',
-                      const Color(0xFFA3E635),
-                      fontFamily,
-                      isUrdu,
-                    ),
-                    const SizedBox(width: 8),
-                    _statMini(
-                      Formatters.formatAmountWithCurrency(salesVal),
-                      isUrdu ? 'فروخت مالیت' : 'Sales Val',
-                      const Color(0xFF93C5FD),
-                      fontFamily,
-                      isUrdu,
-                    ),
-                    const SizedBox(width: 8),
-                    _statMini(
-                      '$lowStockCount',
-                      isUrdu ? 'کم اسٹاک' : 'Low Stock',
-                      const Color(0xFFFBBF24),
-                      fontFamily,
-                      isUrdu,
-                    ),
-                  ],
+              children: [
+                for (var index = 0; index < summaryStats.length; index++) ...[
+                  if (index > 0) const SizedBox(width: 6),
+                  Expanded(child: summaryStats[index]),
                 ],
-              ),
+              ],
             ),
           ),
         ],
@@ -653,16 +540,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildHeaderBannerFallback() {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppTheme.slateColor,
-            AppTheme.verifiedGold,
-          ],
-        ),
-      ),
+      color: Colors.white.withValues(alpha: 0.08),
     );
   }
 
@@ -673,32 +551,32 @@ class _HomeScreenState extends State<HomeScreen> {
     String fontFamily,
     bool isUrdu,
   ) {
-    return SizedBox(
-      width: 124,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-        ),
-        child: Column(
-          children: [
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: UrduAwareText(
-                value,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: -0.4,
-                ),
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: UrduAwareText(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                letterSpacing: -0.4,
               ),
             ),
-            const SizedBox(height: 3),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+          ),
+          const SizedBox(height: 3),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
                   width: 6,
@@ -709,22 +587,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(width: 4),
-                Flexible(
-                  child: UrduAwareText(
-                    label,
-                    style: TextStyle(
-                      fontFamily: fontFamily,
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white.withValues(alpha: 0.75),
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                UrduAwareText(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: TextStyle(
+                    fontFamily: fontFamily,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white.withValues(alpha: 0.75),
                   ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -804,21 +681,29 @@ class _HomeScreenState extends State<HomeScreen> {
             Row(
               children: [
                 Expanded(
-                  child: _quickActionCard(
-                    isUrdu: isUrdu,
-                    fontFamily: fontFamily,
-                    title: isUrdu ? 'مزدوروں کی لسٹ' : 'Workers List',
-                    sub: isUrdu
-                        ? 'تمام مزدوروں اور کاریگروں کا ریکارڈ'
-                        : 'All workers & technicians record',
-                    icon: PhosphorIcons.users(),
-                    color: AppTheme.themeColor,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const WorkersListScreen(),
-                        ),
+                  child: Consumer<WorkerService>(
+                    builder: (context, workerService, _) {
+                      final workerCount = workerService.workers.length;
+                      return _quickActionCard(
+                        isUrdu: isUrdu,
+                        fontFamily: fontFamily,
+                        title: isUrdu ? 'مزدوروں کی لسٹ' : 'Workers List',
+                        sub: isUrdu
+                            ? 'تمام مزدوروں اور کاریگروں کا ریکارڈ'
+                            : 'All workers & technicians record',
+                        icon: PhosphorIcons.users(),
+                        color: AppTheme.themeColor,
+                        badge: workerCount > 0
+                            ? '$workerCount ${isUrdu ? 'مزدور' : 'Workers'}'
+                            : null,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const WorkersListScreen(),
+                            ),
+                          );
+                        },
                       );
                     },
                   ),
@@ -945,7 +830,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         : 'Quick bill cash & credit sales',
                     icon: Icons.receipt_long_rounded,
                     color: AppTheme.verifiedGold,
-                    badge: '$_todayQuickBillsCount',
+                    badge:
+                        '$_todayQuickBillsCount | ${Formatters.formatCompact(_todayQuickBillsAmount)}',
                     onTap: () {
                       Navigator.push(
                         context,
@@ -959,23 +845,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ],
-        ),
-        const SizedBox(height: 8),
-        _quickActionCard(
-          isUrdu: isUrdu,
-          fontFamily: fontFamily,
-          title: isUrdu ? 'خریدیں اور بیچیں' : 'Buy & Sell',
-          sub: isUrdu ? 'اپنی چیزیں فروخت کریں' : 'Buy or list personal items',
-          icon: Icons.sell_outlined,
-          color: AppTheme.verifiedGold,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const MarketplaceScreen(),
-              ),
-            );
-          },
         ),
       ],
     );

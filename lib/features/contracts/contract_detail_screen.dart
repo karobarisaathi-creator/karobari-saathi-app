@@ -18,8 +18,12 @@ import 'package:account_app/core/models/contract_model.dart';
 import 'package:account_app/core/models/transaction_model.dart';
 import '../../core/models/account_model.dart';
 import 'add_edit_contract_screen.dart';
+import 'package:account_app/core/models/category_model.dart';
+import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/features/professions/add_project_transaction_screen.dart';
+import 'package:account_app/features/professions/categories_management_screen.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
+import 'package:uuid/uuid.dart';
 
 class ContractDetailScreen extends StatefulWidget {
   final String contractId;
@@ -50,6 +54,62 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _manageContractExpenseCategories(
+    BuildContext context,
+    DatabaseService db,
+    bool isUrdu,
+  ) async {
+    const parentId = 'contract_expenses';
+    final categories = db
+        .getCategories()
+        .where((category) => category.parentId == parentId)
+        .toList();
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CategoriesManagementScreen(
+          categories: categories.map((category) => category.name).toList(),
+          isUrdu: isUrdu,
+          categoryType: ProfessionCategory.general,
+          title: isUrdu ? 'ٹھیکہ خرچ کے زمرے' : 'Contract Expense Categories',
+          description: isUrdu
+              ? 'یہ زمرے صرف ٹھیکے کے اخراجات کے لیے ہیں، پیشوں سے الگ۔'
+              : 'These categories are only for contract expenses, separate from professions.',
+          useDefaultCategories: false,
+          onCategoriesUpdated: (updatedNames) async {
+            final currentByName = {
+              for (final category in categories)
+                category.name.toLowerCase(): category,
+            };
+            final updatedNamesLower =
+                updatedNames.map((name) => name.toLowerCase()).toSet();
+            for (final category in categories) {
+              if (!updatedNamesLower.contains(category.name.toLowerCase())) {
+                await db.deleteCategory(category.id);
+              }
+            }
+            for (final name in updatedNames) {
+              if (currentByName.containsKey(name.toLowerCase())) continue;
+              final now = DateTime.now();
+              await db.addCategory(
+                Category(
+                  id: 'contract_expense_${const Uuid().v4()}',
+                  name: name,
+                  type: CategoryType.expense,
+                  parentId: parentId,
+                  color: '#D97706',
+                  icon: 'package',
+                  createdAt: now,
+                  updatedAt: now,
+                ),
+              );
+            }
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _confirmStatusChange(
@@ -502,6 +562,8 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                           AddEditContractScreen(contractToEdit: contract),
                     ),
                   );
+                } else if (value == 'categories') {
+                  _manageContractExpenseCategories(context, dbService, isUrdu);
                 } else if (value == 'delete') {
                   showDialog(
                     context: context,
@@ -591,6 +653,25 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                       const SizedBox(width: 10),
                       UrduAwareText(
                         isUrdu ? 'ترمیم کریں' : 'Edit',
+                        style: TextStyle(
+                          fontFamily: fontFamily,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.darkColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'categories',
+                  child: Row(
+                    children: [
+                      Icon(PhosphorIcons.gear(),
+                          size: 18, color: AppTheme.themeColor),
+                      const SizedBox(width: 10),
+                      UrduAwareText(
+                        isUrdu ? 'خرچ کے زمرے' : 'Expense Categories',
                         style: TextStyle(
                           fontFamily: fontFamily,
                           fontSize: 13,
@@ -758,7 +839,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                           UrduAwareText(
                             isUrdu ? 'مزدوری:' : 'Labor:',
                             style: TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 12,
                               fontFamily: fontFamily,
                               color: Colors.white70,
                             ),
@@ -777,7 +858,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                           UrduAwareText(
                             isUrdu ? 'مواد:' : 'Materials:',
                             style: TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 12,
                               fontFamily: fontFamily,
                               color: Colors.white70,
                             ),
@@ -801,7 +882,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                           UrduAwareText(
                             isUrdu ? 'منافع:' : 'Profit:',
                             style: TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                               fontFamily: fontFamily,
                               color: Colors.white70,
@@ -827,7 +908,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
               // ═══ ٹیبز بار + تفصیل کا بٹن (ایک لائن میں تین بٹن) ═══
               if (contract.isIncoming)
                 Container(
-                  margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                  margin: const EdgeInsets.fromLTRB(8, 0, 8, 4),
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     color: AppTheme.lightColor,
@@ -913,7 +994,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                color: _tabController.index == 2
+                                color: _tabController.index == 1
                                     ? AppTheme.slateColor
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(10),
@@ -928,7 +1009,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                                       fontFamily: fontFamily,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w800,
-                                      color: _tabController.index == 2
+                                      color: _tabController.index == 1
                                           ? Colors.white
                                           : AppTheme.darkColor,
                                     ),
@@ -996,7 +1077,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 5, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: _tabController.index == 1
+                                    color: _tabController.index == 2
                                         ? Colors.white.withValues(alpha: 0.3)
                                         : AppTheme.slateColor
                                             .withValues(alpha: 0.15),
@@ -1007,7 +1088,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
-                                      color: _tabController.index == 1
+                                      color: _tabController.index == 2
                                           ? Colors.white
                                           : AppTheme.slateColor,
                                     ),
@@ -1062,7 +1143,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
               // اگر آؤٹ گوئنگ (ٹھیکہ دیا) ہو تو قسط کا بار
               if (!contract.isIncoming)
                 Container(
-                  margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                  margin: const EdgeInsets.fromLTRB(8, 0, 8, 4),
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     color: AppTheme.lightColor,
@@ -1117,7 +1198,6 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                     ],
                   ),
                 ),
-              const SizedBox(height: 8),
 
               Expanded(
                 child: contract.isIncoming
@@ -1203,25 +1283,23 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 100),
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
       child: Container(
+        width: double.infinity,
         decoration: BoxDecoration(
           color: AppTheme.lightColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: const Color(0xFFD1D5DB)),
         ),
         child: ListView.builder(
-          padding: EdgeInsets.zero,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 80),
           itemCount: expenses.length,
           itemBuilder: (context, index) {
             final expense = expenses[index];
             final category = expense.category.startsWith('EXP:')
                 ? expense.category.substring(4)
                 : expense.category;
-            final description =
-                expense.description == 'دیگر' ? '' : expense.description;
+            final description = expense.description;
 
             final primaryTitle =
                 description.isNotEmpty ? description : category;
@@ -1230,39 +1308,65 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
 
             return Column(
               children: [
-                ListTile(
-                  dense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                  minVerticalPadding: 0,
-                  onLongPress: () => _showExpenseOptions(
-                      context, contract, expense, isUrdu, fontFamily),
-                  leading: Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: AppTheme.expenseColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    dense: true,
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    minVerticalPadding: 0,
+                    onLongPress: () => _showExpenseOptions(
+                        context, contract, expense, isUrdu, fontFamily),
+                    leading: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppTheme.expenseColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        PhosphorIcons.receipt(),
+                        size: 18,
+                        color: AppTheme.expenseColor,
+                      ),
                     ),
-                    child: Icon(
-                      PhosphorIcons.receipt(),
-                      size: 18,
-                      color: AppTheme.expenseColor,
+                    title: UrduAwareText(
+                      primaryTitle,
+                      style: TextStyle(
+                        fontFamily: fontFamily,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: AppTheme.darkColor,
+                      ),
                     ),
-                  ),
-                  title: UrduAwareText(
-                    primaryTitle,
-                    style: TextStyle(
-                      fontFamily: fontFamily,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: AppTheme.darkColor,
-                    ),
-                  ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Row(
+                    subtitle: secondaryInfo.isNotEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: UrduAwareText(
+                              secondaryInfo,
+                              style: TextStyle(
+                                color: AppTheme.purpleColor,
+                                fontSize: 11,
+                                fontFamily: fontFamily,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          )
+                        : null,
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
+                        UrduAwareText(
+                          Formatters.formatAmountWithCurrency(expense.amount),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 13.5,
+                            color: AppTheme.expenseColor,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
                         UrduAwareText(
                           Formatters.formatDate(expense.date),
                           style: const TextStyle(
@@ -1271,39 +1375,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        if (secondaryInfo.isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            width: 3,
-                            height: 3,
-                            decoration: const BoxDecoration(
-                              color: Colors.grey,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: UrduAwareText(
-                              secondaryInfo,
-                              style: TextStyle(
-                                color: AppTheme.purpleColor,
-                                fontSize: 10.5,
-                                fontFamily: fontFamily,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
                       ],
-                    ),
-                  ),
-                  trailing: UrduAwareText(
-                    Formatters.formatAmountWithCurrency(expense.amount),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 13.5,
-                      color: AppTheme.expenseColor,
                     ),
                   ),
                 ),
@@ -1515,17 +1587,16 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 100),
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
       child: Container(
+        width: double.infinity,
         decoration: BoxDecoration(
           color: AppTheme.lightColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: const Color(0xFFD1D5DB)),
         ),
         child: ListView.builder(
-          padding: EdgeInsets.zero,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 80),
           itemCount: contract.payments.length,
           itemBuilder: (context, i) {
             final p = contract.payments[i];
@@ -1560,46 +1631,74 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
 
     return Column(
       children: [
-        ListTile(
-          dense: true,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-          minVerticalPadding: 0,
-          onLongPress: () =>
-              _showPaymentOptions(context, contract, p, isUrdu, fontFamily),
-          leading: Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: (contract.isIncoming
-                      ? AppTheme.incomeColor
-                      : AppTheme.themeColor)
-                  .withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
+        Material(
+          color: Colors.transparent,
+          child: ListTile(
+            dense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            minVerticalPadding: 0,
+            onLongPress: () =>
+                _showPaymentOptions(context, contract, p, isUrdu, fontFamily),
+            leading: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: (contract.isIncoming
+                        ? AppTheme.incomeColor
+                        : AppTheme.themeColor)
+                    .withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                contract.isIncoming
+                    ? PhosphorIcons.arrowDownLeft()
+                    : PhosphorIcons.arrowUpRight(),
+                size: 18,
+                color: contract.isIncoming
+                    ? AppTheme.incomeColor
+                    : AppTheme.themeColor,
+              ),
             ),
-            child: Icon(
-              contract.isIncoming
-                  ? PhosphorIcons.arrowDownLeft()
-                  : PhosphorIcons.arrowUpRight(),
-              size: 18,
-              color: contract.isIncoming
-                  ? AppTheme.incomeColor
-                  : AppTheme.themeColor,
+            title: UrduAwareText(
+              primaryTitle,
+              style: TextStyle(
+                fontFamily: fontFamily,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: AppTheme.darkColor,
+              ),
             ),
-          ),
-          title: UrduAwareText(
-            primaryTitle,
-            style: TextStyle(
-              fontFamily: fontFamily,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              color: AppTheme.darkColor,
-            ),
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Row(
+            subtitle: contract.partyName.isNotEmpty
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: UrduAwareText(
+                      contract.partyName,
+                      style: TextStyle(
+                        color: AppTheme.themeColor,
+                        fontSize: 11,
+                        fontFamily: fontFamily,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  )
+                : null,
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                UrduAwareText(
+                  Formatters.formatAmountWithCurrency(p.amount),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13.5,
+                    color: contract.isIncoming
+                        ? AppTheme.incomeColor
+                        : AppTheme.darkColor,
+                  ),
+                ),
+                const SizedBox(height: 2),
                 UrduAwareText(
                   Formatters.formatDate(p.date),
                   style: const TextStyle(
@@ -1608,39 +1707,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (contract.partyName.isNotEmpty) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    width: 3,
-                    height: 3,
-                    decoration: const BoxDecoration(
-                        color: Colors.grey, shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: UrduAwareText(
-                      contract.partyName,
-                      style: TextStyle(
-                        color: AppTheme.themeColor,
-                        fontSize: 10.5,
-                        fontFamily: fontFamily,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
               ],
-            ),
-          ),
-          trailing: UrduAwareText(
-            Formatters.formatAmountWithCurrency(p.amount),
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 13.5,
-              color: contract.isIncoming
-                  ? AppTheme.incomeColor
-                  : AppTheme.darkColor,
             ),
           ),
         ),
@@ -1716,17 +1783,16 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 100),
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
       child: Container(
+        width: double.infinity,
         decoration: BoxDecoration(
           color: AppTheme.lightColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: const Color(0xFFD1D5DB)),
         ),
         child: ListView.builder(
-          padding: EdgeInsets.zero,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 80),
           itemCount: contract.laborPayments.length,
           itemBuilder: (context, i) {
             final p = contract.laborPayments[i];
@@ -1761,11 +1827,11 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
         ListTile(
           dense: true,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           minVerticalPadding: 0,
           leading: SizedBox(
-            width: 34,
-            height: 34,
+            width: 36,
+            height: 36,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: ProfileInfoWidget(
@@ -1773,7 +1839,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                 phone: workerAccount?.phone ?? '',
                 profileImage: workerAccount?.profileImage,
                 category: workerAccount?.category,
-                customSize: 34,
+                customSize: 36,
                 borderRadius: 8,
                 showText: false,
               ),
@@ -1788,50 +1854,43 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
               color: AppTheme.darkColor,
             ),
           ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Row(
-              children: [
-                UrduAwareText(
-                  Formatters.formatDate(p.date),
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    color: AppTheme.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (p.note.isNotEmpty) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    width: 3,
-                    height: 3,
-                    decoration: const BoxDecoration(
-                        color: Colors.grey, shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: UrduAwareText(
-                      p.note,
-                      style: TextStyle(
-                        color: AppTheme.purpleColor,
-                        fontSize: 10.5,
-                        fontFamily: fontFamily,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+          subtitle: p.note.isNotEmpty
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: UrduAwareText(
+                    p.note,
+                    style: TextStyle(
+                      color: AppTheme.purpleColor,
+                      fontSize: 11,
+                      fontFamily: fontFamily,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ],
-            ),
-          ),
-          trailing: UrduAwareText(
-            Formatters.formatAmountWithCurrency(p.amount),
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 13.5,
-              color: AppTheme.expenseColor,
-            ),
+                )
+              : null,
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              UrduAwareText(
+                Formatters.formatAmountWithCurrency(p.amount),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13.5,
+                  color: AppTheme.expenseColor,
+                ),
+              ),
+              const SizedBox(height: 2),
+              UrduAwareText(
+                Formatters.formatDate(p.date),
+                style: const TextStyle(
+                  fontSize: 10.5,
+                  color: AppTheme.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
         if (!isLast)

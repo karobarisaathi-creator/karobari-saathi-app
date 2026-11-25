@@ -8,6 +8,7 @@ import 'package:account_app/core/services/contract_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/worker_payroll_service.dart';
+import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/app_button.dart';
@@ -495,17 +496,51 @@ class _WorkerAttendanceScreenState extends State<WorkerAttendanceScreen> {
     bool isUrdu,
   ) async {
     setState(() => _isSaving = true);
+    String? activityFeedError;
     try {
+      final status = _pendingStatus ?? initialStatus;
+      final isFirstPresentEntry = status == WorkerAttendanceStatus.present &&
+          !service
+              .getAttendanceForWorker(widget.worker.id)
+              .any((record) => record.status == WorkerAttendanceStatus.present);
+      final agreedRate =
+          service.getRateForDate(widget.worker.id, _selectedDate);
       await service.saveAttendance(
         workerId: widget.worker.id,
         date: _selectedDate,
-        status: _pendingStatus ?? initialStatus,
+        status: status,
         databaseService: Provider.of<DatabaseService>(context, listen: false),
       );
       if (!mounted) return;
       setState(() => _pendingStatus = null);
-      AppToast.success(
-          context, isUrdu ? 'حاضری محفوظ ہو گئی' : 'Attendance saved');
+      if (isFirstPresentEntry && widget.worker.phone.trim().isNotEmpty) {
+        try {
+          await Provider.of<NotificationService>(context, listen: false)
+              .notifyWorkerAssignment(
+            workerId: widget.worker.id,
+            workerPhoneNumber: widget.worker.phone,
+            wageAmount: agreedRate?.amount,
+            wageBasis: agreedRate?.type.name,
+          );
+        } catch (error, stackTrace) {
+          activityFeedError = error.toString();
+          debugPrint('Worker assignment feed entry could not be saved: $error');
+          debugPrintStack(stackTrace: stackTrace);
+        }
+      }
+      if (!mounted) return;
+      if (activityFeedError == null) {
+        AppToast.success(
+            context, isUrdu ? 'حاضری محفوظ ہو گئی' : 'Attendance saved');
+      } else {
+        AppToast.warning(
+          context,
+          isUrdu
+              ? 'حاضری محفوظ؛ مزدور کی ہوم فیڈ اپڈیٹ نہیں ہو سکی'
+              : 'Attendance saved; the worker home feed could not be updated',
+          subtitle: activityFeedError,
+        );
+      }
     } catch (error) {
       if (!mounted) return;
       AppToast.error(

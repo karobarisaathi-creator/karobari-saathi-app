@@ -74,10 +74,8 @@ class CurrencyInputFormatter extends TextInputFormatter {
     if (dotIndex >= 0 || commaIndex >= 0) {
       final decimalIndex = dotIndex > commaIndex ? dotIndex : commaIndex;
       final separator = text[decimalIndex];
-      final suffixLength = text.length - decimalIndex - 1;
       final isConfiguredGrouping = separator == grouping &&
           separator != decimal &&
-          suffixLength == 3 &&
           (dotIndex < 0 || commaIndex < 0);
       if (isConfiguredGrouping) {
         integerPart = text;

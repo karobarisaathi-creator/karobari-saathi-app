@@ -9,7 +9,6 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
-import 'package:firebase_messaging/firebase_messaging.dart'; // Added for background handler
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'firebase_options.dart'; // Import generated options
@@ -26,6 +25,7 @@ import 'package:account_app/core/models/dispute_model.dart';
 
 // Services
 import 'package:account_app/core/services/database_service.dart';
+import 'package:account_app/core/services/database/profile_service.dart';
 import 'package:account_app/core/services/auth_service.dart'; // Added AuthService
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/theme_service.dart';
@@ -43,6 +43,7 @@ import 'package:account_app/core/services/worker_payroll_service.dart';
 import 'package:account_app/core/services/security_service.dart';
 import 'package:account_app/core/services/offline_queue_service.dart';
 import 'package:account_app/core/services/settings_service.dart';
+import 'package:account_app/core/services/play_store_update_service.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/startup_loading_gallery.dart';
 import './helpers/migration_helper.dart'; // ✅ یہ import کریں
@@ -53,7 +54,6 @@ import 'package:account_app/features/accounts/party_list_screen.dart';
 import 'package:account_app/features/settings/master_profile_screen.dart'; // Updated
 import 'package:account_app/features/accounts/add_party_screen.dart';
 import 'package:account_app/features/accounts/reports_screen.dart';
-import 'package:account_app/features/notifications/notifications_screen.dart';
 import 'package:account_app/features/professions/professions_screen.dart';
 import 'package:account_app/features/accounts/add_transaction_screen.dart';
 import 'package:account_app/features/settings/app_lock_gate.dart';
@@ -62,16 +62,6 @@ import 'package:account_app/core/theme/app_theme.dart'; // نئی تھیم فا�
 
 // Localization
 import 'l10n/app_localizations.dart';
-
-// Global Navigator Key for notification handling
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-
-// Background Handler must be a top-level function
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  print("Handling a background message: ${message.messageId}");
-}
 
 // Pre-cache helper
 void _precacheAvatars() {
@@ -121,9 +111,6 @@ void main() async {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-      // Register background handler
-      FirebaseMessaging.onBackgroundMessage(
-          _firebaseMessagingBackgroundHandler);
       print("Firebase Initialized Successfully with DefaultOptions");
     } catch (e) {
       print("Firebase Initialization Failed: $e");
@@ -191,12 +178,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LanguageService()),
         ChangeNotifierProvider(create: (_) => ThemeService()),
         ChangeNotifierProvider(create: (_) => AutoSyncService()),
-        ChangeNotifierProvider(create: (_) {
-          // Pass navigator key to NotificationService
-          final service = NotificationService();
-          service.setNavigatorKey(navigatorKey);
-          return service;
-        }),
+        ChangeNotifierProvider(create: (_) => NotificationService()),
         ChangeNotifierProvider(create: (_) => FirebaseService()),
         ChangeNotifierProvider(create: (_) => BalanceService()),
         ChangeNotifierProvider(create: (_) => PdfService()),
@@ -218,8 +200,6 @@ class MyApp extends StatelessWidget {
           return MaterialApp(
             title: 'کاروباری ساتھی',
             debugShowCheckedModeBanner: false,
-            navigatorKey: navigatorKey, // Assign the key here
-
             // Theme Configuration
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
@@ -269,7 +249,6 @@ class MyApp extends StatelessWidget {
                   const MasterProfileScreen(), // Updated
               '/addParty': (context) => AddPartyScreen(),
               '/reports': (context) => ReportsScreen(),
-              '/notifications': (context) => NotificationsScreen(),
               '/professions': (context) => ProfessionsScreen(),
               '/addTransaction': (context) => AddTransactionScreen(),
             },
@@ -289,10 +268,16 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
   bool _isLoading = true;
   bool _needsLogin = true;
   bool _needsProfileSetup = false;
+  bool _isCheckingPlayStoreUpdate = false;
+  DateTime? _lastPlayStoreUpdateCheck;
+  StreamSubscription<User?>? _authSubscription;
+  final PlayStoreUpdateService _playStoreUpdateService =
+      PlayStoreUpdateService();
 
   // Colors for loading screen (Matches AppTheme)
   final Color _themeColor = const Color(0xFF123248); // AppTheme.darkColor
-  final Color _greyColor = const Color(0xFF607D8B); // AppTheme.slateColor (Grey)
+  final Color _greyColor =
+      const Color(0xFF607D8B); // AppTheme.slateColor (Grey)
 
   @override
   void initState() {
@@ -304,14 +289,35 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _authSubscription?.cancel();
+    unawaited(_playStoreUpdateService.dispose());
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed &&
-        FirebaseAuth.instance.currentUser != null) {
-      unawaited(_checkAutoBackup());
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_checkPlayStoreUpdate());
+      if (FirebaseAuth.instance.currentUser != null) {
+        unawaited(_checkAutoBackup());
+      }
+    }
+  }
+
+  Future<void> _checkPlayStoreUpdate() async {
+    if (_isCheckingPlayStoreUpdate) return;
+    final now = DateTime.now();
+    if (_lastPlayStoreUpdateCheck != null &&
+        now.difference(_lastPlayStoreUpdateCheck!) < const Duration(hours: 6)) {
+      return;
+    }
+
+    _isCheckingPlayStoreUpdate = true;
+    _lastPlayStoreUpdateCheck = now;
+    try {
+      await _playStoreUpdateService.checkForUpdate();
+    } finally {
+      _isCheckingPlayStoreUpdate = false;
     }
   }
 
@@ -339,18 +345,21 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
 
     try {
       // Listen to Auth State Changes
-      FirebaseAuth.instance.authStateChanges().listen((user) {
+      _authSubscription =
+          FirebaseAuth.instance.authStateChanges().listen((user) {
         if (mounted) {
-          setState(() {
-            _needsLogin = user == null;
-          });
-          if (user != null) {
-            unawaited(_checkAutoBackup());
+          if (user == null) {
+            setState(() {
+              _needsLogin = true;
+              _needsProfileSetup = false;
+            });
+          } else if (_isLoading) {
+            setState(() => _needsLogin = false);
           }
         }
       });
 
-      // 0. Trigger Notification Permission immediately
+      // Initialize the quiet activity feed service.
       Provider.of<NotificationService>(context, listen: false);
 
       // 1. Initialize Database Service fully
@@ -365,22 +374,67 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
 
       if (user != null) {
         _needsLogin = false;
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get()
-            .timeout(const Duration(seconds: 8));
-        final userData = userDoc.data();
-        final storedName = userData?['displayName'] ?? userData?['name'];
-        _needsProfileSetup =
-            storedName == null || storedName.toString().trim().isEmpty;
-        // 3. Auto Restore from Cloud (with timeout)
-        try {
-          await databaseService
-              .fetchFromFirebase()
-              .timeout(const Duration(seconds: 10));
-        } catch (e) {
-          print("Auto restore failed or timed out: $e");
+        final firestore = FirebaseFirestore.instance;
+        final userRef = firestore.collection('users').doc(user.uid);
+        final userDoc = await userRef.get().timeout(const Duration(seconds: 8));
+        final userData = userDoc.data() ?? <String, dynamic>{};
+        if (userData['isDeactivated'] == true) {
+          try {
+            await databaseService.prepareForLogout();
+          } catch (error, stackTrace) {
+            debugPrint('Failed to clear data for deactivated session: $error');
+            debugPrintStack(stackTrace: stackTrace);
+          }
+          ProfileService.clearCache();
+          await FirebaseAuth.instance.signOut();
+          _needsLogin = true;
+          _needsProfileSetup = false;
+        } else {
+          if (!userDoc.exists) {
+            await userRef.set({
+              'uid': user.uid,
+              'phoneNumber': user.phoneNumber,
+              'displayName': user.displayName,
+            });
+          }
+          databaseService
+            ..stopRealtimeSync()
+            ..startRealtimeSync();
+          final storedName =
+              userData['displayName'] ?? userData['name'] ?? user.displayName;
+          _needsProfileSetup =
+              storedName == null || storedName.toString().trim().isEmpty;
+          try {
+            await firestore
+                .collection('public_profiles')
+                .doc(user.uid)
+                .set(
+                  ProfileService.publicProfileData(
+                    uid: user.uid,
+                    userData: {
+                      ...userData,
+                      'uid': user.uid,
+                      'phoneNumber':
+                          userData['phoneNumber'] ?? user.phoneNumber,
+                      'displayName': userData['displayName'] ??
+                          userData['name'] ??
+                          user.displayName,
+                    },
+                    verifiedPhoneNumber: user.phoneNumber,
+                  ),
+                )
+                .timeout(const Duration(seconds: 8));
+          } catch (error) {
+            debugPrint('Public profile sync failed: $error');
+          }
+          // 3. Auto Restore from Cloud (with timeout)
+          try {
+            await databaseService
+                .fetchFromFirebase()
+                .timeout(const Duration(seconds: 10));
+          } catch (e) {
+            print("Auto restore failed or timed out: $e");
+          }
         }
       } else {
         _needsLogin = true;
@@ -398,6 +452,7 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
         _isLoading = false;
       });
     }
+    unawaited(_checkPlayStoreUpdate());
   }
 
   @override

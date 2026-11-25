@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,6 +12,7 @@ import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/core/services/database/profile_service.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/features/dashboard/app_shell_screen.dart';
@@ -27,49 +31,57 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   String _verificationId = '';
+  String? _pendingPhoneNumber;
+  int? _resendToken;
+  Timer? _resendTimer;
+  int _resendSecondsRemaining = 0;
   bool _loginCompleted = false;
-
-  // Defined Colors
-  final Color _lightColor = AppTheme.lightColor;
-  final Color _themeColor = AppTheme.themeColor;
-  final Color _darkColor = AppTheme.darkColor;
-  final Color _slateColor = const Color(0xFFDAAD51);
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     _phoneController.dispose();
     _otpController.dispose();
     super.dispose();
   }
 
   void _showTermsDialog(bool isUrdu, String fontFamily) {
-    final fontWeight = FontWeight.normal;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         backgroundColor: Colors.white,
-        title: Row(
-          children: [
-            Icon(PhosphorIcons.shield(), color: _themeColor),
-            SizedBox(width: 10),
-            UrduAwareText(
+        title: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.slateColor.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child:
+                Icon(PhosphorIcons.shieldCheck(), color: AppTheme.verifiedGold),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: UrduAwareText(
               isUrdu ? 'شرائط و ضوابط' : 'Terms & Conditions',
               style: TextStyle(
-                  fontFamily: fontFamily,
-                  color: _darkColor,
-                  fontWeight: isUrdu ? fontWeight : FontWeight.bold),
+                fontFamily: fontFamily,
+                color: AppTheme.darkColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
             ),
-          ],
-        ),
+          ),
+        ]),
         content: SingleChildScrollView(
           child: UrduAwareText.rich(
             TextSpan(
               style: TextStyle(
-                  fontFamily: fontFamily,
-                  color: Colors.grey.shade700,
-                  fontSize: 14,
-                  fontWeight: fontWeight),
+                fontFamily: fontFamily,
+                color: Colors.grey.shade700,
+                fontSize: 14,
+              ),
               children: [
                 TextSpan(
                   text: isUrdu
@@ -109,22 +121,21 @@ class _LoginScreenState extends State<LoginScreen> {
                       ? '\nایپ کا استعمال جاری رکھ کر آپ ان تمام شرائط کو قبول کرتے ہیں۔'
                       : '\nBy continuing to use the app, you accept all these terms.',
                   style: TextStyle(
-                      color: _darkColor,
-                      fontFamily: fontFamily,
-                      fontWeight: isUrdu ? fontWeight : FontWeight.bold),
+                    color: AppTheme.darkColor,
+                    fontFamily: fontFamily,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
           ),
         ),
         actions: [
-          TextButton(
+          AppButton(
+            text: isUrdu ? 'قبول ہے' : 'Accept',
             onPressed: () => Navigator.of(context).pop(),
-            child: UrduAwareText(isUrdu ? 'قبول ہے' : 'Accept',
-                style: TextStyle(
-                    fontFamily: fontFamily,
-                    color: _themeColor,
-                    fontWeight: isUrdu ? fontWeight : FontWeight.bold)),
+            color: AppTheme.verifiedGold,
+            size: AppButtonSize.small,
           ),
         ],
       ),
@@ -133,18 +144,20 @@ class _LoginScreenState extends State<LoginScreen> {
 
   InlineSpan _buildTermPoint(
       String title, String description, bool isUrdu, String fontFamily) {
-    final fontWeight = FontWeight.normal;
     return TextSpan(
       children: [
         TextSpan(
-            text: '\n• $title',
-            style: TextStyle(
-                fontWeight: fontWeight,
-                color: _darkColor,
-                fontFamily: fontFamily)),
+          text: '\n• $title',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppTheme.darkColor,
+            fontFamily: fontFamily,
+          ),
+        ),
         TextSpan(
-            text: description,
-            style: TextStyle(fontFamily: fontFamily, fontWeight: fontWeight)),
+          text: description,
+          style: TextStyle(fontFamily: fontFamily),
+        ),
       ],
     );
   }
@@ -154,301 +167,404 @@ class _LoginScreenState extends State<LoginScreen> {
     final languageService = Provider.of<LanguageService>(context);
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-    final fontWeight = FontWeight.normal;
-
-    // Calculate available height to enable scrolling when keyboard is open
-    final size = MediaQuery.of(context).size;
-    final padding = MediaQuery.of(context).padding;
-    final availableHeight = size.height - padding.top - padding.bottom;
 
     return Scaffold(
-      backgroundColor: _themeColor,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: SizedBox(
-            height: availableHeight,
-            child: Column(
-              children: [
-                // Header Section with Logo
-                Expanded(
-                  flex: 4,
-                  child: Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Logo with Glow Effect
-                        Container(
-                          padding: EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _themeColor,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 20,
-                                spreadRadius: 5,
-                              ),
-                            ],
-                          ),
-                          child: ClipOval(
-                            child: Image.asset(
-                              'assets/images/icons/zalooq.png',
-                              width: 100,
-                              height: 100,
-                              //fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 24),
-                        UrduAwareText(
-                          'Karobari Saathi',
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            fontFamily: '',
-                            letterSpacing: 1.0,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withOpacity(0.3),
-                                offset: Offset(0, 2),
-                                blurRadius: 4,
-                              ),
-                            ],
-                          ),
-                        ),
-                        UrduAwareText(
-                          'PRO LEDGER',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: _darkColor,
-                            fontFamily: '',
-                            letterSpacing: 4.0,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Form Section
-                Expanded(
-                  flex: 5,
-                  child: Container(
-                    width: double.infinity,
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppTheme.slateColor, AppTheme.verifiedGold],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 12),
+                  // Top Logo & Header
+                  Container(
+                    padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: _lightColor,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(40),
-                        topRight: Radius.circular(40),
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.15),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        width: 2,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 10,
-                          offset: Offset(0, -5),
+                          color: Colors.black.withValues(alpha: 0.25),
+                          blurRadius: 20,
+                          spreadRadius: 4,
                         ),
                       ],
                     ),
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(32, 40, 32, 24),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            UrduAwareText(
-                              isUrdu ? 'خوش آمدید' : 'Welcome',
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: fontWeight,
-                                color: _darkColor,
-                                fontFamily: fontFamily,
-                              ),
-                            ),
-                            SizedBox(height: 8),
-                            UrduAwareText(
-                              isUrdu
-                                  ? 'اپنے اکاؤنٹ تک رسائی حاصل کریں'
-                                  : 'Sign in to access your account',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: _darkColor.withOpacity(0.6),
-                                fontFamily: fontFamily,
-                                fontWeight: fontWeight,
-                              ),
-                            ),
-                            SizedBox(height: 32),
-
-                            // Phone Field
-                            TextFormField(
-                              controller: _phoneController,
-                              keyboardType: TextInputType.phone,
-                              autofillHints: const [
-                                AutofillHints.telephoneNumber
-                              ],
-                              style: TextStyle(
-                                  fontSize: 18,
-                                  color: _darkColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: ''),
-                              decoration: InputDecoration(
-                                labelText: isUrdu ? 'فون نمبر' : 'Phone Number',
-                                labelStyle: TextStyle(
-                                    color: _darkColor.withOpacity(0.6),
-                                    fontFamily: fontFamily,
-                                    fontWeight: fontWeight),
-                                hintText: '03001234567',
-                                hintStyle: TextStyle(
-                                    color: _darkColor.withOpacity(0.3),
-                                    fontFamily: ''),
-                                prefixIcon: Icon(PhosphorIcons.phone(),
-                                    color: _themeColor),
-                                filled: true,
-                                fillColor: Colors.white,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide:
-                                      BorderSide(color: _themeColor, width: 2),
-                                ),
-                                errorStyle: TextStyle(
-                                    fontFamily: fontFamily,
-                                    fontWeight: fontWeight),
-                                contentPadding: EdgeInsets.symmetric(
-                                    vertical: 18, horizontal: 20),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty)
-                                  return isUrdu
-                                      ? 'نمبر درج کریں'
-                                      : 'Enter number';
-                                if (!Formatters.isValidPhoneNumber(value)) {
-                                  return isUrdu
-                                      ? 'درست فون نمبر لکھیں'
-                                      : 'Enter a valid phone number';
-                                }
-                                return null;
-                              },
-                            ),
-
-                            // OTP Field (Animated)
-                            AnimatedContainer(
-                              duration: Duration(milliseconds: 400),
-                              curve: Curves.easeInOut,
-                              height: _verificationId.isNotEmpty ? 80 : 0,
-                              margin: EdgeInsets.only(
-                                  top: _verificationId.isNotEmpty ? 20 : 0),
-                              child: _verificationId.isNotEmpty
-                                  ? TextFormField(
-                                      controller: _otpController,
-                                      keyboardType: TextInputType.number,
-                                      autofillHints: const [
-                                        AutofillHints.oneTimeCode
-                                      ],
-                                      textAlign: TextAlign.center,
-                                      onChanged: (value) {
-                                        if (value.length == 6) {
-                                          _handleLogin();
-                                        }
-                                      },
-                                      style: TextStyle(
-                                          fontSize: 22,
-                                          letterSpacing: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: _darkColor,
-                                          fontFamily: ''),
-                                      decoration: InputDecoration(
-                                        hintText: '------',
-                                        hintStyle: TextStyle(
-                                            letterSpacing: 12,
-                                            color: _darkColor.withOpacity(0.3),
-                                            fontFamily: ''),
-                                        filled: true,
-                                        fillColor: Colors.white,
-                                        border: OutlineInputBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          borderSide: BorderSide.none,
-                                        ),
-                                        errorStyle: TextStyle(
-                                            fontFamily: fontFamily,
-                                            fontWeight: fontWeight),
-                                        contentPadding:
-                                            EdgeInsets.symmetric(vertical: 16),
-                                      ),
-                                    )
-                                  : SizedBox(),
-                            ),
-
-                            SizedBox(height: 32),
-
-                            // Action Button
-                            AppButton(
-                              text: _verificationId.isEmpty
-                                  ? (isUrdu ? 'کوڈ بھیجیں' : 'Send Code')
-                                  : (isUrdu ? 'تصدیق کریں' : 'Verify & Login'),
-                              onPressed: _handleLogin,
-                              icon: _verificationId.isEmpty
-                                  ? PhosphorIcons.arrowRight()
-                                  : null,
-                              isLoading: _isLoading,
-                              isFullWidth: true,
-                              size: AppButtonSize.large,
-                              color: _themeColor,
-                            ),
-
-                            SizedBox(height: 24),
-
-                            Center(
-                              child: UrduAwareText.rich(
-                                TextSpan(
-                                  style: TextStyle(
-                                      color: _darkColor.withOpacity(0.5),
-                                      fontSize: 12,
-                                      fontFamily: fontFamily,
-                                      fontWeight: fontWeight),
-                                  children: [
-                                    TextSpan(
-                                        text: isUrdu
-                                            ? 'جاری رکھنے پر آپ '
-                                            : 'By continuing, you agree to our '),
-                                    TextSpan(
-                                      text: isUrdu
-                                          ? 'شرائط و ضوابط'
-                                          : 'Terms & Conditions',
-                                      style: TextStyle(
-                                          color: _themeColor,
-                                          fontWeight: FontWeight.bold,
-                                          decoration: TextDecoration.underline),
-                                      recognizer: TapGestureRecognizer()
-                                        ..onTap = () => _showTermsDialog(
-                                            isUrdu, fontFamily),
-                                    ),
-                                    TextSpan(
-                                        text: isUrdu ? ' سے متفق ہیں' : ''),
-                                  ],
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ],
-                        ),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/icons/zalooq.png',
+                        width: 90,
+                        height: 90,
                       ),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 14),
+                  UrduAwareText(
+                    isUrdu ? 'کاروباری ساتھی' : 'Karobari Saathi',
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontFamily: fontFamily,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          offset: const Offset(0, 2),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: UrduAwareText(
+                      isUrdu ? 'پرو ڈیجیٹل کھاتہ' : 'PRO LEDGER',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withValues(alpha: 0.95),
+                        fontFamily: fontFamily,
+                        letterSpacing: isUrdu ? 0 : 3.0,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Full Width White Card (No Radius)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 28),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.zero,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.2),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          UrduAwareText(
+                            isUrdu ? 'خوش آمدید' : 'Welcome',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.darkColor,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          UrduAwareText(
+                            isUrdu
+                                ? 'اپنے اکاؤنٹ تک رسائی کے لیے لاگ ان کریں'
+                                : 'Sign in to access your account',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppTheme.darkColor.withValues(alpha: 0.65),
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Phone Field
+                          TextFormField(
+                            controller: _phoneController,
+                            enabled: _verificationId.isEmpty && !_isLoading,
+                            keyboardType: TextInputType.phone,
+                            autofillHints: const [
+                              AutofillHints.telephoneNumber
+                            ],
+                            style: const TextStyle(
+                              fontSize: 17,
+                              color: AppTheme.darkColor,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: '',
+                            ),
+                            decoration: InputDecoration(
+                              isDense: true,
+                              labelText: isUrdu ? 'فون نمبر' : 'Phone Number',
+                              labelStyle: TextStyle(
+                                color:
+                                    AppTheme.darkColor.withValues(alpha: 0.7),
+                                fontFamily: fontFamily,
+                              ),
+                              hintText: '03001234567',
+                              hintStyle: TextStyle(
+                                color:
+                                    AppTheme.darkColor.withValues(alpha: 0.3),
+                                fontFamily: '',
+                              ),
+                              prefixIcon: Icon(
+                                PhosphorIcons.phoneCall(),
+                                color: AppTheme.slateColor,
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey.shade50,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide:
+                                    BorderSide(color: Colors.grey.shade300),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide:
+                                    BorderSide(color: Colors.grey.shade300),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: AppTheme.verifiedGold, width: 2),
+                              ),
+                              errorStyle: TextStyle(fontFamily: fontFamily),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 12, horizontal: 16),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return isUrdu
+                                    ? 'نمبر درج کریں'
+                                    : 'Enter number';
+                              }
+                              if (!Formatters.isValidPhoneNumber(value)) {
+                                return isUrdu
+                                    ? 'درست فون نمبر لکھیں'
+                                    : 'Enter a valid phone number';
+                              }
+                              return null;
+                            },
+                          ),
+
+                          // OTP Field (Animated)
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 350),
+                            curve: Curves.easeInOut,
+                            height: _verificationId.isNotEmpty ? 75 : 0,
+                            margin: EdgeInsets.only(
+                                top: _verificationId.isNotEmpty ? 14 : 0),
+                            child: _verificationId.isNotEmpty
+                                ? Column(
+                                    children: [
+                                      TextFormField(
+                                        controller: _otpController,
+                                        keyboardType: TextInputType.number,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter
+                                              .digitsOnly,
+                                          LengthLimitingTextInputFormatter(6),
+                                        ],
+                                        autofillHints: const [
+                                          AutofillHints.oneTimeCode
+                                        ],
+                                        textAlign: TextAlign.center,
+                                        onChanged: (value) {
+                                          if (value.length == 6) {
+                                            _handleLogin();
+                                          }
+                                        },
+                                        style: const TextStyle(
+                                          fontSize: 20,
+                                          letterSpacing: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.darkColor,
+                                          fontFamily: '',
+                                        ),
+                                        decoration: InputDecoration(
+                                          isDense: true,
+                                          hintText: '------',
+                                          hintStyle: TextStyle(
+                                            letterSpacing: 10,
+                                            color: AppTheme.darkColor
+                                                .withValues(alpha: 0.3),
+                                            fontFamily: '',
+                                          ),
+                                          prefixIcon: Icon(
+                                            PhosphorIcons.key(),
+                                            color: AppTheme.verifiedGold,
+                                          ),
+                                          filled: true,
+                                          fillColor: Colors.grey.shade50,
+                                          border: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey.shade300),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            borderSide: const BorderSide(
+                                                color: AppTheme.verifiedGold,
+                                                width: 2),
+                                          ),
+                                          errorStyle:
+                                              TextStyle(fontFamily: fontFamily),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                  vertical: 12),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : const SizedBox(),
+                          ),
+
+                          Visibility(
+                            visible: _verificationId.isNotEmpty,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                TextButton(
+                                  onPressed:
+                                      _isLoading || _resendSecondsRemaining > 0
+                                          ? null
+                                          : _resendVerificationCode,
+                                  child: UrduAwareText(
+                                    isUrdu
+                                        ? 'کوڈ دوبارہ بھیجیں ($_resendSecondsRemaining)'
+                                        : 'Resend code ($_resendSecondsRemaining)',
+                                    style: TextStyle(
+                                      color: AppTheme.verifiedGold,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: fontFamily,
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () {
+                                          setState(() {
+                                            _verificationId = '';
+                                            _pendingPhoneNumber = null;
+                                            _resendToken = null;
+                                            _loginCompleted = false;
+                                            _resendTimer?.cancel();
+                                            _resendSecondsRemaining = 0;
+                                            _otpController.clear();
+                                          });
+                                        },
+                                  child: UrduAwareText(
+                                    isUrdu
+                                        ? 'نمبر تبدیل کریں'
+                                        : 'Change number',
+                                    style: TextStyle(
+                                      color: AppTheme.verifiedGold,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: fontFamily,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(
+                            height: _verificationId.isEmpty ? 20 : 0,
+                          ),
+
+                          // Action AppButton
+                          AppButton(
+                            text: _verificationId.isEmpty
+                                ? (isUrdu ? 'کوڈ بھیجیں' : 'Send Code')
+                                : (isUrdu
+                                    ? 'تصدیق اور لاگ ان'
+                                    : 'Verify & Login'),
+                            onPressed: _handleLogin,
+                            icon: _verificationId.isEmpty
+                                ? PhosphorIcons.arrowRight()
+                                : PhosphorIcons.checkCircle(),
+                            isLoading: _isLoading,
+                            loadingTexts: isUrdu
+                                ? [
+                                    'کوڈ بھیجا جا رہا ہے...',
+                                    'برائے مہربانی انتظار کریں...',
+                                  ]
+                                : [
+                                    'Sending OTP...',
+                                    'Please wait...',
+                                  ],
+                            isFullWidth: true,
+                            size: AppButtonSize.large,
+                            color: AppTheme.verifiedGold,
+                          ),
+
+                          const SizedBox(height: 18),
+
+                          Center(
+                            child: UrduAwareText.rich(
+                              TextSpan(
+                                style: TextStyle(
+                                  color: AppTheme.darkColor
+                                      .withValues(alpha: 0.55),
+                                  fontSize: 11.5,
+                                  fontFamily: fontFamily,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: isUrdu
+                                        ? 'جاری رکھنے پر آپ '
+                                        : 'By continuing, you agree to our ',
+                                  ),
+                                  TextSpan(
+                                    text: isUrdu
+                                        ? 'شرائط و ضوابط'
+                                        : 'Terms & Conditions',
+                                    style: const TextStyle(
+                                      color: AppTheme.slateColor,
+                                      fontWeight: FontWeight.bold,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                    recognizer: TapGestureRecognizer()
+                                      ..onTap = () =>
+                                          _showTermsDialog(isUrdu, fontFamily),
+                                  ),
+                                  TextSpan(
+                                      text: isUrdu ? ' سے متفق ہیں۔' : '.'),
+                                ],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
             ),
           ),
         ),
@@ -460,115 +576,253 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_isLoading || _loginCompleted) return;
     if (!_formKey.currentState!.validate()) return;
 
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    if (_verificationId.isEmpty) {
+      final phoneNumber = Formatters.toE164(_phoneController.text);
+      if (phoneNumber.isEmpty) return;
+      _pendingPhoneNumber = phoneNumber;
+      await _sendVerificationCode(phoneNumber);
+      return;
+    }
+
+    final smsCode = _otpController.text.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(smsCode)) {
+      AppToast.warning(
+        context,
+        isUrdu ? 'چھ ہندسوں کا کوڈ درج کریں' : 'Enter the 6-digit code',
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
-
-    final phoneNumber = Formatters.toE164(_phoneController.text);
-
+    var authenticated = false;
     try {
-      if (_verificationId.isEmpty) {
-        // Send OTP
-        await FirebaseAuth.instance.verifyPhoneNumber(
-          phoneNumber: phoneNumber,
-          verificationCompleted: (PhoneAuthCredential credential) async {
-            // Android only: auto-retrieval or instant verification
-            if (_loginCompleted) return;
-            _loginCompleted = true;
-            try {
-              if (credential.smsCode != null) {
-                _otpController.text = credential.smsCode!;
-              }
-
-              await FirebaseAuth.instance.signInWithCredential(credential);
-              if (!mounted) return;
-              await _handleSuccessfulLogin(phoneNumber);
-            } catch (e) {
-              _loginCompleted = false;
-              print('Auto verification error: $e');
-            }
-          },
-          verificationFailed: (FirebaseAuthException e) {
-            if (!mounted) return;
-            setState(() => _isLoading = false);
-            String errorMessage = e.message ?? 'Verification failed';
-            if (e.code == 'invalid-phone-number') {
-              errorMessage = 'The phone number is invalid.';
-            }
-            AppToast.error(context, errorMessage);
-          },
-          codeSent: (String verificationId, int? resendToken) {
-            if (!mounted) return;
-            setState(() {
-              _isLoading = false;
-              _verificationId = verificationId;
-            });
-            AppToast.info(context, 'OTP code sent');
-          },
-          codeAutoRetrievalTimeout: (String verificationId) {
-            if (mounted && !_loginCompleted) {
-              setState(() => _verificationId = verificationId);
-            }
-          },
-        );
-      } else {
-        // Verify OTP
-        final credential = PhoneAuthProvider.credential(
-          verificationId: _verificationId,
-          smsCode: _otpController.text,
-        );
-
-        await FirebaseAuth.instance.signInWithCredential(credential);
-        _loginCompleted = true;
-        if (!mounted) return;
-        await _handleSuccessfulLogin(phoneNumber);
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      AppToast.error(context, 'Error: $e');
+      final credential = PhoneAuthProvider.credential(
+        verificationId: _verificationId,
+        smsCode: smsCode,
+      );
+      await FirebaseAuth.instance.signInWithCredential(credential);
+      authenticated = true;
+      _loginCompleted = true;
+      await _handleSuccessfulLogin(
+        _pendingPhoneNumber ?? Formatters.toE164(_phoneController.text),
+      );
+    } catch (error) {
+      await _handleLoginFailure(error, isUrdu, signOut: authenticated);
     }
   }
 
-  Future<void> _handleSuccessfulLogin(String phoneNumber) async {
-    bool isNewUser = false;
-    // Save user info to Firestore
+  Future<void> _resendVerificationCode() async {
+    final phoneNumber = _pendingPhoneNumber;
+    if (phoneNumber == null || _isLoading) return;
+    await _sendVerificationCode(
+      phoneNumber,
+      forceResendingToken: _resendToken,
+    );
+  }
+
+  Future<void> _sendVerificationCode(
+    String phoneNumber, {
+    int? forceResendingToken,
+  }) async {
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    setState(() => _isLoading = true);
+
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        // فائر بیس سے چیک کرنا کہ کیا صارف کا نام پہلے سے موجود ہے
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-        final userData = userDoc.data();
-
-        // اگر ڈاکیومنٹ موجود نہیں یا نام خالی ہے، تو یہ نیا صارف ہے
-        final storedName = userData?['displayName'] ?? userData?['name'];
-        final hasBasicProfile =
-            storedName != null && storedName.toString().trim().isNotEmpty;
-        if (!userDoc.exists || !hasBasicProfile) {
-          isNewUser = true;
-        }
-
-        // فون نمبر اور آخری لاگ ان اپڈیٹ کریں، لیکن نام کو نہیں چھیڑیں گے
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'phoneNumber': phoneNumber,
-          'uid': user.uid,
-          'lastLogin': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-      }
-    } catch (e) {
-      print('Firestore login error: $e');
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        forceResendingToken: forceResendingToken,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          if (_loginCompleted || !mounted) return;
+          _loginCompleted = true;
+          var authenticated = false;
+          try {
+            if (credential.smsCode != null) {
+              _otpController.text = credential.smsCode!;
+            }
+            await FirebaseAuth.instance.signInWithCredential(credential);
+            authenticated = true;
+            await _handleSuccessfulLogin(phoneNumber);
+          } catch (error) {
+            await _handleLoginFailure(error, isUrdu, signOut: authenticated);
+          }
+        },
+        verificationFailed: (FirebaseAuthException error) {
+          _loginCompleted = false;
+          if (!mounted) return;
+          setState(() => _isLoading = false);
+          AppToast.error(context, _authErrorMessage(error, isUrdu));
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          if (!mounted || _loginCompleted) return;
+          setState(() {
+            _isLoading = false;
+            _verificationId = verificationId;
+            _resendToken = resendToken;
+            _otpController.clear();
+          });
+          _startResendCountdown();
+          AppToast.info(
+            context,
+            isUrdu ? 'او ٹی پی کوڈ بھیج دیا گیا ہے' : 'OTP code sent',
+          );
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          if (mounted && !_loginCompleted) {
+            setState(() => _verificationId = verificationId);
+          }
+        },
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      AppToast.error(context, _authErrorMessage(error, isUrdu));
     }
+  }
+
+  void _startResendCountdown() {
+    _resendTimer?.cancel();
+    setState(() => _resendSecondsRemaining = 30);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || _resendSecondsRemaining <= 1) {
+        timer.cancel();
+        if (mounted) setState(() => _resendSecondsRemaining = 0);
+        return;
+      }
+      setState(() => _resendSecondsRemaining--);
+    });
+  }
+
+  Future<void> _handleLoginFailure(
+    Object error,
+    bool isUrdu, {
+    required bool signOut,
+  }) async {
+    _loginCompleted = false;
+    if (signOut) {
+      try {
+        await Provider.of<DatabaseService>(context, listen: false)
+            .prepareForLogout();
+      } catch (cleanupError, stackTrace) {
+        debugPrint(
+            'Failed to clear local data after login error: $cleanupError');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+      ProfileService.clearCache();
+      await FirebaseAuth.instance.signOut();
+    }
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    AppToast.error(context, _authErrorMessage(error, isUrdu));
+  }
+
+  String _authErrorMessage(Object error, bool isUrdu) {
+    if (error is FirebaseAuthException) {
+      switch (error.code) {
+        case 'invalid-verification-code':
+          return isUrdu ? 'او ٹی پی کوڈ غلط ہے' : 'The OTP code is incorrect';
+        case 'session-expired':
+          return isUrdu
+              ? 'کوڈ کی مدت ختم ہو گئی، نیا کوڈ لیں'
+              : 'The code expired. Request a new one';
+        case 'too-many-requests':
+          return isUrdu
+              ? 'بہت زیادہ کوششیں ہوئیں، کچھ دیر بعد دوبارہ کوشش کریں'
+              : 'Too many attempts. Try again later';
+        case 'network-request-failed':
+          return isUrdu
+              ? 'انٹرنیٹ کنکشن چیک کرکے دوبارہ کوشش کریں'
+              : 'Check your internet connection and try again';
+        case 'invalid-phone-number':
+          return isUrdu ? 'درج کردہ فون نمبر غلط ہے' : 'Invalid phone number';
+      }
+    }
+    if (error is FirebaseException &&
+        (error.code == 'unavailable' ||
+            error.code == 'deadline-exceeded' ||
+            error.code == 'network-request-failed')) {
+      return isUrdu
+          ? 'انٹرنیٹ کنکشن چیک کرکے دوبارہ کوشش کریں'
+          : 'Check your internet connection and try again';
+    }
+    debugPrint('Authentication flow failed: $error');
+    return isUrdu
+        ? 'لاگ ان مکمل نہیں ہو سکا، دوبارہ کوشش کریں'
+        : 'Could not complete sign-in. Please try again';
+  }
+
+  Future<void> _handleSuccessfulLogin(String phoneNumber) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw StateError('Authentication completed without a current user');
+    }
+
+    final firestore = FirebaseFirestore.instance;
+    final userRef = firestore.collection('users').doc(user.uid);
+    final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
+    final userSnapshot = await userRef.get();
+    if (!mounted) return;
+    final userData = userSnapshot.data() ?? <String, dynamic>{};
+
+    if (userData['isDeactivated'] == true) {
+      try {
+        await Provider.of<DatabaseService>(context, listen: false)
+            .prepareForLogout();
+      } catch (error, stackTrace) {
+        debugPrint('Failed to clear local data for deactivated user: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+      ProfileService.clearCache();
+      await FirebaseAuth.instance.signOut();
+      _loginCompleted = false;
+      if (mounted) {
+        setState(() => _isLoading = false);
+        AppToast.error(
+          context,
+          isUrdu
+              ? 'یہ اکاؤنٹ غیر فعال ہے، مدد کے لیے سپورٹ سے رابطہ کریں'
+              : 'This account is deactivated. Contact support for help',
+        );
+      }
+      return;
+    }
+
+    final storedName =
+        userData['displayName'] ?? userData['name'] ?? user.displayName;
+    final isNewUser = !userSnapshot.exists ||
+        storedName == null ||
+        storedName.toString().trim().isEmpty;
+    final profileUpdates = <String, dynamic>{
+      'phoneNumber': user.phoneNumber ?? phoneNumber,
+      'uid': user.uid,
+      'lastLogin': FieldValue.serverTimestamp(),
+    };
+    await userRef.set(profileUpdates, SetOptions(merge: true));
+    await firestore.collection('public_profiles').doc(user.uid).set(
+          ProfileService.publicProfileData(
+            uid: user.uid,
+            userData: {
+              ...userData,
+              ...profileUpdates,
+              'displayName': userData['displayName'] ??
+                  userData['name'] ??
+                  user.displayName,
+            },
+            verifiedPhoneNumber: user.phoneNumber,
+          ),
+        );
 
     await _restoreUserData();
     if (!mounted) return;
+    AppToast.success(
+      context,
+      isUrdu ? 'لاگ ان کامیاب ہو گیا' : 'Signed in successfully',
+    );
 
-    if (mounted) {
-      if (isNewUser) {
-        _navigateToProfileSetup();
-      } else {
-        _navigateToDashboard();
-      }
+    if (isNewUser) {
+      _navigateToProfileSetup();
+    } else {
+      _navigateToDashboard();
     }
   }
 
@@ -588,17 +842,9 @@ class _LoginScreenState extends State<LoginScreen> {
       await databaseService.init();
     }
 
-    // Clear local data before fetching new data
     await databaseService.clearLocalData();
 
-    try {
-      await databaseService.fetchFromFirebase();
-      if (!mounted) return;
-      AppToast.success(context, 'Data restored successfully');
-    } catch (e) {
-      if (!mounted) return;
-      AppToast.error(context, 'Failed to restore data: $e');
-    }
+    await databaseService.fetchFromFirebase();
   }
 
   void _navigateToDashboard() {

@@ -50,4 +50,45 @@ void main() {
       expect(tester.takeException(), isNull);
     }
   });
+
+  testWidgets('tapping an item navigates without recentering the bar',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({'language': 'en'});
+    final previousPlatform = ConnectivityPlatform.instance;
+    ConnectivityPlatform.instance = _TestConnectivityPlatform();
+    addTearDown(() => ConnectivityPlatform.instance = previousPlatform);
+
+    var selectedIndex = 0;
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => LanguageService(),
+        child: MaterialApp(
+          home: StatefulBuilder(
+            builder: (context, setState) => Scaffold(
+              bottomNavigationBar: MainBottomNavBar(
+                selectedIndex: selectedIndex,
+                onItemTapped: (index) {
+                  setState(() => selectedIndex = index);
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final scrollable = find.descendant(
+      of: find.byType(PageView),
+      matching: find.byType(Scrollable),
+    );
+    final position = tester.state<ScrollableState>(scrollable.first).position;
+    final initialOffset = position.pixels;
+
+    await tester.tap(find.byTooltip('Parties').first);
+    await tester.pumpAndSettle();
+
+    expect(selectedIndex, 1);
+    expect(position.pixels, initialOffset);
+  });
 }

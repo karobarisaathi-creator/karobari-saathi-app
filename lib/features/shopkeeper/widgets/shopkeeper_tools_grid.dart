@@ -7,7 +7,6 @@ import 'package:share_plus/share_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
@@ -45,7 +44,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
 
   // URLs — اپنی اصلی URLs سے بدلیں
   static const String _playStoreUrl =
-      'https://play.google.com/store/apps/details?id=com.zalooq.karobari_saathi';
+      'https://play.google.com/store/apps/details?id=com.zalooq.account_app';
   static const String _supportEmail = 'support@zalooq.com';
   static const String _privacyUrl = 'https://zalooq.com/privacy';
 
@@ -100,128 +99,236 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
             ],
           ),
           const SizedBox(height: 10),
-          GridView.count(
-            crossAxisCount: 4,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 1.1,
-            children: [
-              // 1. Sync — loading state
-              _buildItem(
-                context,
-                icon: _isSyncing
-                    ? PhosphorIcons.spinner()
-                    : PhosphorIcons.cloudArrowUp(),
-                label: _isSyncing
-                    ? (isUrdu ? 'سنک...' : 'Syncing')
-                    : (isUrdu ? 'سنک' : 'Sync'),
-                isBusy: _isSyncing,
-                onTap: _isSyncing ? null : () => _syncData(context, isUrdu),
-              ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              if (!width.isFinite || width <= 24) {
+                return const SizedBox.shrink();
+              }
+              final itemWidth = (width - 24) / 4;
+              final itemHeight = itemWidth / 1.1;
+              final doubleWidth = (itemWidth * 2) + 8;
 
-              // 2. Report — 3 options
-              _buildItem(
-                context,
-                icon: PhosphorIcons.filePdf(),
-                label: isUrdu ? 'رپورٹ' : 'Report',
-                onTap: () => _showExportDialog(context, isUrdu, fontFamily),
-              ),
-
-              // 3. Backup
-              _buildItem(
-                context,
-                icon: PhosphorIcons.database(),
-                label: isUrdu ? 'بیک اپ' : 'Backup',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const BackupScreen()),
-                  );
-                },
-              ),
-
-              // Sales Analytics
-              _buildItem(
-                context,
-                icon: PhosphorIcons.chartBar(),
-                label: isUrdu ? 'تجزیہ' : 'Analytics',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const SalesAnalyticsScreen()),
-                  );
-                },
-              ),
-
-              // Share — with Play Store link
-              _buildItem(
-                context,
-                icon: PhosphorIcons.shareNetwork(),
-                label: isUrdu ? 'شیئر' : 'Share',
-                onTap: () => _shareApp(context, isUrdu),
-              ),
-
-              // About — with support contact
-              _buildItem(
-                context,
-                icon: PhosphorIcons.info(),
-                label: isUrdu ? 'معلومات' : 'About',
-                onTap: () => _showAboutAppDialog(context, isUrdu, fontFamily),
-              ),
-
-              // Privacy
-              _buildItem(
-                context,
-                icon: PhosphorIcons.shieldCheck(),
-                label: isUrdu ? 'پرائیویسی' : 'Privacy',
-                onTap: () => _showPrivacyPolicy(context, isUrdu, fontFamily),
-              ),
-
-              // Logout — with sync warning
-              _buildItem(
-                context,
-                icon: PhosphorIcons.signOut(),
-                label: isUrdu ? 'لاگ آؤٹ' : 'Logout',
-                onTap: () => _showLogoutDialog(context, isUrdu, fontFamily),
-              ),
-
-              // 12. Security settings
-              _buildItem(
-                context,
-                icon: PhosphorIcons.lock(),
-                label: isUrdu ? 'سیکیورٹی' : 'Security',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const AppLockSettingsScreen(),
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  // 1. Sync — loading state
+                  SizedBox(
+                    width: itemWidth,
+                    height: itemHeight,
+                    child: _buildItem(
+                      context,
+                      icon: _isSyncing
+                          ? PhosphorIcons.spinner()
+                          : PhosphorIcons.cloudArrowUp(),
+                      label: _isSyncing
+                          ? (isUrdu ? 'سنک...' : 'Syncing')
+                          : (isUrdu ? 'سنک' : 'Sync'),
+                      isBusy: _isSyncing,
+                      onTap:
+                          _isSyncing ? null : () => _syncData(context, isUrdu),
                     ),
-                  );
-                },
-              ),
+                  ),
 
-              // 14. Deactivate (خطرناک — P3)
-              _buildItem(
-                context,
-                icon: PhosphorIcons.userMinus(),
-                label: isUrdu ? 'اکاؤنٹ بند' : 'Deactivate',
-                onTap: () => _showDeactivateDialog(context, isUrdu, fontFamily),
-              ),
+                  // 2. Report — 3 options
+                  SizedBox(
+                    width: itemWidth,
+                    height: itemHeight,
+                    child: _buildItem(
+                      context,
+                      icon: PhosphorIcons.filePdf(),
+                      label: isUrdu ? 'رپورٹ' : 'Report',
+                      onTap: () =>
+                          _showExportDialog(context, isUrdu, fontFamily),
+                    ),
+                  ),
 
-              // 15. Language & Currency Settings
-              _buildItem(
-                context,
-                icon: PhosphorIcons.currencyCircleDollar(),
-                label: isUrdu ? 'زبان اور کرنسی' : 'Language & Currency',
-                onTap: () =>
-                    CurrencySettingsDialog.show(context, isUrdu, fontFamily),
-              ),
-            ],
+                  // 3. Backup
+                  SizedBox(
+                    width: itemWidth,
+                    height: itemHeight,
+                    child: _buildItem(
+                      context,
+                      icon: PhosphorIcons.database(),
+                      label: isUrdu ? 'بیک اپ' : 'Backup',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const BackupScreen()),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // 4. Sales Analytics
+                  SizedBox(
+                    width: itemWidth,
+                    height: itemHeight,
+                    child: _buildItem(
+                      context,
+                      icon: PhosphorIcons.chartBar(),
+                      label: isUrdu ? 'تجزیہ' : 'Analytics',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const SalesAnalyticsScreen()),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // 5. Share — with Play Store link
+                  SizedBox(
+                    width: itemWidth,
+                    height: itemHeight,
+                    child: _buildItem(
+                      context,
+                      icon: PhosphorIcons.shareNetwork(),
+                      label: isUrdu ? 'شیئر' : 'Share',
+                      onTap: () => _shareApp(context, isUrdu),
+                    ),
+                  ),
+
+                  // 6. About — with support contact
+                  SizedBox(
+                    width: itemWidth,
+                    height: itemHeight,
+                    child: _buildItem(
+                      context,
+                      icon: PhosphorIcons.info(),
+                      label: isUrdu ? 'معلومات' : 'About',
+                      onTap: () =>
+                          _showAboutAppDialog(context, isUrdu, fontFamily),
+                    ),
+                  ),
+
+                  // 7. Privacy
+                  SizedBox(
+                    width: itemWidth,
+                    height: itemHeight,
+                    child: _buildItem(
+                      context,
+                      icon: PhosphorIcons.shieldCheck(),
+                      label: isUrdu ? 'پرائیویسی' : 'Privacy',
+                      onTap: () =>
+                          _showPrivacyPolicy(context, isUrdu, fontFamily),
+                    ),
+                  ),
+
+                  // 8. Logout — with sync warning
+                  SizedBox(
+                    width: itemWidth,
+                    height: itemHeight,
+                    child: _buildItem(
+                      context,
+                      icon: PhosphorIcons.signOut(),
+                      label: isUrdu ? 'لاگ آؤٹ' : 'Logout',
+                      onTap: () =>
+                          _showLogoutDialog(context, isUrdu, fontFamily),
+                    ),
+                  ),
+
+                  // 9. Security settings
+                  SizedBox(
+                    width: itemWidth,
+                    height: itemHeight,
+                    child: _buildItem(
+                      context,
+                      icon: PhosphorIcons.lock(),
+                      label: isUrdu ? 'سیکیورٹی' : 'Security',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AppLockSettingsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // 10. Deactivate (خطرناک — P3)
+                  SizedBox(
+                    width: itemWidth,
+                    height: itemHeight,
+                    child: _buildItem(
+                      context,
+                      icon: PhosphorIcons.userMinus(),
+                      label: isUrdu ? 'اکاؤنٹ بند' : 'Deactivate',
+                      onTap: () =>
+                          _showDeactivateDialog(context, isUrdu, fontFamily),
+                    ),
+                  ),
+
+                  // 11. Language & Currency Settings (Double Width - 2 columns span)
+                  SizedBox(
+                    width: doubleWidth,
+                    height: itemHeight,
+                    child: _buildDoubleWidthItem(
+                      context,
+                      icon: PhosphorIcons.currencyCircleDollar(),
+                      label: isUrdu ? 'زبان اور کرنسی' : 'Language & Currency',
+                      onTap: () => CurrencySettingsDialog.show(
+                          context, isUrdu, fontFamily),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // DOUBLE WIDTH ITEM BUILDER
+  // ═══════════════════════════════════════════════════════════
+  Widget _buildDoubleWidthItem(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Opacity(
+          opacity: onTap == null ? 0.5 : 1.0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 20, color: Colors.white),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: UrduAwareText(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -290,15 +397,14 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
   Future<void> _syncData(BuildContext context, bool isUrdu) async {
     // Internet check
     final connectivity = await Connectivity().checkConnectivity();
+    if (!mounted || !context.mounted) return;
     if (connectivity.contains(ConnectivityResult.none)) {
-      if (context.mounted) {
-        AppToast.warning(
-          context,
-          isUrdu
-              ? 'انٹرنیٹ نہیں ہے، پہلے کنیکٹ کریں'
-              : 'No internet, connect first',
-        );
-      }
+      AppToast.warning(
+        context,
+        isUrdu
+            ? 'انٹرنیٹ نہیں ہے، پہلے کنیکٹ کریں'
+            : 'No internet, connect first',
+      );
       return;
     }
 
@@ -991,8 +1097,8 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                   Expanded(
                     child: UrduAwareText(
                       isUrdu
-                          ? 'لاگ آؤٹ سے پہلے ڈیٹا سنک کر لیں ورنہ نقصان ہو سکتا ہے'
-                          : 'Sync your data before logout to avoid loss',
+                          ? 'بغیر سنک لاگ آؤٹ کرنے سے اس فون کا غیر سنک شدہ ڈیٹا حذف ہو سکتا ہے'
+                          : 'Logging out without syncing may remove unsynced data from this device.',
                       style: TextStyle(
                         fontSize: 11,
                         fontFamily: fontFamily,
@@ -1013,11 +1119,17 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
           TextButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
-              await Provider.of<AuthService>(context, listen: false)
-                  .signOut(context);
+              try {
+                await Provider.of<AuthService>(context, listen: false)
+                    .signOut(context);
+              } catch (error) {
+                if (context.mounted) {
+                  AppToast.error(context, 'Could not complete logout: $error');
+                }
+              }
             },
             child: UrduAwareText(
-              isUrdu ? 'صرف لاگ آؤٹ' : 'Logout Anyway',
+              isUrdu ? 'بغیر سنک لاگ آؤٹ' : 'Logout without syncing',
               style: const TextStyle(color: Colors.red),
             ),
           ),
@@ -1026,13 +1138,17 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
             onPressed: () async {
               Navigator.pop(dialogContext);
               try {
-                final syncService =
-                    Provider.of<AutoSyncService>(context, listen: false);
-                await syncService.syncAllDataToCloud();
-              } catch (_) {}
-              if (context.mounted) {
                 await Provider.of<AuthService>(context, listen: false)
-                    .signOut(context);
+                    .signOut(context, syncBeforeLogout: true);
+              } catch (error) {
+                if (context.mounted) {
+                  AppToast.error(
+                    context,
+                    isUrdu
+                        ? 'سنک ناکام ہوا، آپ لاگ آؤٹ نہیں ہوئے: $error'
+                        : 'Sync failed; you are still signed in: $error',
+                  );
+                }
               }
             },
             child: UrduAwareText(
@@ -1124,25 +1240,14 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
               try {
                 final user = FirebaseAuth.instance.currentUser;
                 if (user != null) {
-                  // ⭐ Soft delete
-                  await FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(user.uid)
-                      .set({
-                    'isDeactivated': true,
-                    'deactivatedAt': FieldValue.serverTimestamp(),
-                    'restoreDeadline':
-                        DateTime.now().add(const Duration(days: 30)),
-                  }, SetOptions(merge: true));
-
+                  await Provider.of<AuthService>(context, listen: false)
+                      .deactivateAccount(context);
                   if (context.mounted) {
-                    await Provider.of<AuthService>(context, listen: false)
-                        .signOut(context);
                     AppToast.success(
                       context,
                       isUrdu
-                          ? 'اکاؤنٹ بند — 30 دن میں بحال کر سکتے ہیں'
-                          : 'Account deactivated — can restore in 30 days',
+                          ? 'اکاؤنٹ بند کر دیا گیا ہے'
+                          : 'Account deactivated',
                     );
                   }
                 }

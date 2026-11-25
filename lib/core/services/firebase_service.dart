@@ -3,30 +3,40 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
-import 'package:account_app/core/models/category_model.dart';
 import 'package:account_app/core/models/profession_model.dart';
 
 import 'package:account_app/core/utils/image_utils.dart';
+import 'package:account_app/core/services/database/profile_service.dart';
 
 class FirebaseService with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
   // User Management
   Future<void> saveUserProfile(String phoneNumber, String name) async {
     final user = _auth.currentUser;
     if (user != null) {
-      await _firestore.collection('users').doc(user.uid).set({
+      final userRef = _firestore.collection('users').doc(user.uid);
+      final previousData = (await userRef.get()).data() ?? <String, dynamic>{};
+      final updates = {
         'phoneNumber': phoneNumber,
         'name': name,
+        'displayName': name,
         'createdAt': DateTime.now(),
         'updatedAt': DateTime.now(),
-      }, SetOptions(merge: true));
+      };
+      await userRef.set(updates, SetOptions(merge: true));
+      await _firestore.collection('public_profiles').doc(user.uid).set(
+            ProfileService.publicProfileData(
+              uid: user.uid,
+              userData: {...previousData, ...updates},
+              verifiedPhoneNumber: user.phoneNumber,
+            ),
+          );
+      ProfileService.clearCache();
       notifyListeners();
     }
   }
@@ -159,21 +169,6 @@ class FirebaseService with ChangeNotifier {
     }
   }
 
-  // Notifications
-  Future<String?> getFCMToken() async {
-    return await _messaging.getToken();
-  }
-
-  Future<void> subscribeToTopic(String topic) async {
-    await _messaging.subscribeToTopic(topic);
-    print("✅ Subscribed to topic: $topic");
-  }
-
-  Future<void> unsubscribeFromTopic(String topic) async {
-    await _messaging.unsubscribeFromTopic(topic);
-    print("✅ Unsubscribed from topic: $topic");
-  }
-
   // Data Backup & Restore
   Future<void> backupAllData(Map<String, dynamic> data) async {
     final user = _auth.currentUser;
@@ -202,7 +197,9 @@ class FirebaseService with ChangeNotifier {
   // Utility Methods
   Future<bool> checkConnection() async {
     try {
-      await _firestore.collection('users').limit(1).get();
+      final user = _auth.currentUser;
+      if (user == null) return false;
+      await _firestore.collection('users').doc(user.uid).get();
       return true;
     } catch (e) {
       return false;

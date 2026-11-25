@@ -310,7 +310,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       if (widget.isWorkerWagePayment) {
         final payrollService =
             Provider.of<WorkerPayrollService>(context, listen: false);
-        await payrollService.addWagePayment(
+        final transaction = await payrollService.addWagePayment(
           workerId: _selectedAccountId!,
           amount: amount,
           note: note,
@@ -321,10 +321,31 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           paymentMethod: _selectedPaymentMethod,
         );
         if (!mounted) return;
-        AppToast.success(
-          context,
-          isUrdu ? 'مزدوری کی ادائیگی محفوظ ہو گئی' : 'Wage payment saved',
-        );
+        final worker = databaseService.getAccount(transaction.accountId);
+        final hasWorkerPhone = worker != null && worker.phone.trim().isNotEmpty;
+        if (hasWorkerPhone) {
+          AppToast.success(
+            context,
+            isUrdu ? 'مزدوری محفوظ ہو گئی' : 'Wage payment saved',
+            subtitle: isUrdu
+                ? 'مزدور کے کھاتے میں بھی درج ہو رہی ہے'
+                : 'Syncing to the worker ledger in the background',
+          );
+        } else {
+          AppToast.warning(
+            context,
+            isUrdu
+                ? 'مزدوری محفوظ؛ سرگرمی فیڈ میں شامل نہیں ہو سکی'
+                : 'Wage payment saved; activity could not be added to the feed',
+            subtitle: hasWorkerPhone
+                ? (isUrdu
+                    ? 'سرگرمی دوبارہ شامل کرنے کے لیے محفوظ نہیں ہو سکی'
+                    : 'Could not queue the worker activity')
+                : (isUrdu
+                    ? 'مزدور کا فون نمبر نہیں ملا'
+                    : 'Worker phone number is missing'),
+          );
+        }
         Navigator.pop(context, true);
         return;
       }
@@ -355,8 +376,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           .firstOrNull;
       final noticeMessage = newPayment == null
           ? (isUrdu
-              ? 'قسط محفوظ ہے، مگر اطلاع کے لیے لین دین نہیں ملا'
-              : 'Installment saved, but its transaction was unavailable for notice')
+              ? 'قسط محفوظ ہے، مگر فیڈ کے لیے لین دین نہیں ملا'
+              : 'Installment saved, but its transaction was unavailable for the activity feed')
           : await _notifyContractInstallment(
               transactionId: 'contract_${contractId}_${newPayment.id}',
               databaseService: databaseService,
@@ -368,15 +389,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         AppToast.success(
           context,
           isUrdu
-              ? 'قسط محفوظ ہو گئی اور اطلاع بھیج دی گئی'
-              : 'Installment saved and party notified',
+              ? 'قسط محفوظ ہو گئی اور پارٹی کی سرگرمی فیڈ میں شامل ہو گئی'
+              : 'Installment saved and added to the party activity feed',
         );
       } else {
         AppToast.warning(
           context,
           isUrdu
-              ? 'قسط محفوظ؛ اطلاع نہ بھیجی جا سکی'
-              : 'Installment saved; notice needs attention',
+              ? 'قسط محفوظ؛ سرگرمی فیڈ میں شامل نہیں ہو سکی'
+              : 'Installment saved; activity could not be added to the feed',
           subtitle: noticeMessage,
         );
       }
@@ -450,8 +471,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final transaction = databaseService.getTransaction(transactionId);
     if (transaction == null) {
       return isUrdu
-          ? 'قسط محفوظ ہے، مگر اطلاع کے لیے لین دین نہیں ملا'
-          : 'Installment saved, but its transaction was unavailable for notice';
+          ? 'قسط محفوظ ہے، مگر فیڈ کے لیے لین دین نہیں ملا'
+          : 'Installment saved, but its transaction was unavailable for the activity feed';
     }
 
     final party = databaseService.getAccount(transaction.accountId);
@@ -461,6 +482,43 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           : 'Installment saved, but the party phone number is missing';
     }
 
+    return _sendPaymentNotification(
+      transaction: transaction,
+      recipientPhoneNumber: party.phone,
+      notificationService: notificationService,
+      databaseService: databaseService,
+      isUrdu: isUrdu,
+      recipientUrdu: 'پارٹی',
+      recipientEnglish: 'party',
+      paymentUrdu: 'قسط',
+      paymentEnglish: 'Installment',
+      activityKind: 'contract_installment',
+      contractName: _contractTitleFor(transaction.contractId),
+    );
+  }
+
+  String? _contractTitleFor(String? contractId) {
+    if (contractId == null || contractId.isEmpty) return null;
+    for (final contract
+        in Provider.of<ContractService>(context, listen: false).contracts) {
+      if (contract.id == contractId) return contract.title;
+    }
+    return null;
+  }
+
+  Future<String?> _sendPaymentNotification({
+    required Transaction transaction,
+    required String recipientPhoneNumber,
+    required NotificationService notificationService,
+    required DatabaseService databaseService,
+    required bool isUrdu,
+    required String recipientUrdu,
+    required String recipientEnglish,
+    required String paymentUrdu,
+    required String paymentEnglish,
+    String? activityKind,
+    String? contractName,
+  }) async {
     try {
       final cloudSynced =
           await databaseService.syncTransactionToCloud(transaction);
@@ -468,60 +526,67 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         final queued =
             await notificationService.enqueuePendingPartyNotification(
           transaction: transaction,
-          partyPhoneNumber: party.phone,
+          partyPhoneNumber: recipientPhoneNumber,
+          activityKind: activityKind,
+          contractName: contractName,
         );
         return isUrdu
             ? (queued
-                ? 'اطلاع انٹرنیٹ ملنے پر بھیجی جائے گی'
-                : 'قسط محفوظ ہے، اطلاع قطار میں محفوظ نہیں ہو سکی')
+                ? 'سرگرمی انٹرنیٹ ملنے پر فیڈ میں شامل ہو جائے گی'
+                : '$paymentUrdu محفوظ ہے، سرگرمی دوبارہ شامل کرنے کے لیے محفوظ نہیں ہو سکی')
             : (queued
-                ? 'Notice queued until internet is available'
-                : 'Installment saved, but its notice could not be queued');
+                ? 'Activity queued until internet is available'
+                : '$paymentEnglish saved, but its activity could not be queued');
       }
 
       final result = await notificationService.notifyPartyByPhone(
-        partyPhoneNumber: party.phone,
+        partyPhoneNumber: recipientPhoneNumber,
         amount: transaction.amount,
         transactionType: transaction.type,
         category: transaction.category,
         paymentMethod: transaction.paymentMethod,
         description: transaction.description,
+        items: transaction.items.map((item) => item.toMap()).toList(),
         receivedAmount: transaction.receivedAmount,
         pendingAmount: transaction.pendingAmount,
         transactionId: transaction.id,
         transactionDate: transaction.date,
         referenceNumber: transaction.referenceNumber,
+        activityKind: activityKind,
+        contractName: contractName,
       );
       switch (result) {
         case PartyNotificationResult.savedToInbox:
           return null;
         case PartyNotificationResult.recipientNotFound:
           return isUrdu
-              ? 'پارٹی کا ایپ اکاؤنٹ نہیں ملا؛ اطلاع نہیں بھیجی گئی'
-              : 'Party app account not found; no notice was sent';
+              ? '$recipientUrdu کا ایپ اکاؤنٹ نہیں ملا؛ سرگرمی فیڈ میں شامل نہیں ہوئی'
+              : '$recipientEnglish app account not found; activity was not added to the feed';
         case PartyNotificationResult.sameUser:
           return isUrdu
-              ? 'یہ آپ کا اپنا نمبر ہے؛ اطلاع نہیں بھیجی گئی'
-              : 'This is your own number; no notice was sent';
+              ? 'یہ آپ کا اپنا نمبر ہے؛ سرگرمی فیڈ میں شامل نہیں ہوئی'
+              : 'This is your own number; activity was not added to the feed';
         case PartyNotificationResult.notSignedIn:
           return isUrdu
-              ? 'سائن اِن نہ ہونے کے باعث اطلاع نہیں بھیجی گئی'
-              : 'Not signed in; no notice was sent';
+              ? 'سائن اِن نہ ہونے کے باعث سرگرمی فیڈ میں شامل نہیں ہوئی'
+              : 'Not signed in; activity was not added to the feed';
       }
     } catch (error, stackTrace) {
-      debugPrint('Could not notify the contract party: $error');
+      debugPrint('Could not notify the $recipientEnglish: $error');
       debugPrintStack(stackTrace: stackTrace);
       final queued = await notificationService.enqueuePendingPartyNotification(
         transaction: transaction,
-        partyPhoneNumber: party.phone,
+        partyPhoneNumber: recipientPhoneNumber,
+        activityKind: activityKind,
+        contractName: contractName,
       );
       return isUrdu
           ? (queued
-              ? 'اطلاع قطار میں محفوظ؛ بعد میں بھیجی جائے گی'
-              : 'قسط محفوظ ہے، اطلاع نہیں بھیجی جا سکی')
+              ? 'سرگرمی قطار میں محفوظ؛ انٹرنیٹ ملنے پر فیڈ میں آ جائے گی'
+              : '$paymentUrdu محفوظ ہے، سرگرمی فیڈ میں شامل نہیں ہو سکی')
           : (queued
-              ? 'Notice queued for retry'
-              : 'Installment saved, but notice could not be sent');
+              ? 'Activity queued for retry'
+              : '$paymentEnglish saved, but activity could not be added to the feed');
     }
   }
 
@@ -2201,33 +2266,33 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       if (!isEditing) {
         if (notificationResult == PartyNotificationResult.savedToInbox) {
           resultMessages.add(isUrdu
-              ? 'پارٹی کے ایپ ان باکس میں اطلاع محفوظ'
-              : 'Notice saved to party’s in-app inbox');
+              ? 'سرگرمی پارٹی کی ہوم فیڈ میں محفوظ'
+              : 'Activity saved to the party home feed');
         } else if (notificationResult ==
             PartyNotificationResult.recipientNotFound) {
           resultMessages.add(isUrdu
-              ? 'پارٹی کا ایپ اکاؤنٹ نہیں ملا؛ اطلاع نہیں بھیجی گئی'
-              : 'Party app account not found; no notice sent');
+              ? 'پارٹی کا ایپ اکاؤنٹ نہیں ملا؛ سرگرمی فیڈ میں شامل نہیں ہوئی'
+              : 'Party app account not found; activity not added to the feed');
         } else if (notificationResult == PartyNotificationResult.sameUser) {
           resultMessages.add(isUrdu
-              ? 'یہ آپ کا اپنا فون نمبر ہے؛ اطلاع نہیں بھیجی گئی'
-              : 'This is your phone number; no notice sent');
+              ? 'یہ آپ کا اپنا فون نمبر ہے؛ سرگرمی فیڈ میں شامل نہیں ہوئی'
+              : 'This is your phone number; activity not added to the feed');
         } else if (notificationResult == PartyNotificationResult.notSignedIn) {
           resultMessages.add(isUrdu
-              ? 'سائن اِن نہ ہونے کے باعث اطلاع نہیں بھیجی گئی'
-              : 'Not signed in; no notice sent');
+              ? 'سائن اِن نہ ہونے کے باعث سرگرمی فیڈ میں شامل نہیں ہوئی'
+              : 'Not signed in; activity not added to the feed');
         } else if (partyNotificationQueued) {
           resultMessages.add(isUrdu
-              ? 'پارٹی کی اطلاع قطار میں محفوظ؛ انٹرنیٹ ملنے پر خود بھیجی جائے گی'
-              : 'Party notice queued; it will retry when internet is available');
+              ? 'سرگرمی قطار میں محفوظ؛ انٹرنیٹ ملنے پر فیڈ میں آ جائے گی'
+              : 'Activity queued; it will appear in the feed when online');
         } else if (notificationFailed) {
           resultMessages.add(isUrdu
-              ? 'پارٹی کا فون نمبر نہیں ملا یا اطلاع محفوظ نہیں ہو سکی'
-              : 'Party phone missing or notice could not be saved');
+              ? 'پارٹی کا فون نمبر نہیں ملا یا سرگرمی فیڈ میں محفوظ نہیں ہو سکی'
+              : 'Party phone missing or activity could not be added to the feed');
         } else if (!cloudSynced) {
           resultMessages.add(isUrdu
-              ? 'کلاؤڈ سنک کے بعد پارٹی کو اطلاع دی جا سکے گی'
-              : 'Party can be notified after cloud sync');
+              ? 'کلاؤڈ سنک کے بعد سرگرمی پارٹی کی فیڈ میں شامل ہو گی'
+              : 'Activity will be added to the party feed after cloud sync');
         }
       }
 

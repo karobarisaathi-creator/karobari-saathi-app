@@ -1,9 +1,11 @@
+import 'dart:async';
+
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
-import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/search_sort_bar.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/features/marketplace/marketplace_listing_detail_screen.dart';
 import 'package:account_app/features/marketplace/marketplace_listing_form_screen.dart';
@@ -11,6 +13,7 @@ import 'package:account_app/features/marketplace/models/marketplace_categories.d
 import 'package:account_app/features/marketplace/models/marketplace_listing.dart';
 import 'package:account_app/features/marketplace/services/marketplace_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -24,23 +27,130 @@ class MarketplaceScreen extends StatefulWidget {
 }
 
 class _MarketplaceScreenState extends State<MarketplaceScreen> {
+  static const double _prefetchExtent = 500;
+
   late final MarketplaceService _service;
-  late final Stream<List<MarketplaceListing>> _activeListingsStream;
-  late final Stream<List<MarketplaceListing>> _myListingsStream;
-  final _searchController = TextEditingController();
+  ScrollController? _listScrollController;
+  StreamSubscription<MarketplaceListingPage>? _firstPageSubscription;
+  final _searchController = UrduAwareTextEditingController();
+  final List<MarketplaceListing> _loadedListings = [];
+  QueryDocumentSnapshot<Map<String, dynamic>>? _lastDocument;
   String _searchQuery = '';
   String _selectedCategory = 'all';
+  Object? _initialLoadError;
+  Object? _loadMoreError;
+  bool _isInitialLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  bool _hasFetchedMore = false;
 
   @override
   void initState() {
     super.initState();
     _service = widget.service ?? MarketplaceService();
-    _activeListingsStream = _service.watchActiveListings();
-    _myListingsStream = _service.watchMyListings();
+    _subscribeToFirstPage();
+  }
+
+  ScrollController _getListScrollController() {
+    return _listScrollController ??= ScrollController()
+      ..addListener(_onListScroll);
+  }
+
+  void _subscribeToFirstPage() {
+    _firstPageSubscription = _service.watchFirstActiveListingsPage().listen(
+      _applyFirstPage,
+      onError: (Object error, StackTrace stackTrace) {
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: error,
+            stack: stackTrace,
+            library: 'marketplace listings',
+            context: ErrorDescription('while watching the latest listings'),
+          ),
+        );
+        if (!mounted) return;
+        setState(() {
+          _initialLoadError = error;
+          _isInitialLoading = false;
+        });
+      },
+    );
+  }
+
+  void _applyFirstPage(MarketplaceListingPage page) {
+    if (!mounted) return;
+    setState(() {
+      if (!_hasFetchedMore) {
+        _loadedListings
+          ..clear()
+          ..addAll(page.listings);
+        _lastDocument = page.lastDocument;
+      } else {
+        final firstPageIds = page.listings.map((item) => item.id).toSet();
+        final olderListings = _loadedListings
+            .where((item) => !firstPageIds.contains(item.id))
+            .toList();
+        _loadedListings
+          ..clear()
+          ..addAll(page.listings)
+          ..addAll(olderListings);
+      }
+      if (!_hasFetchedMore) _hasMore = page.hasMore;
+      _isInitialLoading = false;
+      _initialLoadError = null;
+    });
+  }
+
+  void _onListScroll() {
+    final controller = _listScrollController;
+    if (controller == null ||
+        !controller.hasClients ||
+        controller.position.extentAfter > _prefetchExtent) {
+      return;
+    }
+    _loadNextPage();
+  }
+
+  Future<void> _loadNextPage() async {
+    final cursor = _lastDocument;
+    if (_isLoadingMore || !_hasMore || cursor == null) return;
+
+    setState(() {
+      _isLoadingMore = true;
+      _loadMoreError = null;
+    });
+    try {
+      final page = await _service.fetchNextActiveListingsPage(after: cursor);
+      if (!mounted) return;
+      setState(() {
+        final existingIds = _loadedListings.map((item) => item.id).toSet();
+        _loadedListings.addAll(
+          page.listings.where((item) => existingIds.add(item.id)),
+        );
+        _lastDocument = page.lastDocument ?? _lastDocument;
+        _hasMore = page.hasMore;
+        _hasFetchedMore = true;
+      });
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'marketplace listings',
+          context: ErrorDescription('while loading another listings page'),
+        ),
+      );
+      if (mounted) setState(() => _loadMoreError = error);
+    } finally {
+      if (mounted) setState(() => _isLoadingMore = false);
+    }
   }
 
   @override
   void dispose() {
+    _firstPageSubscription?.cancel();
+    _listScrollController?.removeListener(_onListScroll);
+    _listScrollController?.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -57,115 +167,19 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     );
   }
 
-  Future<void> _changeStatus(
-    MarketplaceListing listing,
-    String status,
-    bool isUrdu,
-  ) async {
-    try {
-      await _service.updateStatus(listing.id, status);
-      if (mounted) {
-        AppToast.success(
-          context,
-          status == 'sold'
-              ? (isUrdu ? 'چیز فروخت شدہ ہوگئی' : 'Marked as sold')
-              : status == 'hidden'
-                  ? (isUrdu ? 'اشتہار چھپا دیا گیا' : 'Listing hidden')
-                  : (isUrdu
-                      ? 'اشتہار دوبارہ دستیاب ہے'
-                      : 'Listing is available'),
-        );
-      }
-    } catch (error, stackTrace) {
-      FlutterError.reportError(
-        FlutterErrorDetails(
-          exception: error,
-          stack: stackTrace,
-          library: 'marketplace management',
-          context: ErrorDescription('while changing listing status'),
-        ),
-      );
-      if (mounted) {
-        AppToast.error(
-          context,
-          isUrdu
-              ? 'اشتہار کی حالت تبدیل نہیں ہوسکی'
-              : 'Could not change listing status.',
-        );
-      }
-    }
-  }
-
-  Future<void> _deleteListing(
-    MarketplaceListing listing,
-    bool isUrdu,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isUrdu ? 'اشتہار حذف کریں؟' : 'Delete listing?'),
-        content: Text(
-          isUrdu
-              ? 'یہ اشتہار مستقل طور پر حذف ہوجائے گا۔'
-              : 'This listing will be permanently deleted.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(isUrdu ? 'منسوخ' : 'Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(isUrdu ? 'حذف کریں' : 'Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    try {
-      await _service.deleteListing(listing);
-      if (mounted) {
-        AppToast.success(
-          context,
-          isUrdu ? 'اشتہار حذف ہوگیا' : 'Listing deleted',
-        );
-      }
-    } catch (error, stackTrace) {
-      FlutterError.reportError(
-        FlutterErrorDetails(
-          exception: error,
-          stack: stackTrace,
-          library: 'marketplace management',
-          context: ErrorDescription('while deleting a listing'),
-        ),
-      );
-      if (mounted) {
-        AppToast.error(
-          context,
-          isUrdu ? 'اشتہار حذف نہیں ہوسکا' : 'Could not delete the listing.',
-        );
-      }
-    }
-  }
-
-  Widget _buildListingTile(
-    MarketplaceListing listing,
-    bool isUrdu, {
-    bool isMine = false,
-  }) {
+  Widget _buildListingTile(MarketplaceListing listing, bool isUrdu) {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
-    final statusLabel = switch (listing.status) {
-      'sold' => isUrdu ? 'فروخت ہوگئی' : 'Sold',
-      'hidden' => isUrdu ? 'چھپایا گیا' : 'Hidden',
-      _ => isUrdu ? 'دستیاب' : 'Available',
-    };
     final price = listing.price == 0
         ? (isUrdu ? 'مفت' : 'Free')
         : 'Rs. ${Formatters.formatAmountWithCurrency(listing.price)}';
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade300, width: 1),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => Navigator.push(
@@ -215,9 +229,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
+                    UrduAwareText(
                       price,
                       style: TextStyle(
+                        fontFamily: fontFamily,
                         color: AppTheme.themeColor,
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
@@ -246,73 +261,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                         ),
                       ],
                     ),
-                    if (isMine)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 5),
-                        child: Text(
-                          statusLabel,
-                          style: TextStyle(
-                            color: listing.isActive
-                                ? AppTheme.themeColor
-                                : Colors.grey.shade700,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
-              if (isMine)
-                PopupMenuButton<String>(
-                  tooltip: isUrdu ? 'اشتہار کے اختیارات' : 'Listing options',
-                  onSelected: (action) {
-                    switch (action) {
-                      case 'edit':
-                        _openForm(listing: listing);
-                        break;
-                      case 'sold':
-                        _changeStatus(listing, 'sold', isUrdu);
-                        break;
-                      case 'active':
-                        _changeStatus(listing, 'active', isUrdu);
-                        break;
-                      case 'hide':
-                        _changeStatus(listing, 'hidden', isUrdu);
-                        break;
-                      case 'delete':
-                        _deleteListing(listing, isUrdu);
-                        break;
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: Text(isUrdu ? 'ترمیم' : 'Edit'),
-                    ),
-                    if (!listing.isSold)
-                      PopupMenuItem(
-                        value: 'sold',
-                        child: Text(isUrdu ? 'فروخت شدہ کریں' : 'Mark as sold'),
-                      ),
-                    if (!listing.isActive)
-                      PopupMenuItem(
-                        value: 'active',
-                        child:
-                            Text(isUrdu ? 'دوبارہ دستیاب کریں' : 'Reactivate'),
-                      ),
-                    PopupMenuItem(
-                      value: 'hide',
-                      child: Text(isUrdu ? 'چھپائیں' : 'Hide listing'),
-                    ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Text(isUrdu ? 'حذف کریں' : 'Delete'),
-                    ),
-                  ],
-                )
-              else
-                Icon(PhosphorIcons.caretRight(), color: Colors.grey),
+              Icon(PhosphorIcons.caretRight(), color: Colors.grey),
             ],
           ),
         ),
@@ -338,29 +290,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-          child: TextField(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+          child: SearchSortBar(
             controller: _searchController,
-            onChanged: (value) => setState(() => _searchQuery = value),
-            decoration: InputDecoration(
-              prefixIcon: Icon(PhosphorIcons.magnifyingGlass()),
-              hintText:
-                  isUrdu ? 'چیز یا علاقہ تلاش کریں' : 'Search items or area',
-              suffixIcon: _searchQuery.isEmpty
-                  ? null
-                  : IconButton(
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
-                      icon: Icon(PhosphorIcons.x()),
-                    ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              filled: true,
-              fillColor: Colors.white,
-            ),
+            hintText:
+                isUrdu ? 'چیز یا علاقہ تلاش کریں' : 'Search items or area',
+            onSearchChanged: (value) => setState(() => _searchQuery = value),
           ),
         ),
         SizedBox(
@@ -370,7 +305,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             children: [
               ChoiceChip(
-                label: Text(isUrdu ? 'سب' : 'All'),
+                label: UrduAwareText(isUrdu ? 'سب' : 'All'),
                 selected: _selectedCategory == 'all',
                 onSelected: (_) => setState(() => _selectedCategory = 'all'),
               ),
@@ -378,7 +313,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 (category) => Padding(
                   padding: const EdgeInsetsDirectional.only(start: 6),
                   child: ChoiceChip(
-                    label: Text(category.label(isUrdu)),
+                    label: UrduAwareText(category.label(isUrdu)),
                     selected: _selectedCategory == category.id,
                     onSelected: (_) =>
                         setState(() => _selectedCategory = category.id),
@@ -392,82 +327,110 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     );
   }
 
-  Widget _buildListingStream(
-    Stream<List<MarketplaceListing>> stream,
-    bool isUrdu, {
-    bool isMine = false,
-    Widget? beforeList,
-  }) {
-    return StreamBuilder<List<MarketplaceListing>>(
-      stream: stream,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
+  Widget _buildListingStream(bool isUrdu) {
+    if (_isInitialLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_initialLoadError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              UrduAwareText(
                 isUrdu
                     ? 'اشتہارات لوڈ نہیں ہوسکے، کنکشن چیک کریں'
                     : 'Could not load listings. Check your connection and try again.',
                 textAlign: TextAlign.center,
               ),
-            ),
-          );
-        }
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        final allListings = snapshot.data ?? const <MarketplaceListing>[];
-        final listings = isMine ? allListings : _filterListings(allListings);
-        if (listings.isEmpty) {
-          return Column(
-            children: [
-              if (beforeList != null) beforeList,
-              Expanded(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: UrduAwareText(
-                      isMine
-                          ? (isUrdu
-                              ? 'آپ نے ابھی کوئی اشتہار نہیں دیا'
-                              : 'You have not listed anything yet.')
-                          : (allListings.isEmpty
-                              ? (isUrdu
-                                  ? 'ابھی کوئی چیز فروخت کے لیے موجود نہیں'
-                                  : 'No items are listed yet.')
-                              : (isUrdu
-                                  ? 'اس تلاش سے کوئی چیز نہیں ملی'
-                                  : 'No items match your search.')),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                  ),
-                ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _isInitialLoading = true;
+                    _initialLoadError = null;
+                  });
+                  _subscribeToFirstPage();
+                },
+                child: UrduAwareText(isUrdu ? 'دوبارہ کوشش' : 'Retry'),
               ),
             ],
+          ),
+        ),
+      );
+    }
+
+    final listings = _filterListings(_loadedListings);
+    if (_loadedListings.isEmpty && !_hasMore) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: UrduAwareText(
+            isUrdu
+                ? 'ابھی کوئی چیز فروخت کے لیے موجود نہیں'
+                : 'No items are listed yet.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      controller: _getListScrollController(),
+      padding: const EdgeInsets.only(top: 4, bottom: 88),
+      itemCount: listings.length + 1,
+      itemBuilder: (context, index) {
+        if (index < listings.length) {
+          return _buildListingTile(listings[index], isUrdu);
+        }
+        if (_isLoadingMore) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
           );
         }
-        return Column(
-          children: [
-            if (beforeList != null) beforeList,
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.only(top: 4, bottom: 88),
-                itemCount: listings.length,
-                itemBuilder: (context, index) => _buildListingTile(
-                  listings[index],
-                  isUrdu,
-                  isMine: isMine,
-                ),
+        if (_loadMoreError != null) {
+          return Center(
+            child: TextButton(
+              onPressed: _loadNextPage,
+              child: UrduAwareText(
+                isUrdu
+                    ? 'مزید اشتہارات لوڈ نہیں ہوسکے، دوبارہ کوشش کریں'
+                    : 'Could not load more listings. Tap to retry.',
+                textAlign: TextAlign.center,
               ),
             ),
-          ],
-        );
+          );
+        }
+        if (_hasMore) {
+          return Center(
+            child: TextButton(
+              onPressed: _loadNextPage,
+              child: UrduAwareText(
+                listings.isEmpty
+                    ? (isUrdu
+                        ? 'مزید اشتہارات میں تلاش جاری رکھیں'
+                        : 'Search older listings')
+                    : (isUrdu
+                        ? 'مزید اشتہارات لوڈ کریں'
+                        : 'Load more listings'),
+              ),
+            ),
+          );
+        }
+        if (listings.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: UrduAwareText(
+              isUrdu
+                  ? 'اس تلاش سے کوئی چیز نہیں ملی'
+                  : 'No items match your search.',
+              textAlign: TextAlign.center,
+            ),
+          );
+        }
+        return const SizedBox(height: 16);
       },
     );
   }
@@ -475,58 +438,30 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   @override
   Widget build(BuildContext context) {
     final isUrdu = context.watch<LanguageService>().isUrdu;
-    final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        backgroundColor: AppTheme.backgroundColor,
-        appBar: ScreenAppBar(
-          title: isUrdu ? 'مارکیٹ پلیس' : 'Marketplace',
-          isUrdu: isUrdu,
-          actions: [
-            IconButton(
-              tooltip: isUrdu ? 'چیز فروخت کریں' : 'Sell an item',
-              onPressed: () => _openForm(),
-              icon: Icon(PhosphorIcons.plusCircle()),
-            ),
-          ],
-        ),
-        body: Column(
-          children: [
-            TabBar(
-              labelColor: AppTheme.themeColor,
-              unselectedLabelColor: Colors.grey.shade700,
-              indicatorColor: AppTheme.themeColor,
-              labelStyle: TextStyle(fontFamily: fontFamily),
-              tabs: [
-                Tab(text: isUrdu ? 'خریدیں' : 'Browse'),
-                Tab(text: isUrdu ? 'میرے اشتہارات' : 'My listings'),
-              ],
-            ),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  _buildListingStream(
-                    _activeListingsStream,
-                    isUrdu,
-                    beforeList: _buildSearchAndCategories(isUrdu),
-                  ),
-                  _buildListingStream(
-                    _myListingsStream,
-                    isUrdu,
-                    isMine: true,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => _openForm(),
-          icon: const Icon(Icons.add),
-          label: Text(isUrdu ? 'چیز فروخت کریں' : 'Sell an item'),
-        ),
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
+      appBar: ScreenAppBar(
+        title: isUrdu ? 'مارکیٹ پلیس' : 'Marketplace',
+        isUrdu: isUrdu,
+        actions: [
+          IconButton(
+            tooltip: isUrdu ? 'چیز فروخت کریں' : 'Sell an item',
+            onPressed: () => _openForm(),
+            icon: Icon(PhosphorIcons.plusCircle()),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          _buildSearchAndCategories(isUrdu),
+          Expanded(child: _buildListingStream(isUrdu)),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openForm(),
+        icon: const Icon(Icons.add),
+        label: UrduAwareText(isUrdu ? 'چیز فروخت کریں' : 'Sell an item'),
       ),
     );
   }

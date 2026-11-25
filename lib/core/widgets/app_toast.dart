@@ -13,6 +13,8 @@ class AppToast {
     String subtitle = 'Karobari Saathi',
     required IconData icon,
     required List<Color> gradient,
+    required Color textColor,
+    required Color iconColor,
   }) {
     final languageService = Provider.of<LanguageService>(context, listen: false);
     final isUrdu = languageService.isUrdu;
@@ -26,9 +28,9 @@ class AppToast {
 
     overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
-        top: MediaQuery.of(context).padding.top + 16,
-        left: 16,
-        right: 16,
+        top: 0,
+        left: 0,
+        right: 0,
         child: Material(
           color: Colors.transparent,
           child: TweenAnimationBuilder<double>(
@@ -36,7 +38,7 @@ class AppToast {
             duration: const Duration(milliseconds: 300),
             builder: (context, value, child) {
               return Transform.translate(
-                offset: Offset(0, -20 * (1 - value)),
+                offset: Offset(0, -30 * (1 - value)),
                 child: Opacity(
                   opacity: value,
                   child: child,
@@ -44,32 +46,37 @@ class AppToast {
               );
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                MediaQuery.of(context).padding.top + 12,
+                16,
+                14,
+              ),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: gradient,
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.zero,
                 boxShadow: [
                   BoxShadow(
-                    color: gradient.first.withValues(alpha: 0.4),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
               child: Row(
                 children: [
                   Container(
-                    width: 42,
-                    height: 42,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: iconColor.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(icon, color: gradient.last, size: 24),
+                    child: Icon(icon, color: iconColor, size: 22),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -80,19 +87,19 @@ class AppToast {
                         UrduAwareText(
                           title,
                           style: TextStyle(
-                            color: Colors.white,
+                            color: textColor,
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                             fontFamily: fontFamily,
                           ),
                         ),
                         if (localizedSubtitle.isNotEmpty) ...[
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 2),
                           UrduAwareText(
                             localizedSubtitle,
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontSize: 13,
+                              color: textColor.withValues(alpha: 0.8),
+                              fontSize: 12,
                               fontWeight: FontWeight.w500,
                               fontFamily: fontFamily,
                             ),
@@ -108,8 +115,8 @@ class AppToast {
                         overlayEntry.remove();
                       }
                     },
-                    child: const Icon(Icons.close_rounded,
-                        color: Colors.white, size: 20),
+                    child: Icon(Icons.close_rounded,
+                        color: textColor.withValues(alpha: 0.7), size: 20),
                   ),
                 ],
               ),
@@ -134,8 +141,10 @@ class AppToast {
       context,
       title: title,
       subtitle: subtitle,
-      icon: PhosphorIcons.checkCircle(),
-      gradient: [const Color(0xFF00966B), const Color(0xFF007A55)],
+      icon: PhosphorIcons.checkCircle(PhosphorIconsStyle.fill),
+      gradient: [const Color(0xFFE8F5E9), const Color(0xFFC8E6C9)],
+      textColor: const Color(0xFF1B5E20),
+      iconColor: const Color(0xFF2E7D32),
     );
   }
 
@@ -145,8 +154,10 @@ class AppToast {
       context,
       title: title,
       subtitle: subtitle,
-      icon: PhosphorIcons.info(),
-      gradient: [const Color(0xFF2563EB), const Color(0xFF1D4ED8)],
+      icon: PhosphorIcons.info(PhosphorIconsStyle.fill),
+      gradient: [const Color(0xFFE3F2FD), const Color(0xFFBBDEFB)],
+      textColor: const Color(0xFF0D47A1),
+      iconColor: const Color(0xFF1565C0),
     );
   }
 
@@ -156,8 +167,10 @@ class AppToast {
       context,
       title: title,
       subtitle: subtitle,
-      icon: PhosphorIcons.warning(),
-      gradient: [const Color(0xFFF59E0B), const Color(0xFFD97706)],
+      icon: PhosphorIcons.warning(PhosphorIconsStyle.fill),
+      gradient: [const Color(0xFFFFF8E1), const Color(0xFFFFECB3)],
+      textColor: const Color(0xFFF57F17),
+      iconColor: const Color(0xFFFBC02D),
     );
   }
 
@@ -167,8 +180,10 @@ class AppToast {
       context,
       title: title,
       subtitle: subtitle,
-      icon: PhosphorIcons.warningCircle(),
-      gradient: [const Color(0xFFDC2626), const Color(0xFFB91C1C)],
+      icon: PhosphorIcons.warningCircle(PhosphorIconsStyle.fill),
+      gradient: [const Color(0xFFFFEBEE), const Color(0xFFFFCDD2)],
+      textColor: const Color(0xFFB71C1C),
+      iconColor: const Color(0xFFC62828),
     );
   }
 }

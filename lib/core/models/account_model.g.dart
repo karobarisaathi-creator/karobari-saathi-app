@@ -21,7 +21,7 @@ class AccountAdapter extends TypeAdapter<Account> {
       name: fields[1] as String,
       phone: fields[2] as String,
       address: fields[3] as String?,
-      category: fields[4] as String,
+      accountType: fields[4] as String?,
       initialBalance: fields[5] as double,
       balanceType: fields[6] as String,
       balance: fields[7] as double,
@@ -31,14 +31,16 @@ class AccountAdapter extends TypeAdapter<Account> {
       isActive: fields[13] == null ? true : fields[13] as bool,
       storeName: fields[15] as String?,
       storeImage: fields[16] as String?,
-      settlementNotes: (fields[8] as Map?)?.cast<String, String>() ?? const {},
+      profession: fields[17] as String?,
+      settlementNotes:
+          fields[8] == null ? {} : (fields[8] as Map?)?.cast<String, String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, Account obj) {
     writer
-      ..writeByte(15)
+      ..writeByte(16)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -48,7 +50,7 @@ class AccountAdapter extends TypeAdapter<Account> {
       ..writeByte(3)
       ..write(obj.address)
       ..writeByte(4)
-      ..write(obj.category)
+      ..write(obj.accountType)
       ..writeByte(5)
       ..write(obj.initialBalance)
       ..writeByte(6)
@@ -68,7 +70,9 @@ class AccountAdapter extends TypeAdapter<Account> {
       ..writeByte(15)
       ..write(obj.storeName)
       ..writeByte(16)
-      ..write(obj.storeImage);
+      ..write(obj.storeImage)
+      ..writeByte(17)
+      ..write(obj.profession);
   }
 
   @override

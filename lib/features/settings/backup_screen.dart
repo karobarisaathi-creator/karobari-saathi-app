@@ -97,30 +97,36 @@ class _BackupScreenState extends State<BackupScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: ScreenAppBar(
-        title: isUrdu ? 'بیک اپ' : 'Backup',
+        title: isUrdu ? 'کلاؤڈ بیک اپ اور ڈیٹا' : 'Cloud Backup & Sync',
         isUrdu: isUrdu,
       ),
       body: _isLoading
           ? _buildShimmerLoading()
-          : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
-              child: Column(
-                children: [
-                  // Backup Status Card
-                  _buildBackupStatusCard(isUrdu),
-                  const SizedBox(height: 6),
+          : RefreshIndicator(
+              onRefresh: _loadBackupInfo,
+              color: AppTheme.themeColor,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Modern Hero Status Card
+                    _buildModernBackupStatusCard(isUrdu),
+                    const SizedBox(height: 8),
 
-                  // Data Statistics
-                  _buildDataStatisticsCard(isUrdu, stockService),
-                  const SizedBox(height: 6),
+                    // Backup Actions Card
+                    _buildModernBackupActionsCard(isUrdu),
+                    const SizedBox(height: 8),
 
-                  // Backup Actions
-                  _buildBackupActionsCard(isUrdu),
-                  const SizedBox(height: 6),
+                    // Data Statistics Card
+                    _buildModernDataStatisticsCard(isUrdu, stockService),
+                    const SizedBox(height: 8),
 
-                  // Auto Backup Settings
-                  _buildAutoBackupCard(isUrdu),
-                ],
+                    // Auto Backup Settings Card
+                    _buildModernAutoBackupCard(isUrdu),
+                  ],
+                ),
               ),
             ),
     );
@@ -128,109 +134,43 @@ class _BackupScreenState extends State<BackupScreen> {
 
   Widget _buildShimmerLoading() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
+      padding: const EdgeInsets.all(8),
       child: Column(
         children: [
-          // Shimmer 1: Status Card
-          Card(
-            elevation: 0,
-            margin: const EdgeInsets.symmetric(vertical: 2),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            child: const Padding(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      SkeletonShimmer(width: 130, height: 20, borderRadius: 8),
-                      SkeletonShimmer(width: 90, height: 16, borderRadius: 6),
-                    ],
-                  ),
-                  SizedBox(height: 16),
-                  SkeletonShimmer(
-                      width: double.infinity, height: 40, borderRadius: 12),
-                  SizedBox(height: 10),
-                  SkeletonShimmer(
-                      width: double.infinity, height: 40, borderRadius: 12),
-                  SizedBox(height: 10),
-                  SkeletonShimmer(
-                      width: double.infinity, height: 40, borderRadius: 12),
-                ],
-              ),
-            ),
-          ),
+          SkeletonShimmer(width: double.infinity, height: 220, borderRadius: 20),
           const SizedBox(height: 8),
-
-          // Shimmer 2: Data Stats Card
-          Card(
-            elevation: 0,
-            margin: const EdgeInsets.symmetric(vertical: 2),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            child: const Padding(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SkeletonShimmer(width: 140, height: 18, borderRadius: 8),
-                  SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                          child: SkeletonShimmer(
-                              width: double.infinity,
-                              height: 60,
-                              borderRadius: 14)),
-                      SizedBox(width: 10),
-                      Expanded(
-                          child: SkeletonShimmer(
-                              width: double.infinity,
-                              height: 60,
-                              borderRadius: 14)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
+          SkeletonShimmer(width: double.infinity, height: 180, borderRadius: 20),
           const SizedBox(height: 8),
-
-          // Shimmer 3: Actions Card
-          Card(
-            elevation: 0,
-            margin: const EdgeInsets.symmetric(vertical: 2),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            child: const Padding(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  SkeletonShimmer(
-                      width: double.infinity, height: 48, borderRadius: 14),
-                  SizedBox(height: 10),
-                  SkeletonShimmer(
-                      width: double.infinity, height: 48, borderRadius: 14),
-                ],
-              ),
-            ),
-          ),
+          SkeletonShimmer(width: double.infinity, height: 260, borderRadius: 20),
+          const SizedBox(height: 8),
+          SkeletonShimmer(width: double.infinity, height: 120, borderRadius: 20),
         ],
       ),
     );
   }
 
-  Widget _buildBackupStatusCard(bool isUrdu) {
+  Widget _buildModernBackupStatusCard(bool isUrdu) {
     final lastBackup = _backupInfo['lastBackup'];
     final lastRestore = _backupInfo['lastRestore'];
     final email = _backupInfo['email']?.toString() ?? '';
+    final hasEmail = email.isNotEmpty;
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(vertical: 2),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppTheme.themeColor, AppTheme.incomeColor],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.themeColor.withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -239,176 +179,215 @@ class _BackupScreenState extends State<BackupScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        hasEmail ? PhosphorIcons.cloudCheck(PhosphorIconsStyle.fill) : PhosphorIcons.cloudWarning(PhosphorIconsStyle.fill),
+                        color: hasEmail ? Colors.greenAccent : Colors.amberAccent,
+                        size: 26,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        UrduAwareText(
+                          isUrdu ? 'کلاؤڈ سکیورٹی' : 'Cloud Status',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.white70,
+                            fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        UrduAwareText(
+                          hasEmail
+                              ? (isUrdu ? 'محفوظ اور فعال' : 'Protected & Active')
+                              : (isUrdu ? 'ای میل درکار ہے' : 'Email Required'),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                IconButton(
+                  onPressed: _navigateToProfile,
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.15),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: Icon(PhosphorIcons.pencilSimple(PhosphorIconsStyle.bold), color: Colors.white, size: 16),
+                  tooltip: isUrdu ? 'پروفائل میں ای میل تبدیل کریں' : 'Change Email in Profile',
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+              ),
+              child: Row(
+                children: [
+                  Icon(PhosphorIcons.envelopeSimple(), color: Colors.white70, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: UrduAwareText(
+                      hasEmail ? email : (isUrdu ? 'ای میل درج نہیں ہے (پروفائل میں جوڑیں)' : 'Not set (Link in Profile)'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: hasEmail ? Colors.white : Colors.amberAccent,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Divider(color: Colors.white24, height: 1),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildHeaderDetailItem(
+                  isUrdu ? 'آخری بیک اپ' : 'Last Backup',
+                  lastBackup != null
+                      ? DateFormat('dd/MM/yy hh:mm a').format(lastBackup)
+                      : (isUrdu ? 'کبھی نہیں' : 'Never'),
+                  PhosphorIcons.cloudArrowUp(),
+                  isUrdu,
+                ),
+                Container(width: 1, height: 30, color: Colors.white24),
+                _buildHeaderDetailItem(
+                  isUrdu ? 'آخری بحالی' : 'Last Restore',
+                  lastRestore != null
+                      ? DateFormat('dd/MM/yy hh:mm a').format(lastRestore)
+                      : (isUrdu ? 'کبھی نہیں' : 'Never'),
+                  PhosphorIcons.cloudArrowDown(),
+                  isUrdu,
+                ),
+                Container(width: 1, height: 30, color: Colors.white24),
+                _buildHeaderDetailItem(
+                  isUrdu ? 'سائز' : 'Size',
+                  _formatFileSize(_backupInfo['backupSize'] ?? 0),
+                  PhosphorIcons.hardDrive(),
+                  isUrdu,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderDetailItem(String label, String value, IconData icon, bool isUrdu) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: Colors.white, size: 13),
+              const SizedBox(width: 4),
+              UrduAwareText(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.white70,
+                  fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          UrduAwareText(
+            value,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernBackupActionsCard(bool isUrdu) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.themeColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(PhosphorIcons.cloudArrowUp(PhosphorIconsStyle.bold), color: AppTheme.themeColor, size: 18),
+                ),
+                const SizedBox(width: 10),
                 UrduAwareText(
-                  isUrdu ? 'بیک اپ کی حالت' : 'Backup Status',
+                  isUrdu ? 'بیک اپ اور بحالی کے اختیارات' : 'Cloud Synchronization',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.darkColor,
                     fontFamily: isUrdu ? 'NooriNastaleeq' : '',
                   ),
                 ),
-                TextButton.icon(
-                  onPressed: _navigateToProfile,
-                  icon: Icon(PhosphorIcons.pencilSimple(),
-                      size: 16, color: AppTheme.themeColor),
-                  label: UrduAwareText(
-                    isUrdu ? 'ای میل تبدیل کریں' : 'Change Email',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.themeColor,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                    ),
-                  ),
-                ),
               ],
             ),
-            const SizedBox(height: 16),
-            _buildStatusItem(
-              isUrdu ? 'بیک اپ ای میل:' : 'Backup Email:',
-              email.isNotEmpty
-                  ? email
-                  : isUrdu
-                      ? 'درج نہیں ہے (پروفائل میں جوڑیں)'
-                      : 'Not set (Link in Profile)',
-              PhosphorIcons.envelopeSimple(),
-              AppTheme.verifiedGold,
-              isUrdu,
-            ),
-            _buildStatusItem(
-              isUrdu ? 'آخری بیک اپ:' : 'Last Backup:',
-              lastBackup != null
-                  ? DateFormat('dd/MM/yyyy hh:mm a').format(lastBackup)
-                  : isUrdu
-                      ? 'کبھی نہیں'
-                      : 'Never',
-              PhosphorIcons.cloudArrowUp(),
-              AppTheme.verifiedGold,
-              isUrdu,
-            ),
-            _buildStatusItem(
-              isUrdu ? 'آخری بحالی:' : 'Last Restore:',
-              lastRestore != null
-                  ? DateFormat('dd/MM/yyyy hh:mm a').format(lastRestore)
-                  : isUrdu
-                      ? 'کبھی نہیں'
-                      : 'Never',
-              PhosphorIcons.cloudArrowDown(),
-              AppTheme.verifiedGold,
-              isUrdu,
-            ),
-            _buildStatusItem(
-              isUrdu ? 'بیک اپ سائز:' : 'Backup Size:',
-              _formatFileSize(_backupInfo['backupSize'] ?? 0),
-              PhosphorIcons.hardDrive(),
-              AppTheme.verifiedGold,
-              isUrdu,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDataStatisticsCard(bool isUrdu, StockService stockService) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(vertical: 2),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+            const SizedBox(height: 8),
             UrduAwareText(
-              isUrdu ? 'ڈیٹا کے اعداد و شمار' : 'Data Statistics',
+              isUrdu
+                  ? 'تمام کاروباری ڈیٹا، کسٹمر اکاؤنٹس، لین دین، مارکیٹ تصاویر اور کنٹریکٹ دستاویزات محفوظ کلاؤڈ پر محفوظ یا بحال کریں۔'
+                  : 'Safely backup or restore your business ledger, customer accounts, transactions, and media files.',
               style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.darkColor,
-                fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatItem(
-                    isUrdu ? 'اکاؤنٹس / پارٹیاں' : 'Accounts',
-                    _backupInfo['totalAccounts']?.toString() ?? '0',
-                    PhosphorIcons.users(),
-                    AppTheme.verifiedGold,
-                    isUrdu,
-                  ),
-                ),
-                Expanded(
-                  child: _buildStatItem(
-                    isUrdu ? 'لین دین / بل' : 'Transactions',
-                    _backupInfo['totalTransactions']?.toString() ?? '0',
-                    PhosphorIcons.receipt(),
-                    AppTheme.verifiedGold,
-                    isUrdu,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Divider(height: 1, color: Color(0xFFEEF1F5)),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatItem(
-                    isUrdu ? 'اسٹاک اشیاء' : 'Stock Items',
-                    stockService.isLoading
-                        ? '…'
-                        : stockService.items.length.toString(),
-                    PhosphorIcons.package(),
-                    AppTheme.verifiedGold,
-                    isUrdu,
-                  ),
-                ),
-                Expanded(
-                  child: _buildStatItem(
-                    isUrdu ? 'زمرے و پروجیکٹس' : 'Categories',
-                    _backupInfo['totalCategories']?.toString() ?? '0',
-                    PhosphorIcons.folders(),
-                    AppTheme.verifiedGold,
-                    isUrdu,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBackupActionsCard(bool isUrdu) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(vertical: 2),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            UrduAwareText(
-              isUrdu ? 'بیک اپ کے اختیارات' : 'Backup Options',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.darkColor,
+                fontSize: 12,
+                color: AppTheme.textSecondary,
+                height: 1.4,
                 fontFamily: isUrdu ? 'NooriNastaleeq' : '',
               ),
             ),
             const SizedBox(height: 16),
             AppButton(
               text: isUrdu ? 'کلاؤڈ پر بیک اپ کریں' : 'Backup to Cloud',
-              icon: PhosphorIcons.cloudArrowUp(),
+              icon: PhosphorIcons.cloudArrowUp(PhosphorIconsStyle.bold),
               color: AppTheme.incomeColor,
               size: AppButtonSize.large,
               isLoading: _isBackingUp,
@@ -426,10 +405,10 @@ class _BackupScreenState extends State<BackupScreen> {
                     ],
               onPressed: _createCloudBackup,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             AppButton(
               text: isUrdu ? 'کلاؤڈ سے بحالی کریں' : 'Restore from Cloud',
-              icon: PhosphorIcons.cloudArrowDown(),
+              icon: PhosphorIcons.cloudArrowDown(PhosphorIconsStyle.bold),
               color: AppTheme.themeColor,
               size: AppButtonSize.large,
               isLoading: _isRestoring,
@@ -453,64 +432,112 @@ class _BackupScreenState extends State<BackupScreen> {
     );
   }
 
-  Widget _buildAutoBackupCard(bool isUrdu) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(vertical: 2),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+  Widget _buildModernDataStatisticsCard(bool isUrdu, StockService stockService) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            UrduAwareText(
-              isUrdu ? 'خودکار بیک اپ' : 'Auto Backup',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.darkColor,
-                fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-              ),
-            ),
-            const SizedBox(height: 16),
             Row(
               children: [
-                Expanded(
-                  child: UrduAwareText(
-                    isUrdu ? 'خودکار بیک اپ فعال کریں' : 'Enable Auto Backup',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.darkColor,
-                      fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-                    ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.verifiedGold.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  child: Icon(PhosphorIcons.chartBar(PhosphorIconsStyle.bold), color: AppTheme.verifiedGold, size: 18),
                 ),
-                Switch.adaptive(
-                  activeThumbColor: AppTheme.themeColor,
-                  value: _backupInfo['autoBackupEnabled'] as bool? ?? false,
-                  onChanged: _toggleAutoBackup,
-                  thumbIcon: WidgetStateProperty.resolveWith<Icon?>((states) {
-                    if (states.contains(WidgetState.selected)) {
-                      return Icon(PhosphorIcons.check(),
-                          size: 14, color: Colors.white);
-                    }
-                    return Icon(PhosphorIcons.x(),
-                        size: 14, color: Colors.grey);
-                  }),
+                const SizedBox(width: 10),
+                UrduAwareText(
+                  isUrdu ? 'ڈیٹا کے اعداد و شمار' : 'Data Statistics',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.darkColor,
+                    fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            UrduAwareText(
-              isUrdu
-                  ? 'ایپ کھلنے پر، اگر آخری بیک اپ کو 7 دن ہو جائیں تو ڈیٹا کلاؤڈ پر محفوظ ہوگا'
-                  : 'When the app opens, a cloud backup runs if 7 days have passed',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppTheme.textSecondary,
-                fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-              ),
+            const SizedBox(height: 12),
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 1.6,
+              children: [
+                _buildStatTile(
+                  isUrdu ? 'اکاؤنٹس / پارٹیاں' : 'Accounts',
+                  _backupInfo['totalAccounts']?.toString() ?? '0',
+                  PhosphorIcons.users(PhosphorIconsStyle.fill),
+                  AppTheme.themeColor,
+                  isUrdu,
+                ),
+                _buildStatTile(
+                  isUrdu ? 'لین دین / بل' : 'Transactions',
+                  _backupInfo['totalTransactions']?.toString() ?? '0',
+                  PhosphorIcons.receipt(PhosphorIconsStyle.fill),
+                  AppTheme.incomeColor,
+                  isUrdu,
+                ),
+                _buildStatTile(
+                  isUrdu ? 'اسٹاک اشیاء' : 'Stock Items',
+                  stockService.isLoading ? '…' : stockService.items.length.toString(),
+                  PhosphorIcons.package(PhosphorIconsStyle.fill),
+                  AppTheme.verifiedGold,
+                  isUrdu,
+                ),
+                _buildStatTile(
+                  isUrdu ? 'زمرے و پروجیکٹس' : 'Categories',
+                  _backupInfo['totalCategories']?.toString() ?? '0',
+                  PhosphorIcons.folders(PhosphorIconsStyle.fill),
+                  AppTheme.purpleColor,
+                  isUrdu,
+                ),
+                _buildStatTile(
+                  isUrdu ? 'کنٹریکٹس' : 'Contracts',
+                  _backupInfo['totalContracts']?.toString() ?? '0',
+                  PhosphorIcons.fileText(PhosphorIconsStyle.fill),
+                  AppTheme.slateColor,
+                  isUrdu,
+                ),
+                _buildStatTile(
+                  isUrdu ? 'مارکیٹ اشتہارات' : 'Market Listings',
+                  _backupInfo['totalMarketplaceListings']?.toString() ?? '0',
+                  PhosphorIcons.storefront(PhosphorIconsStyle.fill),
+                  AppTheme.expenseColor,
+                  isUrdu,
+                ),
+                _buildStatTile(
+                  isUrdu ? 'حاضری و اجرت' : 'Attendance & Payroll',
+                  _backupInfo['totalWorkerPayrollRecords']?.toString() ?? '0',
+                  PhosphorIcons.userList(PhosphorIconsStyle.fill),
+                  AppTheme.greenColor,
+                  isUrdu,
+                ),
+                _buildStatTile(
+                  isUrdu ? 'مزدور / کاریگر' : 'Workers',
+                  _backupInfo['totalWorkers']?.toString() ?? '0',
+                  PhosphorIcons.usersThree(PhosphorIconsStyle.fill),
+                  AppTheme.themeColor,
+                  isUrdu,
+                ),
+              ],
             ),
           ],
         ),
@@ -518,84 +545,131 @@ class _BackupScreenState extends State<BackupScreen> {
     );
   }
 
-  Widget _buildStatusItem(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-    bool isUrdu,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
+  Widget _buildStatTile(String label, String value, IconData icon, Color color, bool isUrdu) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: UrduAwareText(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: AppTheme.darkColor,
-                fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Icon(icon, color: color, size: 20),
+              UrduAwareText(
+                value,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.darkColor,
+                ),
               ),
-            ),
+            ],
           ),
+          const SizedBox(height: 6),
           UrduAwareText(
-            value,
-            style: const TextStyle(
+            label,
+            style: TextStyle(
+              fontSize: 11,
               color: AppTheme.textSecondary,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
+              fontFamily: isUrdu ? 'NooriNastaleeq' : '',
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-    bool isUrdu,
-  ) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
+  Widget _buildModernAutoBackupCard(bool isUrdu) {
+    final autoBackupEnabled = _backupInfo['autoBackupEnabled'] as bool? ?? false;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
-          child: Icon(icon, color: color, size: 24),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.purpleColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(PhosphorIcons.clockCounterClockwise(PhosphorIconsStyle.bold), color: AppTheme.purpleColor, size: 18),
+                ),
+                const SizedBox(width: 10),
+                UrduAwareText(
+                  isUrdu ? 'خودکار بیک اپ' : 'Auto Backup',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.darkColor,
+                    fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      UrduAwareText(
+                        isUrdu ? 'خودکار بیک اپ فعال کریں' : 'Enable Auto Backup',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkColor,
+                          fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      UrduAwareText(
+                        isUrdu
+                            ? 'ایپ کھلنے پر، ہر 7 دن بعد خودکار کلاؤڈ بیک اپ ہوگا'
+                            : 'Automatically syncs to cloud every 7 days on app launch',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textSecondary,
+                          fontFamily: isUrdu ? 'NooriNastaleeq' : '',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch.adaptive(
+                  activeTrackColor: AppTheme.themeColor,
+                  value: autoBackupEnabled,
+                  onChanged: _toggleAutoBackup,
+                ),
+              ],
+            ),
+          ],
         ),
-        const SizedBox(height: 8),
-        UrduAwareText(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: AppTheme.textSecondary,
-            fontFamily: isUrdu ? 'NooriNastaleeq' : '',
-          ),
-        ),
-        const SizedBox(height: 4),
-        UrduAwareText(
-          value,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.darkColor,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -732,12 +806,17 @@ class _BackupScreenState extends State<BackupScreen> {
                   ),
                 ),
               ),
-              TextButton(
+              ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.expenseColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
                 child: UrduAwareText(
                   isUrdu ? 'جاری رکھیں' : 'Continue',
                   style: TextStyle(
-                    color: AppTheme.expenseColor,
+                    color: Colors.white,
                     fontWeight: FontWeight.bold,
                     fontFamily: isUrdu ? 'NooriNastaleeq' : '',
                   ),

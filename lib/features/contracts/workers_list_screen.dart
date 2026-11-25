@@ -8,16 +8,17 @@ import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/contract_service.dart';
 import 'package:account_app/core/services/worker_service.dart';
+import 'package:account_app/core/services/worker_payroll_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/party_card.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/models/account_model.dart';
-import 'package:account_app/core/models/worker_model.dart';
 import 'package:account_app/features/accounts/add_party_screen.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
 import 'package:account_app/features/quick_bill/widgets/customer_picker_sheet.dart';
+
 import 'worker_attendance_screen.dart';
 
 class WorkersListScreen extends StatefulWidget {
@@ -47,23 +48,25 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
     if (!context.mounted) return;
     setState(() => _isLoading = true);
     final dbService = Provider.of<DatabaseService>(context, listen: false);
-    final contractService =
-        Provider.of<ContractService>(context, listen: false);
+    final contractService = Provider.of<ContractService>(
+      context,
+      listen: false,
+    );
     final workerService = Provider.of<WorkerService>(context, listen: false);
-
-    final contractWorkerNames = <String>{};
-    for (var c in contractService.contracts) {
-      for (var lp in c.laborPayments) {
-        if (lp.workerName.trim().isNotEmpty) {
-          contractWorkerNames.add(lp.workerName.trim().toLowerCase());
-        }
-      }
-    }
-
+    final payrollService = Provider.of<WorkerPayrollService>(
+      context,
+      listen: false,
+    );
     final List<Account> combined = [];
 
     try {
-      combined.addAll(await workerService.ensureWorkerAccounts(dbService));
+      combined.addAll(
+        await workerService.ensureWorkerAccounts(
+          dbService,
+          payrollService: payrollService,
+          contractService: contractService,
+        ),
+      );
     } catch (error) {
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -75,21 +78,6 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
         subtitle: error.toString(),
       );
       return;
-    }
-
-    for (var a in dbService.accounts) {
-      final isWorkerCat = a.category == 'worker' ||
-          a.category == 'technician' ||
-          a.category == 'employee';
-      final isSelectedInContract =
-          contractWorkerNames.contains(a.name.trim().toLowerCase());
-
-      if (isWorkerCat || isSelectedInContract) {
-        if (!combined.any((c) =>
-            c.id == a.id || c.name.toLowerCase() == a.name.toLowerCase())) {
-          combined.add(a);
-        }
-      }
     }
 
     if (mounted) {
@@ -112,8 +100,9 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(
-                    child:
-                        CircularProgressIndicator(color: AppTheme.slateColor),
+                    child: CircularProgressIndicator(
+                      color: AppTheme.slateColor,
+                    ),
                   )
                 : _workers.isEmpty
                     ? Center(
@@ -128,8 +117,11 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                                     AppTheme.slateColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(22),
                               ),
-                              child: Icon(PhosphorIcons.users(),
-                                  size: 32, color: AppTheme.slateColor),
+                              child: Icon(
+                                PhosphorIcons.users(),
+                                size: 32,
+                                color: AppTheme.slateColor,
+                              ),
                             ),
                             const SizedBox(height: 14),
                             UrduAwareText(
@@ -149,7 +141,8 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                                 backgroundColor: AppTheme.slateColor,
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
                               onPressed: () =>
                                   _showAddWorkerPicker(context, isUrdu),
@@ -157,8 +150,9 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                               label: UrduAwareText(
                                 isUrdu ? 'نیا مزدور شامل کریں' : 'Add Worker',
                                 style: TextStyle(
-                                    fontFamily: fontFamily,
-                                    fontWeight: FontWeight.bold),
+                                  fontFamily: fontFamily,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ],
@@ -175,7 +169,9 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                               color: AppTheme.lightColor,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                  color: const Color(0xFFD1D5DB), width: 1.1),
+                                color: const Color(0xFFD1D5DB),
+                                width: 1.1,
+                              ),
                             ),
                             child: Stack(
                               children: [
@@ -193,7 +189,8 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                                               MaterialPageRoute(
                                                 builder: (_) =>
                                                     PartyDetailScreen(
-                                                        party: worker),
+                                                  party: worker,
+                                                ),
                                               ),
                                             );
                                             _loadAllWorkers();
@@ -205,39 +202,17 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                                           right: 8,
                                           child: PopupMenuButton<String>(
                                             icon: Icon(
-                                                PhosphorIcons
-                                                    .dotsThreeVertical(),
-                                                size: 18,
-                                                color: AppTheme.textSecondary),
+                                              PhosphorIcons.dotsThreeVertical(),
+                                              size: 18,
+                                              color: AppTheme.textSecondary,
+                                            ),
                                             onSelected: (val) async {
                                               if (val == 'remove') {
-                                                final updated = Account(
-                                                  id: worker.id,
-                                                  name: worker.name,
-                                                  phone: worker.phone,
-                                                  address: worker.address,
-                                                  category: 'general',
-                                                  initialBalance:
-                                                      worker.initialBalance,
-                                                  balanceType:
-                                                      worker.balanceType,
-                                                  balance: worker.balance,
-                                                  profileImage:
-                                                      worker.profileImage,
-                                                  createdAt: worker.createdAt,
-                                                  updatedAt: DateTime.now(),
-                                                  isActive: worker.isActive,
-                                                  storeName: worker.storeName,
-                                                  storeImage: worker.storeImage,
-                                                  settlementNotes:
-                                                      worker.settlementNotes,
-                                                );
-                                                final dbService = Provider.of<
-                                                        DatabaseService>(
-                                                    context,
-                                                    listen: false);
-                                                await dbService
-                                                    .updateAccount(updated);
+                                                await Provider.of<
+                                                    WorkerService>(
+                                                  context,
+                                                  listen: false,
+                                                ).hideFromDirectory(worker.id);
                                                 if (!context.mounted) {
                                                   return;
                                                 }
@@ -258,10 +233,10 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                                                       ? 'مزدور کی لسٹ سے نکالیں'
                                                       : 'Remove from Workers List',
                                                   style: const TextStyle(
-                                                      color:
-                                                          AppTheme.expenseColor,
-                                                      fontWeight:
-                                                          FontWeight.bold),
+                                                    color:
+                                                        AppTheme.expenseColor,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                                 ),
                                               ),
                                             ],
@@ -271,7 +246,11 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                                     ),
                                     Padding(
                                       padding: const EdgeInsets.fromLTRB(
-                                          12, 0, 12, 10),
+                                        12,
+                                        0,
+                                        12,
+                                        10,
+                                      ),
                                       child: SizedBox(
                                         width: double.infinity,
                                         child: OutlinedButton.icon(
@@ -309,10 +288,7 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
     if (widget.isEmbedded) {
       return Directionality(
         textDirection: languageService.textDirection,
-        child: ColoredBox(
-          color: AppTheme.backgroundColor,
-          child: bodyContent,
-        ),
+        child: ColoredBox(color: AppTheme.backgroundColor, child: bodyContent),
       );
     }
 
@@ -336,8 +312,10 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
   }
 
   Future<void> _openAttendance(Account worker) async {
-    final databaseService =
-        Provider.of<DatabaseService>(context, listen: false);
+    final databaseService = Provider.of<DatabaseService>(
+      context,
+      listen: false,
+    );
     try {
       var workerAccount = databaseService.getAccount(worker.id);
       if (workerAccount == null) {
@@ -351,7 +329,7 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
       }
       if (workerAccount == null) {
         workerAccount = worker.copyWith(
-          category: 'worker',
+          accountType: 'worker',
           balanceType: 'Payable',
           initialBalance: 0,
           balance: 0,
@@ -378,21 +356,27 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
   }
 
   Future<void> _showAddWorkerPicker(BuildContext context, bool isUrdu) async {
-    final result = await showCustomerPickerSheet(context);
-    if (result?.account != null && mounted) {
+    final result = await showCustomerPickerSheet(
+      context,
+      excludedAccountIds: _workers.map((worker) => worker.id).toSet(),
+    );
+    if (!context.mounted) return;
+    if (result?.account != null) {
       final account = result!.account!;
       final dbService = Provider.of<DatabaseService>(context, listen: false);
-      if (account.category != 'worker' &&
-          account.category != 'technician' &&
-          account.category != 'employee') {
-        await dbService.updateAccount(account.copyWith(category: 'worker'));
-      }
+      await Provider.of<WorkerService>(
+        context,
+        listen: false,
+      ).markAccountAsWorker(account, dbService);
       await _loadAllWorkers();
     }
   }
 
   void _showAddWorkerOptions(
-      BuildContext context, bool isUrdu, String? fontFamily) {
+    BuildContext context,
+    bool isUrdu,
+    String? fontFamily,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppTheme.lightColor,
@@ -422,13 +406,17 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                   color: AppTheme.slateColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child:
-                    Icon(PhosphorIcons.userPlus(), color: AppTheme.slateColor),
+                child: Icon(
+                  PhosphorIcons.userPlus(),
+                  color: AppTheme.slateColor,
+                ),
               ),
               title: UrduAwareText(
                 isUrdu ? 'نیا مزدور درج کریں (مینول)' : 'Manual Entry',
                 style: TextStyle(
-                    fontFamily: fontFamily, fontWeight: FontWeight.w700),
+                  fontFamily: fontFamily,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               onTap: () async {
                 Navigator.pop(ctx);
@@ -449,15 +437,19 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                   color: AppTheme.themeColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(PhosphorIcons.usersThree(),
-                    color: AppTheme.themeColor),
+                child: Icon(
+                  PhosphorIcons.usersThree(),
+                  color: AppTheme.themeColor,
+                ),
               ),
               title: UrduAwareText(
                 isUrdu
                     ? 'موجودہ پارٹیوں میں سے چنیں'
                     : 'Select from Existing Parties',
                 style: TextStyle(
-                    fontFamily: fontFamily, fontWeight: FontWeight.w700),
+                  fontFamily: fontFamily,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               onTap: () {
                 Navigator.pop(ctx);
@@ -471,7 +463,10 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
   }
 
   void _showPartyListPicker(
-      BuildContext context, bool isUrdu, String? fontFamily) {
+    BuildContext context,
+    bool isUrdu,
+    String? fontFamily,
+  ) {
     final dbService = Provider.of<DatabaseService>(context, listen: false);
 
     final existingIds = _workers.map((w) => w.id).toSet();
@@ -486,10 +481,9 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
 
     if (accounts.isEmpty) {
       AppToast.warning(
-          context,
-          isUrdu
-              ? 'کوئی اور پارٹی موجود نہیں ہے'
-              : 'No other parties available');
+        context,
+        isUrdu ? 'کوئی اور پارٹی موجود نہیں ہے' : 'No other parties available',
+      );
       return;
     }
 
@@ -503,7 +497,9 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
               ? 'موجودہ پارٹیوں میں سے منتخب کریں'
               : 'Select from Existing Parties',
           style: const TextStyle(
-              fontWeight: FontWeight.w800, color: AppTheme.darkColor),
+            fontWeight: FontWeight.w800,
+            color: AppTheme.darkColor,
+          ),
         ),
         content: SizedBox(
           width: MediaQuery.of(context).size.width * 0.85,
@@ -527,7 +523,7 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                         name: acc.name,
                         phone: acc.phone,
                         profileImage: acc.profileImage,
-                        category: acc.category,
+                        category: acc.accountType,
                         address: acc.address,
                         isLarge: false,
                         isVerticalCategory: false,
@@ -541,44 +537,36 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                         backgroundColor: AppTheme.slateColor,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       onPressed: () async {
-                        final updated = Account(
-                          id: acc.id,
-                          name: acc.name,
-                          phone: acc.phone,
-                          address: acc.address,
-                          category: 'worker',
-                          initialBalance: acc.initialBalance,
-                          balanceType: acc.balanceType,
-                          balance: acc.balance,
-                          profileImage: acc.profileImage,
-                          createdAt: acc.createdAt,
-                          updatedAt: DateTime.now(),
-                          isActive: acc.isActive,
-                          storeName: acc.storeName,
-                          storeImage: acc.storeImage,
-                          settlementNotes: acc.settlementNotes,
-                        );
-                        await dbService.updateAccount(updated);
+                        await Provider.of<WorkerService>(
+                          context,
+                          listen: false,
+                        ).markAccountAsWorker(acc, dbService);
                         if (!context.mounted) return;
                         if (ctx.mounted) {
                           Navigator.pop(ctx);
                         }
                         AppToast.success(
-                            context,
-                            isUrdu
-                                ? 'مزدور کامیابی سے شامل ہو گیا'
-                                : 'Worker added successfully');
+                          context,
+                          isUrdu
+                              ? 'مزدور کامیابی سے شامل ہو گیا'
+                              : 'Worker added successfully',
+                        );
                         _loadAllWorkers();
                       },
                       child: UrduAwareText(
                         isUrdu ? 'منتخب کریں' : 'Select',
                         style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.bold),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],

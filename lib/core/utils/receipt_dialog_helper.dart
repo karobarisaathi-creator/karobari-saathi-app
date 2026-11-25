@@ -31,16 +31,16 @@ import 'package:account_app/features/professions/add_project_transaction_screen.
 
 class ReceiptDialogHelper {
   static Future<void> showReceiptDialog(
-    BuildContext context, {
-    required Transaction transaction,
-    Account? account,
-    AppNotification? notification,
-    bool isLocalTransaction = true,
-    bool showAddButton = false,
-    bool showDeleteButton = false,
-    VoidCallback? onAddPressed,
-    VoidCallback? onDeletePressed,
-  }) async {
+      BuildContext context, {
+        required Transaction transaction,
+        Account? account,
+        AppNotification? notification,
+        bool isLocalTransaction = true,
+        bool showAddButton = false,
+        bool showDeleteButton = false,
+        VoidCallback? onAddPressed,
+        VoidCallback? onDeletePressed,
+      }) async {
     return showDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -150,10 +150,10 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
     final partyPhone = isIncomingNotification
         ? senderPhone
         : (addedSenderPhone.isNotEmpty
-            ? addedSenderPhone
-            : (accountPhone.isNotEmpty
-                ? accountPhone
-                : widget.transaction.customerPhone ?? ''));
+        ? addedSenderPhone
+        : (accountPhone.isNotEmpty
+        ? accountPhone
+        : widget.transaction.customerPhone ?? ''));
 
     // ⭐ اصول: اوپر ہمیشہ میرا نام (Business Name)، نیچے بنام میں پارٹی کا نام
     _businessName = userName;
@@ -222,14 +222,14 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
       final profile = snapshot.data();
       setState(() {
         final profileName = (profile?['displayName'] ??
-                profile?['name'] ??
-                profile?['businessName'] ??
-                '')
+            profile?['name'] ??
+            profile?['businessName'] ??
+            '')
             .toString()
             .trim();
         final profilePhone = (profile?['phoneNumber'] ?? '').toString();
         final profileAddress =
-            (profile?['businessAddress'] ?? '').toString().trim();
+        (profile?['businessAddress'] ?? '').toString().trim();
 
         // ⭐ ہمیشہ اوپر میرا نام (profileName) رہے گا
         if (profileName.isNotEmpty) _businessName = profileName;
@@ -324,7 +324,6 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
     _initReceiptData(context);
     final languageService = Provider.of<LanguageService>(context);
     final isUrdu = languageService.isUrdu;
-    final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
 
     final db = Provider.of<DatabaseService>(context, listen: false);
     final savedEntry = _savedCounterpartyTransaction(db);
@@ -343,57 +342,41 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
         constraints: const BoxConstraints(maxWidth: 420),
         child: Container(
           decoration: BoxDecoration(
+            // 🎨 صرف سلیٹ کلر
             color: AppTheme.backgroundColor,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+                color: Colors.black.withValues(alpha: 0.20),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
               ),
             ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ═══ Header — لیبل + "کھاتے میں شامل کریں" ایک لائن میں ═══
+              // ═══ ہیڈر: "رسید" ═══
               Padding(
-                padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: UrduAwareText(
-                        _showCounterpartyOnTop &&
-                                widget.notification?.data?['senderName'] != null
-                            ? (isUrdu
-                                ? 'بل کی رسید (از: ${widget.notification!.data!['senderName']})'
-                                : 'Transaction Receipt (From: ${widget.notification!.data!['senderName']})')
-                            : (targetAccount != null && _showCounterpartyOnTop
-                                ? (isUrdu
-                                    ? 'بل کی رسید (از: ${targetAccount.name})'
-                                    : 'Transaction Receipt (From: ${targetAccount.name})')
-                                : (isUrdu
-                                    ? 'بل کی رسید'
-                                    : 'Transaction Receipt')),
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w800,
-                          color: AppTheme.darkColor,
-                          fontFamily: fontFamily,
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
+                child: Center(
+                  child: Text(
+                    isUrdu ? 'رسید' : 'Receipt',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.verifiedGold,
+                      letterSpacing: 2,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black26,
+                          blurRadius: 6,
+                          offset: Offset(0, 2),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      ],
                     ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 22),
-                      color: AppTheme.textSecondary,
-                      onPressed: () => Navigator.of(context).pop(),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
+                  ),
                 ),
               ),
 
@@ -404,38 +387,38 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
                   child: Screenshot(
                     controller: _screenshotController,
                     child: savedEntry == null
-                        // کوئی کھاتے کی انٹری نہیں → Base (Outgoing)
+                    // کوئی کھاتے کی انٹری نہیں → Base (Outgoing)
                         ? BaseLedgerWidget(
-                            transaction: widget.transaction,
-                            account: targetAccount,
-                            businessName: _businessName,
-                            businessPhone: _businessPhone,
-                            businessAddress: _businessAddress,
-                            billedToName: _billedToName,
-                            billedToPhone: _billedToPhone,
-                            isIncomingReceipt: _showCounterpartyOnTop,
-                          )
+                      transaction: widget.transaction,
+                      account: targetAccount,
+                      businessName: _businessName,
+                      businessPhone: _businessPhone,
+                      businessAddress: _businessAddress,
+                      billedToName: _billedToName,
+                      billedToPhone: _billedToPhone,
+                      isIncomingReceipt: _showCounterpartyOnTop,
+                    )
                         : showSavedEntry
-                            // کھاتے کی انٹری — Incoming (پارٹی کی طرف)
-                            ? IncomingReceiptWidget(
-                                transaction: savedEntry,
-                                account: targetAccount,
-                                businessName: _businessName,
-                                businessPhone: _businessPhone,
-                                businessAddress: _businessAddress,
-                                billedToName: _billedToName,
-                                billedToPhone: _billedToPhone,
-                              )
-                            // اصل ٹرانزیکشن — Outgoing (میری طرف)
-                            : OutgoingReceiptWidget(
-                                transaction: originalTransaction,
-                                account: null,
-                                businessName: _businessName,
-                                businessPhone: _businessPhone,
-                                businessAddress: _businessAddress,
-                                billedToName: _billedToName,
-                                billedToPhone: _billedToPhone,
-                              ),
+                    // کھاتے کی انٹری — Incoming (پارٹی کی طرف)
+                        ? IncomingReceiptWidget(
+                      transaction: savedEntry,
+                      account: targetAccount,
+                      businessName: _businessName,
+                      businessPhone: _businessPhone,
+                      businessAddress: _businessAddress,
+                      billedToName: _billedToName,
+                      billedToPhone: _billedToPhone,
+                    )
+                    // اصل ٹرانزیکشن — Outgoing (میری طرف)
+                        : OutgoingReceiptWidget(
+                      transaction: originalTransaction,
+                      account: null,
+                      businessName: _businessName,
+                      businessPhone: _businessPhone,
+                      businessAddress: _businessAddress,
+                      billedToName: _billedToName,
+                      billedToPhone: _billedToPhone,
+                    ),
                   ),
                 ),
               ),
@@ -443,9 +426,13 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
               // ═══ Bottom buttons ═══
               Container(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-                decoration: const BoxDecoration(
-                  border: Border(
-                    top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  border: const Border(
+                    top: BorderSide(color: Colors.white24, width: 1),
+                  ),
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(24),
                   ),
                 ),
                 child: Column(
@@ -502,7 +489,7 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
                           child: AppButton(
                             text: isUrdu ? 'شیئر کریں' : 'Share',
                             onPressed:
-                                _isSharing ? null : () => _shareReceipt(isUrdu),
+                            _isSharing ? null : () => _shareReceipt(isUrdu),
                             icon: PhosphorIcons.shareNetwork(),
                             color: AppTheme.themeColor,
                             size: AppButtonSize.small,

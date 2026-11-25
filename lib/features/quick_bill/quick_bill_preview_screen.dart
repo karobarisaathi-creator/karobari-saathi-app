@@ -179,10 +179,12 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
     final databaseService =
         Provider.of<DatabaseService>(context, listen: false);
     final cashCustomerId = QuickBillConstants.cashCustomerAccountId;
-    _isCashCustomer = transaction.accountId == cashCustomerId;
-    _selectedAccount = _isCashCustomer
-        ? null
-        : databaseService.getAccount(transaction.accountId);
+    final transactionAccount =
+        databaseService.getAccount(transaction.accountId);
+    _isCashCustomer = transaction.accountId == cashCustomerId ||
+        (transactionAccount != null &&
+            QuickBillConstants.isCashCustomerAccount(transactionAccount));
+    _selectedAccount = _isCashCustomer ? null : transactionAccount;
     if (_customerPhoneController.text.trim().isEmpty &&
         _selectedAccount != null) {
       _customerPhoneController.text =
@@ -522,8 +524,8 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
         if (account.phone.trim().isEmpty) {
           followUpFailures.add(
             isUrdu
-                ? 'پارٹی کا فون نمبر موجود نہیں؛ اطلاع نہیں بھیجی جا سکی۔'
-                : 'Party phone number is missing; no notice was sent.',
+                ? 'پارٹی کا فون نمبر نہیں؛ سرگرمی فیڈ میں محفوظ نہیں ہو سکتی۔'
+                : 'Party phone number is missing; activity cannot be added to the feed.',
           );
         } else if (cloudSynced) {
           try {
@@ -545,6 +547,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
               discountAmount: transaction.discountAmount,
               discountPercent: transaction.discountPercent,
               discountReason: transaction.discountReason,
+              isQuickBill: true,
             );
             switch (result) {
               case PartyNotificationResult.savedToInbox:
@@ -552,20 +555,20 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
               case PartyNotificationResult.recipientNotFound:
                 followUpFailures.add(
                   isUrdu
-                      ? 'پارٹی کا ایپ اکاؤنٹ نہیں ملا؛ اطلاع نہیں بھیجی گئی۔'
-                      : 'Party app account not found; no notice was sent.',
+                      ? 'پارٹی کا ایپ اکاؤنٹ نہیں ملا؛ سرگرمی فیڈ میں نہیں آ سکی۔'
+                      : 'Party app account not found; activity was not added to the feed.',
                 );
               case PartyNotificationResult.sameUser:
                 followUpFailures.add(
                   isUrdu
-                      ? 'یہ آپ کا اپنا نمبر ہے؛ اطلاع نہیں بھیجی گئی۔'
-                      : 'This is your own number; no notice was sent.',
+                      ? 'یہ آپ کا اپنا نمبر ہے؛ سرگرمی اپنے ہی فیڈ میں نہیں بھیجی گئی۔'
+                      : 'This is your own number; activity was not shared back to you.',
                 );
               case PartyNotificationResult.notSignedIn:
                 followUpFailures.add(
                   isUrdu
-                      ? 'سائن اِن نہ ہونے کے باعث اطلاع نہیں بھیجی گئی۔'
-                      : 'Not signed in; no notice was sent.',
+                      ? 'سائن اِن نہ ہونے کے باعث سرگرمی فیڈ میں محفوظ نہیں ہوئی۔'
+                      : 'Not signed in; activity was not added to the feed.',
                 );
             }
           } catch (error, stackTrace) {
@@ -578,11 +581,11 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
             followUpFailures.add(
               queued
                   ? (isUrdu
-                      ? 'پارٹی کی اطلاع قطار میں محفوظ؛ انٹرنیٹ ملنے پر دوبارہ بھیجی جائے گی۔'
-                      : 'Party notice queued; it will retry when internet is available.')
+                      ? 'سرگرمی محفوظ ہے؛ انٹرنیٹ ملنے پر پارٹی کی فیڈ میں شامل ہو جائے گی۔'
+                      : 'Activity queued; it will appear in the party feed when online.')
                   : (isUrdu
-                      ? 'پارٹی کو اطلاع نہیں بھیجی جا سکی اور دوبارہ کوشش بھی محفوظ نہیں ہوئی۔'
-                      : 'Could not notify the party or save a retry.'),
+                      ? 'سرگرمی فیڈ میں شامل نہیں ہو سکی اور دوبارہ کوشش بھی محفوظ نہیں ہوئی۔'
+                      : 'Could not add the activity to the feed or queue a retry.'),
             );
           }
         } else {
@@ -593,11 +596,11 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
           followUpFailures.add(
             queued
                 ? (isUrdu
-                    ? 'پارٹی کی اطلاع قطار میں محفوظ؛ انٹرنیٹ ملنے پر دوبارہ بھیجی جائے گی۔'
-                    : 'Party notice queued; it will retry when internet is available.')
+                    ? 'سرگرمی محفوظ ہے؛ انٹرنیٹ ملنے پر پارٹی کی فیڈ میں شامل ہو جائے گی۔'
+                    : 'Activity queued; it will appear in the party feed when online.')
                 : (isUrdu
-                    ? 'پارٹی کی اطلاع دوبارہ بھیجنے کے لیے محفوظ نہیں ہو سکی۔'
-                    : 'Could not save the party notice for retry.'),
+                    ? 'سرگرمی دوبارہ شامل کرنے کے لیے محفوظ نہیں ہو سکی۔'
+                    : 'Could not save the activity for retry.'),
           );
         }
       }
@@ -652,9 +655,7 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                 ? (isUrdu ? 'رعایت بند کریں' : 'Close discount')
                 : (isUrdu ? 'رعایت' : 'Discount'),
             icon: Icon(
-              _isDiscountExpanded
-                  ? Icons.close_rounded
-                  : PhosphorIcons.tag(),
+              _isDiscountExpanded ? Icons.close_rounded : PhosphorIcons.tag(),
               color: AppTheme.themeColor,
             ),
             onPressed: () {
@@ -701,7 +702,8 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                         children: [
                           Row(
                             children: [
-                              Icon(PhosphorIcons.tag(PhosphorIconsStyle.fill), size: 14, color: const Color(0xFFD97706)),
+                              Icon(PhosphorIcons.tag(PhosphorIconsStyle.fill),
+                                  size: 14, color: const Color(0xFFD97706)),
                               const SizedBox(width: 6),
                               UrduAwareText(
                                 isUrdu ? 'ڈسکاونٹ سیٹنگ' : 'Discount Setting',
@@ -715,11 +717,13 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
                             ],
                           ),
                           InkWell(
-                            onTap: () => setState(() => _isDiscountExpanded = false),
+                            onTap: () =>
+                                setState(() => _isDiscountExpanded = false),
                             borderRadius: BorderRadius.circular(20),
                             child: const Padding(
                               padding: EdgeInsets.all(4),
-                              child: Icon(Icons.close, size: 16, color: Color(0xFFD97706)),
+                              child: Icon(Icons.close,
+                                  size: 16, color: Color(0xFFD97706)),
                             ),
                           ),
                         ],
@@ -1223,53 +1227,52 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
             separatorBuilder: (_, __) => const SizedBox(width: 6),
             itemBuilder: (context, index) {
               final preset = _discountPresets[index];
-                final isActive = _discountInputValue == preset &&
-                    _discountType == _DiscountType.percentage;
-                return GestureDetector(
-                  onTap: () => _selectDiscountPreset(
-                    preset,
-                    popupSetState: popupSetState,
+              final isActive = _discountInputValue == preset &&
+                  _discountType == _DiscountType.percentage;
+              return GestureDetector(
+                onTap: () => _selectDiscountPreset(
+                  preset,
+                  popupSetState: popupSetState,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 0,
                   ),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 0,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isActive ? const Color(0xFFD97706) : Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: isActive
+                          ? const Color(0xFFD97706)
+                          : const Color(0xFFD97706).withValues(alpha: 0.30),
+                      width: 1.5,
                     ),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: isActive ? const Color(0xFFD97706) : Colors.white,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: isActive
-                            ? const Color(0xFFD97706)
-                            : const Color(0xFFD97706).withValues(alpha: 0.30),
-                        width: 1.5,
-                      ),
-                      boxShadow: isActive
-                          ? [
-                              BoxShadow(
-                                color: const Color(0xFFD97706)
-                                    .withValues(alpha: 0.30),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: UrduAwareText(
-                      '${preset.toStringAsFixed(0)}%',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
-                        color:
-                            isActive ? Colors.white : const Color(0xFFD97706),
-                      ),
+                    boxShadow: isActive
+                        ? [
+                            BoxShadow(
+                              color: const Color(0xFFD97706)
+                                  .withValues(alpha: 0.30),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: UrduAwareText(
+                    '${preset.toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      color: isActive ? Colors.white : const Color(0xFFD97706),
                     ),
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
+        ),
 
         // Custom input
         Padding(

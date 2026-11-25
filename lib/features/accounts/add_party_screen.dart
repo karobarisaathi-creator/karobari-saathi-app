@@ -27,7 +27,8 @@ class AddPartyScreen extends StatefulWidget {
   final Account? partyToEdit;
   final String? initialCategory;
 
-  const AddPartyScreen({Key? key, this.partyToEdit, this.initialCategory}) : super(key: key);
+  const AddPartyScreen({Key? key, this.partyToEdit, this.initialCategory})
+      : super(key: key);
 
   @override
   _AddPartyScreenState createState() => _AddPartyScreenState();
@@ -42,6 +43,8 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
   late String _selectedCategory;
   File? _profileImage;
   String? _remoteImageUrl; // For profiles found via global lookup
+  String? _selectedProfession;
+  String? _selectedProfessionPhone;
   String? _selectedPhoneNumber;
   bool _isLoading = false;
   bool _isSearchingProfile = false;
@@ -57,13 +60,13 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
     _nameController.addListener(_updatePreview);
     _addressController.addListener(_updatePreview);
     _phoneController.addListener(_onPhoneChanged);
-    
+
     if (widget.partyToEdit != null) {
       _nameController.text = widget.partyToEdit!.name;
       _phoneController.text =
           Formatters.formatPhoneNumber(widget.partyToEdit!.phone);
       _addressController.text = widget.partyToEdit!.address ?? '';
-      
+      _selectedProfession = widget.partyToEdit!.profession;
       _selectedCategory = widget.partyToEdit!.category;
 
       if (widget.partyToEdit!.profileImage != null) {
@@ -91,9 +94,14 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
   void _onPhoneChanged() {
     if (_isFormattingPhone) return;
     _updatePreview();
-    
+
     final raw = _phoneController.text;
     final digitsOnly = raw.replaceAll(RegExp(r'\D'), '');
+    if (_selectedProfessionPhone != null &&
+        !Formatters.phoneNumbersMatch(_selectedProfessionPhone!, raw)) {
+      _selectedProfession = null;
+      _selectedProfessionPhone = null;
+    }
     if (digitsOnly.length >= 10) {
       final formatted = Formatters.formatPhoneNumber(raw);
       if (formatted != raw && formatted.isNotEmpty) {
@@ -127,7 +135,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
     setState(() => _isSearchingProfile = true);
     final dbService = Provider.of<DatabaseService>(context, listen: false);
     final profile = await dbService.findPublicProfileByPhone(phone);
-    
+
     if (mounted) {
       setState(() {
         _foundProfile = profile;
@@ -144,12 +152,13 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
         _addressController.text = _foundProfile!['address']!;
       }
       _remoteImageUrl = _foundProfile!['photoUrl'];
+      final profession = _foundProfile!['profession']?.trim() ?? '';
+      _selectedProfession = profession.isEmpty ? null : profession;
+      _selectedProfessionPhone = _phoneController.text;
       _profileImage = null; // Clear local image if using remote
       _foundProfile = null; // Hide the lookup card
     });
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -170,7 +179,9 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                 children: [
                   IconButton(
                     icon: Icon(
-                      isUrdu ? PhosphorIcons.arrowRight() : PhosphorIcons.arrowLeft(),
+                      isUrdu
+                          ? PhosphorIcons.arrowRight()
+                          : PhosphorIcons.arrowLeft(),
                       color: AppTheme.darkColor,
                     ),
                     onPressed: () => Navigator.pop(context),
@@ -178,7 +189,9 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                   ),
                   Expanded(
                     child: UrduAwareText(
-                      widget.partyToEdit != null ? l10n.editParty : l10n.addParty,
+                      widget.partyToEdit != null
+                          ? l10n.editParty
+                          : l10n.addParty,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -194,7 +207,8 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -204,15 +218,21 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                       ImageSelectorField(
                         isProfile: true,
                         customSize: 190.0,
-                        selectedFiles: _profileImage != null ? [_profileImage!] : [],
-                        remoteUrls: _remoteImageUrl != null && _remoteImageUrl!.isNotEmpty ? [_remoteImageUrl!] : [],
+                        selectedFiles:
+                            _profileImage != null ? [_profileImage!] : [],
+                        remoteUrls: _remoteImageUrl != null &&
+                                _remoteImageUrl!.isNotEmpty
+                            ? [_remoteImageUrl!]
+                            : [],
                         onFilesChanged: (files) {
                           setState(() {
-                            _profileImage = files.isNotEmpty ? files.first : null;
+                            _profileImage =
+                                files.isNotEmpty ? files.first : null;
                             if (files.isNotEmpty) _remoteImageUrl = null;
                           });
                         },
-                        onRemoteRemoved: (_) => setState(() => _remoteImageUrl = null),
+                        onRemoteRemoved: (_) =>
+                            setState(() => _remoteImageUrl = null),
                       ),
                       const SizedBox(height: 24),
 
@@ -225,9 +245,10 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                               color: AppTheme.lightColor,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: _foundProfile != null 
-                                    ? Colors.green.withValues(alpha: 0.5) 
-                                    : AppTheme.themeColor.withValues(alpha: 0.3),
+                                color: _foundProfile != null
+                                    ? Colors.green.withValues(alpha: 0.5)
+                                    : AppTheme.themeColor
+                                        .withValues(alpha: 0.3),
                                 width: 1.2,
                               ),
                               boxShadow: [
@@ -243,34 +264,74 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                               child: Column(
                                 children: [
                                   (() {
-                                    final selectedCatData = _partyCategories.firstWhere(
+                                    final selectedCatData =
+                                        _partyCategories.firstWhere(
                                       (cat) => cat.id == _selectedCategory,
                                       orElse: () => _partyCategories.first,
                                     );
-                                    final categoryDisplay = isUrdu ? selectedCatData.labelUr : selectedCatData.labelEn;
+                                    final categoryDisplay = isUrdu
+                                        ? selectedCatData.labelUr
+                                        : selectedCatData.labelEn;
                                     return ProfileInfoWidget(
-                                      name: (_foundProfile != null && _nameController.text.isEmpty)
-                                          ? (_foundProfile!['name'] ?? l10n.partyName)
-                                          : (_nameController.text.isEmpty ? l10n.partyName : _nameController.text),
-                                      phone: _phoneController.text.isEmpty ? '03000000000' : _phoneController.text,
-                                      profileImage: _remoteImageUrl ?? (_foundProfile != null && _profileImage == null ? _foundProfile!['photoUrl'] : null) ?? _profileImage?.path ?? widget.partyToEdit?.profileImage,
+                                      name: (_foundProfile != null &&
+                                              _nameController.text.isEmpty)
+                                          ? (_foundProfile!['name'] ??
+                                              l10n.partyName)
+                                          : (_nameController.text.isEmpty
+                                              ? l10n.partyName
+                                              : _nameController.text),
+                                      phone: _phoneController.text.isEmpty
+                                          ? '03000000000'
+                                          : _phoneController.text,
+                                      profileImage: _remoteImageUrl ??
+                                          (_foundProfile != null &&
+                                                  _profileImage == null
+                                              ? _foundProfile!['photoUrl']
+                                              : null) ??
+                                          _profileImage?.path ??
+                                          widget.partyToEdit?.profileImage,
                                       category: categoryDisplay,
                                       address: _foundProfile != null
-                                          ? (_foundProfile!['address']?.isNotEmpty == true
+                                          ? (_foundProfile!['address']
+                                                      ?.isNotEmpty ==
+                                                  true
                                               ? _foundProfile!['address']
-                                              : (isUrdu ? 'پہلے سے موجود اکاؤنٹ' : 'Existing Account'))
-                                          : (_addressController.text.isNotEmpty ? _addressController.text : null),
+                                              : (isUrdu
+                                                  ? 'پہلے سے موجود اکاؤنٹ'
+                                                  : 'Existing Account'))
+                                          : (_addressController.text.isNotEmpty
+                                              ? _addressController.text
+                                              : null),
                                       isLarge: true,
                                       isVerticalCategory: true,
                                       customSize: 90,
                                     );
                                   })(),
+                                  if ((_selectedProfession ??
+                                              _foundProfile?['profession'])
+                                          ?.trim()
+                                          .isNotEmpty ==
+                                      true) ...[
+                                    const SizedBox(height: 8),
+                                    UrduAwareText(
+                                      '${isUrdu ? 'پیشہ' : 'Profession'}: '
+                                      '${_selectedProfession ?? _foundProfile!['profession']}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.textSecondary,
+                                        fontFamily: fontFamily,
+                                      ),
+                                    ),
+                                  ],
                                   if (_foundProfile != null) ...[
                                     const Divider(height: 24, thickness: 0.5),
                                     AppButton(
-                                      text: isUrdu ? 'یہ معلومات استعمال کریں' : 'Use this information',
+                                      text: isUrdu
+                                          ? 'یہ معلومات استعمال کریں'
+                                          : 'Use this information',
                                       onPressed: _useFoundProfile,
-                                      icon: PhosphorIcons.checkCircle(PhosphorIconsStyle.fill),
+                                      icon: PhosphorIcons.checkCircle(
+                                          PhosphorIconsStyle.fill),
                                       isFullWidth: true,
                                       color: Colors.green,
                                       size: AppButtonSize.large,
@@ -282,33 +343,50 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                           ),
                           if (_foundProfile != null)
                             Positioned.directional(
-                              textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
+                              textDirection: isUrdu
+                                  ? TextDirection.rtl
+                                  : TextDirection.ltr,
                               top: 0,
                               end: 0,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: Colors.green,
                                   borderRadius: BorderRadius.only(
-                                    topRight: isUrdu ? Radius.zero : const Radius.circular(16),
-                                    bottomLeft: isUrdu ? Radius.zero : const Radius.circular(16),
-                                    topLeft: isUrdu ? const Radius.circular(16) : Radius.zero,
-                                    bottomRight: isUrdu ? const Radius.circular(16) : Radius.zero,
+                                    topRight: isUrdu
+                                        ? Radius.zero
+                                        : const Radius.circular(16),
+                                    bottomLeft: isUrdu
+                                        ? Radius.zero
+                                        : const Radius.circular(16),
+                                    topLeft: isUrdu
+                                        ? const Radius.circular(16)
+                                        : Radius.zero,
+                                    bottomRight: isUrdu
+                                        ? const Radius.circular(16)
+                                        : Radius.zero,
                                   ),
                                   boxShadow: [
-                                    BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4)
+                                    BoxShadow(
+                                        color:
+                                            Colors.black.withValues(alpha: 0.1),
+                                        blurRadius: 4)
                                   ],
                                 ),
                                 child: UrduAwareText(
                                   isUrdu ? 'اکاؤنٹ ملا' : 'Account Found',
-                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold),
                                 ),
                               ),
                             ),
                         ],
                       ),
                       const SizedBox(height: 16),
-                
+
                       // Fields Container Card (Profile Screen style with embedded Category Chips)
                       Container(
                         clipBehavior: Clip.antiAlias,
@@ -329,7 +407,8 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                           children: [
                             // Category Selector Chips inside Card (Left-Right Scrolling)
                             Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 10, horizontal: 8),
                               child: SizedBox(
                                 height: 42,
                                 child: ListView.builder(
@@ -337,9 +416,11 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                                   itemCount: _partyCategories.length,
                                   itemBuilder: (context, index) {
                                     final cat = _partyCategories[index];
-                                    final isSelected = _selectedCategory == cat.id;
+                                    final isSelected =
+                                        _selectedCategory == cat.id;
                                     return Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 4),
                                       child: CategoryChip(
                                         categoryData: cat,
                                         isSelected: isSelected,
@@ -385,7 +466,8 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                                   ),
                                 ),
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 8),
                                   child: IconButton(
                                     onPressed: () => _showPhoneSelectionDialog(
                                         isUrdu, fontFamily, fontWeight),
@@ -485,7 +567,8 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
     required FontWeight fontWeight,
     Widget? suffix,
   }) {
-    final languageService = Provider.of<LanguageService>(context, listen: false);
+    final languageService =
+        Provider.of<LanguageService>(context, listen: false);
     final isUrdu = languageService.isUrdu;
 
     return TextFormField(
@@ -518,18 +601,23 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
         focusedBorder: InputBorder.none,
         errorBorder: InputBorder.none,
         focusedErrorBorder: InputBorder.none,
-        prefixIcon: icon != null ? Icon(icon, color: AppTheme.themeColor, size: 20) : null,
+        prefixIcon: icon != null
+            ? Icon(icon, color: AppTheme.themeColor, size: 20)
+            : null,
         suffixIcon: suffix,
         alignLabelWithHint: maxLines > 1,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
       validator: validator,
     );
   }
 
-  Future<void> _showPhoneSelectionDialog(bool isUrdu, String fontFamily, FontWeight fontWeight) async {
+  Future<void> _showPhoneSelectionDialog(
+      bool isUrdu, String fontFamily, FontWeight fontWeight) async {
     if (await FlutterContacts.requestPermission()) {
-      List<Contact> contacts = await FlutterContacts.getContacts(withProperties: true, withPhoto: false);
+      List<Contact> contacts = await FlutterContacts.getContacts(
+          withProperties: true, withPhoto: false);
       contacts = contacts.where((c) => c.phones.isNotEmpty).toList();
 
       showDialog(
@@ -568,21 +656,22 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final databaseService = Provider.of<DatabaseService>(context, listen: false);
+      final databaseService =
+          Provider.of<DatabaseService>(context, listen: false);
 
       // Check for duplicate phone number
       final existingAccounts = databaseService.getAccounts();
       final enteredPhone = _phoneController.text.trim();
       final originalPhone = _selectedPhoneNumber ?? widget.partyToEdit?.phone;
       final partyPhone = originalPhone != null &&
-            Formatters.phoneNumbersMatch(originalPhone, enteredPhone)
-        ? originalPhone
-        : enteredPhone;
+              Formatters.phoneNumbersMatch(originalPhone, enteredPhone)
+          ? originalPhone
+          : enteredPhone;
       final isDuplicate = existingAccounts.any(
-      (account) =>
-          Formatters.phoneNumbersMatch(account.phone, enteredPhone) &&
-          (widget.partyToEdit == null ||
-              account.id != widget.partyToEdit!.id),
+        (account) =>
+            Formatters.phoneNumbersMatch(account.phone, enteredPhone) &&
+            (widget.partyToEdit == null ||
+                account.id != widget.partyToEdit!.id),
       );
 
       if (isDuplicate) {
@@ -609,7 +698,9 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
         isConnected = false;
       }
 
-      String? finalImagePath = _remoteImageUrl ?? _profileImage?.path ?? widget.partyToEdit?.profileImage;
+      String? finalImagePath = _remoteImageUrl ??
+          _profileImage?.path ??
+          widget.partyToEdit?.profileImage;
 
       Account? savedParty;
       if (widget.partyToEdit != null) {
@@ -617,8 +708,11 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
         final updatedParty = widget.partyToEdit!.copyWith(
           name: _nameController.text,
           phone: partyPhone,
-          address: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
+          address: _addressController.text.trim().isNotEmpty
+              ? _addressController.text.trim()
+              : null,
           category: _selectedCategory,
+          profession: _selectedProfession,
           profileImage: finalImagePath,
           updatedAt: DateTime.now(),
         );
@@ -633,8 +727,11 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           name: _nameController.text,
           phone: partyPhone,
-          address: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
-          category: _selectedCategory,
+          address: _addressController.text.trim().isNotEmpty
+              ? _addressController.text.trim()
+              : null,
+          accountType: _selectedCategory,
+          profession: _selectedProfession,
           initialBalance: 0.0,
           balanceType: 'receivable',
           balance: 0.0,
@@ -645,13 +742,13 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
         );
 
         await databaseService.addAccount(party);
-        
+
         if (isConnected) {
-           try {
-             await syncService.syncNewAccount(party);
-           } catch (e) {
-             print("Sync error: $e");
-           }
+          try {
+            await syncService.syncNewAccount(party);
+          } catch (e) {
+            print("Sync error: $e");
+          }
         }
 
         AppToast.success(
@@ -702,7 +799,8 @@ class _ContactSelectionDialog extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  __ContactSelectionDialogState createState() => __ContactSelectionDialogState();
+  __ContactSelectionDialogState createState() =>
+      __ContactSelectionDialogState();
 }
 
 class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
@@ -721,7 +819,8 @@ class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
     setState(() {
       _filteredContacts = widget.contacts.where((contact) {
         final name = contact.displayName.toLowerCase();
-        final phone = contact.phones.isNotEmpty ? contact.phones.first.number : '';
+        final phone =
+            contact.phones.isNotEmpty ? contact.phones.first.number : '';
         return name.contains(query) ||
             Formatters.phoneMatchesSearch(phone, query);
       }).toList();
@@ -760,11 +859,16 @@ class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
               ),
               child: TextField(
                 controller: _searchController,
-                style: const TextStyle(color: AppTheme.darkColor, fontFamily: ''),
+                style:
+                    const TextStyle(color: AppTheme.darkColor, fontFamily: ''),
                 decoration: InputDecoration(
                   hintText: widget.isUrdu ? 'تلاش کریں...' : 'Search...',
-                  hintStyle: TextStyle(fontFamily: widget.fontFamily, color: Colors.grey, fontWeight: widget.fontWeight),
-                  prefixIcon: Icon(PhosphorIcons.magnifyingGlass(), color: AppTheme.themeColor, size: 20),
+                  hintStyle: TextStyle(
+                      fontFamily: widget.fontFamily,
+                      color: Colors.grey,
+                      fontWeight: widget.fontWeight),
+                  prefixIcon: Icon(PhosphorIcons.magnifyingGlass(),
+                      color: AppTheme.themeColor, size: 20),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -775,8 +879,13 @@ class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
               child: _filteredContacts.isEmpty
                   ? Center(
                       child: UrduAwareText(
-                        widget.isUrdu ? 'کوئی رابطہ نہیں ملا' : 'No contacts found',
-                        style: TextStyle(fontFamily: widget.fontFamily, color: AppTheme.textSecondary, fontWeight: widget.fontWeight),
+                        widget.isUrdu
+                            ? 'کوئی رابطہ نہیں ملا'
+                            : 'No contacts found',
+                        style: TextStyle(
+                            fontFamily: widget.fontFamily,
+                            color: AppTheme.textSecondary,
+                            fontWeight: widget.fontWeight),
                       ),
                     )
                   : ListView.builder(
@@ -785,19 +894,27 @@ class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
                       itemCount: _filteredContacts.length,
                       itemBuilder: (context, index) {
                         Contact contact = _filteredContacts[index];
-                        String phone = contact.phones.isNotEmpty ? contact.phones.first.number : (widget.isUrdu ? 'نمبر موجود نہیں' : 'No number');
+                        String phone = contact.phones.isNotEmpty
+                            ? contact.phones.first.number
+                            : (widget.isUrdu ? 'نمبر موجود نہیں' : 'No number');
                         return Container(
                           margin: const EdgeInsets.symmetric(vertical: 4),
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.withOpacity(0.1)),
+                            border:
+                                Border.all(color: Colors.grey.withOpacity(0.1)),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: AppTheme.themeColor.withOpacity(0.1),
+                              backgroundColor:
+                                  AppTheme.themeColor.withOpacity(0.1),
                               child: UrduAwareText(
-                                contact.displayName.isNotEmpty ? contact.displayName[0] : '?',
-                                style: const TextStyle(color: AppTheme.themeColor, fontWeight: FontWeight.bold),
+                                contact.displayName.isNotEmpty
+                                    ? contact.displayName[0]
+                                    : '?',
+                                style: const TextStyle(
+                                    color: AppTheme.themeColor,
+                                    fontWeight: FontWeight.bold),
                               ),
                             ),
                             title: UrduAwareText(
@@ -805,14 +922,21 @@ class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
                               style: TextStyle(
                                 fontFamily: widget.fontFamily,
                                 color: AppTheme.darkColor,
-                                fontWeight: widget.isUrdu ? FontWeight.bold : FontWeight.normal,
+                                fontWeight: widget.isUrdu
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                             ),
                             subtitle: UrduAwareText(
                               Formatters.displayPhone(phone),
-                              style: const TextStyle(fontFamily: '', fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                  fontFamily: '',
+                                  fontSize: 12,
+                                  color: AppTheme.textSecondary,
+                                  fontWeight: FontWeight.bold),
                             ),
-                            onTap: () => widget.onSelect(contact.displayName, phone),
+                            onTap: () =>
+                                widget.onSelect(contact.displayName, phone),
                           ),
                         );
                       },
@@ -826,7 +950,10 @@ class __ContactSelectionDialogState extends State<_ContactSelectionDialog> {
           onPressed: () => Navigator.pop(context),
           child: UrduAwareText(
             widget.isUrdu ? 'منسوخ' : 'Cancel',
-            style: TextStyle(fontFamily: widget.fontFamily, color: AppTheme.expenseColor, fontWeight: widget.fontWeight),
+            style: TextStyle(
+                fontFamily: widget.fontFamily,
+                color: AppTheme.expenseColor,
+                fontWeight: widget.fontWeight),
           ),
         ),
       ],

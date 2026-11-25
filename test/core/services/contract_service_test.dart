@@ -229,6 +229,46 @@ void main() {
     );
   });
 
+  test('reassigning a worker account updates linked contract labor records',
+      () async {
+    final now = DateTime(2026, 11, 20);
+    final contract = ContractModel(
+      id: 'worker-id-migration',
+      partyId: 'customer',
+      partyName: 'Customer',
+      title: 'Kitchen',
+      totalAmount: 10000,
+      startDate: now,
+      laborPayments: [
+        ContractLaborPayment(
+          id: 'labor-1',
+          workerName: 'Ali',
+          amount: 500,
+          date: now,
+          note: 'Wage',
+          workerId: 'old-worker-id',
+          workerPayrollPaymentId: 'payment-1',
+        ),
+      ],
+      createdAt: now,
+      updatedAt: now,
+    );
+    await contractService.addContract(contract);
+
+    await contractService.reassignPayrollWorkerId(
+      fromWorkerId: 'old-worker-id',
+      toWorkerId: 'worker-account-id',
+    );
+
+    final laborPayment = contractService.contracts
+        .singleWhere((c) => c.id == contract.id)
+        .laborPayments
+        .single;
+    expect(laborPayment.workerId, 'worker-account-id');
+    expect(laborPayment.workerPayrollPaymentId, 'payment-1');
+    expect(laborPayment.amount, 500);
+  });
+
   test('deleting a contract unlinks but keeps its expense transaction',
       () async {
     final now = DateTime(2026, 11, 20);

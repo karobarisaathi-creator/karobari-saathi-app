@@ -5,6 +5,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 
 class MainBottomNavBar extends StatefulWidget {
@@ -26,6 +27,7 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
   static const int _pageCount = 25;
   static const int _middlePage = 10;
   static const int _recenterThreshold = 4;
+  static const String _savedNavScrollIndexKey = 'last_scrolled_nav_index';
 
   bool _isOffline = true;
   bool _hasConnectivityState = false;
@@ -46,32 +48,35 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
       viewportFraction: 1 / _destinationCount,
     );
     _initConnectivityListener();
+    _loadSavedNavScrollPosition();
   }
 
-  @override
-  void didUpdateWidget(covariant MainBottomNavBar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedIndex != widget.selectedIndex &&
-        _pageController.hasClients) {
-      final currentPage =
-          (_pageController.page ?? _centeredPage.toDouble()).round();
-      final currentIndex = currentPage % _destinationCount;
-      final selectedIndex =
-          widget.selectedIndex.clamp(0, _destinationCount - 1).toInt();
-      var pageDelta = (selectedIndex - currentIndex + _destinationCount) %
-          _destinationCount;
-      if (pageDelta > _destinationCount ~/ 2) {
-        pageDelta -= _destinationCount;
+  Future<void> _loadSavedNavScrollPosition() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedIndex = prefs.getInt(_savedNavScrollIndexKey);
+      if (savedIndex != null && savedIndex >= 0 && savedIndex < _destinationCount) {
+        final targetPage = _middlePage + savedIndex;
+        if (mounted && _centeredPage != targetPage) {
+          setState(() => _centeredPage = targetPage);
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(targetPage);
+          }
+        }
       }
-      final targetPage =
-          (currentPage + pageDelta).clamp(0, _pageCount - 1).toInt();
-      _pageController.animateToPage(
-        targetPage,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'bottom navigation bar',
+          context: ErrorDescription('while loading saved nav bar scroll position'),
+        ),
       );
     }
   }
+
+
 
   void _initConnectivityListener() {
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
@@ -107,6 +112,23 @@ class _MainBottomNavBarState extends State<MainBottomNavBar> {
     }
     if (mounted && _centeredPage != centeredPage) {
       setState(() => _centeredPage = centeredPage);
+      _saveNavScrollPosition(centeredPage % _destinationCount);
+    }
+  }
+
+  Future<void> _saveNavScrollPosition(int index) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_savedNavScrollIndexKey, index);
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'bottom navigation bar',
+          context: ErrorDescription('while saving nav bar scroll position'),
+        ),
+      );
     }
   }
 

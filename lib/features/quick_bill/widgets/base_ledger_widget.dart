@@ -13,6 +13,7 @@ import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/utils/account_balance_utils.dart';
+import 'package:account_app/core/widgets/receipt_paper_wrapper.dart';
 
 /// ═══════════════════════════════════════════════════════════════
 /// BaseLedgerWidget — بنیادی رسید کا ڈھانچہ
@@ -34,6 +35,7 @@ class BaseLedgerWidget extends StatelessWidget {
   final bool isIncomingReceipt;
   final Color? accentColor;
   final Color? headerColor;
+  final Widget? bottomActions;
 
   const BaseLedgerWidget({
     super.key,
@@ -47,6 +49,7 @@ class BaseLedgerWidget extends StatelessWidget {
     this.isIncomingReceipt = false,
     this.accentColor,
     this.headerColor,
+    this.bottomActions,
   });
 
   // ═════════════════════════════════════════════════════════════
@@ -90,40 +93,47 @@ class BaseLedgerWidget extends StatelessWidget {
     final themeAccent = accentColor ?? AppTheme.themeColor;
     final themeHeader = headerColor ?? AppTheme.darkColor;
 
+    const clipper = ReceiptClipper(toothWidth: 10, toothHeight: 7);
+
     return Directionality(
       textDirection: isUrdu ? ui.TextDirection.rtl : ui.TextDirection.ltr,
-      child: Container(
-        width: double.infinity,
-        clipBehavior: Clip.antiAlias,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.zero,
-          border: Border(
-            top: BorderSide(color: Color(0xFFD9E0E5)),
-            bottom: BorderSide(color: Color(0xFFD9E0E5)),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildHeader(isUrdu, fontFamily, themeHeader),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildDashedDivider(),
-                  _buildDateAmountRow(isUrdu, fontFamily),
-                  _buildDashedDivider(),
-                  _buildItemsTable(isUrdu, fontFamily),
-                  _buildDashedDivider(),
-                  _buildTAccount(isUrdu, fontFamily, breakdown),
-                  _buildDashedDivider(),
-                  _buildFooter(isUrdu, fontFamily, themeAccent),
-                ],
-              ),
+      child: CustomPaint(
+        painter: ReceiptShadowPainter(clipper: clipper),
+        child: ClipPath(
+          clipper: clipper,
+          child: Container(
+            width: double.infinity,
+            color: const Color(0xFFFAF8F5), // Thermal paper color
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildHeader(isUrdu, fontFamily, themeHeader),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildDashedDivider(),
+                      _buildDateAmountRow(isUrdu, fontFamily),
+                      _buildDashedDivider(),
+                      _buildItemsTable(isUrdu, fontFamily),
+                      _buildDashedDivider(),
+                      _buildTAccount(isUrdu, fontFamily, breakdown),
+                      _buildDashedDivider(),
+                      _buildFooter(isUrdu, fontFamily, themeAccent),
+                      if (bottomActions != null) ...[
+                        const SizedBox(height: 6),
+                        _buildDashedDivider(),
+                        const SizedBox(height: 12),
+                        bottomActions!,
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -149,8 +159,8 @@ class BaseLedgerWidget extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-      color: headerColor,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+      color: Colors.transparent,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -159,21 +169,25 @@ class BaseLedgerWidget extends StatelessWidget {
               children: [
                 TextSpan(
                   text: topName,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: AppTheme.darkColor,
                     fontWeight: FontWeight.w800,
                     fontSize: 14,
+                    fontFamily: fontFamily,
                   ),
                 ),
                 if (topPhone.isNotEmpty) ...[
-                  const TextSpan(
+                  TextSpan(
                     text: '   ·   ',
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                    style: TextStyle(
+                      color: Colors.grey.shade400,
+                      fontSize: 12,
+                    ),
                   ),
                   TextSpan(
                     text: topPhone,
-                    style: const TextStyle(
-                      color: Colors.white70,
+                    style: TextStyle(
+                      color: Colors.grey.shade700,
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),
@@ -181,36 +195,47 @@ class BaseLedgerWidget extends StatelessWidget {
                 ],
               ],
             ),
-            style: TextStyle(fontFamily: fontFamily),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           if (businessAddress.isNotEmpty && !isIncomingReceipt) ...[
             const SizedBox(height: 4),
             UrduAwareText(
               businessAddress,
               style: TextStyle(
-                color: Colors.white70,
+                color: Colors.grey.shade600,
                 fontSize: 11,
-                fontWeight: FontWeight.w600,
                 fontFamily: fontFamily,
               ),
             ),
           ],
           const SizedBox(height: 10),
-          Container(height: 1, color: Colors.white24),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              _buildDashedDivider(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFAF8F5),
+                  border: Border.all(color: const Color(0xFFD1D5DB)),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'FROM',
+                  style: TextStyle(
+                    color: Color(0xFF6B7280),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 10),
           Row(
             children: [
-              UrduAwareText(
-                isUrdu ? 'بنام' : 'BILLED TO',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                  fontFamily: fontFamily,
-                ),
-              ),
-              const SizedBox(width: 8),
               Expanded(
                 child: UrduAwareText.rich(
                   TextSpan(
@@ -218,22 +243,22 @@ class BaseLedgerWidget extends StatelessWidget {
                       TextSpan(
                         text: bottomName,
                         style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
+                          color: AppTheme.darkColor,
+                          fontSize: 14,
                           fontWeight: FontWeight.w800,
                           fontFamily: fontFamily,
                         ),
                       ),
                       if (bottomPhone.isNotEmpty) ...[
                         const TextSpan(
-                          text: '   ·   ',
-                          style: TextStyle(color: Colors.white54, fontSize: 11),
+                          text: '  •  ',
+                          style: TextStyle(color: Colors.grey, fontSize: 11),
                         ),
                         TextSpan(
                           text: bottomPhone,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 13,
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -258,7 +283,7 @@ class BaseLedgerWidget extends StatelessWidget {
     final billNo = !transaction.isWorkerPayrollTransaction &&
             transaction.referenceNumber != null &&
             transaction.referenceNumber!.trim().isNotEmpty
-        ? '#${transaction.referenceNumber!.trim()}'
+        ? transaction.referenceNumber!.trim()
         : '—';
 
     return Padding(
@@ -616,262 +641,257 @@ class BaseLedgerWidget extends StatelessWidget {
       displayColor = AppTheme.expenseColor;
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header
-          Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFFF9FAFB),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                    child: Center(
-                      child: UrduAwareText(
-                        isUrdu ? 'بنام' : 'DEBIT',
-                        style: TextStyle(
-                          color: AppTheme.expenseColor,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
-                          fontFamily: fontFamily,
-                        ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Header
+        Container(
+          color: Colors.transparent,
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsetsDirectional.only(
+                    end: 6,
+                    top: 9,
+                    bottom: 9,
+                  ),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: UrduAwareText(
+                      isUrdu ? 'بنام' : 'DEBIT',
+                      style: TextStyle(
+                        color: AppTheme.expenseColor,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                        fontFamily: fontFamily,
                       ),
                     ),
                   ),
                 ),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                    child: Center(
-                      child: UrduAwareText(
-                        isUrdu ? 'جمع' : 'CREDIT',
-                        style: TextStyle(
-                          color: AppTheme.incomeColor,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
-                          fontFamily: fontFamily,
-                        ),
+              ),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsetsDirectional.only(
+                    start: 6,
+                    top: 9,
+                    bottom: 9,
+                  ),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: UrduAwareText(
+                      isUrdu ? 'جمع' : 'CREDIT',
+                      style: TextStyle(
+                        color: AppTheme.incomeColor,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                        fontFamily: fontFamily,
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+        ),
+          const Divider(height: 1, color: Color(0xFFE5E7EB)),
 
           // Body
-          Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-              borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(10),
-              ),
-            ),
-            child: Column(
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: const BoxDecoration(
-                            border: BorderDirectional(
-                              end: BorderSide(color: Color(0xFFE5E7EB)),
-                            ),
-                          ),
-                          child: debitLines.isEmpty
-                              ? const SizedBox(height: 40)
-                              : Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: debitLines
-                                      .map((l) => Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 2),
-                                            child: _buildTLine(
-                                              label: l.label,
-                                              amount: l.amount,
-                                              color: l.color,
-                                              prefix: l.prefix,
-                                              fontFamily: fontFamily,
-                                            ),
-                                          ))
-                                      .toList(),
-                                ),
-                        ),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsetsDirectional.only(
+                      end: 6,
+                      top: 8,
+                      bottom: 8,
+                    ),
+                    decoration: const BoxDecoration(
+                      border: BorderDirectional(
+                        end: BorderSide(color: Color(0xFFE5E7EB)),
                       ),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
+                    ),
+                    child: debitLines.isEmpty
+                        ? const SizedBox(height: 40)
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: debitLines
+                                .map((l) => Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 2),
+                                      child: _buildTLine(
+                                        label: l.label,
+                                        amount: l.amount,
+                                        color: l.color,
+                                        prefix: l.prefix,
+                                        fontFamily: fontFamily,
+                                      ),
+                                    ))
+                                .toList(),
                           ),
-                          child: creditLines.isEmpty
-                              ? const SizedBox(height: 40)
-                              : Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: creditLines
-                                      .map((l) => Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 2),
-                                            child: _buildTLine(
-                                              label: l.label,
-                                              amount: l.amount,
-                                              color: l.color,
-                                              prefix: l.prefix,
-                                              fontFamily: fontFamily,
-                                            ),
-                                          ))
-                                      .toList(),
-                                ),
-                        ),
-                      ),
-                    ],
                   ),
                 ),
-                const Divider(height: 1, color: Color(0xFFE5E7EB)),
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 9,
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsetsDirectional.only(
+                      start: 6,
+                      top: 8,
+                      bottom: 8,
+                    ),
+                    child: creditLines.isEmpty
+                        ? const SizedBox(height: 40)
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: creditLines
+                                .map((l) => Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 2),
+                                      child: _buildTLine(
+                                        label: l.label,
+                                        amount: l.amount,
+                                        color: l.color,
+                                        prefix: l.prefix,
+                                        fontFamily: fontFamily,
+                                      ),
+                                    ))
+                                .toList(),
                           ),
-                          decoration: const BoxDecoration(
-                            border: BorderDirectional(
-                              end: BorderSide(color: Color(0xFFE5E7EB)),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: UrduAwareText(
-                                  isUrdu ? 'کل بنام' : 'Total Debit',
-                                  style: TextStyle(
-                                    color: AppTheme.expenseColor,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w900,
-                                    fontFamily: fontFamily,
-                                  ),
-                                ),
-                              ),
-                              UrduAwareText(
-                                Formatters.formatAmountWithCurrency(totalDebit),
-                                style: const TextStyle(
-                                  color: AppTheme.expenseColor,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w900,
-                                  fontFeatures: [FontFeature.tabularFigures()],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 9,
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: UrduAwareText(
-                                  isUrdu ? 'کل جمع' : 'Total Credit',
-                                  style: TextStyle(
-                                    color: AppTheme.incomeColor,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w900,
-                                    fontFamily: fontFamily,
-                                  ),
-                                ),
-                              ),
-                              UrduAwareText(
-                                Formatters.formatAmountWithCurrency(
-                                    totalCredit),
-                                style: const TextStyle(
-                                  color: AppTheme.incomeColor,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w900,
-                                  fontFeatures: [FontFeature.tabularFigures()],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ],
             ),
           ),
+          const Divider(height: 1, color: Color(0xFFE5E7EB)),
 
-          const SizedBox(height: 10),
-
-          // Balance Card
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: displayColor.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(10),
+          // Totals
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsetsDirectional.only(
+                      end: 6,
+                      top: 9,
+                      bottom: 9,
+                    ),
+                    decoration: const BoxDecoration(
+                      border: BorderDirectional(
+                        end: BorderSide(color: Color(0xFFE5E7EB)),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: UrduAwareText(
+                            isUrdu ? 'کل بنام' : 'Total Debit',
+                            style: TextStyle(
+                              color: AppTheme.expenseColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                        ),
+                        UrduAwareText(
+                          Formatters.formatAmountWithCurrency(totalDebit),
+                          style: const TextStyle(
+                            color: AppTheme.expenseColor,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsetsDirectional.only(
+                      start: 6,
+                      top: 9,
+                      bottom: 9,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: UrduAwareText(
+                            isUrdu ? 'کل جمع' : 'Total Credit',
+                            style: TextStyle(
+                              color: AppTheme.incomeColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                        ),
+                        UrduAwareText(
+                          Formatters.formatAmountWithCurrency(totalCredit),
+                          style: const TextStyle(
+                            color: AppTheme.incomeColor,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
+          ),
+          const Divider(height: 1, color: Color(0xFFE5E7EB)),
+
+          // Balance Row (Full width)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            color: Colors.transparent,
             child: Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      UrduAwareText(
-                        isUrdu ? 'کل بیلنس' : 'TOTAL BALANCE',
-                        style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
-                          fontFamily: fontFamily,
+                  child: UrduAwareText.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: isUrdu ? 'کل بیلنس' : 'TOTAL BALANCE',
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                            fontFamily: fontFamily,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 3),
-                      UrduAwareText(
-                        displayLabel,
-                        style: TextStyle(
-                          color: displayColor,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w900,
-                          fontFamily: fontFamily,
+                        TextSpan(
+                          text: ' $displayLabel',
+                          style: TextStyle(
+                            color: displayColor,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: fontFamily,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 UrduAwareText(
                   isSettled
                       ? 'Rs 0'
-                      : '${Formatters.formatAmountWithCurrency(absAmount)}',
+                      : Formatters.formatAmountWithCurrency(absAmount),
                   style: TextStyle(
                     color: displayColor,
-                    fontSize: 22,
+                    fontSize: 14.5,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: -0.6,
+                    letterSpacing: -0.3,
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
@@ -879,8 +899,7 @@ class BaseLedgerWidget extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildTLine({

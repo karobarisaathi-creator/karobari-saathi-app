@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   final date = DateTime(2026, 11, 20);
 
-  test('earned wage is credit and wage payment is debit in worker account', () {
+  test('wage accrual and payment reconcile both party ledgers', () {
     final earnedWage = Transaction(
       id: 'earned',
       accountId: 'worker',
@@ -13,7 +13,41 @@ void main() {
       type: 'income',
       category: 'حاضری کی واجب اجرت',
       description: 'حاضری کی واجب اجرت',
+      receivedAmount: 0,
+      pendingAmount: 1200,
+      paymentMethod: 'credit',
+      isPending: true,
       referenceNumber: '${Transaction.workerWageAccrualReference}:attendance_1',
+      date: date,
+      createdAt: date,
+      updatedAt: date,
+    );
+    final workerLedgerAccrual = Transaction(
+      id: 'worker-earned',
+      accountId: 'employer',
+      amount: 1200,
+      type: 'expense',
+      category: 'حاضری کی واجب اجرت',
+      description: 'حاضری کی واجب اجرت',
+      receivedAmount: 0,
+      pendingAmount: 1200,
+      paymentMethod: 'credit',
+      isPending: true,
+      receiptFromCounterparty: true,
+      date: date,
+      createdAt: date,
+      updatedAt: date,
+    );
+    final workerLedgerPayment = Transaction(
+      id: 'worker-paid',
+      accountId: 'employer',
+      amount: 500,
+      type: 'income',
+      category: 'اجرت کی ادائیگی',
+      description: 'اجرت کی ادائیگی',
+      receivedAmount: 0,
+      pendingAmount: 0,
+      receiptFromCounterparty: true,
       date: date,
       createdAt: date,
       updatedAt: date,
@@ -36,8 +70,24 @@ void main() {
     expect(AccountBalanceUtils.transactionColumns(earnedWage).credit, 1200);
     expect(AccountBalanceUtils.transactionColumns(wagePayment).debit, 500);
     expect(
+      AccountBalanceUtils.transactionColumns(workerLedgerAccrual).debit,
+      1200,
+    );
+    expect(
       AccountBalanceUtils.ledgerBalance([earnedWage, wagePayment]),
       -700,
+    );
+    expect(
+      AccountBalanceUtils.ledgerBalance([workerLedgerAccrual]),
+      1200,
+    );
+    expect(AccountBalanceUtils.transactionColumns(workerLedgerPayment).credit,
+        500);
+    expect(
+      AccountBalanceUtils.ledgerBalance(
+        [workerLedgerAccrual, workerLedgerPayment],
+      ),
+      700,
     );
   });
 

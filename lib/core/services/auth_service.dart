@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'database_service.dart';
 import 'package:account_app/core/utils/formatters.dart';
-import 'notification_service.dart';
+import 'package:account_app/core/services/database/profile_service.dart';
+import 'package:account_app/core/services/auto_sync_service.dart';
 import 'package:account_app/features/settings/login_screen.dart'; // For navigation
 
 class AuthService with ChangeNotifier {
@@ -47,16 +48,28 @@ class AuthService with ChangeNotifier {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      if (sanitizedAddress != null) updateData['address'] = sanitizedAddress;
+      if (sanitizedAddress != null) {
+        updateData['address'] = sanitizedAddress;
+        updateData['businessAddress'] = sanitizedAddress;
+      }
       if (sanitizedSlogan != null) updateData['slogan'] = sanitizedSlogan;
-      if (sanitizedStoreName != null)
+      if (sanitizedStoreName != null) {
         updateData['storeName'] = sanitizedStoreName;
+        updateData['shopName'] = sanitizedStoreName;
+      }
       if (storeImage != null) updateData['storeImage'] = storeImage;
 
-      await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .set(updateData, SetOptions(merge: true));
+      final userRef = _firestore.collection('users').doc(user.uid);
+      final existingProfile = await userRef.get();
+      await userRef.set(updateData, SetOptions(merge: true));
+      await _firestore.collection('public_profiles').doc(user.uid).set(
+            ProfileService.publicProfileData(
+              uid: user.uid,
+              userData: {...?existingProfile.data(), ...updateData},
+              verifiedPhoneNumber: user.phoneNumber,
+            ),
+          );
+      ProfileService.clearCache();
 
       notifyListeners();
     } catch (e) {
@@ -65,95 +78,87 @@ class AuthService with ChangeNotifier {
   }
 
   // Sign Out
-  Future<void> signOut(BuildContext context) async {
+  Future<void> signOut(
+    BuildContext context, {
+    bool syncBeforeLogout = false,
+  }) async {
+    if (!context.mounted) return;
+
+    final dbService = Provider.of<DatabaseService>(context, listen: false);
+    final autoSyncService = syncBeforeLogout
+        ? Provider.of<AutoSyncService>(context, listen: false)
+        : null;
+    if (autoSyncService != null) {
+      await dbService.syncWithFirebase();
+      await autoSyncService.syncAllDataToCloud();
+    }
+
+    Object? cleanupError;
     try {
-      // 1. Prepare for logout (Stop listeners and clear data while boxes are open)
-      if (context.mounted) {
-        final dbService = Provider.of<DatabaseService>(context, listen: false);
-        await dbService.prepareForLogout();
-        await _unregisterPushToken(context);
-      }
+      await dbService.prepareForLogout();
+    } catch (error, stackTrace) {
+      cleanupError = error;
+      debugPrint('Local data cleanup failed during sign-out: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+    ProfileService.clearCache();
 
-      // 2. Small delay to ensure all async operations finish
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // 3. Finally sign out from Firebase
-      await _auth.signOut();
-
-      // Navigate to login screen
-      if (!context.mounted) return;
+    await _auth.signOut();
+    if (context.mounted) {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => LoginScreen()),
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
         (Route<dynamic> route) => false,
       );
-    } catch (e) {
-      debugPrint("Sign out error: $e");
-      // Fallback signout
-      if (context.mounted) {
-        await _unregisterPushToken(context);
-      }
-      await _auth.signOut();
-      if (context.mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => LoginScreen()),
-          (Route<dynamic> route) => false,
-        );
-      }
+    }
+
+    if (cleanupError != null) {
+      throw Exception(
+          'Signed out, but local data cleanup failed: $cleanupError');
     }
   }
 
   // Deactivate account
   Future<void> deactivateAccount(BuildContext context) async {
     final user = _auth.currentUser;
-    if (user == null) return;
+    if (user == null || !context.mounted) return;
 
     try {
-      // Directly update Firestore to avoid dependency issues
-      await _firestore.collection('users').doc(user.uid).update({
+      final dbService = Provider.of<DatabaseService>(context, listen: false);
+      final batch = _firestore.batch();
+      batch.update(_firestore.collection('users').doc(user.uid), {
         'isDeactivated': true,
         'deactivatedAt': FieldValue.serverTimestamp(),
+        'restoreDeadline':
+            Timestamp.fromDate(DateTime.now().add(const Duration(days: 30))),
       });
+      batch.delete(_firestore.collection('public_profiles').doc(user.uid));
+      await batch.commit();
 
-      // Sign out the user
-      await _unregisterPushToken(context);
-      await _auth.signOut();
-
-      // Clear local data
-      if (context.mounted) {
-        final dbService = Provider.of<DatabaseService>(context, listen: false);
-        await dbService.clearLocalData();
+      Object? cleanupError;
+      try {
+        await dbService.prepareForLogout();
+      } catch (error, stackTrace) {
+        cleanupError = error;
+        debugPrint('Local data cleanup failed during deactivation: $error');
+        debugPrintStack(stackTrace: stackTrace);
       }
 
+      ProfileService.clearCache();
+      await _auth.signOut();
+
       // Navigate to login screen and remove all previous routes
-      if (!context.mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => LoginScreen()),
-        (Route<dynamic> route) => false,
-      );
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (Route<dynamic> route) => false,
+        );
+      }
+      if (cleanupError != null) {
+        throw Exception(
+            'Account deactivated, but local data cleanup failed: $cleanupError');
+      }
     } catch (e) {
       throw Exception("Failed to deactivate account: $e");
-    }
-  }
-
-  Future<void> _unregisterPushToken(BuildContext context) async {
-    try {
-      await Provider.of<NotificationService>(context, listen: false)
-          .unregisterCurrentDeviceToken();
-    } catch (error, stackTrace) {
-      debugPrint('Push token cleanup failed during sign-out: $error');
-      debugPrintStack(stackTrace: stackTrace);
-    }
-  }
-
-  // Activate account - This would typically be an admin function.
-  Future<void> activateAccount(BuildContext context, String userId) async {
-    try {
-      await _firestore.collection('users').doc(userId).update({
-        'isDeactivated': false,
-        'deactivatedAt': null,
-      });
-    } catch (e) {
-      throw Exception("Failed to activate account: $e");
     }
   }
 }

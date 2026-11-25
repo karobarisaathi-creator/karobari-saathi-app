@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
@@ -15,6 +17,7 @@ class WorkerPayrollService extends ChangeNotifier {
   bool _isLoading = true;
   Object? _initializationError;
   late final Future<void> _initialization;
+  StreamSubscription<BoxEvent>? _boxSubscription;
   List<WorkerAttendanceRecord> _attendance = [];
   List<WorkerWageRate> _rates = [];
   List<WorkerWagePayment> _payments = [];
@@ -34,11 +37,23 @@ class WorkerPayrollService extends ChangeNotifier {
           ? Hive.box(_boxName)
           : await Hive.openBox(_boxName);
       _loadFromBox();
+      _boxSubscription = _box!.watch().listen(
+        (_) => _loadFromBox(),
+        onError: (Object error, StackTrace stackTrace) {
+          debugPrint('Worker payroll storage watch failed: $error');
+        },
+      );
     } catch (error) {
       _initializationError = error;
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  @override
+  void dispose() {
+    _boxSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _ensureInitialized() async {
@@ -153,10 +168,11 @@ class WorkerPayrollService extends ChangeNotifier {
       date: record.date,
       quantity: 1,
       rate: amount,
-      receivedAmount: amount,
-      pendingAmount: 0,
+      receivedAmount: 0,
+      pendingAmount: amount,
       referenceNumber: '${Transaction.workerWageAccrualReference}:${record.id}',
-      isPending: false,
+      paymentMethod: 'credit',
+      isPending: true,
       createdAt: existing?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -176,6 +192,52 @@ class WorkerPayrollService extends ChangeNotifier {
     for (final record in getAttendanceForWorker(workerId)) {
       await _syncAttendanceLedger(record, databaseService);
     }
+  }
+
+  Future<void> reassignWorkerId({
+    required String fromWorkerId,
+    required String toWorkerId,
+    required DatabaseService databaseService,
+    ContractService? contractService,
+  }) async {
+    await _ensureInitialized();
+    if (fromWorkerId == toWorkerId) return;
+    if (databaseService.getAccount(toWorkerId) == null) {
+      throw StateError('The destination worker account does not exist.');
+    }
+
+    for (final transaction in databaseService
+        .getAllTransactions()
+        .where((entry) => entry.accountId == fromWorkerId)
+        .toList()) {
+      await databaseService.updateTransaction(
+        Transaction.fromMap({
+          ...transaction.toMap(),
+          'accountId': toWorkerId,
+          'updatedAt': DateTime.now().toIso8601String(),
+        }),
+      );
+    }
+
+    if (contractService != null) {
+      await contractService.reassignPayrollWorkerId(
+        fromWorkerId: fromWorkerId,
+        toWorkerId: toWorkerId,
+      );
+    }
+
+    for (final entry in _box!.toMap().entries) {
+      final value = entry.value;
+      if (value is! Map || value['workerId'] != fromWorkerId) continue;
+      final record = Map<String, dynamic>.from(value)
+        ..['workerId'] = toWorkerId;
+      await _box!.put(entry.key, record);
+    }
+    _loadFromBox();
+    await reconcileWorkerLedger(
+      workerId: toWorkerId,
+      databaseService: databaseService,
+    );
   }
 
   WorkerAttendanceRecord? getAttendance(String workerId, DateTime date) {
@@ -216,8 +278,9 @@ class WorkerPayrollService extends ChangeNotifier {
     }
     _requireWorkerAccount(workerId, databaseService);
     final normalizedDate = _dateOnly(date);
-    final id = 'attendance_${workerId}_${_dayKey(normalizedDate)}';
     final previous = getAttendance(workerId, normalizedDate);
+    final id =
+        previous?.id ?? 'attendance_${workerId}_${_dayKey(normalizedDate)}';
     final record = WorkerAttendanceRecord(
       id: id,
       workerId: workerId,
@@ -256,7 +319,13 @@ class WorkerPayrollService extends ChangeNotifier {
     }
     _requireWorkerAccount(workerId, databaseService);
     final effectiveDate = _dateOnly(effectiveFrom);
-    final id = 'rate_${workerId}_${_dayKey(effectiveDate)}';
+    final existingRate = _rates.cast<WorkerWageRate?>().firstWhere(
+          (rate) =>
+              rate!.workerId == workerId &&
+              _dateOnly(rate.effectiveFrom) == effectiveDate,
+          orElse: () => null,
+        );
+    final id = existingRate?.id ?? 'rate_${workerId}_${_dayKey(effectiveDate)}';
     final previous = _box!.get(id);
     await _box!.put(
       id,
@@ -289,7 +358,7 @@ class WorkerPayrollService extends ChangeNotifier {
     }
   }
 
-  Future<void> addWagePayment({
+  Future<Transaction> addWagePayment({
     required String workerId,
     required double amount,
     required String note,
@@ -346,6 +415,7 @@ class WorkerPayrollService extends ChangeNotifier {
       rethrow;
     }
     _loadFromBox();
+    return transaction;
   }
 
   Future<void> editWagePayment({

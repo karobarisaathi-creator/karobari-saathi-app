@@ -46,7 +46,6 @@ class RouteConstants {
   static const String parties = '/parties';
   static const String addParty = '/addParty';
   static const String shareAccount = '/shareAccount';
-  static const String notifications = '/notifications';
   static const String settings = '/settings';
   static const String professions = '/professions';
   static const String addTransaction = '/addTransaction';

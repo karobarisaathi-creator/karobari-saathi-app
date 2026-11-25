@@ -39,26 +39,7 @@ class AutoSyncService with ChangeNotifier {
     if (user == null) {
       throw Exception('User is not logged in');
     }
-
-    try {
-      final userDoc = await _firestore.collection('users').doc(user.uid).get();
-      if (userDoc.exists) {
-        final profileEmail = userDoc.data()?['email']?.toString().trim();
-        if (profileEmail != null && profileEmail.isNotEmpty) {
-          return profileEmail;
-        }
-      }
-    } catch (_) {}
-
-    if (user.email != null && user.email!.trim().isNotEmpty) {
-      return user.email!.trim();
-    }
-
-    if (user.phoneNumber != null && user.phoneNumber!.trim().isNotEmpty) {
-      return user.phoneNumber!.trim();
-    }
-
-    throw Exception('User email or phone number not available');
+    return user.uid;
   }
 
   Future<void> syncAllDataToCloud() async {
@@ -81,7 +62,9 @@ class AutoSyncService with ChangeNotifier {
         'professions': professions.map((p) => p.toMap()).toList(),
         'lastSync': DateTime.now().toIso8601String(),
         'identifier': identifier,
-        'email': identifier.contains('@') ? identifier : null,
+        'email': _auth.currentUser?.emailVerified == true
+            ? _auth.currentUser?.email
+            : null,
         'phoneNumber': _auth.currentUser?.phoneNumber,
       }, SetOptions(merge: true));
 
@@ -95,12 +78,48 @@ class AutoSyncService with ChangeNotifier {
 
   Future<void> restoreAllDataFromPhone(String? key) async {
     try {
-      final targetKey = key ?? await _getUserIdentifier();
-      final snapshot =
-          await _firestore.collection('userData').doc(targetKey).get();
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('User is not logged in');
 
-      if (snapshot.exists) {
-        final data = snapshot.data()!;
+      final legacyKeys = <String>[
+        if (user.emailVerified && user.email?.trim().isNotEmpty == true)
+          user.email!.trim(),
+        if (user.phoneNumber?.trim().isNotEmpty == true)
+          user.phoneNumber!.trim(),
+      ];
+      if (key != null && key != user.uid && !legacyKeys.contains(key.trim())) {
+        throw ArgumentError(
+            'The requested backup does not belong to this user');
+      }
+
+      final candidates = <String>[
+        if (key != null) key.trim(),
+        user.uid,
+        ...legacyKeys,
+      ].toSet();
+      DocumentSnapshot<Map<String, dynamic>>? snapshot;
+      String? sourceKey;
+      for (final candidate in candidates) {
+        final candidateSnapshot =
+            await _firestore.collection('userData').doc(candidate).get();
+        if (candidateSnapshot.exists) {
+          snapshot = candidateSnapshot;
+          sourceKey = candidate;
+          break;
+        }
+      }
+
+      final foundSnapshot = snapshot;
+      if (foundSnapshot != null && foundSnapshot.exists) {
+        final data = foundSnapshot.data()!;
+        if (sourceKey != user.uid) {
+          await _firestore.collection('userData').doc(user.uid).set({
+            ...data,
+            'identifier': user.uid,
+            'phoneNumber': user.phoneNumber,
+            'email': user.emailVerified ? user.email : null,
+          });
+        }
 
         print('کلاؤڈ سے ڈیٹا ملا، بحال کیا جا رہا ہے...');
 
@@ -156,7 +175,7 @@ class AutoSyncService with ChangeNotifier {
         print('تمام ڈیٹا کامیابی سے واپس آگیا اور لوکل محفوظ ہوگیا');
         notifyListeners();
       } else {
-        print('اس شناخت (ایمیل/فون) کا کوئی ڈیٹا کلاؤڈ پر نہیں ملا');
+        print('اس اکاؤنٹ کا کوئی پرانا ڈیٹا کلاؤڈ پر نہیں ملا');
       }
     } catch (e) {
       print('ڈیٹا واپس لینے میں خرابی: $e');

@@ -10,7 +10,7 @@ import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
-import 'package:account_app/core/utils/account_balance_utils.dart';
+import 'package:account_app/core/utils/party_summary_utils.dart';
 import 'package:account_app/features/accounts/widgets/party_trust_metrics.dart';
 import 'package:account_app/features/accounts/widgets/party_trust_popup.dart';
 import 'profile_info_widget.dart';
@@ -42,7 +42,6 @@ class PartyCard extends StatefulWidget {
 
 class _PartyCardState extends State<PartyCard> {
   Map<String, String>? _remoteProfileMap;
-  String? _remoteProfession;
 
   @override
   void initState() {
@@ -68,7 +67,6 @@ class _PartyCardState extends State<PartyCard> {
 
     if (mounted && profile != null) {
       setState(() {
-        _remoteProfession = profile['profession'];
         _remoteProfileMap = profile;
       });
     }
@@ -98,8 +96,8 @@ class _PartyCardState extends State<PartyCard> {
         .getAllTransactions()
         .where((t) => t.accountId == widget.party.id)
         .toList();
-    final cycleBalance = AccountBalanceUtils.currentCycle(transactions);
-    final double displayBalance = cycleBalance.balance;
+    final double displayBalance =
+        PartySummaryUtils.partyCardBalance(widget.party, transactions);
 
     final trustMetrics = PartyTrustMetrics.calculate(
       party: widget.party,
@@ -108,7 +106,8 @@ class _PartyCardState extends State<PartyCard> {
     );
 
     final bool isReceivable = displayBalance >= 0;
-    final bool isSettled = displayBalance.abs() < 0.01;
+    final bool isSettled =
+        displayBalance.abs() < PartySummaryUtils.settledThreshold;
 
     final Color balanceColor = isSettled
         ? AppTheme.textSecondary
@@ -140,16 +139,15 @@ class _PartyCardState extends State<PartyCard> {
     final remotePhoto = _remoteProfileMap?['photoUrl']?.trim() ?? '';
     final localPhoto = (widget.party.profileImage ?? '').trim();
     final remoteProf = _remoteProfileMap?['profession']?.trim() ?? '';
-    final localProf = (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account').trim();
+    final localProf = (widget.party.profession ?? '').trim();
     final remoteAddress = _remoteProfileMap?['address']?.trim() ?? '';
     final localAddress = (widget.party.address ?? '').trim();
 
     final bool hasUpdate = _remoteProfileMap != null &&
         ((remoteName.isNotEmpty && remoteName != localName) ||
             (remotePhoto.isNotEmpty && remotePhoto != localPhoto) ||
-            (remoteProf.isNotEmpty &&
-                remoteProf != widget.party.category &&
-                remoteProf != localProf) ||
+            (remoteProf != localProf &&
+                (remoteProf.isNotEmpty || localProf.isNotEmpty)) ||
             (remoteAddress.isNotEmpty && remoteAddress != localAddress));
 
     // ─── مین کارڈ کا مشترکہ content ───
@@ -269,17 +267,37 @@ class _PartyCardState extends State<PartyCard> {
                         ),
                         const SizedBox(height: 4),
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              child: UrduAwareText(
-                                displayCategory,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: AppTheme.themeColor,
-                                  fontFamily: fontFamily,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  UrduAwareText(
+                                    displayCategory,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppTheme.themeColor,
+                                      fontFamily: fontFamily,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if ((widget.party.profession ?? '')
+                                      .trim()
+                                      .isNotEmpty)
+                                    UrduAwareText(
+                                      '${isUrdu ? 'پیشہ' : 'Profession'}: '
+                                      '${widget.party.profession!.trim()}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: AppTheme.textSecondary,
+                                        fontFamily: fontFamily,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                ],
                               ),
                             ),
                             const SizedBox(width: 8),

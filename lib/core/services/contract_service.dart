@@ -94,6 +94,54 @@ class ContractService extends ChangeNotifier {
     return null;
   }
 
+  Future<void> reassignPayrollWorkerId({
+    required String fromWorkerId,
+    required String toWorkerId,
+  }) async {
+    await _ensureInitialized();
+    if (fromWorkerId == toWorkerId) return;
+
+    final updates = <String, ContractModel>{};
+    for (final contract in _contracts) {
+      final payments = contract.laborPayments
+          .map((payment) => payment.workerId == fromWorkerId
+              ? ContractLaborPayment(
+                  id: payment.id,
+                  workerName: payment.workerName,
+                  amount: payment.amount,
+                  date: payment.date,
+                  note: payment.note,
+                  workerId: toWorkerId,
+                  workerPayrollPaymentId: payment.workerPayrollPaymentId,
+                )
+              : payment)
+          .toList();
+      if (payments
+          .asMap()
+          .entries
+          .any((entry) => entry.value != contract.laborPayments[entry.key])) {
+        updates[contract.id] = contract.copyWith(laborPayments: payments);
+      }
+    }
+
+    final originals = {
+      for (final contract in _contracts)
+        if (updates.containsKey(contract.id)) contract.id: contract,
+    };
+    try {
+      for (final entry in updates.entries) {
+        await _box!.put(entry.key, entry.value.toMap());
+      }
+    } catch (error) {
+      for (final entry in originals.entries) {
+        await _box!.put(entry.key, entry.value.toMap());
+      }
+      _loadFromBox();
+      rethrow;
+    }
+    if (updates.isNotEmpty) _loadFromBox();
+  }
+
   Future<void> syncPayrollLaborPayment({
     required String paymentId,
     required String workerId,

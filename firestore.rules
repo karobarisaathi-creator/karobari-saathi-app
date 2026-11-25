@@ -1,14 +1,35 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // --- سیکیورٹی ہیلپرز ---
+
+    // ═══ HELPER FUNCTIONS ═══
     function isSignedIn() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // users/{userId} document موجود ہونا اور deactivated نہ ہونا لازم ہے
+    function isActiveUser(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId))
+        && get(/databases/$(database)/documents/users/$(userId))
+            .data.get('isDeactivated', false) != true;
+    }
+
+    function isActiveOwner(userId) {
+      return isOwner(userId) && isActiveUser(userId);
+    }
+
+    function ownsLegacyUserData(docId) {
+      return isSignedIn() && (
+        (request.auth.token.phone_number != null
+          && docId == request.auth.token.phone_number)
+        || (request.auth.token.email_verified == true
+          && request.auth.token.email != null
+          && docId == request.auth.token.email)
+      );
     }
 
     function validMarketplaceListing(data, listingId) {
@@ -33,6 +54,7 @@ service cloud.firestore {
         && data.phoneNumber.size() >= 7
         && data.phoneNumber.size() <= 30
         && data.phoneNumber.matches('^[+0-9 ()-]+$')
+        && data.phoneNumber.matches('.*[0-9].*')
         && data.phoneShared == true
         && data.title is string
         && data.title.size() > 0
@@ -50,7 +72,6 @@ service cloud.firestore {
         && data.price >= 0
         && data.isNegotiable is bool
         && data.imageUrls is list
-        && data.imageUrls.size() > 0
         && data.imageUrls.size() <= 5
         && data.imagePaths is list
         && data.imagePaths.size() == data.imageUrls.size()
@@ -59,29 +80,56 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
-    // --- ایپ سیٹنگز ---
+    // ═══ SETTINGS ═══
     match /settings/{document} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if false;
     }
 
     match /userData/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn()
+        && isActiveOwner(request.auth.uid)
+        && (docId == request.auth.uid || ownsLegacyUserData(docId));
     }
 
-    // --- صارفین کا ڈیٹا (کھاتہ، ٹرانزیکشنز) ---
+    // ═══ BACKUPS ═══
     match /backups/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read, write: if isActiveOwner(userId);
 
       match /{backupPath=**} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isActiveOwner(userId);
       }
     }
 
+    // ═══ PUBLIC PROFILES ═══
+    match /public_profiles/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isActiveOwner(userId)
+        && request.resource.data.uid == userId
+        && (
+          (
+            request.auth.token.phone_number == null
+            && !request.resource.data.keys().hasAny(['phoneNumber'])
+          )
+          || (
+            request.auth.token.phone_number is string
+            && request.resource.data.keys().hasAll(['phoneNumber'])
+            && request.resource.data.phoneNumber is string
+            && request.resource.data.phoneNumber == request.auth.token.phone_number
+          )
+        )
+        && request.resource.data.keys().hasOnly([
+          'uid', 'phoneNumber', 'displayName', 'photoURL',
+          'profession', 'businessAddress', 'shopName', 'photoUrl'
+        ]);
+      allow delete: if isOwner(userId);
+    }
+
+    // ═══ PUBLIC SHOPS ═══
     match /public_shops/{shopId} {
       allow read: if isSignedIn();
-      allow create, delete: if isOwner(shopId);
-      allow update: if isOwner(shopId)
+      allow create, delete: if isActiveOwner(shopId);
+      allow update: if isActiveOwner(shopId)
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
           'communityRating',
           'communityReviewCount',
@@ -90,12 +138,12 @@ service cloud.firestore {
 
       match /items/{itemId} {
         allow read: if isSignedIn();
-        allow create, update, delete: if isOwner(shopId);
+        allow create, update, delete: if isActiveOwner(shopId);
       }
 
       match /reviews/{userId} {
         allow read: if isSignedIn();
-        allow create, update: if isSignedIn()
+        allow create, update: if isActiveOwner(userId)
           && request.auth.uid == userId
           && request.auth.uid != shopId
           && request.resource.data.keys().hasAll([
@@ -111,104 +159,37 @@ service cloud.firestore {
           && request.resource.data.comment is string
           && request.resource.data.comment.size() <= 500
           && request.resource.data.updatedAt == request.time;
-        allow delete: if isSignedIn()
+        allow delete: if isActiveOwner(userId)
           && request.auth.uid == userId
           && request.auth.uid != shopId;
       }
-
-      match /orders/{orderId} {
-        allow create: if isSignedIn()
-          && request.resource.data.customerId == request.auth.uid
-          && request.resource.data.shopId == shopId
-          && request.resource.data.id == orderId
-          && request.resource.data.status == 'pending'
-          && request.resource.data.keys().hasAll([
-            'id', 'shopId', 'customerId', 'status', 'items',
-            'subtotal', 'deliveryFee', 'minimumOrder', 'total', 'note',
-            'createdAt'
-          ])
-          && request.resource.data.keys().hasOnly([
-            'id', 'shopId', 'shopName', 'shopOwnerName', 'customerId',
-            'customerName', 'customerPhone', 'status', 'items', 'subtotal',
-            'deliveryFee', 'minimumOrder', 'total', 'note', 'createdAt'
-          ])
-          && request.resource.data.items is list
-          && request.resource.data.items.size() > 0
-          && request.resource.data.subtotal is number
-          && request.resource.data.subtotal >= 0
-          && request.resource.data.deliveryFee is number
-          && request.resource.data.deliveryFee >= 0
-          && request.resource.data.minimumOrder is number
-          && request.resource.data.minimumOrder >= 0
-          && request.resource.data.subtotal
-            >= request.resource.data.minimumOrder
-          && request.resource.data.total is number
-          && request.resource.data.total
-            == request.resource.data.subtotal + request.resource.data.deliveryFee
-          && request.resource.data.note is string
-          && request.resource.data.note.size() <= 500
-          && request.resource.data.createdAt == request.time;
-        allow read: if isOwner(shopId)
-          || (isSignedIn() && resource.data.customerId == request.auth.uid);
-        allow update: if (
-            isOwner(shopId)
-            && resource.data.status == 'pending'
-            && (
-              (request.resource.data.status == 'accepted'
-                && request.resource.data.acceptedAt == request.time
-                && request.resource.data.diff(resource.data).affectedKeys()
-                  .hasOnly([
-                    'status', 'acceptedAt', 'items', 'subtotal',
-                    'deliveryFee', 'minimumOrder', 'total'
-                  ]))
-              || (request.resource.data.status == 'rejected'
-                && request.resource.data.rejectedAt == request.time
-                && request.resource.data.diff(resource.data).affectedKeys()
-                  .hasOnly(['status', 'rejectedAt']))
-            )
-          ) || (
-            isOwner(shopId)
-            && resource.data.status == 'accepted'
-            && request.resource.data.status == 'delivered'
-            && request.resource.data.deliveredAt == request.time
-            && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['status', 'deliveredAt'])
-          ) || (
-            isSignedIn()
-            && resource.data.customerId == request.auth.uid
-            && resource.data.status == 'pending'
-            && request.resource.data.status == 'cancelled'
-            && request.resource.data.cancelledAt == request.time
-            && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['status', 'cancelledAt'])
-          );
-        allow delete: if false;
-      }
     }
 
+    // ═══ MARKETPLACE ═══
     match /marketplace_listings/{listingId} {
       allow read: if isSignedIn()
         && (resource.data.status != 'hidden'
-          || isOwner(resource.data.ownerId));
+          || isActiveOwner(resource.data.ownerId));
       allow create: if isSignedIn()
+        && isActiveOwner(request.auth.uid)
         && validMarketplaceListing(request.resource.data, listingId)
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.status == 'active'
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
-      allow update: if isOwner(resource.data.ownerId)
+      allow update: if isActiveOwner(resource.data.ownerId)
         && validMarketplaceListing(request.resource.data, listingId)
         && request.resource.data.ownerId == resource.data.ownerId
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.updatedAt == request.time;
-      allow delete: if isOwner(resource.data.ownerId);
+      allow delete: if isActiveOwner(resource.data.ownerId);
 
       match /reports/{reporterId} {
         allow read: if isOwner(
           get(/databases/$(database)/documents/marketplace_listings/$(listingId))
             .data.ownerId
         ) || isOwner(reporterId);
-        allow create: if isSignedIn()
+        allow create: if isActiveOwner(request.auth.uid)
           && reporterId == request.auth.uid
           && get(/databases/$(database)/documents/marketplace_listings/$(listingId))
             .data.ownerId != request.auth.uid
@@ -227,38 +208,65 @@ service cloud.firestore {
       }
     }
 
+    // ═══ USERS (private data) ═══
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && !request.resource.data.keys().hasAny(['isDeactivated']);
+      allow update: if isOwner(userId)
+        && isActiveUser(userId)
+        && (
+          !request.resource.data.diff(resource.data)
+            .affectedKeys().hasAny(['isDeactivated'])
+          || (request.resource.data.isDeactivated == true
+            && request.resource.data.diff(resource.data)
+              .affectedKeys()
+              .hasOnly(['isDeactivated', 'deactivatedAt', 'restoreDeadline']))
+        );
+      allow delete: if false;
 
       match /accounts/{accountId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isActiveOwner(userId);
       }
       match /categories/{categoryId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isActiveOwner(userId);
       }
       match /professions/{professionId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isActiveOwner(userId);
       }
       match /transactions/{transactionId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isActiveOwner(userId);
       }
       match /stock_items/{itemId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isActiveOwner(userId);
       }
       match /stock_movements/{movementId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isActiveOwner(userId);
       }
       match /notifications/{notificationId} {
-        allow read, delete, update: if isOwner(userId);
-        allow create: if isSignedIn();
-      }
-    }
+        allow read, delete, update: if isActiveOwner(userId);
+        allow create: if isSignedIn()
+          && isActiveUser(userId)
+          && isActiveOwner(request.auth.uid)
+          && request.resource.data.keys().hasAll(['data'])
+          && request.resource.data.data is map
+          && request.resource.data.data.get('senderUid', '') == request.auth.uid;
 
-    // --- Collection Group Query rule for customer orders ---
-    match /{path=**}/orders/{orderId} {
-      allow read: if isSignedIn()
-        && resource.data.customerId == request.auth.uid;
+        match /reports/{reporterId} {
+          allow create: if isActiveOwner(userId)
+            && reporterId == request.auth.uid
+            && request.resource.data.keys().hasAll([
+              'reporterUid', 'reason', 'createdAt'
+            ])
+            && request.resource.data.keys().hasOnly([
+              'reporterUid', 'reason', 'createdAt'
+            ])
+            && request.resource.data.reporterUid == request.auth.uid
+            && request.resource.data.reason == 'user_reported'
+            && request.resource.data.createdAt == request.time;
+          allow read, update, delete: if false;
+        }
+      }
     }
   }
 }

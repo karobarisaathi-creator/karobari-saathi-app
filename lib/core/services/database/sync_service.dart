@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, debugPrintStack;
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/profession_model.dart';
@@ -19,6 +19,15 @@ class SyncService extends BaseService {
   StreamSubscription? _accountsSub, _txSub, _proSub, _catSub, _connectivitySub;
   bool _hasCompletedInitialFetch = false;
   String? _listeningUserId;
+
+  void _logRealtimeSyncError(
+    String collection,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    debugPrint('Firestore $collection sync listener failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
 
   void startRealtimeSync() {
     final user = auth.currentUser;
@@ -39,6 +48,8 @@ class SyncService extends BaseService {
           accountsBox?.put(a.id, a);
       }
       notifyListeners();
+    }, onError: (Object error, StackTrace stackTrace) {
+      _logRealtimeSyncError('accounts', error, stackTrace);
     });
 
     _txSub =
@@ -66,9 +77,10 @@ class SyncService extends BaseService {
           await _professionService
               .recalculateProfessionFinance(t.professionId!);
       }
-      if (quickBillMetricsChanged) {
-      }
+      if (quickBillMetricsChanged) {}
       notifyListeners();
+    }, onError: (Object error, StackTrace stackTrace) {
+      _logRealtimeSyncError('transactions', error, stackTrace);
     });
 
     _catSub = userDoc.collection('categories').snapshots().listen((snap) {
@@ -81,6 +93,8 @@ class SyncService extends BaseService {
           categoriesBox?.put(cat.id, cat);
       }
       notifyListeners();
+    }, onError: (Object error, StackTrace stackTrace) {
+      _logRealtimeSyncError('categories', error, stackTrace);
     });
 
     _proSub = userDoc.collection('professions').snapshots().listen((snap) {
@@ -93,6 +107,8 @@ class SyncService extends BaseService {
         }
       }
       notifyListeners();
+    }, onError: (Object error, StackTrace stackTrace) {
+      _logRealtimeSyncError('professions', error, stackTrace);
     });
   }
 

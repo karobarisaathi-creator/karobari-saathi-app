@@ -5,7 +5,6 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
-import 'package:account_app/core/constants/quick_bill_constants.dart';
 import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/features/accounts/party_detail_screen.dart';
 import 'package:account_app/features/accounts/add_party_screen.dart';
@@ -16,6 +15,7 @@ import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/account_balance_utils.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/core/utils/party_summary_utils.dart';
 import 'package:account_app/features/accounts/sms_invitation_screen.dart';
 
 class PartyListScreen extends StatefulWidget {
@@ -83,12 +83,8 @@ class _PartyListScreenState extends State<PartyListScreen> {
           : Consumer<DatabaseService>(
               builder: (context, databaseService, child) {
                 final allAccounts = databaseService.getAccounts();
-                final parties = allAccounts
-                    .where((p) =>
-                        p.isActive &&
-                        p.category != 'Partner' &&
-                        p.id != QuickBillConstants.cashCustomerAccountId)
-                    .toList();
+                final parties =
+                    PartySummaryUtils.filterPartyAccounts(allAccounts);
 
                 return Container(
                   color: AppTheme.backgroundColor,
@@ -417,9 +413,7 @@ class _PartyListScreenState extends State<PartyListScreen> {
             .where((t) => t.accountId == party.id)
             .toList();
 
-        final openingBalance = party.balanceType.toLowerCase() == 'payable'
-            ? -party.initialBalance
-            : party.initialBalance;
+        final openingBalance = PartySummaryUtils.openingBalanceFor(party);
         final liveBalance = AccountBalanceUtils.ledgerBalance(
           partyTransactions,
           initialBalance: openingBalance,

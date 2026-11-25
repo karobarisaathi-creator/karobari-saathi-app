@@ -22,6 +22,7 @@ class ProfileInfoWidget extends StatelessWidget {
   final bool isCentered;
   final bool showText;
   final bool isVerticalCategory;
+  final bool isCategoryInline;
   final String? topLabel;
   final bool isStore;
   final Color? textColor;
@@ -55,6 +56,7 @@ class ProfileInfoWidget extends StatelessWidget {
     this.isCentered = false,
     this.showText = true,
     this.isVerticalCategory = false,
+    this.isCategoryInline = false,
     this.topLabel,
     this.isStore = false,
     this.textColor,
@@ -417,6 +419,23 @@ class ProfileInfoWidget extends StatelessWidget {
                                 ),
                               ),
                             ),
+                            if (isCategoryInline && displayCategory.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: UrduAwareText(
+                                  displayCategory,
+                                  style: TextStyle(
+                                    fontSize: isLarge ? 16 : 14,
+                                    color: categoryColor ?? AppTheme.themeColor,
+                                    fontFamily: fontFamily,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.0,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -428,7 +447,7 @@ class ProfileInfoWidget extends StatelessWidget {
                   ),
                 ],
               ),
-              if (isVerticalCategory && displayCategory.isNotEmpty) ...[
+              if (!isCategoryInline && isVerticalCategory && displayCategory.isNotEmpty) ...[
                 SizedBox(height: verticalSpacing),
                 Row(
                   mainAxisSize: MainAxisSize.min,

@@ -159,13 +159,16 @@ class AccountBalanceUtils {
     return balances;
   }
 
-  static AccountCycleBalance currentCycle(Iterable<Transaction> transactions) {
+  static AccountCycleBalance currentCycle(
+    Iterable<Transaction> transactions, {
+    double initialBalance = 0,
+  }) {
     final sortedTransactions = transactions.toList()..sort(_compareOrder);
 
-    double currentCycleCredit = 0;
-    double currentCycleDebit = 0;
-    double totalRunningCredit = 0;
-    double totalRunningDebit = 0;
+    double currentCycleCredit = initialBalance < 0 ? -initialBalance : 0;
+    double currentCycleDebit = initialBalance > 0 ? initialBalance : 0;
+    double totalRunningCredit = currentCycleCredit;
+    double totalRunningDebit = currentCycleDebit;
 
     for (final transaction in sortedTransactions) {
       final columns = transactionColumns(transaction);
@@ -182,9 +185,9 @@ class AccountBalanceUtils {
 
     if (currentCycleCredit == 0 &&
         currentCycleDebit == 0 &&
-        sortedTransactions.isNotEmpty) {
-      double lastCycleCredit = 0;
-      double lastCycleDebit = 0;
+        (sortedTransactions.isNotEmpty || initialBalance != 0)) {
+      double lastCycleCredit = initialBalance < 0 ? -initialBalance : 0;
+      double lastCycleDebit = initialBalance > 0 ? initialBalance : 0;
       for (final transaction in sortedTransactions) {
         final columns = transactionColumns(transaction);
         lastCycleDebit += columns.debit;
@@ -205,8 +208,11 @@ class AccountBalanceUtils {
     );
   }
 
-  static double currentCycleBalance(Iterable<Transaction> transactions) =>
-      currentCycle(transactions).balance;
+  static double currentCycleBalance(
+    Iterable<Transaction> transactions, {
+    double initialBalance = 0,
+  }) =>
+      currentCycle(transactions, initialBalance: initialBalance).balance;
 
   static ReceiptBalanceBreakdown receiptBreakdown({
     required Iterable<Transaction> transactions,

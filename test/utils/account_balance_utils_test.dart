@@ -921,4 +921,42 @@ void main() {
       expect(result.openingBalance, 200);
     });
   });
+
+  group('AccountBalanceUtils.currentCycle initialBalance', () {
+    test('handles opening balance with no transactions', () {
+      final receivable = AccountBalanceUtils.currentCycle(
+        const [],
+        initialBalance: 500,
+      );
+      final payable = AccountBalanceUtils.currentCycle(
+        const [],
+        initialBalance: -350,
+      );
+
+      expect(receivable.debit, 500);
+      expect(receivable.credit, 0);
+      expect(receivable.balance, 500);
+
+      expect(payable.debit, 0);
+      expect(payable.credit, 350);
+      expect(payable.balance, -350);
+    });
+
+    test('settles opening balance when matching transactions occur', () {
+      final payment = _transaction(
+        id: 'payment',
+        type: 'income',
+        amount: 500,
+        date: DateTime(2026, 1, 1),
+      );
+      final cycle = AccountBalanceUtils.currentCycle(
+        [payment],
+        initialBalance: 500,
+      );
+
+      expect(cycle.debit, 500);
+      expect(cycle.credit, 500);
+      expect(cycle.balance, 0);
+    });
+  });
 }

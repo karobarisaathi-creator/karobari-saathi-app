@@ -6,10 +6,32 @@ class ProfileService extends BaseService {
 
   static void clearCache() => _profileCacheMap.clear();
 
+  static Map<String, dynamic> publicProfileData({
+    required String uid,
+    required Map<String, dynamic> userData,
+    required String? verifiedPhoneNumber,
+  }) {
+    final profile = <String, dynamic>{
+      'uid': uid,
+      'phoneNumber': verifiedPhoneNumber,
+      'displayName': userData['displayName'] ?? userData['name'],
+      'photoURL': userData['photoURL'] ?? userData['photoUrl'],
+      'profession': userData['profession'],
+      'businessAddress': userData['address'] ??
+          userData['businessAddress'] ??
+          userData['shopAddress'] ??
+          userData['storeAddress'] ??
+          userData['location'],
+      'shopName': userData['shopName'] ?? userData['storeName'],
+    };
+    profile.removeWhere((key, value) => value == null);
+    return profile;
+  }
+
   Future<Map<String, String>?> findPublicProfileByPhone(String phone) async {
     for (final candidate in Formatters.phoneNumberLookupCandidates(phone)) {
       final query = await firestore
-          .collection('users')
+          .collection('public_profiles')
           .where('phoneNumber', isEqualTo: candidate)
           .limit(1)
           .get();
@@ -50,9 +72,7 @@ class ProfileService extends BaseService {
                   data['profileImage'] ??
                   '')
               .toString(),
-          'profession':
-              (data['profession'] ?? data['category'] ?? data['shopName'] ?? '')
-                  .toString(),
+          'profession': (data['profession'] ?? '').toString(),
           'address': addr,
         };
 
@@ -76,13 +96,14 @@ class ProfileService extends BaseService {
         'name': localAccount.name,
         'photoUrl': localAccount.profileImage ?? '',
         'phone': localAccount.phone,
+        'profession': localAccount.profession ?? '',
         'address': localAccount.address ?? '',
       };
       _profileCacheMap[uid] = res;
       return res;
     }
 
-    final doc = await firestore.collection('users').doc(uid).get();
+    final doc = await firestore.collection('public_profiles').doc(uid).get();
     if (doc.exists) {
       final data = doc.data()!;
       String addr = (data['businessAddress'] ??
@@ -117,9 +138,7 @@ class ProfileService extends BaseService {
             (data['photoURL'] ?? data['photoUrl'] ?? data['profileImage'] ?? '')
                 .toString(),
         'phone': (data['phoneNumber'] ?? '').toString(),
-        'profession':
-            (data['profession'] ?? data['category'] ?? data['shopName'] ?? '')
-                .toString(),
+        'profession': (data['profession'] ?? '').toString(),
         'address': addr,
       };
 

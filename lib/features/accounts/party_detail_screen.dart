@@ -12,6 +12,7 @@ import 'package:account_app/core/models/account_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/utils/account_balance_utils.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:account_app/core/utils/party_summary_utils.dart';
 import 'package:account_app/core/utils/receipt_dialog_helper.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
@@ -277,21 +278,14 @@ class _CombinedHeader extends StatelessWidget {
             .toList()
           ..sort((a, b) => b.date.compareTo(a.date));
 
-        final openingBalance = party.balanceType.toLowerCase() == 'payable'
-            ? -party.initialBalance
-            : party.initialBalance;
+        final openingBalance = PartySummaryUtils.openingBalanceFor(party);
 
-        final cycle = AccountBalanceUtils.currentCycle(allTx);
-        double totalCredit = cycle.credit;
-        double totalDebit = cycle.debit;
-
-        if (allTx.isEmpty) {
-          if (openingBalance > 0) {
-            totalDebit += openingBalance;
-          } else if (openingBalance < 0) {
-            totalCredit += openingBalance.abs();
-          }
-        }
+        final cycle = AccountBalanceUtils.currentCycle(
+          allTx,
+          initialBalance: openingBalance,
+        );
+        final double totalCredit = cycle.credit;
+        final double totalDebit = cycle.debit;
 
         double currentBalance = totalDebit - totalCredit;
         final bool isReceivable = currentBalance > 0;
@@ -307,16 +301,15 @@ class _CombinedHeader extends StatelessWidget {
         final remotePhoto = remoteProfileMap?['photoUrl']?.trim() ?? '';
         final localPhoto = (party.profileImage ?? '').trim();
         final remoteProf = remoteProfileMap?['profession']?.trim() ?? '';
-        final localProf = (isUrdu ? 'پرسنل کھاتہ' : 'Personal Account').trim();
+        final localProf = (party.profession ?? '').trim();
         final remoteAddress = remoteProfileMap?['address']?.trim() ?? '';
         final localAddress = (party.address ?? '').trim();
 
         final bool hasUpdate = remoteProfileMap != null &&
             ((remoteName.isNotEmpty && remoteName != localName) ||
                 (remotePhoto.isNotEmpty && remotePhoto != localPhoto) ||
-                (remoteProf.isNotEmpty &&
-                    remoteProf != party.category &&
-                    remoteProf != localProf) ||
+                (remoteProf != localProf &&
+                    (remoteProf.isNotEmpty || localProf.isNotEmpty)) ||
                 (remoteAddress.isNotEmpty && remoteAddress != localAddress));
 
         return Column(

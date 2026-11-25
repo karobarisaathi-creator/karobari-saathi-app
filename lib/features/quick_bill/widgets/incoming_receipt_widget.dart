@@ -25,6 +25,7 @@ class IncomingReceiptWidget extends StatelessWidget {
   final String businessAddress;
   final String billedToName;
   final String billedToPhone;
+  final Widget? bottomActions;
 
   const IncomingReceiptWidget({
     super.key,
@@ -35,6 +36,7 @@ class IncomingReceiptWidget extends StatelessWidget {
     this.businessAddress = '',
     this.billedToName = '',
     this.billedToPhone = '',
+    this.bottomActions,
   });
 
   @override
@@ -48,6 +50,7 @@ class IncomingReceiptWidget extends StatelessWidget {
       billedToName: billedToName,
       billedToPhone: billedToPhone,
       isIncomingReceipt: true,
+      bottomActions: bottomActions,
     );
   }
 }

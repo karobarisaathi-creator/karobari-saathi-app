@@ -65,6 +65,9 @@ class StockService with ChangeNotifier {
           snapshot.docs.map((doc) => StockItem.fromMap(doc.data())).toList();
       _itemsLoaded = true;
       _updateLoadingState();
+    }, onError: (Object error, StackTrace stackTrace) {
+      debugPrint('Firestore stock items listener failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
     });
 
     _movementsSub?.cancel();
@@ -78,6 +81,9 @@ class StockService with ChangeNotifier {
           .toList();
       _movementsLoaded = true;
       _updateLoadingState();
+    }, onError: (Object error, StackTrace stackTrace) {
+      debugPrint('Firestore stock movements listener failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
     });
   }
 

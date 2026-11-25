@@ -12,15 +12,12 @@ import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'package:account_app/core/models/transaction_item_model.dart' as model;
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/contract_model.dart';
-import 'package:account_app/core/models/category_model.dart';
 import 'package:account_app/core/config/professions_config.dart';
-import 'package:account_app/features/professions/categories_management_screen.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/utils/formatters.dart';
-import 'package:uuid/uuid.dart';
 
 const String _contractExpenseCategoryParentId = 'contract_expenses';
 
@@ -438,29 +435,16 @@ class _AddProjectTransactionScreenState
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: UrduAwareText(
-                  isUrdu ? 'ٹھیکہ خرچ کا زمرہ' : 'Contract expense category',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: fontWeight,
-                    fontFamily: fontFamily,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ),
-              IconButton(
-                tooltip: isUrdu ? 'زمرے منظم کریں' : 'Manage categories',
-                onPressed: () => _manageContractExpenseCategories(isUrdu),
-                icon: Icon(
-                  PhosphorIcons.gear(),
-                  color: AppTheme.themeColor,
-                ),
-              ),
-            ],
+          UrduAwareText(
+            isUrdu ? 'ٹھیکہ خرچ کا زمرہ' : 'Contract expense category',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: fontWeight,
+              fontFamily: fontFamily,
+              color: Colors.grey.shade600,
+            ),
           ),
+          const SizedBox(height: 6),
           if (categories.isEmpty)
             UrduAwareText(
               isUrdu
@@ -928,7 +912,7 @@ class _AddProjectTransactionScreenState
       List<model.TransactionItem> items = [];
       String mainDesc = "";
       for (var entry in _itemEntries) {
-        final desc = entry.descriptionController.text;
+        final desc = entry.descriptionController.text.trim();
         final total =
             Formatters.tryParseAmount(entry.totalController.text) ?? 0;
         if (total > 0 || desc.isNotEmpty) {
@@ -988,71 +972,7 @@ class _AddProjectTransactionScreenState
     }
   }
 
-  Future<void> _manageContractExpenseCategories(bool isUrdu) async {
-    final db = Provider.of<DatabaseService>(context, listen: false);
-    final categories = db
-        .getCategories()
-        .where(
-            (category) => category.parentId == _contractExpenseCategoryParentId)
-        .toList();
-    await Navigator.push<void>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CategoriesManagementScreen(
-          categories: categories.map((category) => category.name).toList(),
-          isUrdu: isUrdu,
-          categoryType: ProfessionCategory.general,
-          title: isUrdu ? 'ٹھیکہ خرچ کے زمرے' : 'Contract Expense Categories',
-          description: isUrdu
-              ? 'یہ زمرے صرف ٹھیکے کے اخراجات کے لیے ہیں، پیشوں سے الگ۔'
-              : 'These categories are only for contract expenses, separate from professions.',
-          useDefaultCategories: false,
-          onCategoriesUpdated: (updatedNames) async {
-            final currentByName = {
-              for (final category in categories)
-                category.name.toLowerCase(): category,
-            };
-            final updatedNamesLower =
-                updatedNames.map((name) => name.toLowerCase()).toSet();
-            for (final category in categories) {
-              if (!updatedNamesLower.contains(category.name.toLowerCase())) {
-                await db.deleteCategory(category.id);
-              }
-            }
-            for (final name in updatedNames) {
-              if (currentByName.containsKey(name.toLowerCase())) continue;
-              final now = DateTime.now();
-              await db.addCategory(
-                Category(
-                  id: 'contract_expense_${const Uuid().v4()}',
-                  name: name,
-                  type: CategoryType.expense,
-                  parentId: _contractExpenseCategoryParentId,
-                  color: '#D97706',
-                  icon: 'package',
-                  createdAt: now,
-                  updatedAt: now,
-                ),
-              );
-            }
-          },
-        ),
-      ),
-    );
-    if (!mounted) return;
-    final remaining = db
-        .getCategories()
-        .where((category) =>
-            category.parentId == _contractExpenseCategoryParentId &&
-            category.isActive)
-        .map((category) => category.name)
-        .toSet();
-    setState(() {
-      if (_selectedCategory != null && !remaining.contains(_selectedCategory)) {
-        _selectedCategory = null;
-      }
-    });
-  }
+
 
   @override
   void dispose() {

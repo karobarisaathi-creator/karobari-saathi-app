@@ -348,16 +348,25 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         : '';
 
     final health = report.healthLabel;
-    final healthColor = _healthColor(health);
 
     return Container(
       margin: EdgeInsets.zero,
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: LinearGradient(
+          colors: [AppTheme.themeColor, AppTheme.incomeColor],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.backgroundColor, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.themeColor.withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -372,7 +381,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
-                    color: AppTheme.darkColor,
+                    color: Colors.white,
                     fontFamily: fontFamily,
                     letterSpacing: -0.3,
                     height: 1.3,
@@ -384,7 +393,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                 padding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: healthColor.withValues(alpha: 0.10),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Row(
@@ -395,7 +404,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                           ? PhosphorIcons.checkCircle(PhosphorIconsStyle.fill)
                           : PhosphorIcons.warning(PhosphorIconsStyle.fill),
                       size: 11,
-                      color: healthColor,
+                      color: Colors.white,
                     ),
                     const SizedBox(width: 4),
                     UrduAwareText(
@@ -405,7 +414,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                       style: TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w800,
-                        color: healthColor,
+                        color: Colors.white,
                         fontFamily: fontFamily,
                         letterSpacing: 0.2,
                       ),

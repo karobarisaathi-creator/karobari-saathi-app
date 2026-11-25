@@ -54,19 +54,23 @@ class _ProfileUpdateDialogState extends State<ProfileUpdateDialog> {
 
     final remoteName = widget.remoteProfile['name']?.trim() ?? '';
     final localName = widget.party.name.trim();
-    final bool isNameDifferent = remoteName.isNotEmpty && remoteName != localName;
+    final bool isNameDifferent =
+        remoteName.isNotEmpty && remoteName != localName;
 
     final remotePhoto = widget.remoteProfile['photoUrl']?.trim() ?? '';
     final localPhoto = (widget.party.profileImage ?? '').trim();
-    final bool isPhotoDifferent = remotePhoto.isNotEmpty && remotePhoto != localPhoto;
+    final bool isPhotoDifferent =
+        remotePhoto.isNotEmpty && remotePhoto != localPhoto;
 
     final remoteProf = widget.remoteProfile['profession']?.trim() ?? '';
-    final localProf = (widget.party.category).trim();
-    final bool isProfDifferent = remoteProf.isNotEmpty && remoteProf != localProf;
+    final localProf = (widget.party.profession ?? '').trim();
+    final bool isProfDifferent = remoteProf != localProf &&
+        (remoteProf.isNotEmpty || localProf.isNotEmpty);
 
     final remoteAddress = widget.remoteProfile['address']?.trim() ?? '';
     final localAddress = (widget.party.address ?? '').trim();
-    final bool isAddressDifferent = remoteAddress.isNotEmpty && remoteAddress != localAddress;
+    final bool isAddressDifferent =
+        remoteAddress.isNotEmpty && remoteAddress != localAddress;
 
     return AlertDialog(
       backgroundColor: Colors.white,
@@ -153,7 +157,8 @@ class _ProfileUpdateDialogState extends State<ProfileUpdateDialog> {
                           ),
                         ],
                       ),
-                      Icon(PhosphorIcons.arrowRight(), color: AppTheme.themeColor, size: 20),
+                      Icon(PhosphorIcons.arrowRight(),
+                          color: AppTheme.themeColor, size: 20),
                       Column(
                         children: [
                           UrduAwareText(
@@ -167,9 +172,12 @@ class _ProfileUpdateDialogState extends State<ProfileUpdateDialog> {
                           ),
                           const SizedBox(height: 4),
                           ProfileInfoWidget(
-                            name: remoteName.isNotEmpty ? remoteName : localName,
+                            name:
+                                remoteName.isNotEmpty ? remoteName : localName,
                             phone: widget.party.phone,
-                            profileImage: remotePhoto.isNotEmpty ? remotePhoto : widget.party.profileImage,
+                            profileImage: remotePhoto.isNotEmpty
+                                ? remotePhoto
+                                : widget.party.profileImage,
                             showText: false,
                             customSize: 44,
                             borderRadius: 8,
@@ -184,7 +192,9 @@ class _ProfileUpdateDialogState extends State<ProfileUpdateDialog> {
                   _buildComparisonRow(
                     label: isUrdu ? 'نام' : 'Name',
                     icon: PhosphorIcons.user(),
-                    currentVal: localName.isNotEmpty ? localName : (isUrdu ? 'نامعلوم' : 'Unknown'),
+                    currentVal: localName.isNotEmpty
+                        ? localName
+                        : (isUrdu ? 'نامعلوم' : 'Unknown'),
                     newVal: remoteName,
                     isChanged: isNameDifferent,
                     isUrdu: isUrdu,
@@ -192,13 +202,17 @@ class _ProfileUpdateDialogState extends State<ProfileUpdateDialog> {
                     isHighlight: isNameDifferent,
                   ),
 
-                  // Category / Profession Comparison
-                  if (remoteProf.isNotEmpty)
+                  // Profession comparison
+                  if (remoteProf.isNotEmpty || localProf.isNotEmpty)
                     _buildComparisonRow(
-                      label: isUrdu ? 'زمرہ / کاروبار' : 'Category / Profession',
+                      label: isUrdu ? 'پیشہ' : 'Profession',
                       icon: PhosphorIcons.briefcase(),
-                      currentVal: localProf.isNotEmpty ? localProf : (isUrdu ? 'عام' : 'General'),
-                      newVal: remoteProf,
+                      currentVal: localProf.isNotEmpty
+                          ? localProf
+                          : (isUrdu ? 'درج نہیں' : 'Not set'),
+                      newVal: remoteProf.isNotEmpty
+                          ? remoteProf
+                          : (isUrdu ? 'ہٹا دیا جائے گا' : 'Will be removed'),
                       isChanged: isProfDifferent,
                       isUrdu: isUrdu,
                       fontFamily: fontFamily,
@@ -209,7 +223,9 @@ class _ProfileUpdateDialogState extends State<ProfileUpdateDialog> {
                   _buildComparisonRow(
                     label: isUrdu ? 'پتہ (Address)' : 'Address',
                     icon: PhosphorIcons.mapPin(),
-                    currentVal: localAddress.isNotEmpty ? localAddress : (isUrdu ? 'درج نہیں ہے' : 'Not set'),
+                    currentVal: localAddress.isNotEmpty
+                        ? localAddress
+                        : (isUrdu ? 'درج نہیں ہے' : 'Not set'),
                     newVal: remoteAddress,
                     isChanged: isAddressDifferent,
                     isUrdu: isUrdu,
@@ -273,10 +289,14 @@ class _ProfileUpdateDialogState extends State<ProfileUpdateDialog> {
       padding: isHighlight ? const EdgeInsets.all(8) : EdgeInsets.zero,
       decoration: isHighlight
           ? BoxDecoration(
-              color: isChanged ? Colors.green.withValues(alpha: 0.08) : Colors.grey.withValues(alpha: 0.05),
+              color: isChanged
+                  ? Colors.green.withValues(alpha: 0.08)
+                  : Colors.grey.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: isChanged ? Colors.green.withValues(alpha: 0.3) : Colors.grey.shade300,
+                color: isChanged
+                    ? Colors.green.withValues(alpha: 0.3)
+                    : Colors.grey.shade300,
               ),
             )
           : null,
@@ -307,7 +327,8 @@ class _ProfileUpdateDialogState extends State<ProfileUpdateDialog> {
                     if (isChanged) ...[
                       const SizedBox(width: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1),
                         decoration: BoxDecoration(
                           color: Colors.green.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(4),
@@ -349,7 +370,11 @@ class _ProfileUpdateDialogState extends State<ProfileUpdateDialog> {
                   ),
                 ] else ...[
                   UrduAwareText(
-                    currentVal.isNotEmpty ? currentVal : (newVal.isNotEmpty ? newVal : (isUrdu ? 'درج نہیں ہے' : 'Not specified')),
+                    currentVal.isNotEmpty
+                        ? currentVal
+                        : (newVal.isNotEmpty
+                            ? newVal
+                            : (isUrdu ? 'درج نہیں ہے' : 'Not specified')),
                     style: TextStyle(
                       fontSize: 13,
                       fontFamily: fontFamily,
@@ -383,8 +408,11 @@ class _ProfileUpdateDialogState extends State<ProfileUpdateDialog> {
     try {
       final updatedParty = widget.party.copyWith(
         name: isNameDifferent ? remoteName : widget.party.name,
-        profileImage: isPhotoDifferent ? remotePhoto : widget.party.profileImage,
-        category: isProfDifferent ? remoteProf : widget.party.category,
+        profileImage:
+            isPhotoDifferent ? remotePhoto : widget.party.profileImage,
+        profession:
+            isProfDifferent && remoteProf.isNotEmpty ? remoteProf : null,
+        clearProfession: isProfDifferent && remoteProf.isEmpty,
         address: isAddressDifferent ? remoteAddress : widget.party.address,
         updatedAt: DateTime.now(),
       );
@@ -395,7 +423,9 @@ class _ProfileUpdateDialogState extends State<ProfileUpdateDialog> {
       if (mounted) {
         AppToast.success(
           context,
-          isUrdu ? 'پارٹی معلومات کامیابی سے اپڈیٹ ہو گئیں' : 'Party profile updated successfully',
+          isUrdu
+              ? 'پارٹی معلومات کامیابی سے اپڈیٹ ہو گئیں'
+              : 'Party profile updated successfully',
         );
         Navigator.pop(context, true);
         if (widget.onUpdated != null) widget.onUpdated!();

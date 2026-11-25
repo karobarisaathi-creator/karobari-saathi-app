@@ -9,6 +9,7 @@ import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/worker_payroll_service.dart';
 import 'package:account_app/core/services/worker_service.dart';
+import 'package:account_app/core/services/contract_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/widgets/app_button.dart';
@@ -28,7 +29,7 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen> {
   DateTime _selectedDate = DateTime.now();
   List<Account> _workers = [];
   final Map<String, WorkerAttendanceStatus> _attendanceMap = {};
-  final Map<String, WorkerAttendanceStatus> _initialAttendanceMap = {};
+  final Map<String, WorkerAttendanceStatus?> _initialAttendanceMap = {};
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -58,27 +59,21 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen> {
       final workerService = Provider.of<WorkerService>(context, listen: false);
       final payrollService =
           Provider.of<WorkerPayrollService>(context, listen: false);
+      final contractService =
+          Provider.of<ContractService>(context, listen: false);
 
-      final combined = await workerService.ensureWorkerAccounts(dbService);
-
-      for (var a in dbService.accounts) {
-        if (a.category == 'worker' ||
-            a.category == 'technician' ||
-            a.category == 'employee') {
-          if (!combined.any((c) =>
-              c.id == a.id || c.name.toLowerCase() == a.name.toLowerCase())) {
-            combined.add(a);
-          }
-        }
-      }
-
+      final combined = await workerService.ensureWorkerAccounts(
+        dbService,
+        payrollService: payrollService,
+        contractService: contractService,
+      );
       _attendanceMap.clear();
       _initialAttendanceMap.clear();
       for (final worker in combined) {
         final record = payrollService.getAttendance(worker.id, _selectedDate);
         final status = record?.status ?? WorkerAttendanceStatus.present;
         _attendanceMap[worker.id] = status;
-        _initialAttendanceMap[worker.id] = status;
+        _initialAttendanceMap[worker.id] = record?.status;
       }
 
       if (mounted) {

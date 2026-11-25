@@ -10,9 +10,19 @@ import 'package:account_app/core/services/database_service.dart';
 class QuickBillConstants {
   static const String cashCustomerAccountId = 'cash_customer';
   static const String cashCustomerName = 'نقد گاہک';
+  static const Set<String> _cashCustomerLabels = {
+    cashCustomerName,
+    'cash customer',
+  };
 
   static const String itemCategoriesSettingKey = 'quick_bill_item_categories';
   static const String defaultCategory = 'عمومی';
+
+  static bool isCashCustomerAccount(Account account) {
+    return account.id == cashCustomerAccountId ||
+        _cashCustomerLabels.contains(account.name.trim().toLowerCase()) ||
+        _cashCustomerLabels.contains(account.category.trim().toLowerCase());
+  }
 
   /// "نقد فروخت" اکاؤنٹ موجود نہ ہو تو بنا دیتا ہے، تاکہ نقد گاہک کی
   /// فروخت بھی ایک درست Transaction کے طور پر محفوظ ہو سکے۔

@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/widgets/image_selector_field.dart';
 import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
-import 'package:account_app/core/services/stock_service.dart';
 import 'package:account_app/features/dashboard/app_shell_screen.dart';
 import 'package:account_app/features/profile/controllers/profile_controller.dart';
-import 'package:account_app/features/shopkeeper/home_screen.dart';
 
 class MasterProfileScreen extends StatefulWidget {
   const MasterProfileScreen({super.key});
@@ -53,7 +50,6 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
     if (_isSavingProfile) return;
     if (!_formKey.currentState!.validate()) return;
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-    final stockService = Provider.of<StockService>(context, listen: false);
     setState(() {
       _isSavingProfile = true;
       _saveLoadingText =
@@ -67,36 +63,10 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
       if (!success) {
         AppToast.error(
           context,
-          _controller.locationUnavailable
-              ? (isUrdu
-                  ? 'دکان کا پتہ نقشے پر نہیں ملا۔ پتہ درست کریں یا لوکیشن کی اجازت دے کر دوبارہ کوشش کریں۔'
-                  : 'Shop address could not be located. Correct the address or allow location access and try again.')
-              : (_controller.errorMessage ??
-                  (isUrdu
-                      ? 'پروفائل محفوظ نہیں ہو سکا'
-                      : 'Unable to save profile')),
+          _controller.errorMessage ??
+              (isUrdu ? 'پروفائل محفوظ نہیں ہو سکا' : 'Unable to save profile'),
         );
         return;
-      }
-
-      if (_controller.isShopkeeper) {
-        setState(() {
-          _saveLoadingText = isUrdu
-              ? 'پروفائل محفوظ؛ مصنوعات شائع ہو رہی ہیں...'
-              : 'Profile saved; publishing products...';
-        });
-        try {
-          await stockService.syncPublicCatalog();
-        } catch (error) {
-          if (!mounted) return;
-          AppToast.error(
-            context,
-            isUrdu
-                ? 'پروفائل محفوظ ہوگیا، مگر دکان کے اشیاء شائع نہیں ہوسکے: $error'
-                : 'Profile saved, but shop items could not be published: $error',
-          );
-          return;
-        }
       }
 
       if (!mounted) return;
@@ -144,6 +114,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
     _controller.emailController.isUrdu = isUrdu;
     _controller.addressController.isUrdu = isUrdu;
     _controller.shopNameController.isUrdu = isUrdu;
+    _controller.professionController.isUrdu = isUrdu;
+    _controller.aboutController.isUrdu = isUrdu;
 
     return ChangeNotifierProvider.value(
       value: _controller,
@@ -187,74 +159,6 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                         ),
                         const SizedBox(height: 8),
 
-                        // Shop Banner Image
-                        ImageSelectorField(
-                          label: isUrdu
-                              ? 'دکان کا بینر (تصویر)'
-                              : 'Shop Banner Image',
-                          isFullWidth: true,
-                          aspectRatio: 16 / 6,
-                          selectedFiles: controller.bannerImage == null
-                              ? []
-                              : [controller.bannerImage!],
-                          remoteUrls: controller.remoteBannerImage == null
-                              ? []
-                              : [controller.remoteBannerImage!],
-                          maxTotal: 1,
-                          onFilesChanged: (files) {
-                            controller.bannerImage =
-                                files.isEmpty ? null : files.first;
-                            controller.notifyListeners();
-                          },
-                          onRemoteRemoved: (_) {
-                            controller.remoteBannerImage = null;
-                            controller.notifyListeners();
-                          },
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Detailed Shop Note
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppTheme.themeColor.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color:
-                                  AppTheme.themeColor.withValues(alpha: 0.22),
-                            ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Icon(
-                                  PhosphorIcons.storefront(),
-                                  size: 20,
-                                  color: AppTheme.themeColor,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: UrduAwareText(
-                                  isUrdu
-                                      ? '🏪 دکان رجسٹر کرنے کی تفصیل:\nدکان کا نام درج کریں؛ پتہ درج کریں تو اسی سے مقام لیا جائے گا۔ پتہ خالی چھوڑنے پر ایپ آپ کی موجودہ لوکیشن استعمال کرے گی۔ پھر آپ کی دکان "قریبی دکاندار" میں دکھائی دے گی۔'
-                                      : '🏪 Shop Registration Details:\nEnter a shop name and address to list your shop under "Nearby Shops". If the address is left blank, the app will use your current location. Customers can browse your live stock and catalog.',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.darkColor,
-                                    fontFamily: fontFamily,
-                                    height: 1.45,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-
                         // Fields Container
                         Container(
                           clipBehavior: Clip.antiAlias,
@@ -288,6 +192,13 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                               ),
                               const Divider(height: 1),
                               _buildField(
+                                controller: controller.professionController,
+                                label: isUrdu ? 'شعبہ / پیشہ' : 'Profession',
+                                icon: PhosphorIcons.briefcase(),
+                                fontFamily: fontFamily,
+                              ),
+                              const Divider(height: 1),
+                              _buildField(
                                 controller: controller.phoneController,
                                 label: isUrdu ? 'فون نمبر' : 'Phone Number',
                                 icon: PhosphorIcons.phone(),
@@ -315,8 +226,8 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                               _buildField(
                                 controller: controller.shopNameController,
                                 label: isUrdu
-                                    ? 'دکان کا نام (اختیاری)'
-                                    : 'Shop Name (Optional)',
+                                    ? 'کمپنی / شاپ کا نام (اختیاری)'
+                                    : 'Company / Shop Name (Optional)',
                                 icon: PhosphorIcons.storefront(),
                                 fontFamily: fontFamily,
                               ),
@@ -332,83 +243,6 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                             ],
                           ),
                         ),
-
-                        if (controller.isShopkeeper) ...[
-                          const SizedBox(height: 8),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const HomeScreen(),
-                                ),
-                              );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 14),
-                              decoration: BoxDecoration(
-                                color:
-                                    AppTheme.themeColor.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: AppTheme.themeColor
-                                      .withValues(alpha: 0.3),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.themeColor,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(
-                                      Icons.storefront_rounded,
-                                      color: Colors.white,
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        UrduAwareText(
-                                          isUrdu
-                                              ? 'شاپ کیپر ڈیش بورڈ کھولیں'
-                                              : 'Open Shopkeeper Dashboard',
-                                          style: TextStyle(
-                                            fontSize: 13.5,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppTheme.darkColor,
-                                            fontFamily: fontFamily,
-                                          ),
-                                        ),
-                                        UrduAwareText(
-                                          isUrdu
-                                              ? 'سٹاک اور پروڈکٹس کا حساب کتاب'
-                                              : 'Manage stock & products',
-                                          style: TextStyle(
-                                            fontSize: 10.5,
-                                            color: AppTheme.textSecondary,
-                                            fontFamily: fontFamily,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const Icon(
-                                    Icons.chevron_right_rounded,
-                                    color: AppTheme.themeColor,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
 
                         const SizedBox(height: 8),
                         AppButton(
@@ -441,6 +275,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
     FocusNode? focusNode,
     VoidCallback? onTap,
     String? Function(String?)? validator,
+    int maxLines = 1,
   }) {
     return TextFormField(
       controller: controller,
@@ -448,6 +283,7 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
       focusNode: focusNode,
       onTap: onTap,
       validator: validator,
+      maxLines: maxLines,
       style: TextStyle(color: readOnly ? Colors.grey : AppTheme.darkColor),
       decoration: InputDecoration(
         labelText: label,

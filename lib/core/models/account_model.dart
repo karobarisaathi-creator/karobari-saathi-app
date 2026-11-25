@@ -5,6 +5,46 @@ part 'account_model.g.dart';
 
 @HiveType(typeId: 0)
 class Account {
+  static const Set<String> _workerAccountTypes = {
+    'worker',
+    'technician',
+    'employee',
+    'مزدور',
+    'کاریگر/مستری',
+    'ملازم',
+  };
+
+  static const Set<String> _knownAccountTypes = {
+    ..._workerAccountTypes,
+    'general',
+    'عام',
+    'customer',
+    'گاہک',
+    'supplier',
+    'سپلائر',
+    'wholesaler',
+    'ہول سیلر',
+    'retailer',
+    'پرچون فروش',
+    'farmer',
+    'کاشتکار',
+    'agent',
+    'ایجنٹ/آڑھتی',
+    'transport',
+    'ٹرانسپورٹ',
+    'investor',
+    'سرمایہ کار',
+    'business',
+    'کاروباری',
+    'friend',
+    'دوست',
+    'family',
+    'فیملی',
+    'other',
+    'دیگر',
+    'partner',
+  };
+
   @HiveField(0)
   final String id;
 
@@ -18,7 +58,7 @@ class Account {
   final String? address;
 
   @HiveField(4)
-  final String category;
+  final String accountType;
 
   @HiveField(5)
   final double initialBalance;
@@ -50,12 +90,26 @@ class Account {
   @HiveField(16)
   final String? storeImage;
 
+  @HiveField(17)
+  final String? profession;
+
+  String get category => accountType;
+
+  bool get isWorkerAccount => isWorkerAccountType(accountType);
+
+  static bool isWorkerAccountType(String value) =>
+      _workerAccountTypes.contains(value.trim().toLowerCase());
+
+  static bool isKnownAccountType(String value) =>
+      _knownAccountTypes.contains(value.trim().toLowerCase());
+
   Account({
     required this.id,
     required this.name,
     required this.phone,
     this.address,
-    required this.category,
+    String? category,
+    String? accountType,
     required this.initialBalance,
     required this.balanceType,
     required this.balance,
@@ -65,8 +119,9 @@ class Account {
     this.isActive = true,
     this.storeName,
     this.storeImage,
+    this.profession,
     this.settlementNotes = const {},
-  });
+  }) : accountType = accountType ?? category ?? 'Other';
 
   Map<String, dynamic> toMap() {
     return {
@@ -74,7 +129,9 @@ class Account {
       'name': name,
       'phone': phone,
       'address': address,
-      'category': category,
+      'category': accountType,
+      'accountType': accountType,
+      'profession': profession,
       'initialBalance': initialBalance,
       'balanceType': balanceType,
       'balance': balance,
@@ -103,7 +160,10 @@ class Account {
       name: map['name']?.toString() ?? '',
       phone: map['phone']?.toString() ?? '',
       address: map['address']?.toString(),
-      category: map['category']?.toString() ?? 'Other',
+      accountType: map['accountType']?.toString() ??
+          map['category']?.toString() ??
+          'Other',
+      profession: map['profession']?.toString(),
       initialBalance: (map['initialBalance'] is num)
           ? (map['initialBalance'] as num).toDouble()
           : 0.0,
@@ -127,6 +187,7 @@ class Account {
     String? phone,
     String? address,
     String? category,
+    String? accountType,
     double? initialBalance,
     String? balanceType,
     double? balance,
@@ -136,6 +197,8 @@ class Account {
     bool? isActive,
     String? storeName,
     String? storeImage,
+    String? profession,
+    bool clearProfession = false,
     Map<String, String>? settlementNotes,
   }) {
     return Account(
@@ -143,7 +206,7 @@ class Account {
       name: name ?? this.name,
       phone: phone ?? this.phone,
       address: address ?? this.address,
-      category: category ?? this.category,
+      accountType: accountType ?? category ?? this.accountType,
       initialBalance: initialBalance ?? this.initialBalance,
       balanceType: balanceType ?? this.balanceType,
       balance: balance ?? this.balance,
@@ -153,6 +216,7 @@ class Account {
       isActive: isActive ?? this.isActive,
       storeName: storeName ?? this.storeName,
       storeImage: storeImage ?? this.storeImage,
+      profession: clearProfession ? null : profession ?? this.profession,
       settlementNotes:
           settlementNotes ?? this.settlementNotes ?? const <String, String>{},
     );

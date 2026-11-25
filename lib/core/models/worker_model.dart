@@ -38,12 +38,13 @@ class WorkerModel {
   }
 
   WorkerModel copyWith({
+    String? id,
     String? name,
     String? phone,
     String? skill,
   }) {
     return WorkerModel(
-      id: id,
+      id: id ?? this.id,
       name: name ?? this.name,
       phone: phone ?? this.phone,
       skill: skill ?? this.skill,
