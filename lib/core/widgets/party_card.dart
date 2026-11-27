@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -12,7 +11,6 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/utils/party_summary_utils.dart';
 import 'package:account_app/features/accounts/widgets/party_trust_metrics.dart';
-import 'package:account_app/features/accounts/widgets/party_trust_popup.dart';
 import 'profile_info_widget.dart';
 import 'profile_update_dialog.dart';
 
@@ -140,6 +138,9 @@ class _PartyCardState extends State<PartyCard> {
     final localPhoto = (widget.party.profileImage ?? '').trim();
     final remoteProf = _remoteProfileMap?['profession']?.trim() ?? '';
     final localProf = (widget.party.profession ?? '').trim();
+    final displayProfession = localProf.isNotEmpty ? localProf : remoteProf;
+    final displaySubtitle =
+        displayProfession.isNotEmpty ? displayProfession : displayCategory;
     final remoteAddress = _remoteProfileMap?['address']?.trim() ?? '';
     final localAddress = (widget.party.address ?? '').trim();
 
@@ -274,7 +275,7 @@ class _PartyCardState extends State<PartyCard> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   UrduAwareText(
-                                    displayCategory,
+                                    displaySubtitle,
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: AppTheme.themeColor,
@@ -283,20 +284,6 @@ class _PartyCardState extends State<PartyCard> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                  if ((widget.party.profession ?? '')
-                                      .trim()
-                                      .isNotEmpty)
-                                    UrduAwareText(
-                                      '${isUrdu ? 'پیشہ' : 'Profession'}: '
-                                      '${widget.party.profession!.trim()}',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: AppTheme.textSecondary,
-                                        fontFamily: fontFamily,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
                                 ],
                               ),
                             ),
@@ -388,42 +375,32 @@ class _PartyCardState extends State<PartyCard> {
                         width: 1,
                         color: Colors.grey.withValues(alpha: 0.3)),
 
-                    // Trust Score Action
+                    // Trust Score Display
                     Expanded(
-                      child: InkWell(
-                        onTap: () => PartyTrustPopup.show(
-                          context: context,
-                          trustScore: trustMetrics.hasTransactionHistory
-                              ? trustMetrics.overallScore
-                              : null,
-                          isUrdu: isUrdu,
-                          fontFamily: fontFamily,
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                PhosphorIcons.shieldCheck(
-                                    PhosphorIconsStyle.fill),
-                                size: 16,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              PhosphorIcons.shieldCheck(
+                                  PhosphorIconsStyle.fill),
+                              size: 16,
+                              color: trustMetrics.badgeColor,
+                            ),
+                            const SizedBox(width: 4),
+                            UrduAwareText(
+                              trustMetrics.hasTransactionHistory
+                                  ? '${trustMetrics.overallScore.round()}%'
+                                  : (isUrdu ? 'بھروسہ' : 'Trust'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
                                 color: trustMetrics.badgeColor,
+                                fontFamily: fontFamily,
                               ),
-                              const SizedBox(width: 4),
-                              UrduAwareText(
-                                trustMetrics.hasTransactionHistory
-                                    ? '${trustMetrics.overallScore.round()}%'
-                                    : (isUrdu ? 'بھروسہ' : 'Trust'),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: trustMetrics.badgeColor,
-                                  fontFamily: fontFamily,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),

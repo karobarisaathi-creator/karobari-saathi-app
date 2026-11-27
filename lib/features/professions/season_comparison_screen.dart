@@ -11,6 +11,7 @@ import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/season_report_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
+import 'package:account_app/core/utils/formatters.dart';
 
 class SeasonComparisonScreen extends StatefulWidget {
   final Profession seasonA;
@@ -27,20 +28,13 @@ class SeasonComparisonScreen extends StatefulWidget {
 }
 
 class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
-  // ═════════════════════════════════════════════════════════
-  // Cached Reports
-  // ═════════════════════════════════════════════════════════
   late bool _hasTwo;
   late Profession _newSeason;
   Profession? _oldSeason;
   late SeasonReportData _newReport;
   SeasonReportData? _oldReport;
-  bool _reportBuilt = false;
-
   void _buildReports(DatabaseService db) {
-    if (_reportBuilt) return;
-
-    _hasTwo = widget.seasonB != null;
+    _hasTwo = widget.seasonB != null && widget.seasonB!.id != widget.seasonA.id;
 
     if (_hasTwo) {
       if (widget.seasonA.createdAt.isAfter(widget.seasonB!.createdAt)) {
@@ -66,35 +60,15 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             transactions: allTx,
           )
         : null;
-
-    _reportBuilt = true;
   }
 
   // ═════════════════════════════════════════════════════════
   // Helpers
   // ═════════════════════════════════════════════════════════
-  String _formatMoney(double amount) {
-    final abs = amount.abs();
-    final sign = amount < 0 ? '-' : '';
-    if (abs >= 1000000) {
-      return '$sign${(abs / 1000000).toStringAsFixed(2)}M';
-    }
-    if (abs >= 1000) {
-      return '$sign${(abs / 1000).toStringAsFixed(0)}K';
-    }
-    return '$sign${abs.toStringAsFixed(0)}';
-  }
+  String _formatMoney(double amount) => Formatters.formatCompact(amount);
 
-  String _formatFull(double amount) {
-    final isNegative = amount < 0;
-    final str = amount.abs().toStringAsFixed(0);
-    final buffer = StringBuffer();
-    for (int i = 0; i < str.length; i++) {
-      if (i > 0 && (str.length - i) % 3 == 0) buffer.write(',');
-      buffer.write(str[i]);
-    }
-    return '${isNegative ? '-' : ''}${buffer.toString()}';
-  }
+  String _formatFull(double amount) =>
+      Formatters.formatAmountWithCurrency(amount);
 
   String _formatQty(double qty) {
     if (qty == qty.roundToDouble()) return qty.toStringAsFixed(0);
@@ -107,7 +81,6 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
     final db = Provider.of<DatabaseService>(context);
 
-    // Build reports only once (cached)
     _buildReports(db);
 
     final hasTwo = _hasTwo;
@@ -115,6 +88,9 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
     final oldSeason = _oldSeason;
     final newReport = _newReport;
     final oldReport = _oldReport;
+    final canComparePerAcre = hasTwo
+        ? newReport.areaAcres > 0 && oldReport!.areaAcres > 0
+        : newReport.areaAcres > 0;
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
@@ -142,12 +118,14 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             const SizedBox(height: 8),
 
             // ═══ Per Acre Metrics ═══
-            if (!hasTwo)
-              _buildPerAcreCard(newReport, isUrdu, fontFamily)
-            else
-              _buildComparePerAcreCard(
-                  newReport, oldReport!, isUrdu, fontFamily),
-            const SizedBox(height: 8),
+            if (canComparePerAcre) ...[
+              if (!hasTwo)
+                _buildPerAcreCard(newReport, isUrdu, fontFamily)
+              else
+                _buildComparePerAcreCard(
+                    newReport, oldReport!, isUrdu, fontFamily),
+              const SizedBox(height: 8),
+            ],
 
             // ═══ Target Progress (single only) ═══
             if (!hasTwo &&
@@ -164,7 +142,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                 icon: PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold),
                 iconColor: AppTheme.incomeColor,
                 iconBg: AppTheme.incomeColor.withValues(alpha: 0.10),
-                badge: 'Rs ${_formatMoney(newReport.totalIncome)}',
+                badge: _formatMoney(newReport.totalIncome),
                 categories: newReport.incomeCategories,
                 total: newReport.totalIncome,
                 isIncome: true,
@@ -173,9 +151,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               )
             else
               _buildCompareCategoryCard(
-                title: isUrdu
-                    ? 'آمدن کی زمرہ وار موازنہ'
-                    : 'Income Categories',
+                title: isUrdu ? 'آمدن کی زمرہ وار موازنہ' : 'Income Categories',
                 icon: PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold),
                 iconColor: AppTheme.incomeColor,
                 iconBg: AppTheme.incomeColor.withValues(alpha: 0.10),
@@ -196,7 +172,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                 icon: PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold),
                 iconColor: AppTheme.expenseColor,
                 iconBg: AppTheme.expenseColor.withValues(alpha: 0.10),
-                badge: 'Rs ${_formatMoney(newReport.totalExpense)}',
+                badge: _formatMoney(newReport.totalExpense),
                 categories: newReport.expenseCategories,
                 total: newReport.totalExpense,
                 isIncome: false,
@@ -337,11 +313,11 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // 1. Season Header (Single)
   // ═════════════════════════════════════════════════════════
   Widget _buildSingleHeader(
-      Profession season,
-      SeasonReportData report,
-      bool isUrdu,
-      String? fontFamily,
-      ) {
+    Profession season,
+    SeasonReportData report,
+    bool isUrdu,
+    String? fontFamily,
+  ) {
     final displayName = season.name;
     final crop = season.cropType.isNotEmpty
         ? '${isUrdu ? 'فصل' : 'Crop'}: ${season.cropType}'
@@ -391,7 +367,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               const SizedBox(width: 10),
               Container(
                 padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(999),
@@ -440,14 +416,14 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                 _headerChip(
                   icon: PhosphorIcons.ruler(),
                   label:
-                  '${_formatQty(report.areaAcres)} ${isUrdu ? "ایکڑ" : "acres"}',
+                      '${_formatQty(report.areaAcres)} ${isUrdu ? "ایکڑ" : "acres"}',
                   fontFamily: fontFamily,
                 ),
               if (report.productionMun > 0)
                 _headerChip(
                   icon: PhosphorIcons.package(),
                   label:
-                  '${_formatQty(report.productionMun)} ${isUrdu ? "من" : "mun"}',
+                      '${_formatQty(report.productionMun)} ${isUrdu ? "من" : "mun"}',
                   fontFamily: fontFamily,
                 ),
             ],
@@ -488,11 +464,11 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // 1b. Season Header (Comparison)
   // ═════════════════════════════════════════════════════════
   Widget _buildCompareHeader(
-      Profession newSeason,
-      Profession oldSeason,
-      bool isUrdu,
-      String? fontFamily,
-      ) {
+    Profession newSeason,
+    Profession oldSeason,
+    bool isUrdu,
+    String? fontFamily,
+  ) {
     return Container(
       margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(16),
@@ -540,11 +516,11 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   }
 
   Widget _seasonPill(
-      String label,
-      Color color,
-      String? fontFamily,
-      String tag,
-      ) {
+    String label,
+    Color color,
+    String? fontFamily,
+    String tag,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -597,10 +573,10 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // 2. Hero Summary (Single)
   // ═════════════════════════════════════════════════════════
   Widget _buildHeroSummary(
-      SeasonReportData report,
-      bool isUrdu,
-      String? fontFamily,
-      ) {
+    SeasonReportData report,
+    bool isUrdu,
+    String? fontFamily,
+  ) {
     return Column(
       children: [
         Row(
@@ -608,7 +584,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             Expanded(
               child: _heroCard(
                 label: isUrdu ? 'کل آمدن' : 'Total Income',
-                value: 'Rs ${_formatFull(report.totalIncome)}',
+                value: _formatFull(report.totalIncome),
                 icon: PhosphorIcons.arrowDownLeft(PhosphorIconsStyle.bold),
                 iconColor: AppTheme.incomeColor,
                 iconBg: AppTheme.incomeColor.withValues(alpha: 0.10),
@@ -620,7 +596,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
             Expanded(
               child: _heroCard(
                 label: isUrdu ? 'کل خرچ' : 'Total Expense',
-                value: 'Rs ${_formatFull(report.totalExpense)}',
+                value: _formatFull(report.totalExpense),
                 icon: PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold),
                 iconColor: AppTheme.expenseColor,
                 iconBg: AppTheme.expenseColor.withValues(alpha: 0.10),
@@ -633,7 +609,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         const SizedBox(height: 8),
         _heroCard(
           label: isUrdu ? 'خالص منافع' : 'Net Profit',
-          value: 'Rs ${_formatFull(report.netProfit)}',
+          value: _formatFull(report.netProfit),
           icon: PhosphorIcons.money(),
           iconColor: AppTheme.incomeColor,
           iconBg: AppTheme.incomeColor.withValues(alpha: 0.10),
@@ -739,11 +715,11 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // 2b. Hero Summary (Comparison)
   // ═════════════════════════════════════════════════════════
   Widget _buildCompareHeroSummary(
-      SeasonReportData newR,
-      SeasonReportData oldR,
-      bool isUrdu,
-      String? fontFamily,
-      ) {
+    SeasonReportData newR,
+    SeasonReportData oldR,
+    bool isUrdu,
+    String? fontFamily,
+  ) {
     return _sectionCard(
       title: isUrdu ? 'مالیاتی موازنہ' : 'Financial Comparison',
       icon: PhosphorIcons.money(),
@@ -853,23 +829,21 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   }
 
   Widget _compareRow(
-      String label,
-      double newVal,
-      double oldVal,
-      String? fontFamily, {
-        bool lowerIsBetter = false,
-        bool isPercent = false,
-      }) {
+    String label,
+    double newVal,
+    double oldVal,
+    String? fontFamily, {
+    bool lowerIsBetter = false,
+    bool isPercent = false,
+  }) {
     final diff = newVal - oldVal;
     final isNeutral = diff == 0;
     final isGood = lowerIsBetter ? diff < 0 : diff > 0;
 
-    final newText = isPercent
-        ? '${newVal.toStringAsFixed(1)}%'
-        : _formatMoney(newVal);
-    final oldText = isPercent
-        ? '${oldVal.toStringAsFixed(1)}%'
-        : _formatMoney(oldVal);
+    final newText =
+        isPercent ? '${newVal.toStringAsFixed(1)}%' : _formatMoney(newVal);
+    final oldText =
+        isPercent ? '${oldVal.toStringAsFixed(1)}%' : _formatMoney(oldVal);
     final diffText = isPercent
         ? '${diff >= 0 ? "+" : ""}${diff.toStringAsFixed(1)}%'
         : '${diff >= 0 ? "+" : ""}${_formatMoney(diff)}';
@@ -937,8 +911,10 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
               padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 2),
               decoration: BoxDecoration(
                 color: (isNeutral
-                    ? AppTheme.textSecondary
-                    : (isGood ? AppTheme.incomeColor : AppTheme.expenseColor))
+                        ? AppTheme.textSecondary
+                        : (isGood
+                            ? AppTheme.incomeColor
+                            : AppTheme.expenseColor))
                     .withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(6),
               ),
@@ -971,10 +947,10 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // 3. Per Acre Metrics (Single)
   // ═════════════════════════════════════════════════════════
   Widget _buildPerAcreCard(
-      SeasonReportData report,
-      bool isUrdu,
-      String? fontFamily,
-      ) {
+    SeasonReportData report,
+    bool isUrdu,
+    String? fontFamily,
+  ) {
     return _sectionCard(
       title: isUrdu ? 'فی ایکڑ تفصیلات' : 'Per Acre Metrics',
       icon: PhosphorIcons.ruler(),
@@ -982,9 +958,9 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
       iconBg: AppTheme.themeColor.withValues(alpha: 0.10),
       badge: report.areaAcres > 0
           ? _badge(
-        '${_formatQty(report.areaAcres)} ${isUrdu ? "ایکڑ" : "acres"}',
-        AppTheme.themeColor,
-      )
+              '${_formatQty(report.areaAcres)} ${isUrdu ? "ایکڑ" : "acres"}',
+              AppTheme.themeColor,
+            )
           : null,
       fontFamily: fontFamily,
       children: [
@@ -997,12 +973,12 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         if (report.rentPerAcre > 0) ...[
           _metricRow(
             isUrdu ? 'فی ایکڑ ٹھیکہ' : 'Rent / Acre',
-            'Rs ${_formatFull(report.rentPerAcre)}',
+            _formatFull(report.rentPerAcre),
             fontFamily,
           ),
           _metricRow(
             isUrdu ? 'کل ٹھیکہ' : 'Total Lease',
-            'Rs ${_formatFull(report.totalLease)}',
+            _formatFull(report.totalLease),
             fontFamily,
             valueColor: AppTheme.expenseColor,
           ),
@@ -1023,13 +999,13 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         if (report.areaAcres > 0) ...[
           _metricRow(
             isUrdu ? 'فی ایکڑ خرچ' : 'Cost / Acre',
-            'Rs ${_formatFull(report.costPerAcre)}',
+            _formatFull(report.costPerAcre),
             fontFamily,
             valueColor: AppTheme.expenseColor,
           ),
           _metricRow(
             isUrdu ? 'فی ایکڑ منافع' : 'Profit / Acre',
-            'Rs ${_formatFull(report.profitPerAcre)}',
+            _formatFull(report.profitPerAcre),
             fontFamily,
             valueColor: AppTheme.incomeColor,
           ),
@@ -1037,12 +1013,12 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
         if (report.productionMun > 0) ...[
           _metricRow(
             isUrdu ? 'فی من اوسط ریٹ' : 'Avg Rate / Mun',
-            'Rs ${_formatFull(report.avgRatePerMun)}',
+            _formatFull(report.avgRatePerMun),
             fontFamily,
           ),
           _metricRow(
             isUrdu ? 'فی من لاگت' : 'Cost / Mun',
-            'Rs ${_formatFull(report.costPerMun)}',
+            _formatFull(report.costPerMun),
             fontFamily,
             valueColor: AppTheme.expenseColor,
           ),
@@ -1055,11 +1031,11 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // ⭐ _metricRow — تمام الفاظ پوری طرح
   // ═════════════════════════════════════════════════════════
   Widget _metricRow(
-      String label,
-      String value,
-      String? fontFamily, {
-        Color? valueColor,
-      }) {
+    String label,
+    String value,
+    String? fontFamily, {
+    Color? valueColor,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
@@ -1109,11 +1085,11 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // 3b. Per Acre (Comparison)
   // ═════════════════════════════════════════════════════════
   Widget _buildComparePerAcreCard(
-      SeasonReportData newR,
-      SeasonReportData oldR,
-      bool isUrdu,
-      String? fontFamily,
-      ) {
+    SeasonReportData newR,
+    SeasonReportData oldR,
+    bool isUrdu,
+    String? fontFamily,
+  ) {
     return _sectionCard(
       title: isUrdu ? 'فی ایکڑ موازنہ' : 'Per Acre Comparison',
       icon: PhosphorIcons.ruler(),
@@ -1154,19 +1130,21 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
           oldR.profitPerAcre,
           fontFamily,
         ),
-        _compareRow(
-          isUrdu ? 'فی من اوسط ریٹ' : 'Avg Rate / Mun',
-          newR.avgRatePerMun,
-          oldR.avgRatePerMun,
-          fontFamily,
-        ),
-        _compareRow(
-          isUrdu ? 'فی من لاگت' : 'Cost / Mun',
-          newR.costPerMun,
-          oldR.costPerMun,
-          fontFamily,
-          lowerIsBetter: true,
-        ),
+        if (newR.productionMun > 0 && oldR.productionMun > 0) ...[
+          _compareRow(
+            isUrdu ? 'فی من اوسط ریٹ' : 'Avg Rate / Mun',
+            newR.avgRatePerMun,
+            oldR.avgRatePerMun,
+            fontFamily,
+          ),
+          _compareRow(
+            isUrdu ? 'فی من لاگت' : 'Cost / Mun',
+            newR.costPerMun,
+            oldR.costPerMun,
+            fontFamily,
+            lowerIsBetter: true,
+          ),
+        ],
       ],
     );
   }
@@ -1175,10 +1153,10 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // 4. Target Card (Single only)
   // ═════════════════════════════════════════════════════════
   Widget _buildTargetCard(
-      SeasonReportData report,
-      bool isUrdu,
-      String? fontFamily,
-      ) {
+    SeasonReportData report,
+    bool isUrdu,
+    String? fontFamily,
+  ) {
     if (report.targetProduction <= 0 && report.benchmarkCostPerUnit <= 0) {
       return const SizedBox.shrink();
     }
@@ -1232,17 +1210,16 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
     final health = percent >= 80
         ? 'excellent'
         : percent >= 60
-        ? 'good'
-        : percent >= 40
-        ? 'fair'
-        : 'poor';
+            ? 'good'
+            : percent >= 40
+                ? 'fair'
+                : 'poor';
     final color = _healthColor(health);
 
     final valueText =
-    unit == 'Rs' ? 'Rs ${_formatFull(value)}' : '${_formatQty(value)} $unit';
-    final targetText = unit == 'Rs'
-        ? 'Rs ${_formatFull(target)}'
-        : '${_formatQty(target)} $unit';
+        unit == 'Rs' ? _formatFull(value) : '${_formatQty(value)} $unit';
+    final targetText =
+        unit == 'Rs' ? _formatFull(target) : '${_formatQty(target)} $unit';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -1331,7 +1308,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
     String? fontFamily,
   }) {
     final colors =
-    isIncome ? _incomeCategoryColors() : _expenseCategoryColors();
+        isIncome ? _incomeCategoryColors() : _expenseCategoryColors();
 
     return _sectionCard(
       title: title,
@@ -1365,12 +1342,12 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   }
 
   Widget _catRow(
-      CategoryBreakdown cat,
-      double total,
-      Color color,
-      bool isUrdu,
-      String? fontFamily,
-      ) {
+    CategoryBreakdown cat,
+    double total,
+    Color color,
+    bool isUrdu,
+    String? fontFamily,
+  ) {
     final percent = total > 0 ? cat.percentOf(total) : 0.0;
 
     return Container(
@@ -1415,7 +1392,7 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerRight,
                   child: UrduAwareText(
-                    'Rs ${_formatFull(cat.amount)}',
+                    _formatFull(cat.amount),
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w900,
@@ -1500,12 +1477,12 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
 
     final rows = allNames.map((name) {
       final newC = newCategories.firstWhere(
-            (c) => c.name == name,
+        (c) => c.name == name,
         orElse: () =>
             CategoryBreakdown(name: name, amount: 0, isIncome: isIncome),
       );
       final oldC = oldCategories.firstWhere(
-            (c) => c.name == name,
+        (c) => c.name == name,
         orElse: () =>
             CategoryBreakdown(name: name, amount: 0, isIncome: isIncome),
       );
@@ -1608,8 +1585,8 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
                       color: (isIncome
-                          ? newTotal - oldTotal >= 0
-                          : newTotal - oldTotal <= 0)
+                              ? newTotal - oldTotal >= 0
+                              : newTotal - oldTotal <= 0)
                           ? AppTheme.incomeColor
                           : AppTheme.expenseColor,
                     ),
@@ -1627,10 +1604,10 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
   // 6. Budget Alert Card
   // ═════════════════════════════════════════════════════════
   Widget _buildBudgetAlertCard(
-      List<MapEntry<String, MapEntry<double, double>>> overruns,
-      bool isUrdu,
-      String? fontFamily,
-      ) {
+    List<MapEntry<String, MapEntry<double, double>>> overruns,
+    bool isUrdu,
+    String? fontFamily,
+  ) {
     return _sectionCard(
       title: isUrdu ? 'بجٹ کی حد' : 'Budget Alerts',
       icon: PhosphorIcons.bellRinging(),
@@ -1650,19 +1627,18 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
           children: [
             _metricRow(
               '$name — ${isUrdu ? "بجٹ" : "Budget"}',
-              'Rs ${_formatFull(limit)}',
+              _formatFull(limit),
               fontFamily,
             ),
             _metricRow(
               '$name — ${isUrdu ? "اصل" : "Actual"}',
-              'Rs ${_formatFull(actual)}',
+              _formatFull(actual),
               fontFamily,
               valueColor: AppTheme.expenseColor,
             ),
             Container(
               margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: AppTheme.expenseColor.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(14),
@@ -1679,8 +1655,8 @@ class _SeasonComparisonScreenState extends State<SeasonComparisonScreen> {
                   Expanded(
                     child: UrduAwareText(
                       isUrdu
-                          ? '$name کی حد سے ${percent.toStringAsFixed(1)}% زیادہ (Rs ${_formatFull(over)})'
-                          : '$name exceeded by ${percent.toStringAsFixed(1)}% (Rs ${_formatFull(over)})',
+                          ? '$name کی حد سے ${percent.toStringAsFixed(1)}% زیادہ (${_formatFull(over)})'
+                          : '$name exceeded by ${percent.toStringAsFixed(1)}% (${_formatFull(over)})',
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

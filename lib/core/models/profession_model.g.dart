@@ -41,13 +41,14 @@ class ProfessionAdapter extends TypeAdapter<Profession> {
       areaAcres: fields[21] == null ? 0.0 : fields[21] as double,
       rentPerAcre: fields[22] == null ? 0.0 : fields[22] as double,
       productionMun: fields[23] == null ? 0.0 : fields[23] as double,
+      notes: fields[24] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Profession obj) {
     writer
-      ..writeByte(24)
+      ..writeByte(25)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -95,7 +96,9 @@ class ProfessionAdapter extends TypeAdapter<Profession> {
       ..writeByte(22)
       ..write(obj.rentPerAcre)
       ..writeByte(23)
-      ..write(obj.productionMun);
+      ..write(obj.productionMun)
+      ..writeByte(24)
+      ..write(obj.notes);
   }
 
   @override

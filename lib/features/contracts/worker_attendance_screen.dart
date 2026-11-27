@@ -249,12 +249,15 @@ class _WorkerAttendanceScreenState extends State<WorkerAttendanceScreen> {
               name: widget.worker.name,
               phone: widget.worker.phone,
               profileImage: widget.worker.profileImage,
-              category: widget.worker.category,
+              category: widget.worker.profession?.trim().isNotEmpty == true
+                  ? widget.worker.profession!.trim()
+                  : widget.worker.category,
               address: widget.worker.address,
+              isCategoryInline: true,
               textColor: Colors.white,
               subtitleColor: Colors.white70,
               addressColor: Colors.white70,
-              categoryColor: Colors.white70,
+              categoryColor: Colors.white,
               customSize: 44,
               suffix: Icon(
                 PhosphorIcons.identificationCard(),

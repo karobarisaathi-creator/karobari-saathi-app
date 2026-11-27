@@ -257,8 +257,14 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen> {
                                         name: worker.name,
                                         phone: worker.phone,
                                         profileImage: worker.profileImage,
-                                        category: worker.category,
-                                        address: worker.address,
+                                        category: worker.profession
+                                                    ?.trim()
+                                                    .isNotEmpty ==
+                                                true
+                                            ? worker.profession!.trim()
+                                            : worker.category,
+                                        isCategoryInline: true,
+                                        categoryColor: AppTheme.themeColor,
                                         isLarge: false,
                                         customSize: 36,
                                         borderRadius: 8,

@@ -32,7 +32,6 @@ class ScreenAppBar extends StatelessWidget implements PreferredSizeWidget {
           ? IconButton(
               icon: const Icon(Icons.arrow_back),
               onPressed: () => Navigator.maybePop(context),
-              tooltip: isUrdu ? 'پیچھے جائیں' : 'Back',
             )
           : null,
       automaticallyImplyLeading: showBackButton,

@@ -24,6 +24,7 @@ import 'package:account_app/core/widgets/item_rate_history_card_widget.dart';
 import 'package:account_app/features/accounts/add_transaction_screen.dart';
 import 'package:account_app/features/accounts/sms_invitation_screen.dart';
 import 'package:account_app/features/accounts/widgets/party_tools_grid_widget.dart';
+import 'package:account_app/features/accounts/widgets/party_trust_metrics.dart';
 import 'package:account_app/features/dashboard/app_shell_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -134,9 +135,9 @@ class _PartyCombinedScreenState extends State<PartyCombinedScreen>
           }
         },
         child: Scaffold(
-          backgroundColor: AppTheme.scaffoldBackground,
+          backgroundColor: AppTheme.backgroundColor,
           appBar: ScreenAppBar(
-            title: isUrdu ? 'پارٹی ڈیٹیل' : 'Party Detail',
+            title: isUrdu ? 'کھاتہ تفصیل' : 'Account Detail',
             isUrdu: isUrdu,
             actions: [
               IconButton(
@@ -193,7 +194,7 @@ class _PartyCombinedScreenState extends State<PartyCombinedScreen>
                 curve: Curves.easeInOut,
                 child: _showSearch
                     ? Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
                         child: SearchSortBar(
                           controller: _searchController,
                           hintText: isUrdu ? 'تلاش کریں...' : 'Search...',
@@ -302,6 +303,9 @@ class _CombinedHeader extends StatelessWidget {
         final localPhoto = (party.profileImage ?? '').trim();
         final remoteProf = remoteProfileMap?['profession']?.trim() ?? '';
         final localProf = (party.profession ?? '').trim();
+        final displayProfession = localProf.isNotEmpty ? localProf : remoteProf;
+        final displaySubtitle =
+            displayProfession.isNotEmpty ? displayProfession : party.category;
         final remoteAddress = remoteProfileMap?['address']?.trim() ?? '';
         final localAddress = (party.address ?? '').trim();
 
@@ -345,9 +349,10 @@ class _CombinedHeader extends StatelessWidget {
                         name: party.name,
                         phone: party.phone,
                         profileImage: party.profileImage,
-                        category: party.category,
+                        category: displaySubtitle,
                         address: party.address,
                         isLarge: false,
+                        isCategoryInline: true,
                         isVerticalCategory: false,
                         textColor: Colors.white,
                         subtitleColor: Colors.white70,
@@ -807,59 +812,62 @@ class _TransactionsTabState extends State<_TransactionsTab> {
           ? _compareTransactions(a, b)
           : _compareTransactions(b, a));
 
-    return Stack(
-      children: [
-        Column(
-          children: [
-            // ═══ LIST LABELS ═══
-            _buildListLabels(),
+    return Container(
+      color: AppTheme.backgroundColor,
+      child: Stack(
+        children: [
+          Column(
+            children: [
+              // ═══ LIST LABELS ═══
+              _buildListLabels(),
 
-            // ═══ TRANSACTIONS LIST ═══
-            Expanded(
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: AppTheme.themeColor,
+              // ═══ TRANSACTIONS LIST ═══
+              Expanded(
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: AppTheme.themeColor,
+                        ),
+                      )
+                    : filtered.isEmpty
+                        ? _buildEmptyState()
+                        : _buildTransactionList(filtered),
+              ),
+            ],
+          ),
+
+          // ═══ FAB ═══
+          if (!widget.isReadOnly)
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 200),
+              bottom: _isFabVisible ? 20 : -80,
+              left: 20,
+              child: FloatingActionButton(
+                heroTag: 'combined_fab',
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AddTransactionScreen(
+                        account: widget.party,
                       ),
-                    )
-                  : filtered.isEmpty
-                      ? _buildEmptyState()
-                      : _buildTransactionList(filtered),
-            ),
-          ],
-        ),
-
-        // ═══ FAB ═══
-        if (!widget.isReadOnly)
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 200),
-            bottom: _isFabVisible ? 20 : -80,
-            right: 20,
-            child: FloatingActionButton(
-              heroTag: 'combined_fab',
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => AddTransactionScreen(
-                      account: widget.party,
                     ),
-                  ),
-                );
-                if (!mounted) return;
-                _load();
-              },
-              backgroundColor: AppTheme.slateColor,
-              shape: const CircleBorder(),
-              elevation: 4,
-              child: const Icon(
-                Icons.add,
-                color: Colors.white,
-                size: 28,
+                  );
+                  if (!mounted) return;
+                  _load();
+                },
+                backgroundColor: AppTheme.slateColor,
+                shape: const CircleBorder(),
+                elevation: 4,
+                child: const Icon(
+                  Icons.add,
+                  color: Colors.white,
+                  size: 28,
+                ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -881,7 +889,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                 color: AppTheme.themeColor,
                 fontSize: 13,
                 fontFamily: widget.fontFamily,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.normal,
               ),
             ),
           ),
@@ -925,7 +933,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                 color: AppTheme.themeColor,
                 fontSize: 12,
                 fontFamily: widget.fontFamily,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.normal,
               ),
             ),
           ),
@@ -1196,7 +1204,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontFamily: widget.fontFamily,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.normal,
                       fontSize: 13,
                       color: AppTheme.darkColor,
                     ),
@@ -1221,7 +1229,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                       style: const TextStyle(
                         fontSize: 11.5,
                         color: AppTheme.textSecondary,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.normal,
                       ),
                     ),
                   ),
@@ -1232,7 +1240,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                           '${widget.isUrdu ? "بنام:" : "Debit:"} ${Formatters.formatAmountWithCurrency(totalDebit)}',
                           style: const TextStyle(
                             fontSize: 11,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.normal,
                             color: AppTheme.expenseColor,
                           ),
                         ),
@@ -1243,7 +1251,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                           '${widget.isUrdu ? "جمع:" : "Credit:"} ${Formatters.formatAmountWithCurrency(totalCredit)}',
                           style: const TextStyle(
                             fontSize: 11,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.normal,
                             color: AppTheme.incomeColor,
                           ),
                         ),
@@ -1296,7 +1304,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                     style: TextStyle(
                       color: AppTheme.darkColor,
                       fontWeight: FontWeight.normal,
-                      fontSize: 15,
+                      fontSize: 14,
                       fontFamily: widget.fontFamily,
                     ),
                     maxLines: 2,
@@ -1323,7 +1331,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                             style: TextStyle(
                               color: AppTheme.themeColor,
                               fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.normal,
                               fontFamily:
                                   widget.isUrdu ? widget.fontFamily : null,
                             ),
@@ -1337,7 +1345,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                             style: TextStyle(
                               color: AppTheme.purpleColor,
                               fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.normal,
                               fontFamily: widget.fontFamily,
                             ),
                           ),
@@ -1368,7 +1376,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                   style: const TextStyle(
                     color: AppTheme.expenseColor,
                     fontWeight: FontWeight.bold,
-                    fontSize: 15,
+                    fontSize: 14,
                   ),
                 ),
               ),
@@ -1385,7 +1393,7 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                   style: const TextStyle(
                     color: AppTheme.incomeColor,
                     fontWeight: FontWeight.bold,
-                    fontSize: 15,
+                    fontSize: 14,
                   ),
                 ),
               ),
@@ -1648,7 +1656,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
     return Container(
       color: AppTheme.backgroundColor,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 30),
+        padding: const EdgeInsets.fromLTRB(8, 0, 8, 30),
         child: Column(
           children: [
             PartyToolsGridWidget(
@@ -1672,7 +1680,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
                 ),
               )
             else
-              ..._itemHistory.entries.map((e) {
+              ..._itemHistory.entries.expand((e) {
                 final cardHistory = e.value
                     .map((h) => ItemPriceHistory(
                           price: h.price,
@@ -1686,14 +1694,18 @@ class _AnalysisTabState extends State<_AnalysisTab> {
                         ))
                     .toList();
 
-                return ItemRateHistoryCardWidget(
-                  itemName: e.key,
-                  partyName: widget.party.name,
-                  history: cardHistory,
-                  isUrdu: widget.isUrdu,
-                  fontFamily: widget.fontFamily,
-                  onItemUpdated: _loadData,
-                );
+                return [
+                  ItemRateHistoryCardWidget(
+                    itemName: e.key,
+                    partyName: widget.party.name,
+                    history: cardHistory,
+                    isUrdu: widget.isUrdu,
+                    fontFamily: widget.fontFamily,
+                    onItemUpdated: _loadData,
+                    margin: EdgeInsets.zero,
+                  ),
+                  const SizedBox(height: 8),
+                ];
               }),
           ],
         ),
@@ -1702,27 +1714,18 @@ class _AnalysisTabState extends State<_AnalysisTab> {
   }
 
   Widget _build3Stats() {
-    return Column(
-      children: [
-        _fullWidthStatCard(
-          _getRelationshipPeriod(),
-          widget.isUrdu ? 'تعلق کے دن/دورانیہ' : 'Relationship Duration',
-          PhosphorIcons.calendar(),
-        ),
-        const SizedBox(height: 8),
-        _fullWidthStatCard(
-          _formatVolume(_totalVolume),
-          widget.isUrdu ? 'کل کاروبار کا حجم' : 'Total Business Volume',
-          PhosphorIcons.chartBar(),
-        ),
-      ],
+    final trustMetrics = PartyTrustMetrics.calculate(
+      party: widget.party,
+      transactions: _transactions,
+      isUrdu: widget.isUrdu,
     );
-  }
 
-  Widget _fullWidthStatCard(String value, String label, IconData icon) {
+    final trustValue = trustMetrics.hasTransactionHistory
+        ? '${trustMetrics.overallScore.round()}%'
+        : (widget.isUrdu ? 'نیا کھاتہ' : 'New');
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -1735,30 +1738,73 @@ class _AnalysisTabState extends State<_AnalysisTab> {
           ),
         ],
       ),
+      child: Column(
+        children: [
+          _buildStatRowItem(
+            icon: PhosphorIcons.calendar(),
+            label: widget.isUrdu ? 'تعلق' : 'Relationship',
+            value: _getRelationshipPeriod(),
+            iconBgColor: AppTheme.themeColor.withValues(alpha: 0.1),
+            iconColor: AppTheme.themeColor,
+          ),
+          const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+          _buildStatRowItem(
+            icon: PhosphorIcons.chartBar(),
+            label: widget.isUrdu ? 'کاروبار کا حجم' : 'Business Volume',
+            value: _formatVolume(_totalVolume),
+            iconBgColor: AppTheme.themeColor.withValues(alpha: 0.1),
+            iconColor: AppTheme.themeColor,
+          ),
+          const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+          _buildStatRowItem(
+            icon: PhosphorIcons.shieldCheck(PhosphorIconsStyle.fill),
+            label: widget.isUrdu ? 'بھروسہ (ٹرسٹ)' : 'Trust Score',
+            value: trustValue,
+            valueColor: trustMetrics.hasTransactionHistory
+                ? trustMetrics.badgeColor
+                : AppTheme.darkColor,
+            iconBgColor: trustMetrics.badgeColor.withValues(alpha: 0.12),
+            iconColor: trustMetrics.badgeColor,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatRowItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? valueColor,
+    required Color iconBgColor,
+    required Color iconColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 14),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
-                  color: AppTheme.themeColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  color: iconBgColor,
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   icon,
-                  size: 18,
-                  color: AppTheme.themeColor,
+                  size: 16,
+                  color: iconColor,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               UrduAwareText(
                 label,
                 style: TextStyle(
                   fontFamily: widget.fontFamily,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.normal,
                   color: AppTheme.darkColor,
                 ),
               ),
@@ -1766,10 +1812,10 @@ class _AnalysisTabState extends State<_AnalysisTab> {
           ),
           UrduAwareText(
             value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              color: AppTheme.darkColor,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.normal,
+              color: valueColor ?? AppTheme.darkColor,
             ),
           ),
         ],

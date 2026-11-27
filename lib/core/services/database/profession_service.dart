@@ -1,10 +1,81 @@
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:account_app/core/models/profession_model.dart';
 import 'package:account_app/core/models/transaction_model.dart' as model;
 import 'base_service.dart';
 
 class ProfessionService extends BaseService {
+  @visibleForTesting
+  static Set<String> professionTreeIds(
+    Iterable<Profession> professions,
+    String rootId,
+  ) {
+    final childrenByParent = <String, List<Profession>>{};
+    for (final profession in professions) {
+      final parentId = profession.parentId?.trim();
+      if (parentId == null || parentId.isEmpty) continue;
+      childrenByParent.putIfAbsent(parentId, () => []).add(profession);
+    }
+
+    final ids = <String>{rootId};
+    final pending = <String>[rootId];
+    while (pending.isNotEmpty) {
+      final parentId = pending.removeLast();
+      for (final child in childrenByParent[parentId] ?? const <Profession>[]) {
+        if (ids.add(child.id)) pending.add(child.id);
+      }
+    }
+    return ids;
+  }
+
+  @visibleForTesting
+  static List<Profession> activeSeasonsToDeactivate(
+    Iterable<Profession> seasons,
+    Profession selectedSeason,
+  ) {
+    return seasons
+        .where(
+          (season) =>
+              season.id != selectedSeason.id &&
+              season.parentId == selectedSeason.parentId &&
+              (season.isActive ?? true),
+        )
+        .toList();
+  }
+
+  Future<void> _deactivateOtherSeasons(Profession season) async {
+    final parentId = season.parentId?.trim();
+    if (parentId == null || parentId.isEmpty || !(season.isActive ?? true)) {
+      return;
+    }
+
+    final box = professionsBox;
+    for (final current in activeSeasonsToDeactivate(
+      getSeasons(parentId),
+      season,
+    )) {
+      final inactive = current.copyWith(
+        isActive: false,
+        updatedAt: DateTime.now(),
+      );
+      await box?.put(current.id, inactive);
+      final userId = auth.currentUser?.uid;
+      if (userId != null) {
+        firestore
+            .collection('users')
+            .doc(userId)
+            .collection('professions')
+            .doc(current.id)
+            .set(inactive.toMap(), SetOptions(merge: true))
+            .catchError((error) {
+          debugPrint('Offline Sync: Previous season update delayed: $error');
+        });
+      }
+    }
+  }
+
   Future<void> addProfession(Profession profession) async {
+    await _deactivateOtherSeasons(profession);
     // 1. Save locally
     await professionsBox?.put(profession.id, profession);
     notifyListeners();
@@ -23,6 +94,7 @@ class ProfessionService extends BaseService {
   }
 
   Future<void> updateProfession(Profession profession) async {
+    await _deactivateOtherSeasons(profession);
     final updated = profession.copyWith(updatedAt: DateTime.now());
     // 1. Update locally
     await professionsBox?.put(profession.id, updated);
@@ -44,39 +116,51 @@ class ProfessionService extends BaseService {
   Future<void> deleteProfession(String professionId) async {
     final profession = professionsBox?.get(professionId);
     final String? parentId = profession?.parentId;
+    final professionIds = professionTreeIds(getProfessions(), professionId);
 
-    final transactionsToDelete = transactionsBox?.values
-            .where((t) => t.professionId == professionId)
+    final transactionsToKeep = transactionsBox?.values
+            .where((transaction) =>
+                professionIds.contains(transaction.professionId))
             .toList() ??
         [];
-    for (var transaction in transactionsToDelete) {
-      await transactionsBox?.delete(transaction.id);
-      if (auth.currentUser != null) {
+    final userId = auth.currentUser?.uid;
+    for (final transaction in transactionsToKeep) {
+      final unlinkedTransaction = transaction.withoutProfession();
+      await transactionsBox?.put(unlinkedTransaction.id, unlinkedTransaction);
+      if (userId != null) {
         firestore
             .collection('users')
-            .doc(auth.currentUser!.uid)
+            .doc(userId)
             .collection('transactions')
             .doc(transaction.id)
-            .delete()
-            .catchError((_) {});
+            .update(unlinkedTransaction.toMap())
+            .catchError((error) {
+          debugPrint('Offline Sync: Transaction update delayed: $error');
+        });
       }
     }
-    await professionsBox?.delete(professionId);
+
+    for (final id in professionIds) {
+      await professionsBox?.delete(id);
+    }
 
     // If this was a season, recalculate the master profession
     if (parentId != null) {
       await _recalculateMasterProfessionFinance(parentId);
     }
 
-    if (auth.currentUser != null) {
-      firestore
-          .collection('users')
-          .doc(auth.currentUser!.uid)
-          .collection('professions')
-          .doc(professionId)
-          .delete()
-          .catchError(
-              (e) => debugPrint("Offline Sync: Profession deletion delayed"));
+    if (userId != null) {
+      for (final id in professionIds) {
+        firestore
+            .collection('users')
+            .doc(userId)
+            .collection('professions')
+            .doc(id)
+            .delete()
+            .catchError((error) {
+          debugPrint('Offline Sync: Profession deletion delayed: $error');
+        });
+      }
     }
     notifyListeners();
   }
@@ -85,11 +169,13 @@ class ProfessionService extends BaseService {
 
   List<Profession> getMasterProfessions() {
     // ہر وہ پیشہ جس کا کوئی پیرنٹ نہیں ہے یا isMaster سچ ہے اسے ماسٹر سمجھا جائے گا
-    return professionsBox?.values.where((p) =>
-      (p.isMaster ?? false) ||
-      p.parentId == null ||
-      p.parentId!.trim().isEmpty
-    ).toList() ?? [];
+    return professionsBox?.values
+            .where((p) =>
+                (p.isMaster ?? false) ||
+                p.parentId == null ||
+                p.parentId!.trim().isEmpty)
+            .toList() ??
+        [];
   }
 
   List<Profession> getSeasons(String parentId) {

@@ -523,9 +523,13 @@ class _WorkersListScreenState extends State<WorkersListScreen> {
                         name: acc.name,
                         phone: acc.phone,
                         profileImage: acc.profileImage,
-                        category: acc.accountType,
+                        category: acc.profession?.trim().isNotEmpty == true
+                            ? acc.profession!.trim()
+                            : acc.accountType,
                         address: acc.address,
                         isLarge: false,
+                        isCategoryInline: true,
+                        categoryColor: Colors.white,
                         isVerticalCategory: false,
                         customSize: 40,
                         borderRadius: 8,

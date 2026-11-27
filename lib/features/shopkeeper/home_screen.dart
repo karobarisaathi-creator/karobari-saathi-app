@@ -471,7 +471,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ? null
                           : _profession.trim(),
                       isCategoryInline: true,
-                      categoryColor: AppTheme.greenColor,
+                      categoryColor: Colors.white,
                       address: locationText,
                       isVerticalCategory: false,
                       bottom: _about.trim().isEmpty

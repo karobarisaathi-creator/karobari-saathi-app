@@ -11,7 +11,6 @@ import 'package:account_app/core/services/notification_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/account_balance_utils.dart';
 import 'package:account_app/core/utils/formatters.dart';
-import 'package:account_app/core/widgets/app_button.dart';
 import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
@@ -192,20 +191,6 @@ class _HomeActivityFeedState extends State<HomeActivityFeed> {
               fontWeight: FontWeight.w600,
             ),
           ),
-          if (activityMessage.canAddToLedger) ...[
-            const SizedBox(height: 8),
-            AppButton(
-              text: data['isAdded'] == true
-                  ? (isUrdu ? 'کھاتے میں شامل ہے' : 'Already added')
-                  : (isUrdu ? 'کھاتے میں شامل کریں' : 'Add to my ledger'),
-              variant: AppButtonVariant.outlined,
-              size: AppButtonSize.small,
-              color: AppTheme.themeColor,
-              onPressed: isProcessing || data['isAdded'] == true
-                  ? null
-                  : () => _addToLedger(notification, isUrdu),
-            ),
-          ],
           const SizedBox(height: 2),
           Row(
             children: [

@@ -204,9 +204,8 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
     }
 
     final amountController =
-        TextEditingController(text: paymentToEdit?.amount.toString() ?? '');
-    final noteController =
-        TextEditingController(text: paymentToEdit?.note ?? '');
+        TextEditingController(text: paymentToEdit.amount.toString());
+    final noteController = TextEditingController(text: paymentToEdit.note);
 
     showDialog(
       context: context,
@@ -310,10 +309,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
           ),
         ],
       ),
-    ).whenComplete(() {
-      amountController.dispose();
-      noteController.dispose();
-    });
+    );
   }
 
   void _showDescriptionDialog(BuildContext context, String rawDescription,
@@ -733,14 +729,18 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                           : (isUrdu ? 'کوئی پارٹی نہیں' : 'No party'),
                       phone: partyAccount?.phone ?? '',
                       profileImage: partyAccount?.profileImage,
-                      category: partyAccount?.category ??
-                          (contract.isIncoming
-                              ? (isUrdu ? 'مالک / کلائنٹ' : 'Client')
-                              : (isUrdu ? 'ٹھیکیدار' : 'Contractor')),
+                      category:
+                          (partyAccount?.profession?.trim().isNotEmpty == true
+                                  ? partyAccount!.profession!.trim()
+                                  : partyAccount?.category) ??
+                              (contract.isIncoming
+                                  ? (isUrdu ? 'مالک / کلائنٹ' : 'Client')
+                                  : (isUrdu ? 'ٹھیکیدار' : 'Contractor')),
                       address: partyAccount?.address ?? '',
+                      isCategoryInline: true,
                       textColor: Colors.white,
                       subtitleColor: Colors.white70,
-                      categoryColor: Colors.white70,
+                      categoryColor: Colors.white,
                       customSize: 42,
                       borderRadius: 8,
                       suffix: GestureDetector(
@@ -1838,7 +1838,11 @@ class _ContractDetailScreenState extends State<ContractDetailScreen>
                 name: p.workerName,
                 phone: workerAccount?.phone ?? '',
                 profileImage: workerAccount?.profileImage,
-                category: workerAccount?.category,
+                category: workerAccount?.profession?.trim().isNotEmpty == true
+                    ? workerAccount!.profession!.trim()
+                    : workerAccount?.category,
+                isCategoryInline: true,
+                categoryColor: Colors.white,
                 customSize: 36,
                 borderRadius: 8,
                 showText: false,

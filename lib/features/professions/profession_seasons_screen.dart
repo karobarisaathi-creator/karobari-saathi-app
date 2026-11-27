@@ -21,6 +21,7 @@ import 'package:account_app/core/widgets/screen_app_bar.dart';
 import 'package:account_app/core/utils/receipt_dialog_helper.dart';
 import 'package:account_app/features/professions/add_project_transaction_screen.dart';
 import 'package:account_app/core/utils/formatters.dart';
+import 'package:uuid/uuid.dart';
 
 class ProfessionSeasonsScreen extends StatefulWidget {
   final Profession masterProfession;
@@ -169,12 +170,6 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               InkWell(
-                                onLongPress: () => _showSeasonOptions(
-                                    context,
-                                    activeSeason,
-                                    isUrdu,
-                                    fontFamily,
-                                    databaseService),
                                 borderRadius: BorderRadius.circular(12),
                                 child: Column(
                                   children: [
@@ -198,7 +193,15 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                                               fontFamily: fontFamily,
                                             ),
                                           ),
-                                          const SizedBox(width: 8),
+                                          const SizedBox(width: 2),
+                                          _buildSeasonPopupMenu(
+                                            context,
+                                            activeSeason,
+                                            isUrdu,
+                                            fontFamily,
+                                            databaseService,
+                                          ),
+                                          const SizedBox(width: 6),
                                           if (activeSeason.areaAcres > 0) ...[
                                             Container(
                                               padding:
@@ -276,6 +279,13 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                                         ],
                                       ),
                                     ),
+                                    if (activeSeason.notes.trim().isNotEmpty)
+                                      _buildSeasonNote(
+                                        context,
+                                        activeSeason,
+                                        isUrdu,
+                                        fontFamily,
+                                      ),
                                     const Divider(
                                         height: 1, indent: 12, endIndent: 12),
                                     // Stats Row: Always visible
@@ -743,10 +753,6 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                 _expandedSeasonId = isExpanded ? null : season.id;
               });
             },
-            onLongPress: () {
-              _showSeasonOptions(context, season, isUrdu, fontFamily, db,
-                  isBaseRecord: isBaseRecord);
-            },
             borderRadius: BorderRadius.circular(12),
             child: Column(
               children: [
@@ -769,7 +775,16 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                           fontFamily: fontFamily,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 2),
+                      _buildSeasonPopupMenu(
+                        context,
+                        season,
+                        isUrdu,
+                        fontFamily,
+                        db,
+                        isBaseRecord: isBaseRecord,
+                      ),
+                      const SizedBox(width: 6),
 
                       // Area Badge if available
                       if (season.areaAcres > 0) ...[
@@ -815,6 +830,8 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                     ],
                   ),
                 ),
+                if (season.notes.trim().isNotEmpty)
+                  _buildSeasonNote(context, season, isUrdu, fontFamily),
                 const Divider(height: 1, indent: 12, endIndent: 12),
                 Padding(
                   padding:
@@ -853,6 +870,279 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
     );
   }
 
+  Widget _buildSeasonNote(
+    BuildContext context,
+    Profession season,
+    bool isUrdu,
+    String fontFamily,
+  ) {
+    final note = season.notes.trim();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => _showSeasonNoteDialog(
+            context,
+            note,
+            isUrdu,
+            fontFamily,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: UrduAwareText(
+                    note,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[800],
+                      fontFamily: fontFamily,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  PhosphorIcons.arrowSquareOut(),
+                  size: 14,
+                  color: Colors.grey[600],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSeasonNoteDialog(
+    BuildContext context,
+    String note,
+    bool isUrdu,
+    String fontFamily,
+  ) {
+    final lines = note
+        .split(RegExp(r'\n(---|──────────────────|\s*[-─]{3,}\s*)\n|\n'))
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: UrduAwareText(
+          isUrdu ? 'سیزن کا نوٹ' : 'Season Note',
+          style: TextStyle(
+            fontFamily: fontFamily,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(dialogContext).size.height * 0.6,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: List.generate(lines.length, (index) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (index > 0)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+                      ),
+                    UrduAwareText(
+                      lines[index],
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        color: AppTheme.darkColor,
+                        fontFamily: fontFamily,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                );
+              }),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: UrduAwareText(isUrdu ? 'بند کریں' : 'Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTransactionNoteInputDialog(
+    BuildContext context,
+    transaction_model.Transaction tx,
+    Profession season,
+    bool isUrdu,
+    String fontFamily,
+    DatabaseService db,
+  ) {
+    final initialNote =
+        (tx.voiceNote != null && tx.voiceNote != 'LINKED') ? tx.voiceNote! : '';
+    final noteController = TextEditingController(text: initialNote);
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.link_rounded,
+                color: AppTheme.themeColor, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: UrduAwareText(
+                isUrdu ? 'منسلک انٹری کا نوٹ' : 'Linked Transaction Note',
+                style: TextStyle(
+                  fontFamily: fontFamily,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            UrduAwareText(
+              '${tx.description.isNotEmpty ? tx.description : tx.category} (${Formatters.formatAmountWithCurrency(tx.amount)})',
+              style: TextStyle(
+                fontSize: 12.5,
+                color: AppTheme.textSecondary,
+                fontFamily: fontFamily,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: noteController,
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                labelText:
+                    isUrdu ? 'انٹری کا نوٹ / تفصیل' : 'Entry Note / Details',
+                labelStyle: TextStyle(fontFamily: fontFamily),
+                hintText: isUrdu
+                    ? 'اس انٹری یا خرچ کے متعلق نوٹ لکھیں...'
+                    : 'Write a note for this transaction...',
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel'),
+          ),
+          ElevatedButton(
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppTheme.themeColor),
+            onPressed: () async {
+              final newNote = noteController.text.trim();
+              Navigator.pop(dialogContext);
+              try {
+                final oldNote =
+                    (tx.voiceNote != null && tx.voiceNote != 'LINKED')
+                        ? tx.voiceNote!.trim()
+                        : '';
+
+                // 1. Update transaction voiceNote
+                final updatedTx = transaction_model.Transaction.fromMap({
+                  ...tx.toMap(),
+                  'voiceNote': newNote.isNotEmpty ? newNote : 'LINKED',
+                  'updatedAt': DateTime.now().toIso8601String(),
+                });
+                await db.updateTransaction(updatedTx);
+
+                // 2. Replace this transaction's old reference in season notes
+                final df = DateFormat('dd/MM/yyyy');
+                final dateStr = df.format(tx.date);
+                final isExpense = tx.type == 'expense';
+                final typeLabel = isExpense
+                    ? (isUrdu ? 'خرچ' : 'Expense')
+                    : (isUrdu ? 'آمدنی' : 'Income');
+                final amountStr =
+                    Formatters.formatAmountWithCurrency(tx.amount);
+                final oldRefLine = oldNote.isNotEmpty
+                    ? '[$dateStr] $typeLabel: $amountStr - $oldNote'
+                    : '[$dateStr] $typeLabel: $amountStr';
+                final refLine = newNote.isNotEmpty
+                    ? '[$dateStr] $typeLabel: $amountStr - $newNote'
+                    : '';
+
+                final currentNotes = season.notes.trim();
+                var updatedNotes = currentNotes;
+                if (oldRefLine.isNotEmpty) {
+                  updatedNotes = updatedNotes
+                      .replaceFirst(oldRefLine, '')
+                      .replaceAll(
+                          '\n──────────────────\n\n──────────────────\n',
+                          '\n──────────────────\n')
+                      .trim();
+                }
+                if (refLine.isNotEmpty) {
+                  final separator =
+                      updatedNotes.isNotEmpty ? '\n──────────────────\n' : '';
+                  updatedNotes = '$updatedNotes$separator$refLine';
+                }
+
+                final updatedSeason = season.copyWith(
+                  notes: updatedNotes.trim(),
+                  updatedAt: DateTime.now(),
+                );
+                await db.updateProfession(updatedSeason);
+
+                if (context.mounted) {
+                  AppToast.success(
+                    context,
+                    isUrdu
+                        ? (newNote.isNotEmpty
+                            ? 'نوٹ محفوظ ہو گیا اور سیزن نوٹ میں شامل کر دیا گیا'
+                            : 'ٹرانزیکشن کا نوٹ ہٹا دیا گیا')
+                        : (newNote.isNotEmpty
+                            ? 'Note saved and added to season notes'
+                            : 'Transaction note removed'),
+                  );
+                }
+              } catch (error, stackTrace) {
+                debugPrint('Unable to save transaction note: $error');
+                debugPrintStack(stackTrace: stackTrace);
+                if (context.mounted) {
+                  AppToast.error(
+                    context,
+                    isUrdu
+                        ? 'ٹرانزیکشن کا نوٹ محفوظ نہیں ہو سکا'
+                        : 'Could not save transaction note',
+                  );
+                }
+              }
+            },
+            child: UrduAwareText(
+              isUrdu ? 'محفوظ کریں' : 'Save',
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    ).whenComplete(() => noteController.dispose());
+  }
+
   Widget _buildTransactionsForSeason(BuildContext context, DatabaseService db,
       Profession season, bool isUrdu, String fontFamily,
       {bool hideSummary = false}) {
@@ -881,7 +1171,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
           itemCount: txs.length,
           itemBuilder: (context, index) {
             return _buildTransactionItem(
-                context, txs[index], isUrdu, fontFamily,
+                context, txs[index], season, isUrdu, fontFamily,
                 isLast: index == txs.length - 1);
           },
         ),
@@ -889,8 +1179,12 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
     );
   }
 
-  Widget _buildTransactionItem(BuildContext context,
-      transaction_model.Transaction t, bool isUrdu, String fontFamily,
+  Widget _buildTransactionItem(
+      BuildContext context,
+      transaction_model.Transaction t,
+      Profession season,
+      bool isUrdu,
+      String fontFamily,
       {bool isLast = false}) {
     final isIncome = t.professionSide == 'income';
     final db = Provider.of<DatabaseService>(context, listen: false);
@@ -908,6 +1202,9 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
     final String primaryTitle = (partyName != null && partyName.isNotEmpty)
         ? partyName
         : (cleanCategory.isNotEmpty ? cleanCategory : t.category);
+
+    final bool hasCustomNote =
+        t.voiceNote != null && t.voiceNote!.trim().isNotEmpty;
 
     return Column(
       children: [
@@ -984,27 +1281,41 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                        isIncome
-                            ? PhosphorIcons.arrowDownLeft()
-                            : PhosphorIcons.arrowUpRight(),
-                        color: isIncome
-                            ? AppTheme.incomeColor
-                            : AppTheme.expenseColor,
-                        size: 12),
-                    const SizedBox(width: 2),
-                    UrduAwareText(
-                        '${Formatters.formatAmountWithCurrency(t.amount)}',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                InkWell(
+                  onTap: () => _showTransactionNoteInputDialog(
+                      context, t, season, isUrdu, fontFamily, db),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (hasCustomNote) ...[
+                          const Icon(Icons.link_rounded,
+                              size: 13, color: AppTheme.themeColor),
+                          const SizedBox(width: 2),
+                        ],
+                        Icon(
+                            isIncome
+                                ? PhosphorIcons.arrowDownLeft()
+                                : PhosphorIcons.arrowUpRight(),
                             color: isIncome
                                 ? AppTheme.incomeColor
-                                : AppTheme.expenseColor)),
-                  ],
+                                : AppTheme.expenseColor,
+                            size: 12),
+                        const SizedBox(width: 2),
+                        UrduAwareText(
+                            '${Formatters.formatAmountWithCurrency(t.amount)}',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: isIncome
+                                    ? AppTheme.incomeColor
+                                    : AppTheme.expenseColor)),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -1126,7 +1437,9 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
     final isAgriculture = categoryType == ProfessionCategory.agriculture;
     String selectedCrop = 'دھان';
     final TextEditingController nameController = TextEditingController(
-      text: isAgriculture ? 'دھان ${DateTime.now().year}' : '',
+      text: isAgriculture
+          ? '${isUrdu ? 'دھان' : 'Rice'} ${DateTime.now().year}'
+          : '',
     );
     final TextEditingController areaController = TextEditingController();
     final TextEditingController rentController = TextEditingController();
@@ -1135,16 +1448,17 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
     final rentFocusNode = FocusNode();
     bool hasFocusedInput = false;
     bool focusListenersAttached = false;
+    bool isSaving = false;
 
     final crops = [
-      {'name': 'دھان', 'icon': PhosphorIcons.plant()},
-      {'name': 'گندم', 'icon': PhosphorIcons.plant()},
-      {'name': 'کپاس', 'icon': PhosphorIcons.cloud()},
-      {'name': 'گنا', 'icon': PhosphorIcons.plant()},
-      {'name': 'مکئی', 'icon': PhosphorIcons.plant()},
-      {'name': 'سبزیاں', 'icon': PhosphorIcons.leaf()},
-      {'name': 'پھل', 'icon': PhosphorIcons.appleLogo()},
-      {'name': 'دیگر', 'icon': PhosphorIcons.plus()},
+      {'name': 'دھان', 'nameEn': 'Rice', 'icon': PhosphorIcons.plant()},
+      {'name': 'گندم', 'nameEn': 'Wheat', 'icon': PhosphorIcons.plant()},
+      {'name': 'کپاس', 'nameEn': 'Cotton', 'icon': PhosphorIcons.cloud()},
+      {'name': 'گنا', 'nameEn': 'Sugarcane', 'icon': PhosphorIcons.plant()},
+      {'name': 'مکئی', 'nameEn': 'Corn', 'icon': PhosphorIcons.plant()},
+      {'name': 'سبزیاں', 'nameEn': 'Vegetables', 'icon': PhosphorIcons.leaf()},
+      {'name': 'پھل', 'nameEn': 'Fruits', 'icon': PhosphorIcons.appleLogo()},
+      {'name': 'دیگر', 'nameEn': 'Other', 'icon': PhosphorIcons.plus()},
     ];
 
     showDialog<void>(
@@ -1202,8 +1516,10 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                         runSpacing: 4,
                         children: crops.map((crop) {
                           final cropName = crop['name'] as String;
+                          final cropLabel =
+                              isUrdu ? cropName : crop['nameEn'] as String;
                           return ChoiceChip(
-                            label: UrduAwareText(cropName),
+                            label: UrduAwareText(cropLabel),
                             avatar: Icon(
                               crop['icon'] as IconData,
                               size: 16,
@@ -1216,7 +1532,7 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                               setDialogState(() {
                                 selectedCrop = cropName;
                                 nameController.text =
-                                    '$cropName ${DateTime.now().year}';
+                                    '$cropLabel ${DateTime.now().year}';
                               });
                             },
                           );
@@ -1326,14 +1642,16 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: isSaving ? null : () => Navigator.pop(context),
                 child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel'),
               ),
               AppButton(
                 text: isAgriculture
                     ? (isUrdu ? 'سیزن شروع کریں' : 'Start Season')
                     : (isUrdu ? 'پروجیکٹ شروع کریں' : 'Start Project'),
+                isLoading: isSaving,
                 onPressed: () async {
+                  if (isSaving) return;
                   final seasonName = nameController.text.trim();
                   if (seasonName.isEmpty) {
                     AppToast.warning(
@@ -1342,170 +1660,219 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
                     );
                     return;
                   }
-                  final area = double.tryParse(areaController.text) ?? 0.0;
-                  final rent = double.tryParse(rentController.text) ?? 0.0;
+                  final areaText = areaController.text.trim();
+                  final rentText = rentController.text.trim();
+                  final area = areaText.isEmpty
+                      ? 0.0
+                      : Formatters.tryParseAmount(
+                          areaText,
+                          allowDecimals: true,
+                        );
+                  final rent = rentText.isEmpty
+                      ? 0.0
+                      : Formatters.tryParseAmount(rentText);
+                  if (area == null || rent == null || area < 0 || rent < 0) {
+                    AppToast.warning(
+                      context,
+                      isUrdu
+                          ? 'رقبہ اور کرایہ درست درج کریں'
+                          : 'Enter a valid area and rent',
+                    );
+                    return;
+                  }
 
-                  final newSeason = Profession(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    name: widget.masterProfession.name,
-                    categories: widget.masterProfession.categories,
-                    description: widget.masterProfession.description,
-                    totalProduction: 0,
-                    productionUnit: widget.masterProfession.productionUnit,
-                    season: seasonName,
-                    categoryType: categoryType,
-                    cropType: isAgriculture ? selectedCrop : '',
-                    areaAcres: area,
-                    rentPerAcre: rent,
-                    createdAt: DateTime.now(),
-                    updatedAt: DateTime.now(),
-                    isActive: true,
-                    isMaster: false,
-                    parentId: widget.masterProfession.id,
-                  );
+                  setDialogState(() => isSaving = true);
+                  var didPop = false;
+                  try {
+                    final now = DateTime.now();
+                    final newSeason = Profession(
+                      id: const Uuid().v4(),
+                      name: widget.masterProfession.name,
+                      categories: widget.masterProfession.categories,
+                      description: widget.masterProfession.description,
+                      totalProduction: 0,
+                      productionUnit: widget.masterProfession.productionUnit,
+                      season: seasonName,
+                      categoryType: categoryType,
+                      cropType: isAgriculture ? selectedCrop : '',
+                      areaAcres: area,
+                      rentPerAcre: rent,
+                      createdAt: now,
+                      updatedAt: now,
+                      isActive: true,
+                      isMaster: false,
+                      parentId: widget.masterProfession.id,
+                    );
 
-                  await db.addProfession(newSeason);
-                  if (context.mounted) Navigator.pop(context);
+                    await db.addProfession(newSeason);
+                    if (context.mounted) {
+                      didPop = true;
+                      Navigator.pop(context);
+                    }
+                  } catch (error, stackTrace) {
+                    debugPrint('Unable to start season: $error');
+                    debugPrintStack(stackTrace: stackTrace);
+                    if (context.mounted) {
+                      AppToast.error(
+                        context,
+                        isUrdu
+                            ? 'سیزن شروع نہیں ہو سکا'
+                            : 'Could not start the season',
+                      );
+                    }
+                  } finally {
+                    if (context.mounted && !didPop) {
+                      setDialogState(() => isSaving = false);
+                    }
+                  }
                 },
               ),
             ],
           );
         },
       ),
-    ).whenComplete(() {
-      nameController.dispose();
-      areaController.dispose();
-      rentController.dispose();
-      nameFocusNode.dispose();
-      areaFocusNode.dispose();
-      rentFocusNode.dispose();
-    });
+    );
   }
 
-  void _showSeasonOptions(BuildContext context, Profession season, bool isUrdu,
-      String fontFamily, DatabaseService db,
+  Widget _buildSeasonPopupMenu(BuildContext context, Profession season,
+      bool isUrdu, String fontFamily, DatabaseService db,
       {bool isBaseRecord = false}) {
-    showModalBottomSheet(
-        context: context,
-        shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-        builder: (context) => Material(
-              color: Colors.transparent,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: UrduAwareText(
-                        isBaseRecord
-                            ? (isUrdu
-                                ? 'بنیادی ریکارڈ کے اختیارات'
-                                : 'Base Record Options')
-                            : '${_workNoun(isUrdu)}: ${season.season}',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            fontFamily: fontFamily),
-                      ),
-                    ),
-                    if (!isBaseRecord && (season.isActive ?? true))
-                      ListTile(
-                        leading: Icon(PhosphorIcons.checkCircle(),
-                            color: AppTheme.incomeColor),
-                        title: UrduAwareText(
-                          isUrdu
-                              ? '${_workNoun(isUrdu)} مکمل کریں'
-                              : 'Complete ${_workNoun(isUrdu)}',
-                          style: TextStyle(
-                              fontFamily: fontFamily,
-                              fontWeight:
-                                  isUrdu ? FontWeight.bold : FontWeight.normal),
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  CompleteSeasonScreen(season: season),
-                            ),
-                          );
-                        },
-                      ),
-                    if (!isBaseRecord && !(season.isActive ?? true)) ...[
-                      ListTile(
-                        leading: Icon(PhosphorIcons.pencilLine(),
-                            color: AppTheme.themeColor),
-                        title: UrduAwareText(
-                          isUrdu
-                              ? 'تفصیل شامل کریں / ترمیم'
-                              : 'Add / Edit Details',
-                          style: TextStyle(
-                              fontFamily: fontFamily,
-                              fontWeight:
-                                  isUrdu ? FontWeight.bold : FontWeight.normal),
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => CompleteSeasonScreen(
-                                season: season,
-                                isEditingDetails: true,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      ListTile(
-                        leading: Icon(PhosphorIcons.playCircle(),
-                            color: AppTheme.themeColor),
-                        title: UrduAwareText(
-                          isUrdu ? 'دوبارہ فعال کریں' : 'Reactivate',
-                          style: TextStyle(
-                              fontFamily: fontFamily,
-                              fontWeight:
-                                  isUrdu ? FontWeight.bold : FontWeight.normal),
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _reactivateSeason(
-                              context, season, isUrdu, fontFamily, db);
-                        },
-                      ),
-                    ],
-                    ListTile(
-                      leading: Icon(PhosphorIcons.trash(),
-                          color: AppTheme.expenseColor),
-                      title: UrduAwareText(
-                        isBaseRecord
-                            ? (isUrdu
-                                ? 'بنیادی ریکارڈ صاف کریں'
-                                : 'Clear Base Record')
-                            : (isUrdu ? 'حذف کریں' : 'Delete'),
-                        style: TextStyle(
-                            fontFamily: fontFamily,
-                            fontWeight:
-                                isUrdu ? FontWeight.bold : FontWeight.normal),
-                      ),
-                      onTap: () {
-                        Navigator.pop(context);
-                        if (isBaseRecord) {
-                          _showClearBaseRecordDialog(
-                              context, isUrdu, fontFamily, db);
-                        } else {
-                          _showDeleteSeasonDialog(
-                              context, season, isUrdu, fontFamily);
-                        }
-                      },
-                    ),
-                  ],
+    return SizedBox(
+      width: 24,
+      height: 24,
+      child: PopupMenuButton<String>(
+        padding: EdgeInsets.zero,
+        icon: Icon(
+          PhosphorIcons.dotsThreeVertical(),
+          size: 16,
+          color: AppTheme.textSecondary,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        onSelected: (value) {
+          if (value == 'complete') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CompleteSeasonScreen(season: season),
+              ),
+            );
+          } else if (value == 'edit_details') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CompleteSeasonScreen(
+                  season: season,
+                  isEditingDetails: true,
                 ),
               ),
-            ));
+            );
+          } else if (value == 'reactivate') {
+            _reactivateSeason(context, season, isUrdu, fontFamily, db);
+          } else if (value == 'delete') {
+            if (isBaseRecord) {
+              _showClearBaseRecordDialog(context, isUrdu, fontFamily, db);
+            } else {
+              _showDeleteSeasonDialog(context, season, isUrdu, fontFamily);
+            }
+          }
+        },
+        itemBuilder: (context) => [
+          if (!isBaseRecord && (season.isActive ?? true))
+            PopupMenuItem<String>(
+              value: 'complete',
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(PhosphorIcons.checkCircle(),
+                      color: AppTheme.incomeColor, size: 18),
+                  const SizedBox(width: 8),
+                  UrduAwareText(
+                    isUrdu
+                        ? '${_workNoun(isUrdu)} مکمل کریں'
+                        : 'Complete ${_workNoun(isUrdu)}',
+                    style: TextStyle(
+                      fontFamily: fontFamily,
+                      fontSize: 14,
+                      fontWeight:
+                          isUrdu ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (!isBaseRecord && !(season.isActive ?? true)) ...[
+            PopupMenuItem<String>(
+              value: 'edit_details',
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(PhosphorIcons.pencilLine(),
+                      color: AppTheme.themeColor, size: 18),
+                  const SizedBox(width: 8),
+                  UrduAwareText(
+                    isUrdu
+                        ? 'تفصیل شامل کریں / ترمیم'
+                        : 'Add / Edit Details',
+                    style: TextStyle(
+                      fontFamily: fontFamily,
+                      fontSize: 14,
+                      fontWeight:
+                          isUrdu ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            PopupMenuItem<String>(
+              value: 'reactivate',
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(PhosphorIcons.playCircle(),
+                      color: AppTheme.themeColor, size: 18),
+                  const SizedBox(width: 8),
+                  UrduAwareText(
+                    isUrdu ? 'دوبارہ فعال کریں' : 'Reactivate',
+                    style: TextStyle(
+                      fontFamily: fontFamily,
+                      fontSize: 14,
+                      fontWeight:
+                          isUrdu ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          PopupMenuItem<String>(
+            value: 'delete',
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(PhosphorIcons.trash(),
+                    color: AppTheme.expenseColor, size: 18),
+                const SizedBox(width: 8),
+                UrduAwareText(
+                  isBaseRecord
+                      ? (isUrdu
+                          ? 'بنیادی ریکارڈ صاف کریں'
+                          : 'Clear Base Record')
+                      : (isUrdu ? 'حذف کریں' : 'Delete'),
+                  style: TextStyle(
+                    fontFamily: fontFamily,
+                    fontSize: 14,
+                    fontWeight:
+                        isUrdu ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showClearBaseRecordDialog(BuildContext context, bool isUrdu,
@@ -1614,8 +1981,8 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
             children: [
               UrduAwareText(
                 isUrdu
-                    ? 'کیا آپ واقعی "${season.season}" کو حذف کرنا چاہتے ہیں؟ اس سے منسلک تمام ٹرانزیکشنز بھی ڈیلیٹ ہو جائیں گی۔'
-                    : 'Are you sure you want to delete "${season.season}"? This will also delete all its transactions.',
+                    ? 'کیا آپ واقعی "${season.season}" کو حذف کرنا چاہتے ہیں؟ کھاتے کی ٹرانزیکشنز محفوظ رہیں گی؛ صرف سیزن سے ان کا تعلق ختم ہوگا۔'
+                    : 'Are you sure you want to delete "${season.season}"? Account transactions will be kept and only unlinked from this season.',
                 style: TextStyle(fontFamily: fontFamily),
               ),
               const SizedBox(height: 16),
@@ -1777,14 +2144,18 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
               DropdownButton<Profession>(
                 isExpanded: true,
                 value: selectedA,
-                items: completedSeasons.map((s) {
+                items: completedSeasons
+                    .where((season) => season.id != selectedB.id)
+                    .map((s) {
                   return DropdownMenuItem(
                       value: s,
                       child: UrduAwareText(
                           s.season.isNotEmpty ? s.season : s.name));
                 }).toList(),
                 onChanged: (val) {
-                  if (val != null) setDialogState(() => selectedA = val);
+                  if (val != null && val.id != selectedB.id) {
+                    setDialogState(() => selectedA = val);
+                  }
                 },
               ),
               const SizedBox(height: 12),
@@ -1793,14 +2164,18 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
               DropdownButton<Profession>(
                 isExpanded: true,
                 value: selectedB,
-                items: completedSeasons.map((s) {
+                items: completedSeasons
+                    .where((season) => season.id != selectedA.id)
+                    .map((s) {
                   return DropdownMenuItem(
                       value: s,
                       child: UrduAwareText(
                           s.season.isNotEmpty ? s.season : s.name));
                 }).toList(),
                 onChanged: (val) {
-                  if (val != null) setDialogState(() => selectedB = val);
+                  if (val != null && val.id != selectedA.id) {
+                    setDialogState(() => selectedB = val);
+                  }
                 },
               ),
             ],
@@ -1812,18 +2187,20 @@ class _ProfessionSeasonsScreenState extends State<ProfessionSeasonsScreen> {
             ),
             AppButton(
               text: isUrdu ? 'موازنہ کریں' : 'Compare',
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => SeasonComparisonScreen(
-                      seasonA: selectedA,
-                      seasonB: selectedB,
-                    ),
-                  ),
-                );
-              },
+              onPressed: selectedA.id == selectedB.id
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SeasonComparisonScreen(
+                            seasonA: selectedA,
+                            seasonB: selectedB,
+                          ),
+                        ),
+                      );
+                    },
             ),
           ],
         ),

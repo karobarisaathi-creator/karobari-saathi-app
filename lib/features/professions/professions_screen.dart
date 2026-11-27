@@ -74,81 +74,81 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
           children: [
             Expanded(
               child: Consumer<DatabaseService>(
-        builder: (context, databaseService, child) {
-          var professions = databaseService.getMasterProfessions();
-          final allProfessions = databaseService.getProfessions();
+                builder: (context, databaseService, child) {
+                  var professions = databaseService.getMasterProfessions();
+                  final allProfessions = databaseService.getProfessions();
 
-          if (professions.isEmpty && allProfessions.isNotEmpty) {
-            professions = allProfessions
-                .where((p) =>
-                    (p.isMaster ?? false) ||
-                    p.parentId == null ||
-                    p.parentId!.trim().isEmpty)
-                .toList();
-            if (professions.isEmpty) {
-              professions = allProfessions;
-            }
-          }
+                  if (professions.isEmpty && allProfessions.isNotEmpty) {
+                    professions = allProfessions
+                        .where((p) =>
+                            (p.isMaster ?? false) ||
+                            p.parentId == null ||
+                            p.parentId!.trim().isEmpty)
+                        .toList();
+                    if (professions.isEmpty) {
+                      professions = allProfessions;
+                    }
+                  }
 
-          return professions.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(PhosphorIcons.briefcase(),
-                          size: 80, color: Colors.grey[400]),
-                      const SizedBox(height: 20),
-                      UrduAwareText(
-                        isUrdu ? 'کوئی پیشہ نہیں' : 'No Professions',
-                        style: TextStyle(
-                          fontSize: 20,
-                          color: AppTheme.darkColor,
-                          fontFamily: fontFamily,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      UrduAwareText(
-                        isUrdu
-                            ? 'پہلا پیشہ شامل کریں'
-                            : 'Add your first profession',
-                        style: TextStyle(
-                          color: AppTheme.darkColor.withValues(alpha: 0.7),
-                          fontFamily: fontFamily,
-                          fontWeight: fontWeight,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: () async =>
-                      await databaseService.fetchFromFirebase(),
-                  color: AppTheme.themeColor,
-                  backgroundColor: Colors.white,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                    itemCount: professions.length,
-                    itemBuilder: (context, index) {
-                      return _buildProfessionListItem(
-                        professions[index],
-                        isUrdu,
-                        fontFamily,
-                        fontWeight,
-                      );
-                    },
-                  ),
-                );
-        },
-      ),
+                  return professions.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(PhosphorIcons.briefcase(),
+                                  size: 80, color: Colors.grey[400]),
+                              const SizedBox(height: 20),
+                              UrduAwareText(
+                                isUrdu ? 'کوئی پیشہ نہیں' : 'No Professions',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  color: AppTheme.darkColor,
+                                  fontFamily: fontFamily,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              UrduAwareText(
+                                isUrdu
+                                    ? 'پہلا پیشہ شامل کریں'
+                                    : 'Add your first profession',
+                                style: TextStyle(
+                                  color:
+                                      AppTheme.darkColor.withValues(alpha: 0.7),
+                                  fontFamily: fontFamily,
+                                  fontWeight: fontWeight,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: () async =>
+                              await databaseService.fetchFromFirebase(),
+                          color: AppTheme.themeColor,
+                          backgroundColor: Colors.white,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 12),
+                            itemCount: professions.length,
+                            itemBuilder: (context, index) {
+                              return _buildProfessionListItem(
+                                professions[index],
+                                isUrdu,
+                                fontFamily,
+                                fontWeight,
+                              );
+                            },
+                          ),
+                        );
+                },
+              ),
             ),
           ],
         ),
       ),
     );
   }
-
-
 
   Widget _buildProfessionListItem(Profession profession, bool isUrdu,
       String fontFamily, FontWeight fontWeight) {
@@ -526,8 +526,8 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
             children: [
               UrduAwareText(
                   isUrdu
-                      ? 'کیا آپ واقعی "${profession.name}" پیشہ ڈیلیٹ کرنا چاہتے ہیں؟ اس سے منسلک تمام سیزنز اور ٹرانزیکشنز بھی حذف ہو جائیں گی۔'
-                      : 'Are you sure you want to delete "${profession.name}"? All its seasons and transactions will be deleted.',
+                      ? 'کیا آپ واقعی "${profession.name}" پیشہ ڈیلیٹ کرنا چاہتے ہیں؟ اس کے تمام سیزنز حذف ہوں گے، لیکن کھاتے کی ٹرانزیکشنز محفوظ رہیں گی۔'
+                      : 'Are you sure you want to delete "${profession.name}"? Its seasons will be deleted, but account transactions will be kept.',
                   style: TextStyle(
                       fontFamily: fontFamily,
                       color: AppTheme.textSecondary,
@@ -562,18 +562,34 @@ class _ProfessionsScreenState extends State<ProfessionsScreen> {
             AppButton(
               text: isUrdu ? 'ڈیلیٹ' : 'Delete',
               onPressed: isConfirmed
-                  ? () {
-                      final databaseService =
-                          Provider.of<DatabaseService>(context, listen: false);
-                      databaseService.deleteProfession(profession.id);
-                      _loadProfessions();
-                      Navigator.pop(context);
-                      AppToast.success(
-                        context,
-                        isUrdu
-                            ? 'پیشہ ڈیلیٹ کر دیا گیا'
-                            : 'Deleted successfully',
-                      );
+                  ? () async {
+                      try {
+                        final databaseService = Provider.of<DatabaseService>(
+                          context,
+                          listen: false,
+                        );
+                        await databaseService.deleteProfession(profession.id);
+                        if (!mounted || !context.mounted) return;
+                        _loadProfessions();
+                        Navigator.pop(context);
+                        AppToast.success(
+                          this.context,
+                          isUrdu
+                              ? 'پیشہ اور اس کے تمام سیزن حذف ہو گئے'
+                              : 'Profession and all its seasons deleted',
+                        );
+                      } catch (error, stackTrace) {
+                        debugPrint('Unable to delete profession: $error');
+                        debugPrintStack(stackTrace: stackTrace);
+                        if (mounted) {
+                          AppToast.error(
+                            this.context,
+                            isUrdu
+                                ? 'پیشہ حذف نہیں ہو سکا'
+                                : 'Could not delete the profession',
+                          );
+                        }
+                      }
                     }
                   : null,
               color: AppTheme.expenseColor,

@@ -10,25 +10,30 @@ part 'profession_model.g.dart';
 @HiveType(typeId: 10)
 enum ProfessionCategory {
   @HiveField(0)
-  agriculture,      // زراعت
+  agriculture, // زراعت
   @HiveField(1)
-  manufacturing,    // مینوفیکچرنگ
+  manufacturing, // مینوفیکچرنگ
   @HiveField(2)
-  services,         // سروسز
+  services, // سروسز
   @HiveField(3)
-  retail,           // رٹیل
+  retail, // رٹیل
   @HiveField(4)
-  construction,     // تعمیرات
+  construction, // تعمیرات
   @HiveField(5)
-  education,        // تعلیم
+  education, // تعلیم
   @HiveField(6)
-  healthcare,       // صحت
+  healthcare, // صحت
   @HiveField(7)
-  transportation,   // ٹرانسپورٹ
+  transportation, // ٹرانسپورٹ
   @HiveField(8)
-  technology,       // ٹیکنالوجی
+  technology, // ٹیکنالوجی
   @HiveField(9)
-  general,          // عام
+  general, // عام
+}
+
+String _legacyProfessionNotes(String? description) {
+  if (description == null || description.startsWith('ICON:')) return '';
+  return description;
 }
 
 @HiveType(typeId: 4)
@@ -107,6 +112,9 @@ class Profession {
   @HiveField(23, defaultValue: 0.0)
   final double productionMun;
 
+  @HiveField(24)
+  final String notes;
+
   Profession({
     required this.id,
     required this.name,
@@ -132,7 +140,8 @@ class Profession {
     this.areaAcres = 0.0,
     this.rentPerAcre = 0.0,
     this.productionMun = 0.0,
-  });
+    String? notes,
+  }) : notes = notes ?? _legacyProfessionNotes(description);
 
   // Map میں تبدیل
   Map<String, dynamic> toMap() {
@@ -161,6 +170,7 @@ class Profession {
       'areaAcres': areaAcres,
       'rentPerAcre': rentPerAcre,
       'productionMun': productionMun,
+      'notes': notes,
     };
   }
 
@@ -176,7 +186,7 @@ class Profession {
     ProfessionCategory parseCategory(String? cat) {
       if (cat == null) return ProfessionCategory.general;
       return ProfessionCategory.values.firstWhere(
-            (e) => e.name == cat,
+        (e) => e.name == cat,
         orElse: () => ProfessionCategory.general,
       );
     }
@@ -210,6 +220,7 @@ class Profession {
       areaAcres: (map['areaAcres'] ?? 0.0).toDouble(),
       rentPerAcre: (map['rentPerAcre'] ?? 0.0).toDouble(),
       productionMun: (map['productionMun'] ?? 0.0).toDouble(),
+      notes: map.containsKey('notes') ? map['notes']?.toString() ?? '' : null,
     );
   }
 
@@ -239,6 +250,7 @@ class Profession {
     double? areaAcres,
     double? rentPerAcre,
     double? productionMun,
+    String? notes,
   }) {
     return Profession(
       id: id ?? this.id,
@@ -265,6 +277,7 @@ class Profession {
       areaAcres: areaAcres ?? this.areaAcres,
       rentPerAcre: rentPerAcre ?? this.rentPerAcre,
       productionMun: productionMun ?? this.productionMun,
+      notes: notes ?? this.notes,
     );
   }
 
@@ -448,7 +461,7 @@ class Profession {
 // پیشے کی صحت کی درجہ بندی
 enum ProfessionHealth {
   excellent, // بہترین
-  good,      // اچھا
-  fair,      // مناسب
-  poor,      // خراب
+  good, // اچھا
+  fair, // مناسب
+  poor, // خراب
 }

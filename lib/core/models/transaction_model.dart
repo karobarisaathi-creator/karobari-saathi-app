@@ -232,6 +232,12 @@ class Transaction extends HiveObject {
   bool get isWorkerPayrollTransaction =>
       referenceNumber?.startsWith(workerPayrollReferencePrefix) ?? false;
 
+  Transaction withoutProfession() => Transaction.fromMap({
+        ...toMap(),
+        'professionId': null,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+
   String get formattedDate => DateFormat('dd/MM/yyyy').format(date);
   String get formattedTime => DateFormat('hh:mm a').format(date);
 

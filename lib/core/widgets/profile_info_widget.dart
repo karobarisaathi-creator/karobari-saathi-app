@@ -419,16 +419,27 @@ class ProfileInfoWidget extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            if (isCategoryInline && displayCategory.isNotEmpty) ...[
+                            if (isCategoryInline &&
+                                displayCategory.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              UrduAwareText(
+                                '|',
+                                style: TextStyle(
+                                  fontSize: isLarge ? 14 : 12,
+                                  color: categoryColor ?? Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.0,
+                                ),
+                              ),
                               const SizedBox(width: 8),
                               Flexible(
                                 child: UrduAwareText(
                                   displayCategory,
                                   style: TextStyle(
                                     fontSize: isLarge ? 16 : 14,
-                                    color: categoryColor ?? AppTheme.themeColor,
+                                    color: categoryColor ?? Colors.white,
                                     fontFamily: fontFamily,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.bold,
                                     height: 1.0,
                                   ),
                                   maxLines: 1,
@@ -447,7 +458,9 @@ class ProfileInfoWidget extends StatelessWidget {
                   ),
                 ],
               ),
-              if (!isCategoryInline && isVerticalCategory && displayCategory.isNotEmpty) ...[
+              if (!isCategoryInline &&
+                  isVerticalCategory &&
+                  displayCategory.isNotEmpty) ...[
                 SizedBox(height: verticalSpacing),
                 Row(
                   mainAxisSize: MainAxisSize.min,

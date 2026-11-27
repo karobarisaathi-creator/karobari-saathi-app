@@ -4,17 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:account_app/core/models/account_model.dart';
-import 'package:account_app/core/models/transaction_model.dart';
 import 'package:account_app/core/services/database_service.dart';
 import 'package:account_app/core/services/pdf_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
-import 'package:account_app/core/utils/account_balance_utils.dart';
-import 'package:account_app/core/utils/party_ledger_metrics.dart';
-import 'package:account_app/features/accounts/widgets/party_trust_metrics.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/features/accounts/add_party_screen.dart';
 import 'package:account_app/features/accounts/bulk_party_transaction_screen.dart';
-import 'package:account_app/features/accounts/widgets/party_trust_popup.dart';
 
 class PartyToolsGridWidget extends StatelessWidget {
   final Account party;
@@ -33,13 +28,6 @@ class PartyToolsGridWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final db = Provider.of<DatabaseService>(context);
-    final currentParty = db.getAccount(party.id) ?? party;
-    final allTx = db.getTransactions(party.id);
-    final trustMetrics = PartyTrustMetrics.calculate(
-      party: currentParty,
-      transactions: allTx,
-      isUrdu: isUrdu,
-    );
 
     return Container(
       padding: const EdgeInsets.all(10),
@@ -74,14 +62,14 @@ class PartyToolsGridWidget extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           GridView.count(
-            crossAxisCount: 5,
+            crossAxisCount: 4,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             mainAxisSpacing: 6,
             crossAxisSpacing: 6,
-            childAspectRatio: 0.85,
+            childAspectRatio: 1.25,
             children: [
               _buildToolItem(
                 icon: PhosphorIcons.listBullets(),
@@ -110,19 +98,6 @@ class PartyToolsGridWidget extends StatelessWidget {
                     isUrdu: isUrdu,
                   );
                 },
-              ),
-              _buildToolItem(
-                icon: PhosphorIcons.shieldCheck(),
-                label: isUrdu ? 'بھروسہ پوائنٹ' : 'Trust Point',
-                iconColor: trustMetrics.badgeColor,
-                onTap: () => PartyTrustPopup.show(
-                  context: context,
-                  trustScore: trustMetrics.hasTransactionHistory
-                      ? trustMetrics.overallScore
-                      : null,
-                  isUrdu: isUrdu,
-                  fontFamily: fontFamily,
-                ),
               ),
               _buildToolItem(
                 icon: PhosphorIcons.pencilLine(),
@@ -159,15 +134,15 @@ class PartyToolsGridWidget extends StatelessWidget {
   }) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppTheme.backgroundColor, width: 1.2),
             boxShadow: [
               BoxShadow(
@@ -180,12 +155,12 @@ class PartyToolsGridWidget extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 20, color: iconColor),
-              const SizedBox(height: 4),
+              Icon(icon, size: 18, color: iconColor),
+              const SizedBox(height: 2),
               UrduAwareText(
                 label,
                 style: TextStyle(
-                  fontSize: 10.5,
+                  fontSize: 10,
                   fontWeight: FontWeight.w700,
                   color: AppTheme.darkColor,
                   fontFamily: fontFamily,

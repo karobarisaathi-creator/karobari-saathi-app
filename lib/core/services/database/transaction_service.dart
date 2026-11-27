@@ -11,7 +11,6 @@ class TransactionService extends BaseService {
   final AccountService _accountService = AccountService();
   final ProfessionService _professionService = ProfessionService();
 
-
   Future<void> addTransaction(model.Transaction transaction) async {
     final box = transactionsBox;
     if (box == null) {
@@ -89,8 +88,7 @@ class TransactionService extends BaseService {
     }
     notifyListeners();
 
-    if (transaction.isQuickBill || oldTransaction?.isQuickBill == true) {
-    }
+    if (transaction.isQuickBill || oldTransaction?.isQuickBill == true) {}
 
     // 2. Background Cloud Update
     if (auth.currentUser != null) {
@@ -113,8 +111,7 @@ class TransactionService extends BaseService {
       if (transaction.professionId != null)
         await _professionService
             .recalculateProfessionFinance(transaction.professionId!);
-      if (transaction.isQuickBill) {
-      }
+      if (transaction.isQuickBill) {}
       if (auth.currentUser != null) {
         firestore
             .collection('users')
@@ -150,13 +147,10 @@ class TransactionService extends BaseService {
     for (var t in txs) {
       final isProtectedInternalAccount =
           protectedAccountIds.contains(t.accountId);
-      bool isOrphaned =
-          !accountIds.contains(t.accountId) && !isProtectedInternalAccount;
-      if (!isOrphaned && t.professionId != null) {
-        isOrphaned = !professionIds.contains(t.professionId);
-      }
+      final hasValidAccount =
+          accountIds.contains(t.accountId) || isProtectedInternalAccount;
 
-      if (isOrphaned) {
+      if (!hasValidAccount) {
         await transactionsBox?.delete(t.id);
         if (user != null) {
           await firestore
@@ -166,6 +160,21 @@ class TransactionService extends BaseService {
               .doc(t.id)
               .delete()
               .catchError((_) {});
+        }
+      } else if (t.professionId != null &&
+          !professionIds.contains(t.professionId)) {
+        final unlinkedTransaction = t.withoutProfession();
+        await transactionsBox?.put(t.id, unlinkedTransaction);
+        if (user != null) {
+          await firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('transactions')
+              .doc(t.id)
+              .update(unlinkedTransaction.toMap())
+              .catchError((error) {
+            debugPrint('Orphaned profession link cleanup delayed: $error');
+          });
         }
       }
     }

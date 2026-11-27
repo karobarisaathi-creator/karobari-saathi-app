@@ -10,23 +10,10 @@ import 'package:account_app/core/theme/app_theme.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/models/contract_model.dart';
 import 'package:account_app/core/widgets/screen_app_bar.dart';
+import 'package:account_app/core/services/database_service.dart';
+import 'package:account_app/core/widgets/profile_info_widget.dart';
 import 'add_edit_contract_screen.dart';
 import 'contract_detail_screen.dart';
-
-// ═══════════════════════════════════════════════════════════════
-// مقامی رنگ — AppTheme تھیم فائل سے ماخوذ
-// ═══════════════════════════════════════════════════════════════
-class _C {
-  static const bg = AppTheme.backgroundColor;
-  static const card = AppTheme.lightColor;
-  static const border = Color(0xFFD1D5DB);
-  static const accent = AppTheme.themeColor;
-  static final accentSoft = AppTheme.themeColor.withValues(alpha: 0.1);
-  static const textPrimary = AppTheme.darkColor;
-  static const textSecondary = AppTheme.textSecondary;
-  static const success = AppTheme.incomeColor;
-  static const danger = AppTheme.expenseColor;
-}
 
 class ContractsListScreen extends StatefulWidget {
   const ContractsListScreen({super.key});
@@ -70,7 +57,7 @@ class _ContractsListScreenState extends State<ContractsListScreen>
     return Directionality(
       textDirection: languageService.textDirection,
       child: Scaffold(
-        backgroundColor: _C.bg,
+        backgroundColor: AppTheme.backgroundColor,
         appBar: ScreenAppBar(
           title: isUrdu ? 'ٹھیکے' : 'Contracts',
           isUrdu: isUrdu,
@@ -180,7 +167,8 @@ class _ContractsListScreenState extends State<ContractsListScreen>
               Expanded(
                 child: contractService.isLoading
                     ? const Center(
-                        child: CircularProgressIndicator(color: _C.accent))
+                        child: CircularProgressIndicator(
+                            color: AppTheme.themeColor))
                     : TabBarView(
                         controller: _tabController,
                         children: [
@@ -231,10 +219,11 @@ class _ContractsListScreenState extends State<ContractsListScreen>
               width: 88,
               height: 88,
               decoration: BoxDecoration(
-                color: _C.accentSoft,
+                color: AppTheme.themeColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(26),
               ),
-              child: Icon(PhosphorIcons.fileText(), size: 40, color: _C.accent),
+              child: Icon(PhosphorIcons.fileText(),
+                  size: 40, color: AppTheme.themeColor),
             ),
             const SizedBox(height: 16),
             UrduAwareText(
@@ -243,7 +232,7 @@ class _ContractsListScreenState extends State<ContractsListScreen>
                 fontFamily: fontFamily,
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
-                color: _C.textSecondary,
+                color: AppTheme.textSecondary,
               ),
             ),
           ],
@@ -251,11 +240,14 @@ class _ContractsListScreenState extends State<ContractsListScreen>
       );
     }
 
+    final dbService = Provider.of<DatabaseService>(context, listen: false);
+
     return ListView.builder(
       padding: const EdgeInsets.all(8),
       itemCount: list.length,
       itemBuilder: (context, i) {
         final contract = list[i];
+        final partyAccount = dbService.getAccount(contract.partyId);
         final progress = contract.totalAmount > 0
             ? (contract.totalPaid / contract.totalAmount).clamp(0.0, 1.0)
             : 0.0;
@@ -273,12 +265,11 @@ class _ContractsListScreenState extends State<ContractsListScreen>
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: _C.card,
+              color: AppTheme.slateColor,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: _C.border),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: AppTheme.slateColor.withValues(alpha: 0.2),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),
@@ -287,54 +278,46 @@ class _ContractsListScreenState extends State<ContractsListScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: contract.isIncoming
-                            ? _C.success.withValues(alpha: 0.12)
-                            : _C.danger.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            contract.isIncoming
-                                ? PhosphorIcons.arrowDownLeft()
-                                : PhosphorIcons.arrowUpRight(),
-                            size: 12,
-                            color: contract.isIncoming ? _C.success : _C.danger,
-                          ),
-                          const SizedBox(width: 4),
-                          UrduAwareText(
-                            contract.isIncoming
-                                ? (isUrdu ? 'ٹھیکہ لیا' : 'Incoming')
-                                : (isUrdu ? 'ٹھیکہ دیا' : 'Outgoing'),
-                            style: TextStyle(
-                              fontFamily: fontFamily,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color:
-                                  contract.isIncoming ? _C.success : _C.danger,
-                            ),
-                          ),
-                        ],
+                ProfileInfoWidget(
+                  name: contract.partyName.isNotEmpty
+                      ? contract.partyName
+                      : (isUrdu ? 'کوئی پارٹی نہیں' : 'No party'),
+                  phone: partyAccount?.phone ?? '',
+                  profileImage: partyAccount?.profileImage,
+                  category: (partyAccount?.profession?.trim().isNotEmpty == true
+                          ? partyAccount!.profession!.trim()
+                          : partyAccount?.category) ??
+                      (contract.isIncoming
+                          ? (isUrdu ? 'مالک / کلائنٹ' : 'Client')
+                          : (isUrdu ? 'ٹھیکیدار' : 'Contractor')),
+                  address: partyAccount?.address ?? '',
+                  isCategoryInline: true,
+                  textColor: Colors.white,
+                  subtitleColor: Colors.white70,
+                  categoryColor: Colors.white,
+                  customSize: 40,
+                  borderRadius: 8,
+                  suffix: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.4),
                       ),
                     ),
-                    const Spacer(),
-                    UrduAwareText(
-                      Formatters.formatAmountWithCurrency(contract.totalAmount),
+                    child: UrduAwareText(
+                      contract.isIncoming
+                          ? (isUrdu ? 'ٹھیکہ لیا' : 'Incoming')
+                          : (isUrdu ? 'ٹھیکہ دیا' : 'Outgoing'),
                       style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: _C.textPrimary,
-                        letterSpacing: -0.3,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 10),
                 UrduAwareText(
@@ -343,22 +326,30 @@ class _ContractsListScreenState extends State<ContractsListScreen>
                     fontFamily: fontFamily,
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: _C.textPrimary,
+                    color: Colors.white,
                   ),
                 ),
-                if (contract.partyName.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  UrduAwareText(
-                    '👤 ${contract.partyName}',
-                    style: TextStyle(
-                      fontFamily: fontFamily,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _C.textSecondary,
-                    ),
+                const SizedBox(height: 8),
+                UrduAwareText(
+                  Formatters.formatAmountWithCurrency(contract.totalAmount),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
                   ),
-                ],
-                const SizedBox(height: 12),
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 7,
+                    backgroundColor: Colors.white30,
+                    valueColor: const AlwaysStoppedAnimation(Colors.white),
+                  ),
+                ),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
@@ -368,9 +359,9 @@ class _ContractsListScreenState extends State<ContractsListScreen>
                             : 'Paid: ${Formatters.formatAmountWithCurrency(contract.totalPaid)}',
                         style: TextStyle(
                           fontFamily: fontFamily,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: _C.success,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white.withValues(alpha: 0.95),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -382,24 +373,12 @@ class _ContractsListScreenState extends State<ContractsListScreen>
                           : 'Due: ${Formatters.formatAmountWithCurrency(contract.remainingBalance)}',
                       style: TextStyle(
                         fontFamily: fontFamily,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: _C.danger,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white.withValues(alpha: 0.95),
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 7,
-                    backgroundColor: _C.border,
-                    valueColor: AlwaysStoppedAnimation(
-                      contract.status == 'completed' ? _C.success : _C.accent,
-                    ),
-                  ),
                 ),
               ],
             ),
