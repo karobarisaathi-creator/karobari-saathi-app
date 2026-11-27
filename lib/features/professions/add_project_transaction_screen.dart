@@ -950,6 +950,7 @@ class _AddProjectTransactionScreenState
         professionId: widget.profession?.id,
         professionName: widget.profession?.name,
         contractId: widget.contract?.id,
+        contractName: widget.contract?.title,
       );
 
       if (widget.transactionToEdit != null) {

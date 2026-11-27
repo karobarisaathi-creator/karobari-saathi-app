@@ -108,6 +108,8 @@ class StockReturnTransactionUtils {
       discountReason: transaction.discountReason,
       receiptFromCounterparty: transaction.receiptFromCounterparty,
       customerPhone: transaction.customerPhone,
+      contractId: transaction.contractId,
+      contractName: transaction.contractName,
     );
   }
 }

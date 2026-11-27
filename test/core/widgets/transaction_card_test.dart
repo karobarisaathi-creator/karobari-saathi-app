@@ -28,6 +28,7 @@ void main() {
       createdAt: date,
       updatedAt: date,
       receiptFromCounterparty: true,
+      contractName: 'Shop renovation',
     );
 
     await tester.pumpWidget(
@@ -51,5 +52,6 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.textContaining('بنام:'), findsOneWidget);
     expect(find.textContaining('جمع:'), findsOneWidget);
+    expect(find.text('Shop renovation'), findsOneWidget);
   });
 }

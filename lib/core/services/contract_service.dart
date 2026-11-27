@@ -94,6 +94,14 @@ class ContractService extends ChangeNotifier {
     return null;
   }
 
+  String? contractNameForId(String? contractId) {
+    if (contractId == null || contractId.isEmpty) return null;
+    for (final contract in _contracts) {
+      if (contract.id == contractId) return contract.title;
+    }
+    return null;
+  }
+
   Future<void> reassignPayrollWorkerId({
     required String fromWorkerId,
     required String toWorkerId,
@@ -262,6 +270,8 @@ class ContractService extends ChangeNotifier {
       isPending: false,
       createdAt: existing?.createdAt ?? payment.date,
       updatedAt: DateTime.now(),
+      contractId: contract.id,
+      contractName: contract.title,
     );
   }
 
@@ -288,6 +298,8 @@ class ContractService extends ChangeNotifier {
       isPending: false,
       createdAt: existing?.createdAt ?? payment.date,
       updatedAt: DateTime.now(),
+      contractId: contract.id,
+      contractName: contract.title,
     );
   }
 
@@ -347,6 +359,7 @@ class ContractService extends ChangeNotifier {
       final unlinkedTransaction = Transaction.fromMap({
         ...transaction.toMap(),
         'contractId': null,
+        'contractName': null,
       });
       await databaseService.updateTransaction(unlinkedTransaction);
     }

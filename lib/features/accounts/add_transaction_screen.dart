@@ -2172,6 +2172,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         receiptFromCounterparty:
             widget.transactionToEdit?.receiptFromCounterparty ?? false,
         contractId: existingTransaction?.contractId,
+        contractName: existingTransaction?.contractName,
       );
 
       final isEditing = widget.transactionToEdit != null;

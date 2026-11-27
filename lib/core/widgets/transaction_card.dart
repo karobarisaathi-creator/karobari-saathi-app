@@ -79,6 +79,17 @@ class TransactionCard extends StatelessWidget {
                   fontWeight: fontWeight,
                 ),
               ),
+            if (transaction.contractName != null &&
+                transaction.contractName!.isNotEmpty)
+              UrduAwareText(
+                transaction.contractName!,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.themeColor,
+                  fontFamily: fontFamily,
+                  fontWeight: fontWeight,
+                ),
+              ),
           ],
         ),
         trailing: Column(

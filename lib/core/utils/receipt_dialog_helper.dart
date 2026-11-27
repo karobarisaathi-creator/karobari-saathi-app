@@ -199,6 +199,8 @@ class _ReceiptDialogContentState extends State<_ReceiptDialogContent> {
       updatedAt: savedEntry.updatedAt,
       professionId: savedEntry.professionId,
       professionName: savedEntry.professionName,
+      contractId: savedEntry.contractId,
+      contractName: savedEntry.contractName,
       partnershipId: savedEntry.partnershipId,
       voiceNote: savedEntry.voiceNote,
       items: savedEntry.items,

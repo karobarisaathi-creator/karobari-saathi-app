@@ -1350,6 +1350,19 @@ class _TransactionsTabState extends State<_TransactionsTab> {
                             ),
                           ),
                         ],
+                        if (t.contractName != null &&
+                            t.contractName!.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          UrduAwareText(
+                            t.contractName!,
+                            style: TextStyle(
+                              color: AppTheme.themeColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.normal,
+                              fontFamily: widget.fontFamily,
+                            ),
+                          ),
+                        ],
                         const SizedBox(width: 8),
                         UrduAwareText(
                           "${Formatters.formatAmount(runningBalance.abs())}",

@@ -1034,46 +1034,50 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         title: UrduAwareText(
           isUrdu ? 'پرائیویسی پالیسی' : 'Privacy Policy',
           style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold),
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              UrduAwareText(
-                policyText,
-                style: TextStyle(
-                    fontFamily: isUrdu ? fontFamily : null, fontSize: 13),
-              ),
-              const SizedBox(height: 12),
-              InkWell(
-                onTap: () => _launchUrl(
-                  'mailto:$_supportEmail',
-                  context,
-                  isUrdu,
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                UrduAwareText(
+                  policyText,
+                  style: TextStyle(
+                      fontFamily: isUrdu ? fontFamily : null, fontSize: 13),
                 ),
-                child: Row(
-                  children: [
-                    Icon(
-                      PhosphorIcons.envelope(),
-                      size: 16,
-                      color: AppTheme.themeColor,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _supportEmail,
-                      textDirection: TextDirection.ltr,
-                      style: const TextStyle(
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () => _launchUrl(
+                    'mailto:$_supportEmail',
+                    context,
+                    isUrdu,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        PhosphorIcons.envelope(),
+                        size: 16,
                         color: AppTheme.themeColor,
-                        decoration: TextDecoration.underline,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Text(
+                        _supportEmail,
+                        textDirection: TextDirection.ltr,
+                        style: const TextStyle(
+                          color: AppTheme.themeColor,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         actions: [

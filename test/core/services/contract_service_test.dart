@@ -136,12 +136,15 @@ void main() {
     );
     await contractService.addContract(contract);
 
+    final databaseService = _NoopDatabaseService();
     await contractService.addClientPayment(
       contractId: contract.id,
       amount: 2500,
       note: 'Final collection',
-      databaseService: _NoopDatabaseService(),
+      databaseService: databaseService,
     );
+    expect(databaseService.transactions.single.contractId, contract.id);
+    expect(databaseService.transactions.single.contractName, contract.title);
 
     final updatedContract =
         contractService.contracts.singleWhere((item) => item.id == contract.id);
@@ -295,6 +298,7 @@ void main() {
           createdAt: now,
           updatedAt: now,
           contractId: contract.id,
+          contractName: contract.title,
         ),
       );
     await contractService.addContract(contract);
@@ -308,6 +312,7 @@ void main() {
       databaseService.transactions.single.contractId,
       isNull,
     );
+    expect(databaseService.transactions.single.contractName, isNull);
     expect(databaseService.transactions.single.amount, 1250);
     expect(
       contractService.contracts.any((item) => item.id == contract.id),
@@ -327,7 +332,10 @@ class _NoopDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<bool> addTransaction(Transaction transaction) async => true;
+  Future<bool> addTransaction(Transaction transaction) async {
+    _transactions.add(transaction);
+    return true;
+  }
 
   @override
   Future<bool> updateTransaction(Transaction transaction) async {

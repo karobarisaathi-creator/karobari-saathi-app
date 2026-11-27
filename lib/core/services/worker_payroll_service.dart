@@ -114,6 +114,8 @@ class WorkerPayrollService extends ChangeNotifier {
     String accountId, {
     Transaction? existing,
     String paymentMethod = 'cash',
+    String? contractId,
+    String? contractName,
   }) {
     return Transaction(
       id: 'worker_wage_${payment.id}',
@@ -135,6 +137,8 @@ class WorkerPayrollService extends ChangeNotifier {
       isPending: false,
       createdAt: existing?.createdAt ?? payment.date,
       updatedAt: DateTime.now(),
+      contractId: contractId,
+      contractName: contractName,
     );
   }
 
@@ -387,6 +391,8 @@ class WorkerPayrollService extends ChangeNotifier {
       payment,
       account.id,
       paymentMethod: paymentMethod,
+      contractId: contractId,
+      contractName: contractService.contractNameForId(contractId),
     );
     await databaseService.addTransaction(transaction);
     try {
@@ -451,6 +457,8 @@ class WorkerPayrollService extends ChangeNotifier {
           updatedPayment,
           account?.id ?? existing!.accountId,
           existing: existing,
+          contractId: contractId,
+          contractName: contractService.contractNameForId(contractId),
         );
         if (existing == null) {
           await databaseService.addTransaction(transaction);

@@ -437,6 +437,8 @@ class _QuickBillPreviewScreenState extends State<QuickBillPreviewScreen> {
         }(),
         professionId: originalTransaction?.professionId,
         professionName: originalTransaction?.professionName,
+        contractId: originalTransaction?.contractId,
+        contractName: originalTransaction?.contractName,
         partnershipId: originalTransaction?.partnershipId,
         voiceNote: originalTransaction?.voiceNote,
         receiptFromCounterparty:
