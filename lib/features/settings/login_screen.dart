@@ -7,6 +7,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:account_app/core/services/account_deletion_service.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/database_service.dart';
@@ -762,29 +763,83 @@ class _LoginScreenState extends State<LoginScreen> {
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
     final userSnapshot = await userRef.get();
     if (!mounted) return;
-    final userData = userSnapshot.data() ?? <String, dynamic>{};
+    var userData = userSnapshot.data() ?? <String, dynamic>{};
 
     if (userData['isDeactivated'] == true) {
-      try {
-        await Provider.of<DatabaseService>(context, listen: false)
-            .prepareForLogout();
-      } catch (error, stackTrace) {
-        debugPrint('Failed to clear local data for deactivated user: $error');
-        debugPrintStack(stackTrace: stackTrace);
+      final deadlineValue = userData['restoreDeadline'];
+      final restoreDeadline =
+          deadlineValue is Timestamp ? deadlineValue.toDate() : null;
+      final hasRestoreDeadline = restoreDeadline != null;
+      final deadlineText = restoreDeadline == null
+          ? ''
+          : MaterialLocalizations.of(context)
+              .formatMediumDate(restoreDeadline.toLocal());
+      final shouldRestore = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(
+            isUrdu ? 'اکاؤنٹ حذف کرنے کی درخواست' : 'Account deletion pending',
+          ),
+          content: Text(
+            hasRestoreDeadline
+                ? (isUrdu
+                    ? 'آپ کے اکاؤنٹ کو حذف کرنے کی درخواست موصول ہو چکی ہے۔ 30 دن کی مدت باقی ہو تو اسے بحال کریں۔ آخری تاریخ: $deadlineText'
+                    : 'Your account is scheduled for deletion. You can restore it if the 30-day window is still open. Deadline: $deadlineText')
+                : (isUrdu
+                    ? 'اکاؤنٹ بحال کرنے کی مدت ختم ہو چکی ہے۔'
+                    : 'The account recovery period has ended.'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(isUrdu ? 'سائن آؤٹ' : 'Sign out'),
+            ),
+            if (hasRestoreDeadline)
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(isUrdu ? 'اکاؤنٹ بحال کریں' : 'Restore account'),
+              ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      if (shouldRestore == true) {
+        try {
+          await AccountDeletionService.restoreDeletion();
+          final refreshedUser = await userRef.get();
+          userData = refreshedUser.data() ?? <String, dynamic>{};
+          if (userData['isDeactivated'] == true) {
+            throw StateError('The account is still marked for deletion.');
+          }
+        } catch (error, stackTrace) {
+          debugPrint('Account restoration failed: $error');
+          debugPrintStack(stackTrace: stackTrace);
+          await _signOutPendingDeletionUser();
+          if (mounted) {
+            setState(() => _isLoading = false);
+            AppToast.error(
+              context,
+              isUrdu
+                  ? 'اکاؤنٹ بحال نہیں ہو سکا۔ انٹرنیٹ چیک کریں اور تصدیق کریں کہ 30 دن کی مدت ختم نہیں ہوئی۔'
+                  : 'Could not restore the account. Check your connection and confirm the 30-day window has not ended.',
+            );
+          }
+          return;
+        }
+      } else {
+        await _signOutPendingDeletionUser();
+        if (mounted) {
+          setState(() => _isLoading = false);
+          AppToast.warning(
+            context,
+            isUrdu
+                ? 'اکاؤنٹ ابھی حذف کرنے کے لیے مقرر ہے'
+                : 'The account is still scheduled for deletion',
+          );
+        }
+        return;
       }
-      ProfileService.clearCache();
-      await FirebaseAuth.instance.signOut();
-      _loginCompleted = false;
-      if (mounted) {
-        setState(() => _isLoading = false);
-        AppToast.error(
-          context,
-          isUrdu
-              ? 'یہ اکاؤنٹ غیر فعال ہے، مدد کے لیے سپورٹ سے رابطہ کریں'
-              : 'This account is deactivated. Contact support for help',
-        );
-      }
-      return;
     }
 
     final storedName =
@@ -824,6 +879,19 @@ class _LoginScreenState extends State<LoginScreen> {
     } else {
       _navigateToDashboard();
     }
+  }
+
+  Future<void> _signOutPendingDeletionUser() async {
+    try {
+      await Provider.of<DatabaseService>(context, listen: false)
+          .prepareForLogout();
+    } catch (error, stackTrace) {
+      debugPrint('Failed to clear local data for deactivated user: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+    ProfileService.clearCache();
+    await FirebaseAuth.instance.signOut();
+    _loginCompleted = false;
   }
 
   void _navigateToProfileSetup() {

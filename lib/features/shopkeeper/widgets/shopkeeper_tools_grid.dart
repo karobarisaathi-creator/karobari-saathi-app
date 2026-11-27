@@ -45,8 +45,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
   // URLs — اپنی اصلی URLs سے بدلیں
   static const String _playStoreUrl =
       'https://play.google.com/store/apps/details?id=com.zalooq.account_app';
-  static const String _supportEmail = 'support@zalooq.com';
-  static const String _privacyUrl = 'https://zalooq.com/privacy';
+  static const String _supportEmail = 'karobarisaathi@gmail.com';
 
   @override
   void initState() {
@@ -250,14 +249,14 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                     ),
                   ),
 
-                  // 10. Deactivate (خطرناک — P3)
+                  // 10. Request account deletion
                   SizedBox(
                     width: itemWidth,
                     height: itemHeight,
                     child: _buildItem(
                       context,
                       icon: PhosphorIcons.userMinus(),
-                      label: isUrdu ? 'اکاؤنٹ بند' : 'Deactivate',
+                      label: isUrdu ? 'اکاؤنٹ حذف' : 'Delete account',
                       onTap: () =>
                           _showDeactivateDialog(context, isUrdu, fontFamily),
                     ),
@@ -1000,6 +999,37 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
   // ═══════════════════════════════════════════════════════════
   void _showPrivacyPolicy(
       BuildContext context, bool isUrdu, String fontFamily) {
+    final policyText = isUrdu
+        ? [
+            'کاروباری ساتھی (Account App) دکانداروں اور کاروباری افراد کے کھاتوں، لین دین، اسٹاک اور مزدوروں کی اجرت کے ریکارڈ سنبھالنے کے لیے ہے۔ یہ پالیسی بتاتی ہے کہ ایپ کون سا ڈیٹا استعمال کرتی ہے۔',
+            'مؤثر تاریخ: 27 نومبر 2026',
+            '1. جمع ہونے والا ڈیٹا\nاکاؤنٹ کے لیے فون نمبر اور SMS تصدیقی کوڈ استعمال ہوتے ہیں۔ آپ کا نام، ای میل، دکان کا نام، پیشہ، تصویر اور ہاتھ سے درج کردہ کاروباری پتہ بھی محفوظ ہو سکتے ہیں۔ ای میل اختیاری ہے، لیکن کلاؤڈ بیک اپ بنانے کے لیے پروفائل میں ای میل درج ہونا ضروری ہے۔\nآپ کے درج کردہ کاروباری ریکارڈ میں گاہکوں/سپلائرز کے نام، فون نمبر اور پتے، لین دین کی رقوم، تاریخیں، نوٹس، اسٹاک، معاہدے، مزدوروں کی حاضری/اجرت اور اپ لوڈ کی گئی تصاویر شامل ہو سکتی ہیں۔ رابطے صرف اس وقت پڑھے جاتے ہیں جب آپ کسی رابطے کو خود منتخب کرتے ہیں۔',
+            '2. ڈیٹا کا استعمال\nیہ معلومات فون نمبر کے ذریعے اکاؤنٹ کی تصدیق، کاروباری ریکارڈ سنبھالنے، ایپ کے سنک فنکشن کے چلنے پر متعلقہ ڈیٹا کلاؤڈ سے ملانے، آپ کی درخواست پر بیک اپ/ریسٹور، پروفائل اور دکان کی معلومات دکھانے، اور متعلقہ مزدور کو اجرت کے اندراج کی اطلاع دینے کے لیے استعمال ہوتی ہیں۔',
+            '3. مقامی اور کلاؤڈ اسٹوریج\nایپ کاروباری ریکارڈ فون پر مقامی ڈیٹا بیس میں رکھتی ہے۔ اکاؤنٹس، لین دین اور کچھ دیگر ریکارڈ سنک کے ذریعے Firebase پر بھی جا سکتے ہیں؛ بیک اپ آپ کی درخواست پر Firebase میں محفوظ ہوتا ہے۔ ایپ کی بعض ترتیبات SharedPreferences اور ایپ لاک کی حساس معلومات ڈیوائس کے محفوظ اسٹوریج میں رکھی جاتی ہیں۔',
+            '4. رسائی اور شیئرنگ\nآپ کے نجی کھاتے اور لین دین عموماً آپ کے اکاؤنٹ تک محدود ہیں۔ اگر مزدور کا فون نمبر ایپ اکاؤنٹ سے مل جائے تو اجرت کا مخصوص اندراج اس مزدور کے اکاؤنٹ میں بھی نقل ہو سکتا ہے۔ اس میں رقم، تاریخ، اندراج کی تفصیل، آپ کا نام اور فون نمبر شامل ہو سکتے ہیں۔ سائن اِن صارفین آپ کا تصدیق شدہ فون نمبر، نام، تصویر، پیشہ، کاروباری پتہ اور دکان کا نام دیکھ سکتے ہیں۔ دکان کی معلومات، آئٹمز اور ریویوز بھی سائن اِن صارفین کو نظر آ سکتے ہیں۔ Firebase/Google اکاؤنٹ اور کلاؤڈ ہوسٹنگ فراہم کرتے ہیں۔',
+            '5. بیک اپ اور ریسٹور\nکلاؤڈ بیک اپ بنانے کے لیے پروفائل میں ای میل درکار ہے۔ بیک اپ میں آپ کے کاروباری ریکارڈ کی نقل شامل ہو سکتی ہے اور اسے آپ کے اکاؤنٹ سے جوڑا جاتا ہے؛ بیک اپ آن کرنے سے پہلے یقینی بنائیں کہ آپ کو یہ سہولت درکار ہے۔',
+            '6. ڈیٹا رکھنے اور اکاؤنٹ حذف کرنے کی مدت\nایپ کی سیٹنگز سے اکاؤنٹ حذف کرنے کی درخواست دی جا سکتی ہے۔ درخواست پر اکاؤنٹ فوراً غیر فعال ہوتا ہے اور 30 دن کے اندر دوبارہ لاگ اِن کر کے بحال کیا جا سکتا ہے۔ اس مدت میں دکان کی کچھ معلومات سائن اِن صارفین کو نظر آ سکتی ہیں۔ 30 دن بعد کلاؤڈ اکاؤنٹ، متعلقہ ریکارڈ، بیک اپ اور اپ لوڈ کردہ فائلیں حذف کرنے کے لیے سرور پر شیڈول ہوتی ہیں۔ [تصدیق درکار: سرور فنکشنز کی deployment اور 30 دن بعد حذف ہونے کے عمل کی عملی جانچ] پہلے ورژن میں بنائی گئی کوئی marketplace لسٹنگ، اگر موجود ہو، اکاؤنٹ حذف ہونے تک نجی طور پر باقی رہ سکتی ہے۔ دوسرے صارفین کے اپنے ریکارڈ میں محفوظ کی گئی آزاد نقلیں بھی باقی رہ سکتی ہیں۔',
+            '7. اجازتیں اور مقام\nکیمرہ تصاویر لینے یا اسکین کرنے، Contacts منتخب رابطہ چننے، Internet کلاؤڈ سروسز کے لیے، اور biometric اجازت ایپ لاک کے لیے استعمال ہوتی ہے۔ ایپ GPS، لوکیشن اجازت، نقشہ، آن لائن ایڈریس تلاش یا آڈیو ریکارڈنگ استعمال نہیں کرتی؛ کاروباری پتہ صرف آپ کے ہاتھ سے درج کرنے پر محفوظ ہوتا ہے۔ پہلے ورژن کے محفوظ کردہ کوآرڈینیٹس، اگر موجود ہوں، پروفائل محفوظ کرنے یا اکاؤنٹ حذف ہونے تک کلاؤڈ میں رہ سکتے ہیں۔',
+            '8. بچوں کا ڈیٹا\nیہ ایپ کاروباری استعمال کے لیے ہے، بچوں کے لیے نہیں بنائی گئی، اور ایپ میں عمر کی جانچ موجود نہیں۔ [تصدیق درکار: کم از کم عمر اور بچوں کے ڈیٹا سے متعلق قانونی پالیسی]',
+            '9. سیکیورٹی\nایپ Firebase سروسز اور Firestore rules استعمال کرتی ہے۔ پروفائل اور دکان کی اوپر بیان کردہ معلومات دوسرے سائن اِن صارفین کو دکھائی جاتی ہیں۔ ایپ لاک اور biometric ڈیوائس پر رسائی کنٹرول کے لیے ہیں؛ یہ تمام کاروباری ریکارڈز کی الگ انکرپشن کی ضمانت نہیں۔ [تصدیق درکار: Firebase کنسول کی سیکیورٹی اور سرور/بیک اپ کی ترتیبات]',
+            '10. پالیسی میں تبدیلی اور رابطہ\nپالیسی میں تبدیلی ہو تو ایپ یا متعلقہ صفحے پر نظرثانی شدہ تاریخ کے ساتھ اپ ڈیٹ کیا جائے گا۔ سوال یا ڈیٹا سے متعلق درخواست کے لیے اس ای میل پر رابطہ کریں:',
+            'قانونی نوٹ: یہ پالیسی قانونی مشورہ نہیں ہے۔ اشاعت سے پہلے کسی مستند وکیل سے اس کا جائزہ کروائیں۔',
+          ].join('\n\n')
+        : [
+            'Karobari Saathi (Account App) helps shopkeepers and business owners manage accounts, transactions, inventory and worker wage records. This policy explains what information the app uses.',
+            'Effective date: November 27, 2026',
+            '1. Information we collect\nYour phone number and SMS verification code are used for account authentication. Your name, email, shop name, profession, photo and manually entered business address may also be stored. Email is optional for the account, but is required in your profile to create a cloud backup.\nBusiness records you enter may include customer/supplier names, phone numbers and addresses, transaction amounts, dates and notes, inventory, contracts, worker attendance/payroll, and uploaded images. Contacts are accessed only when you choose a contact.',
+            '2. How we use information\nWe use this information to authenticate your account by phone, manage business records, sync relevant data to the cloud when the app sync function runs, create or restore a backup at your request, display profile and shop information, and notify the relevant worker about a wage entry.',
+            '3. Local and cloud storage\nThe app stores business records in a local database on your device. Accounts, transactions and some other records may also be synced to Firebase; a backup is stored in Firebase when you request one. Some app settings are stored in SharedPreferences; sensitive app-lock information is kept in the device secure storage.',
+            '4. Access and sharing\nYour private accounts and transactions are generally limited to your account. If a worker’s phone number matches an app account, a specific wage entry may also be copied to that worker’s account. It may include the amount, date, entry description, your name and phone number. Signed-in users can see your verified phone number, name, photo, profession, business address and shop name. Shop information, items and reviews may also be visible to signed-in users. Firebase/Google provide account and cloud-hosting services.',
+            '5. Backup and restore\nAn email address in your profile is required to create a cloud backup. A backup may contain copies of your business records and is associated with your account. Enable this feature only if you want cloud backups.',
+            '6. Retention and account deletion\nYou can request account deletion in Settings. The account is disabled immediately and can be restored by signing in within 30 days. Some shop information may remain visible to signed-in users during this period. After 30 days, the server is configured to schedule deletion of the cloud account, associated records, backups and uploaded files. [Verification required: confirm the server functions are deployed and the 30-day deletion process has been tested.] Any marketplace listings created in an earlier version, if present, may remain private until account deletion. Independent copies that other users keep in their own records may also remain.',
+            '7. Permissions and location\nCamera is used to take photos or scan; Contacts to choose a contact; Internet for cloud services; and biometric permission for the app lock. The app does not use GPS, location permission, maps, online address lookup or audio recording; a business address is stored only when you enter it manually. Coordinates saved by an earlier version, if any, may remain in cloud storage until you save your profile or account deletion completes.',
+            '8. Children’s information\nThis app is intended for business use and is not designed for children. The app does not verify users’ ages. [Verification required: set the minimum age and confirm the legal policy for children’s data.]',
+            '9. Security\nThe app uses Firebase services and Firestore rules. The profile and shop information described above is visible to other signed-in users. App lock and biometrics control access on your device; they do not mean that all business records are separately encrypted. [Verification required: confirm Firebase Console security and server/backup settings.]',
+            '10. Changes and contact\nWe may update this policy and show the revised date in the app or on the related page. For questions or data requests, contact:',
+            'Legal note: This policy is not legal advice. Have it reviewed by a qualified lawyer before publication.',
+          ].join('\n\n');
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -1013,31 +1043,31 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               UrduAwareText(
-                isUrdu
-                    ? 'ہم آپ کی رازداری کا احترام کرتے ہیں۔\n\n1. اکاؤنٹ: لاگ اِن کے لیے فون نمبر اور SMS OTP۔\n2. کاروباری ریکارڈ: آپ کے کھاتے، لین دین، پروفائل کلاؤڈ میں محفوظ۔\n3. مقامی حفاظت: ایپ PIN اور حساس معلومات ڈیوائس پر محفوظ۔\n4. شیئرنگ: آپ کا ڈیٹا فروخت نہیں کیا جاتا۔\n5. بیک اپ: کلاؤڈ سنک سہولت ہے، اپنا بیک اپ بھی رکھیں۔'
-                    : 'We respect your privacy.\n\n1. Account: Phone number and SMS OTP for sign in.\n2. Business records: Your accounts, transactions, profile stored in cloud.\n3. Local security: App Lock, PIN and sensitive data stored securely on device.\n4. Sharing: We do not sell your data.\n5. Backups: Cloud sync is provided, keep your own backup too.',
+                policyText,
                 style: TextStyle(
                     fontFamily: isUrdu ? fontFamily : null, fontSize: 13),
               ),
               const SizedBox(height: 12),
-              // ⭐ Web link
               InkWell(
-                onTap: () => _launchUrl(_privacyUrl, context, isUrdu),
+                onTap: () => _launchUrl(
+                  'mailto:$_supportEmail',
+                  context,
+                  isUrdu,
+                ),
                 child: Row(
                   children: [
-                    Icon(PhosphorIcons.globe(),
-                        size: 14, color: AppTheme.themeColor),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        _privacyUrl,
-                        style: const TextStyle(
-                          color: AppTheme.themeColor,
-                          fontSize: 11,
-                          decoration: TextDecoration.underline,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    Icon(
+                      PhosphorIcons.envelope(),
+                      size: 16,
+                      color: AppTheme.themeColor,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _supportEmail,
+                      textDirection: TextDirection.ltr,
+                      style: const TextStyle(
+                        color: AppTheme.themeColor,
+                        decoration: TextDecoration.underline,
                       ),
                     ),
                   ],
@@ -1163,7 +1193,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 14. DEACTIVATE — Soft delete (P3)
+  // 14. ACCOUNT DELETION
   // ═══════════════════════════════════════════════════════════
   void _showDeactivateDialog(
       BuildContext context, bool isUrdu, String fontFamily) {
@@ -1179,7 +1209,9 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                 size: 22, color: AppTheme.expenseColor),
             const SizedBox(width: 8),
             UrduAwareText(
-              isUrdu ? 'اکاؤنٹ بند کریں' : 'Deactivate Account',
+              isUrdu
+                  ? 'اکاؤنٹ حذف کرنے کی درخواست'
+                  : 'Request account deletion',
               style: TextStyle(
                 fontFamily: fontFamily,
                 fontWeight: FontWeight.bold,
@@ -1195,8 +1227,8 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
           children: [
             UrduAwareText(
               isUrdu
-                  ? 'یہ عمل آپ کا اکاؤنٹ 30 دن کے لیے بند کر دے گا۔ اس دوران دوبارہ لاگ اِن کر کے بحال کر سکتے ہیں۔'
-                  : 'This will deactivate your account for 30 days. You can restore by logging in again during this period.',
+                  ? 'اکاؤنٹ فوراً غیر فعال ہو گا۔ 30 دن کے اندر لاگ اِن کر کے بحال کریں؛ اس کے بعد اکاؤنٹ، کلاؤڈ ریکارڈ، بیک اپ اور اپ لوڈ کی گئی فائلیں مستقل حذف کرنے کے لیے شیڈول ہوں گی۔'
+                  : 'Your account will be disabled immediately. Sign in within 30 days to restore it; afterward, the account, cloud records, backups and uploaded files will be scheduled for permanent deletion.',
               style: TextStyle(fontFamily: fontFamily, fontSize: 12),
             ),
             const SizedBox(height: 12),
@@ -1241,15 +1273,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
                 final user = FirebaseAuth.instance.currentUser;
                 if (user != null) {
                   await Provider.of<AuthService>(context, listen: false)
-                      .deactivateAccount(context);
-                  if (context.mounted) {
-                    AppToast.success(
-                      context,
-                      isUrdu
-                          ? 'اکاؤنٹ بند کر دیا گیا ہے'
-                          : 'Account deactivated',
-                    );
-                  }
+                      .requestAccountDeletion(context, isUrdu: isUrdu);
                 }
               } catch (e) {
                 if (context.mounted) {
@@ -1258,7 +1282,7 @@ class _ShopkeeperToolsGridState extends State<ShopkeeperToolsGrid> {
               }
             },
             child: UrduAwareText(
-              isUrdu ? 'بند کریں' : 'Deactivate',
+              isUrdu ? 'اکاؤنٹ حذف کریں' : 'Delete account',
               style: const TextStyle(color: Colors.red),
             ),
           ),

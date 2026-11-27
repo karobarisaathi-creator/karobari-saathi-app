@@ -15,6 +15,34 @@ val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
+val releaseTaskRequested = gradle.startParameter.taskNames.any {
+    it.contains("release", ignoreCase = true)
+}
+val releaseStoreFile = keystoreProperties.getProperty("storeFile")?.let {
+    project.file(it)
+}
+val requiredSigningProperties = listOf(
+    "keyAlias",
+    "keyPassword",
+    "storeFile",
+    "storePassword",
+)
+val missingSigningProperties = requiredSigningProperties.filter {
+    keystoreProperties.getProperty(it).isNullOrBlank()
+}
+val hasReleaseSigning = missingSigningProperties.isEmpty() &&
+    releaseStoreFile?.exists() == true
+if (releaseTaskRequested && (!keystorePropertiesFile.exists() || !hasReleaseSigning)) {
+    throw GradleException(
+        "Release builds require android/key.properties with all signing values. " +
+            "Missing: ${missingSigningProperties.joinToString()}" +
+            if (releaseStoreFile?.exists() == false) {
+                "; storeFile does not exist"
+            } else {
+                ""
+            },
+    )
+}
 
 android {
     namespace = "com.zalooq.account_app"
@@ -59,7 +87,7 @@ android {
 
     signingConfigs {
         create("release") {
-            if (keystorePropertiesFile.exists()) {
+            if (hasReleaseSigning) {
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
                 storeFile = file(keystoreProperties["storeFile"] as String)
@@ -70,10 +98,10 @@ android {
 
     buildTypes {
         release {
-            if (keystorePropertiesFile.exists()) {
+            if (hasReleaseSigning) {
                  signingConfig = signingConfigs.getByName("release")
             } else {
-                 signingConfig = signingConfigs.getByName("debug")
+                 signingConfig = null
             }
             // Enabling code shrinking (ProGuard/R8) for smaller APK
             isMinifyEnabled = true 

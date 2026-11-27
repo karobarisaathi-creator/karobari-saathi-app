@@ -36,9 +36,6 @@ class ProfileController extends ChangeNotifier {
   bool _isDisposed = false;
   String? remoteProfileImage;
   File? profileImage;
-  double? _latitude;
-  double? _longitude;
-  String _savedAddress = '';
   ProfileSaveStatus saveStatus = ProfileSaveStatus.idle;
   String? errorMessage;
 
@@ -67,9 +64,6 @@ class ProfileController extends ChangeNotifier {
               .toString();
       emailController.text = (data?['email'] ?? user.email ?? '').toString();
       addressController.text = (data?['businessAddress'] ?? '').toString();
-      _savedAddress = addressController.text.trim();
-      _latitude = (data?['latitude'] as num?)?.toDouble();
-      _longitude = (data?['longitude'] as num?)?.toDouble();
       shopNameController.text = (data?['shopName'] ?? '').toString();
       professionController.text = (data?['profession'] ?? '').toString();
       aboutController.text = (data?['about'] ?? '').toString();
@@ -116,11 +110,6 @@ class ProfileController extends ChangeNotifier {
       }
 
       final hasShopName = shopNameController.text.trim().isNotEmpty;
-      final address = addressController.text.trim();
-      if (address != _savedAddress) {
-        _latitude = null;
-        _longitude = null;
-      }
 
       final effectiveShopkeeper = hasShopName;
       selectedRole = effectiveShopkeeper ? AppRole.shopkeeper : AppRole.simple;
@@ -139,12 +128,8 @@ class ProfileController extends ChangeNotifier {
         'about': aboutController.text.trim(),
         'role': selectedRole.id,
         'photoURL': profileImageUrl,
-        'latitude': effectiveShopkeeper && _latitude != null
-            ? _latitude
-            : FieldValue.delete(),
-        'longitude': effectiveShopkeeper && _longitude != null
-            ? _longitude
-            : FieldValue.delete(),
+        'latitude': FieldValue.delete(),
+        'longitude': FieldValue.delete(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
       final firestore = FirebaseFirestore.instance;
@@ -172,8 +157,8 @@ class ProfileController extends ChangeNotifier {
           'shopName': shopNameController.text.trim(),
           'profession': professionController.text.trim(),
           'businessAddress': addressController.text.trim(),
-          'latitude': _latitude,
-          'longitude': _longitude,
+          'latitude': FieldValue.delete(),
+          'longitude': FieldValue.delete(),
           'role': selectedRole.id,
           'photoURL': profileImageUrl,
           'profileImageUrl': profileImageUrl,
@@ -203,7 +188,6 @@ class ProfileController extends ChangeNotifier {
       }
 
       remoteProfileImage = profileImageUrl;
-      _savedAddress = addressController.text.trim();
       saveStatus = ProfileSaveStatus.success;
       isEditing = true;
       notifyListeners();

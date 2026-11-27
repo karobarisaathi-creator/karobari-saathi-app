@@ -1,12 +1,405 @@
 const {
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
+const {onSchedule} = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
 
 const workerWageAccrualPrefix = "WORKER_PAYROLL:ACCRUAL:";
 const workerWagePaymentPrefix = "WORKER_PAYROLL:PAYMENT:";
+const deletionGracePeriodMs = 30 * 24 * 60 * 60 * 1000;
+
+function requireAuthenticatedUid(request) {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in to continue.");
+  }
+  return request.auth.uid;
+}
+
+function accountDeletionDate(value) {
+  if (value && typeof value.toDate === "function") return value.toDate();
+  if (value instanceof Date) return value;
+  return null;
+}
+
+function getPublicProfileData(uid, userData, authUser) {
+  const profile = {
+    uid,
+    phoneNumber: authUser.phoneNumber || userData.phoneNumber || null,
+    displayName:
+      userData.displayName || userData.name || authUser.displayName || null,
+    photoURL:
+      userData.photoURL ||
+      userData.photoUrl ||
+      userData.profileImage ||
+      authUser.photoURL ||
+      null,
+    profession: userData.profession || null,
+    businessAddress:
+      userData.businessAddress ||
+      userData.address ||
+      userData.shopAddress ||
+      userData.storeAddress ||
+      userData.location ||
+      null,
+    shopName: userData.shopName || userData.storeName || null,
+  };
+  return Object.fromEntries(
+    Object.entries(profile).filter(([, value]) => value != null),
+  );
+}
+
+exports.requestAccountDeletion = onCall(async (request) => {
+  const uid = requireAuthenticatedUid(request);
+  const db = admin.firestore();
+  const userRef = db.collection("users").doc(uid);
+  const deletionRef = db.collection("account_deletion_requests").doc(uid);
+  const profileRef = db.collection("public_profiles").doc(uid);
+  const authUser = await admin.auth().getUser(uid);
+  const now = admin.firestore.Timestamp.now();
+
+  const deleteAfter = await db.runTransaction(async (transaction) => {
+    const [userSnapshot, deletionSnapshot] = await Promise.all([
+      transaction.get(userRef),
+      transaction.get(deletionRef),
+    ]);
+    if (!userSnapshot.exists) {
+      throw new HttpsError("failed-precondition", "Account data was not found.");
+    }
+
+    const userData = userSnapshot.data();
+    const existingDeadline = accountDeletionDate(userData.restoreDeadline);
+    let deadline;
+    if (userData.isDeactivated === true) {
+      if (deletionSnapshot.exists) {
+        deadline = accountDeletionDate(deletionSnapshot.data().deleteAfter);
+      } else {
+        deadline = existingDeadline;
+      }
+      if (!deadline || deadline.getTime() <= now.toMillis()) {
+        throw new HttpsError(
+          "failed-precondition",
+          "The account recovery period has ended.",
+        );
+      }
+    } else {
+      deadline = new Date(now.toMillis() + deletionGracePeriodMs);
+    }
+
+    const deadlineTimestamp =
+      admin.firestore.Timestamp.fromDate(deadline);
+    if (userData.isDeactivated !== true || !deletionSnapshot.exists) {
+      transaction.set(deletionRef, {
+        uid,
+        phoneNumber: authUser.phoneNumber || userData.phoneNumber || null,
+        email: authUser.email || userData.email || null,
+        requestedAt: now,
+        deleteAfter: deadlineTimestamp,
+        status: "pending",
+      });
+    }
+    if (userData.isDeactivated !== true) {
+      transaction.update(userRef, {
+        isDeactivated: true,
+        deactivatedAt: now,
+        restoreDeadline: deadlineTimestamp,
+      });
+    }
+    transaction.delete(profileRef);
+    return deadline.getTime();
+  });
+
+  return {deleteAfter};
+});
+
+exports.restoreAccountDeletion = onCall(async (request) => {
+  const uid = requireAuthenticatedUid(request);
+  const db = admin.firestore();
+  const userRef = db.collection("users").doc(uid);
+  const deletionRef = db.collection("account_deletion_requests").doc(uid);
+  const profileRef = db.collection("public_profiles").doc(uid);
+  const authUser = await admin.auth().getUser(uid);
+  const now = admin.firestore.Timestamp.now();
+
+  await db.runTransaction(async (transaction) => {
+    const [userSnapshot, deletionSnapshot] = await Promise.all([
+      transaction.get(userRef),
+      transaction.get(deletionRef),
+    ]);
+    if (!userSnapshot.exists || userSnapshot.data().isDeactivated !== true) {
+      throw new HttpsError(
+        "failed-precondition",
+        "There is no pending account deletion to restore.",
+      );
+    }
+
+    const userData = userSnapshot.data();
+    const deadline = deletionSnapshot.exists
+      ? accountDeletionDate(deletionSnapshot.data().deleteAfter)
+      : accountDeletionDate(userData.restoreDeadline);
+    if (
+      !deadline ||
+      deadline.getTime() <= now.toMillis() ||
+      deletionSnapshot.data()?.status === "purging"
+    ) {
+      throw new HttpsError(
+        "failed-precondition",
+        "The account recovery period has ended.",
+      );
+    }
+
+    transaction.update(userRef, {
+      isDeactivated: false,
+      deactivatedAt: admin.firestore.FieldValue.delete(),
+      restoreDeadline: admin.firestore.FieldValue.delete(),
+    });
+    if (deletionSnapshot.exists) transaction.delete(deletionRef);
+    transaction.set(
+      profileRef,
+      getPublicProfileData(uid, userData, authUser),
+    );
+  });
+
+  return {restored: true};
+});
+
+async function deleteQueryResults(query, pageSize = 200) {
+  while (true) {
+    const snapshot = await query.limit(pageSize).get();
+    if (snapshot.empty) return;
+    for (let index = 0; index < snapshot.docs.length; index += 400) {
+      const batch = admin.firestore().batch();
+      snapshot.docs.slice(index, index + 400).forEach((document) => {
+        batch.delete(document.ref);
+      });
+      await batch.commit();
+    }
+  }
+}
+
+async function deleteUserData(uid, deletionRequest) {
+  const db = admin.firestore();
+  const userRef = db.collection("users").doc(uid);
+  const identity = {
+    phoneNumber: deletionRequest.phoneNumber || null,
+    email: deletionRequest.email || null,
+  };
+  try {
+    const authUser = await admin.auth().getUser(uid);
+    identity.phoneNumber = identity.phoneNumber || authUser.phoneNumber || null;
+    identity.email = identity.email || authUser.email || null;
+  } catch (error) {
+    if (error.code !== "auth/user-not-found") throw error;
+  }
+
+  const ownMappings = await userRef.collection("workerWageMirrors").get();
+  for (let index = 0; index < ownMappings.docs.length; index += 150) {
+    const batch = db.batch();
+    ownMappings.docs.slice(index, index + 150).forEach((mappingDocument) => {
+      const mapping = mappingDocument.data();
+      if (mapping.recipientUid && mapping.mirrorTransactionId) {
+        const recipientRef = db.collection("users").doc(mapping.recipientUid);
+        batch.delete(
+          recipientRef
+            .collection("transactions")
+            .doc(mapping.mirrorTransactionId),
+        );
+        if (mapping.notificationId) {
+          batch.delete(
+            recipientRef
+              .collection("notifications")
+              .doc(mapping.notificationId),
+          );
+        }
+      }
+      batch.delete(mappingDocument.ref);
+    });
+    await batch.commit();
+  }
+
+  await deleteQueryResults(
+    db.collectionGroup("workerWageMirrors")
+      .where("recipientUid", "==", uid),
+  );
+  await deleteQueryResults(
+    db.collectionGroup("notifications")
+      .where("data.senderUid", "==", uid),
+  );
+  await deleteQueryResults(
+    db.collectionGroup("reports")
+      .where("reporterId", "==", uid),
+  );
+
+  await deleteQueryResults(
+    db.collectionGroup("reviews").where("userId", "==", uid),
+  );
+
+  const listingsQuery = db.collection("marketplace_listings")
+    .where("ownerId", "==", uid);
+  while (true) {
+    const listings = await listingsQuery.limit(10).get();
+    if (listings.empty) break;
+    await Promise.all(
+      listings.docs.map((listing) =>
+        db.recursiveDelete(listing.ref),
+      ),
+    );
+  }
+
+  const publicShopRef = db.collection("public_shops").doc(uid);
+  await db.recursiveDelete(publicShopRef);
+
+  const userDataIds = new Set([uid]);
+  if (identity.phoneNumber) {
+    phoneLookupCandidates(identity.phoneNumber).forEach((candidate) => {
+      userDataIds.add(candidate);
+    });
+  }
+  if (identity.email) userDataIds.add(identity.email.toLowerCase());
+  for (const identifier of userDataIds) {
+    const legacyDataRef = db.collection("userData").doc(identifier);
+    const legacyDataSnapshot = await legacyDataRef.get();
+    if (legacyDataSnapshot.exists) await db.recursiveDelete(legacyDataRef);
+  }
+
+  const backupRef = db.collection("backups").doc(uid);
+  await db.recursiveDelete(backupRef);
+
+  const bucket = admin.storage().bucket();
+  await bucket.deleteFiles({prefix: `users/${uid}/`});
+  await bucket.deleteFiles({prefix: `marketplace/${uid}/`});
+
+  try {
+    await admin.auth().deleteUser(uid);
+  } catch (error) {
+    if (error.code !== "auth/user-not-found") throw error;
+  }
+
+  await db.recursiveDelete(userRef);
+}
+
+async function enqueueLegacyDeletionRequests() {
+  const db = admin.firestore();
+  const now = admin.firestore.Timestamp.now();
+  const activeDeactivations = await db.collection("users")
+    .where("isDeactivated", "==", true)
+    .where("restoreDeadline", "<=", now)
+    .limit(200)
+    .get();
+  for (const userDocument of activeDeactivations.docs) {
+    const deletionRef = db.collection("account_deletion_requests")
+      .doc(userDocument.id);
+    const deletionSnapshot = await deletionRef.get();
+    if (deletionSnapshot.exists) continue;
+
+    const userData = userDocument.data();
+    const deadline = accountDeletionDate(userData.restoreDeadline);
+    if (!deadline) {
+      console.error(
+        `Cannot schedule legacy deactivated account ${userDocument.id}: missing recovery deadline`,
+      );
+      continue;
+    }
+    let authUser = null;
+    try {
+      authUser = await admin.auth().getUser(userDocument.id);
+    } catch (error) {
+      if (error.code !== "auth/user-not-found") throw error;
+    }
+    await db.runTransaction(async (transaction) => {
+      const [currentUserSnapshot, currentDeletionSnapshot] = await Promise.all([
+        transaction.get(userDocument.ref),
+        transaction.get(deletionRef),
+      ]);
+      if (
+        !currentUserSnapshot.exists ||
+        currentUserSnapshot.data().isDeactivated !== true ||
+        currentDeletionSnapshot.exists
+      ) {
+        return;
+      }
+
+      transaction.create(deletionRef, {
+        uid: userDocument.id,
+        phoneNumber:
+          authUser?.phoneNumber || userData.phoneNumber || null,
+        email: authUser?.email || userData.email || null,
+        requestedAt: accountDeletionDate(userData.deactivatedAt) || new Date(),
+        deleteAfter: admin.firestore.Timestamp.fromDate(deadline),
+        status: "pending",
+      });
+    });
+  }
+}
+
+exports.purgeExpiredAccountDeletions = onSchedule(
+  {
+    schedule: "every 6 hours",
+    timeZone: "UTC",
+    timeoutSeconds: 540,
+    memory: "512MiB",
+  },
+  async () => {
+    const db = admin.firestore();
+    await enqueueLegacyDeletionRequests();
+    const expiredRequests = await db.collection("account_deletion_requests")
+      .where("deleteAfter", "<=", admin.firestore.Timestamp.now())
+      .limit(20)
+      .get();
+
+    for (const deletionDocument of expiredRequests.docs) {
+      const deletionRef = deletionDocument.ref;
+      const shouldPurge = await db.runTransaction(async (transaction) => {
+        const latest = await transaction.get(deletionRef);
+        if (!latest.exists) return false;
+        const data = latest.data();
+        const deadline = accountDeletionDate(data.deleteAfter);
+        const now = admin.firestore.Timestamp.now();
+        const leaseUntil = accountDeletionDate(data.purgingUntil);
+        if (
+          !deadline ||
+          deadline.getTime() > now.toMillis() ||
+          leaseUntil?.getTime() > now.toMillis()
+        ) {
+          return false;
+        }
+        transaction.set(
+          deletionRef,
+          {
+            status: "purging",
+            lastAttemptAt: now,
+            purgingUntil: admin.firestore.Timestamp.fromMillis(
+              now.toMillis() + 12 * 60 * 1000,
+            ),
+          },
+          {merge: true},
+        );
+        return true;
+      });
+      if (!shouldPurge) continue;
+
+      try {
+        await deleteUserData(deletionDocument.id, deletionDocument.data());
+        await deletionRef.delete();
+      } catch (error) {
+        console.error(
+          `Failed to purge account ${deletionDocument.id}:`,
+          error,
+        );
+        await deletionRef.set(
+          {
+            status: "pending",
+            lastAttemptAt: admin.firestore.Timestamp.now(),
+            purgingUntil: admin.firestore.FieldValue.delete(),
+          },
+          {merge: true},
+        );
+      }
+    }
+  },
+);
 
 function phoneLookupCandidates(phone) {
   const trimmed = typeof phone === "string" ? phone.trim() : "";

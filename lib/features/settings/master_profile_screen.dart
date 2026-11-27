@@ -243,24 +243,37 @@ class _MasterProfileScreenState extends State<MasterProfileScreen> {
                             ],
                           ),
                         ),
-
-                        const SizedBox(height: 8),
-                        AppButton(
-                          text: controller.isEditing
-                              ? (isUrdu ? 'محفوظ کریں' : 'Save Profile')
-                              : (isUrdu ? 'پروفائل بنائیں' : 'Create Profile'),
-                          color: AppTheme.darkColor,
-                          variant: AppButtonVariant.primary,
-                          size: AppButtonSize.large,
-                          isFullWidth: true,
-                          isLoading: _isSavingProfile,
-                          loadingText: _saveLoadingText,
-                          onPressed: _saveProfile,
-                        ),
                       ],
                     ),
                   ),
                 ),
+          bottomNavigationBar: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, -3),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              child: AppButton(
+                text: controller.isEditing
+                    ? (isUrdu ? 'محفوظ کریں' : 'Save Profile')
+                    : (isUrdu ? 'پروفائل بنائیں' : 'Create Profile'),
+                color: AppTheme.slateColor,
+                variant: AppButtonVariant.primary,
+                size: AppButtonSize.large,
+                isFullWidth: true,
+                isLoading: _isSavingProfile,
+                loadingText: _saveLoadingText,
+                onPressed: _saveProfile,
+              ),
+            ),
+          ),
         ),
       ),
     );

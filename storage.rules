@@ -26,12 +26,8 @@ service firebase.storage {
     }
 
     match /marketplace/{userId}/{listingId}/{fileName} {
-      allow read: if request.auth != null;
-      allow create, update: if isOwner(userId)
-        && request.resource.size > 0
-        && request.resource.size <= 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/(jpeg|png|webp)');
-      allow delete: if isOwner(userId);
+      allow read, delete: if isOwner(userId);
+      allow create, update: if false;
     }
 
     match /marketplace/{userId}/backups/{snapshotId}/{fileName} {

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
 
@@ -15,11 +13,8 @@ class SearchSortBar extends StatefulWidget {
   final TextEditingController? controller;
   final EdgeInsets? padding;
   final Widget? trailing;
-  final bool showVoiceSearch;
   final bool showScanner;
   final VoidCallback? onScannerTap;
-  final VoidCallback? onVoicePressed;
-  final VoidCallback? onVoiceReleased;
 
   const SearchSortBar({
     Key? key,
@@ -31,24 +26,17 @@ class SearchSortBar extends StatefulWidget {
     this.controller,
     this.padding,
     this.trailing,
-    this.showVoiceSearch = false,
     this.showScanner = false,
     this.onScannerTap,
-    this.onVoicePressed,
-    this.onVoiceReleased,
   }) : super(key: key);
 
   @override
   State<SearchSortBar> createState() => _SearchSortBarState();
 }
 
-class _SearchSortBarState extends State<SearchSortBar> with SingleTickerProviderStateMixin {
+class _SearchSortBarState extends State<SearchSortBar> {
   bool _isFocused = false;
   final FocusNode _focusNode = FocusNode();
-  final stt.SpeechToText _speech = stt.SpeechToText();
-  bool _isListening = false;
-  
-  late AnimationController _pulseController;
 
   @override
   void initState() {
@@ -58,65 +46,12 @@ class _SearchSortBarState extends State<SearchSortBar> with SingleTickerProvider
         _isFocused = _focusNode.hasFocus;
       });
     });
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    );
   }
 
   @override
   void dispose() {
     _focusNode.dispose();
-    _pulseController.dispose();
-    if (_isListening) _speech.stop();
     super.dispose();
-  }
-
-  void _startListening() async {
-    if (_isListening) return;
-
-    bool available = await _speech.initialize(
-      onStatus: (val) {
-        if (val == 'done' || val == 'notListening') {
-           if (mounted) setState(() => _isListening = false);
-        }
-      },
-      onError: (val) {
-        if (mounted) setState(() => _isListening = false);
-      },
-    );
-
-    if (available) {
-      HapticFeedback.mediumImpact();
-      _pulseController.repeat(reverse: true);
-      setState(() => _isListening = true);
-      final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
-      _speech.listen(
-        onResult: (val) {
-          if (widget.controller != null) {
-            widget.controller!.text = val.recognizedWords;
-          }
-          if (widget.onSearchChanged != null) {
-            widget.onSearchChanged!(val.recognizedWords);
-          }
-          if (val.finalResult) {
-            _stopListening();
-            if (widget.onSubmitted != null) {
-              widget.onSubmitted!(val.recognizedWords);
-            }
-          }
-        },
-        localeId: isUrdu ? 'ur_PK' : 'en_US',
-      );
-    }
-  }
-
-  void _stopListening() {
-    if (_isListening) {
-      _speech.stop();
-      _pulseController.stop();
-      setState(() => _isListening = false);
-    }
   }
 
   @override
@@ -124,7 +59,7 @@ class _SearchSortBarState extends State<SearchSortBar> with SingleTickerProvider
     final languageService = Provider.of<LanguageService>(context);
     final isUrdu = languageService.isUrdu;
     final fontFamily = isUrdu ? 'NooriNastaleeq' : '';
-    
+
     final activeColor = AppTheme.themeColor;
     final inactiveColor = AppTheme.darkColor;
 
@@ -137,7 +72,8 @@ class _SearchSortBarState extends State<SearchSortBar> with SingleTickerProvider
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               height: 42,
-              clipBehavior: Clip.antiAlias, // Ensures internal components don't overlap rounded corners
+              clipBehavior: Clip
+                  .antiAlias, // Ensures internal components don't overlap rounded corners
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
@@ -160,9 +96,13 @@ class _SearchSortBarState extends State<SearchSortBar> with SingleTickerProvider
                   onChanged: widget.onSearchChanged,
                   onSubmitted: widget.onSubmitted,
                   textAlignVertical: TextAlignVertical.center,
-                  style: TextStyle(fontFamily: fontFamily, fontSize: 14, color: AppTheme.darkColor),
+                  style: TextStyle(
+                      fontFamily: fontFamily,
+                      fontSize: 14,
+                      color: AppTheme.darkColor),
                   decoration: InputDecoration(
-                    hintText: widget.hintText ?? (isUrdu ? "تلاش کریں..." : "Search..."),
+                    hintText: widget.hintText ??
+                        (isUrdu ? "تلاش کریں..." : "Search..."),
                     hintStyle: TextStyle(
                       color: Colors.grey.withOpacity(0.7),
                       fontSize: 13,
@@ -171,45 +111,19 @@ class _SearchSortBarState extends State<SearchSortBar> with SingleTickerProvider
                     ),
                     prefixIcon: Icon(
                       PhosphorIcons.magnifyingGlass(),
-                      color: _isFocused ? activeColor : inactiveColor.withOpacity(0.5),
+                      color: _isFocused
+                          ? activeColor
+                          : inactiveColor.withOpacity(0.5),
                       size: 18,
                     ),
                     suffixIcon: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (widget.showVoiceSearch)
-                          GestureDetector(
-                            onLongPressStart: (_) => widget.onVoicePressed != null ? widget.onVoicePressed!() : _startListening(),
-                            onLongPressEnd: (_) => widget.onVoiceReleased != null ? widget.onVoiceReleased!() : _stopListening(),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                if (_isListening)
-                                  ScaleTransition(
-                                    scale: Tween(begin: 1.0, end: 2.0).animate(_pulseController),
-                                    child: Container(
-                                      width: 20, height: 20,
-                                      decoration: BoxDecoration(
-                                        color: Colors.red.withOpacity(0.2),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                                  child: Icon(
-                                    _isListening ? PhosphorIcons.microphone(PhosphorIconsStyle.fill) : PhosphorIcons.microphone(),
-                                    color: _isListening ? Colors.red : activeColor.withOpacity(0.6),
-                                    size: 18,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         if (widget.showScanner)
                           IconButton(
                             onPressed: widget.onScannerTap,
-                            icon: Icon(PhosphorIcons.scan(), color: activeColor.withOpacity(0.6), size: 18),
+                            icon: Icon(PhosphorIcons.scan(),
+                                color: activeColor.withOpacity(0.6), size: 18),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                           ),
@@ -222,7 +136,8 @@ class _SearchSortBarState extends State<SearchSortBar> with SingleTickerProvider
                     focusedBorder: InputBorder.none,
                     errorBorder: InputBorder.none,
                     disabledBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   ),
                 ),
               ),
@@ -240,15 +155,19 @@ class _SearchSortBarState extends State<SearchSortBar> with SingleTickerProvider
                 height: 40,
                 width: 40,
                 decoration: BoxDecoration(
-                  color: (widget.isAscending ? activeColor : inactiveColor).withOpacity(0.15),
+                  color: (widget.isAscending ? activeColor : inactiveColor)
+                      .withOpacity(0.15),
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: (widget.isAscending ? activeColor : inactiveColor).withOpacity(0.3),
+                    color: (widget.isAscending ? activeColor : inactiveColor)
+                        .withOpacity(0.3),
                     width: 1,
                   ),
                 ),
                 child: Icon(
-                  widget.isAscending ? PhosphorIcons.sortAscending() : PhosphorIcons.sortDescending(),
+                  widget.isAscending
+                      ? PhosphorIcons.sortAscending()
+                      : PhosphorIcons.sortDescending(),
                   color: widget.isAscending ? activeColor : inactiveColor,
                   size: 20,
                 ),

@@ -13,6 +13,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "isDeactivated",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "restoreDeadline",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

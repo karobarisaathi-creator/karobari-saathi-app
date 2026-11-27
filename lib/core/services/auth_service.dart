@@ -2,10 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'account_deletion_service.dart';
 import 'database_service.dart';
 import 'package:account_app/core/utils/formatters.dart';
 import 'package:account_app/core/services/database/profile_service.dart';
 import 'package:account_app/core/services/auto_sync_service.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/features/settings/login_screen.dart'; // For navigation
 
 class AuthService with ChangeNotifier {
@@ -117,37 +119,51 @@ class AuthService with ChangeNotifier {
     }
   }
 
-  // Deactivate account
-  Future<void> deactivateAccount(BuildContext context) async {
+  Future<void> requestAccountDeletion(
+    BuildContext context, {
+    required bool isUrdu,
+  }) async {
     final user = _auth.currentUser;
-    if (user == null || !context.mounted) return;
+    if (user == null) {
+      throw StateError('Sign in before requesting account deletion.');
+    }
+    final dbService = Provider.of<DatabaseService>(context, listen: false);
 
     try {
-      final dbService = Provider.of<DatabaseService>(context, listen: false);
-      final batch = _firestore.batch();
-      batch.update(_firestore.collection('users').doc(user.uid), {
-        'isDeactivated': true,
-        'deactivatedAt': FieldValue.serverTimestamp(),
-        'restoreDeadline':
-            Timestamp.fromDate(DateTime.now().add(const Duration(days: 30))),
-      });
-      batch.delete(_firestore.collection('public_profiles').doc(user.uid));
-      await batch.commit();
+      final deleteAfter = await AccountDeletionService.requestDeletion();
 
       Object? cleanupError;
       try {
         await dbService.prepareForLogout();
       } catch (error, stackTrace) {
         cleanupError = error;
-        debugPrint('Local data cleanup failed during deactivation: $error');
+        debugPrint('Local data cleanup failed after deletion request: $error');
         debugPrintStack(stackTrace: stackTrace);
       }
 
       ProfileService.clearCache();
       await _auth.signOut();
 
-      // Navigate to login screen and remove all previous routes
       if (context.mounted) {
+        if (cleanupError == null) {
+          final deadlineText =
+              MaterialLocalizations.of(context).formatMediumDate(
+            deleteAfter.toLocal(),
+          );
+          AppToast.success(
+            context,
+            isUrdu
+                ? 'درخواست موصول ہوئی۔ $deadlineText تک لاگ اِن کر کے بحال کریں۔'
+                : 'Deletion scheduled. Sign in by $deadlineText to restore.',
+          );
+        } else {
+          AppToast.error(
+            context,
+            isUrdu
+                ? 'درخواست موصول ہوئی، لیکن ڈیوائس کا مقامی ڈیٹا صاف نہیں ہو سکا۔'
+                : 'Deletion is scheduled, but local data could not be cleared.',
+          );
+        }
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const LoginScreen()),
           (Route<dynamic> route) => false,
@@ -155,10 +171,11 @@ class AuthService with ChangeNotifier {
       }
       if (cleanupError != null) {
         throw Exception(
-            'Account deactivated, but local data cleanup failed: $cleanupError');
+          'Deletion was scheduled, but local data cleanup failed: $cleanupError',
+        );
       }
     } catch (e) {
-      throw Exception("Failed to deactivate account: $e");
+      throw Exception('Failed to request account deletion: $e');
     }
   }
 }

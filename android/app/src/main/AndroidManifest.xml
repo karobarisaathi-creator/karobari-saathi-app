@@ -8,25 +8,11 @@
         android:name="android.hardware.camera"
         android:required="false" />
 
-    <!-- Location Permissions -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-
-    <!-- Screen Wake Permissions (Added) -->
+    <!-- Screen wake permission -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-
-    <!-- SMS and Phone permissions -->
-    <uses-permission android:name="android.permission.SEND_SMS" />
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <uses-permission android:name="android.permission.CALL_PHONE" />
     
     <!-- Contacts permissions -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
-    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
-
-    <!-- Microphone Permission for Speech to Text -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- Make telephony hardware optional -->
     <uses-feature android:name="android.hardware.telephony" android:required="false" />

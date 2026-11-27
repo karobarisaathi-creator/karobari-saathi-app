@@ -24,8 +24,6 @@ class Shop {
   final bool showDeliveryInfo;
   final bool showItemsCount;
   final bool showTags;
-  final double? latitude;
-  final double? longitude;
 
   const Shop({
     required this.id,
@@ -51,8 +49,6 @@ class Shop {
     this.showDeliveryInfo = true,
     this.showItemsCount = true,
     this.showTags = true,
-    this.latitude,
-    this.longitude,
   });
 
   int get availableItemCount => itemCount ?? items.length;
@@ -85,8 +81,6 @@ class Shop {
         showDeliveryInfo: showDeliveryInfo,
         showItemsCount: showItemsCount,
         showTags: showTags,
-        latitude: latitude,
-        longitude: longitude,
       );
 }
 

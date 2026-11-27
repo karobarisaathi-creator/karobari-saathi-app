@@ -32,54 +32,6 @@ service cloud.firestore {
       );
     }
 
-    function validMarketplaceListing(data, listingId) {
-      return data.keys().hasAll([
-          'id', 'ownerId', 'sellerName', 'phoneNumber', 'phoneShared', 'title',
-          'description', 'category', 'condition', 'area', 'price',
-          'isNegotiable', 'imageUrls', 'imagePaths', 'status', 'createdAt',
-          'updatedAt'
-        ])
-        && data.keys().hasOnly([
-          'id', 'ownerId', 'sellerName', 'phoneNumber', 'phoneShared', 'title',
-          'description', 'category', 'condition', 'area', 'price',
-          'isNegotiable', 'imageUrls', 'imagePaths', 'status', 'createdAt',
-          'updatedAt'
-        ])
-        && data.id == listingId
-        && data.ownerId is string
-        && data.sellerName is string
-        && data.sellerName.size() > 0
-        && data.sellerName.size() <= 80
-        && data.phoneNumber is string
-        && data.phoneNumber.size() >= 7
-        && data.phoneNumber.size() <= 30
-        && data.phoneNumber.matches('^[+0-9 ()-]+$')
-        && data.phoneNumber.matches('.*[0-9].*')
-        && data.phoneShared == true
-        && data.title is string
-        && data.title.size() > 0
-        && data.title.size() <= 100
-        && data.description is string
-        && data.description.size() <= 1500
-        && data.category in [
-          'electronics', 'home', 'fashion', 'tools', 'vehicles', 'other'
-        ]
-        && data.condition in ['new', 'used']
-        && data.area is string
-        && data.area.size() > 0
-        && data.area.size() <= 100
-        && data.price is number
-        && data.price >= 0
-        && data.isNegotiable is bool
-        && data.imageUrls is list
-        && data.imageUrls.size() <= 5
-        && data.imagePaths is list
-        && data.imagePaths.size() == data.imageUrls.size()
-        && data.status in ['active', 'sold', 'hidden']
-        && data.createdAt is timestamp
-        && data.updatedAt is timestamp;
-    }
-
     // ═══ SETTINGS ═══
     match /settings/{document} {
       allow read: if true;
@@ -90,6 +42,10 @@ service cloud.firestore {
       allow read, write: if isSignedIn()
         && isActiveOwner(request.auth.uid)
         && (docId == request.auth.uid || ownsLegacyUserData(docId));
+    }
+
+    match /account_deletion_requests/{userId} {
+      allow read, write: if false;
     }
 
     // ═══ BACKUPS ═══
@@ -165,46 +121,14 @@ service cloud.firestore {
       }
     }
 
-    // ═══ MARKETPLACE ═══
+    // Marketplace publishing and public browsing are disabled. Keep owners'
+    // legacy listings readable for existing backups and account cleanup.
     match /marketplace_listings/{listingId} {
-      allow read: if isSignedIn()
-        && (resource.data.status != 'hidden'
-          || isActiveOwner(resource.data.ownerId));
-      allow create: if isSignedIn()
-        && isActiveOwner(request.auth.uid)
-        && validMarketplaceListing(request.resource.data, listingId)
-        && request.resource.data.ownerId == request.auth.uid
-        && request.resource.data.status == 'active'
-        && request.resource.data.createdAt == request.time
-        && request.resource.data.updatedAt == request.time;
-      allow update: if isActiveOwner(resource.data.ownerId)
-        && validMarketplaceListing(request.resource.data, listingId)
-        && request.resource.data.ownerId == resource.data.ownerId
-        && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.updatedAt == request.time;
-      allow delete: if isActiveOwner(resource.data.ownerId);
+      allow read, delete: if isActiveOwner(resource.data.ownerId);
+      allow create, update: if false;
 
       match /reports/{reporterId} {
-        allow read: if isOwner(
-          get(/databases/$(database)/documents/marketplace_listings/$(listingId))
-            .data.ownerId
-        ) || isOwner(reporterId);
-        allow create: if isActiveOwner(request.auth.uid)
-          && reporterId == request.auth.uid
-          && get(/databases/$(database)/documents/marketplace_listings/$(listingId))
-            .data.ownerId != request.auth.uid
-          && request.resource.data.keys().hasAll([
-            'reporterId', 'reason', 'createdAt'
-          ])
-          && request.resource.data.keys().hasOnly([
-            'reporterId', 'reason', 'createdAt'
-          ])
-          && request.resource.data.reporterId == request.auth.uid
-          && request.resource.data.reason is string
-          && request.resource.data.reason.size() > 0
-          && request.resource.data.reason.size() <= 500
-          && request.resource.data.createdAt == request.time;
-        allow update, delete: if false;
+        allow read, write: if false;
       }
     }
 

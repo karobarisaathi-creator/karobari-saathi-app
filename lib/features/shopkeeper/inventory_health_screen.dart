@@ -197,7 +197,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
         isUrdu: isUrdu,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -209,7 +209,7 @@ class _InventoryHealthScreenState extends State<InventoryHealthScreen> {
               hasItems: totalItems > 0,
               totalValue: totalPurchaseValue,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
 
             // ═══ Traffic Lights ═══
             Row(
