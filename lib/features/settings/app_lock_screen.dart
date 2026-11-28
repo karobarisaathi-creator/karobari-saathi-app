@@ -35,12 +35,6 @@ class _AppLockScreenState extends State<AppLockScreen> {
   bool _isAuthenticatingBiometrics = false;
   String? _errorTextOverride;
 
-  // Gold & Slate Palette
-  final Color _slateDark = const Color(0xFF0F172A);
-  final Color _slateCard = const Color(0xFF1E293B);
-  final Color _goldPrimary = const Color(0xFFD4AF37);
-  final Color _goldLight = const Color(0xFFF3E5AB);
-
   @override
   void initState() {
     super.initState();
@@ -127,27 +121,27 @@ class _AppLockScreenState extends State<AppLockScreen> {
 
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              _slateDark,
-              _slateCard,
-              const Color(0xFF0B132B),
+              AppTheme.slateColor, // Slate Top
+              AppTheme.darkColor,  // Dark Slate Center
+              Color(0xFF0F172A),   // Deep Slate Bottom
             ],
           ),
         ),
         child: SafeArea(
           child: _isLoading
-              ? Center(
+              ? const Center(
                   child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(_goldPrimary),
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(AppTheme.verifiedGold),
                   ),
                 )
               : Column(
                   children: [
-                    // Top Bar / Close Button if setting up or verifying only
                     if ((widget.isSettingUp ||
                             widget.isChangingPin ||
                             widget.isVerifyingOnly) &&
@@ -176,40 +170,41 @@ class _AppLockScreenState extends State<AppLockScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Container(
-                            width: 76,
-                            height: 76,
+                            width: 80,
+                            height: 80,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               gradient: LinearGradient(
                                 colors: [
-                                  _goldPrimary.withValues(alpha: 0.2),
-                                  _goldPrimary.withValues(alpha: 0.05),
+                                  AppTheme.verifiedGold.withValues(alpha: 0.35),
+                                  AppTheme.verifiedGold.withValues(alpha: 0.1),
                                 ],
                               ),
                               border: Border.all(
-                                color: _goldPrimary.withValues(alpha: 0.5),
-                                width: 1.5,
+                                color: AppTheme.verifiedGold,
+                                width: 2,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: _goldPrimary.withValues(alpha: 0.15),
-                                  blurRadius: 20,
-                                  spreadRadius: 2,
+                                  color: AppTheme.verifiedGold
+                                      .withValues(alpha: 0.3),
+                                  blurRadius: 24,
+                                  spreadRadius: 4,
                                 ),
                               ],
                             ),
-                            child: Icon(
+                            child: const Icon(
                               Icons.lock_rounded,
-                              color: _goldPrimary,
-                              size: 36,
+                              color: AppTheme.verifiedGold,
+                              size: 38,
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 18),
                           UrduAwareText(
                             isUrdu ? 'کاروباری ساتھی' : 'Karobari Sathi',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 22,
+                              fontSize: 24,
                               fontWeight: FontWeight.w700,
                               fontFamily: fontFamily,
                               letterSpacing: 0.5,
@@ -219,11 +214,10 @@ class _AppLockScreenState extends State<AppLockScreen> {
                           UrduAwareText(
                             _getStatusText(isUrdu),
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: _goldLight,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: fontFamily,
+                            style: const TextStyle(
+                              color: AppTheme.verifiedGold,
+                              fontSize: 19,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           const SizedBox(height: 6),
@@ -233,14 +227,14 @@ class _AppLockScreenState extends State<AppLockScreen> {
                                 : 'Enter your 4-digit security PIN',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
+                              color: Colors.white.withValues(alpha: 0.75),
                               fontSize: 13,
                               fontFamily: fontFamily,
                             ),
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 28),
 
-                          // PIN Dots Indicator
+                          // PIN Dots Indicator (Gold & Slate Styled)
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: List.generate(4, (index) {
@@ -255,14 +249,15 @@ class _AppLockScreenState extends State<AppLockScreen> {
                                   shape: BoxShape.circle,
                                   color: isFilled
                                       ? (_isError
-                                          ? Colors.redAccent
-                                          : _goldPrimary)
-                                      : Colors.white.withValues(alpha: 0.15),
+                                          ? AppTheme.redColor
+                                          : AppTheme.verifiedGold)
+                                      : AppTheme.slateColor
+                                          .withValues(alpha: 0.4),
                                   border: Border.all(
                                     color: isFilled
                                         ? (_isError
-                                            ? Colors.redAccent
-                                            : _goldLight)
+                                            ? AppTheme.redColor
+                                            : AppTheme.verifiedGold)
                                         : Colors.white.withValues(alpha: 0.3),
                                     width: 1.5,
                                   ),
@@ -270,11 +265,11 @@ class _AppLockScreenState extends State<AppLockScreen> {
                                       ? [
                                           BoxShadow(
                                             color: (_isError
-                                                    ? Colors.redAccent
-                                                    : _goldPrimary)
-                                                .withValues(alpha: 0.5),
-                                            blurRadius: 8,
-                                            spreadRadius: 1,
+                                                    ? AppTheme.redColor
+                                                    : AppTheme.verifiedGold)
+                                                .withValues(alpha: 0.6),
+                                            blurRadius: 10,
+                                            spreadRadius: 2,
                                           )
                                         ]
                                       : [],
@@ -282,9 +277,9 @@ class _AppLockScreenState extends State<AppLockScreen> {
                               );
                             }),
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 16),
 
-                          // Error text or spacing
+                          // Error text
                           AnimatedSwitcher(
                             duration: const Duration(milliseconds: 180),
                             child: _isError
@@ -293,7 +288,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
                                     key: const ValueKey('pin-error'),
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      color: const Color(0xFFFF6B6B),
+                                      color: AppTheme.redColor,
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
                                       fontFamily: fontFamily,
@@ -308,36 +303,38 @@ class _AppLockScreenState extends State<AppLockScreen> {
                       ),
                     ),
 
-                    // Custom On-Screen Keypad
+                    // Custom On-Screen Keypad (Slate background with Gold accents)
                     Container(
-                      padding: const EdgeInsets.fromLTRB(32, 16, 32, 24),
+                      padding: const EdgeInsets.fromLTRB(32, 20, 32, 28),
                       decoration: BoxDecoration(
-                        color: _slateCard.withValues(alpha: 0.6),
+                        color: AppTheme.darkColor.withValues(alpha: 0.95),
                         borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(32),
+                          top: Radius.circular(36),
                         ),
                         border: Border.all(
-                          color: _goldPrimary.withValues(alpha: 0.15),
-                          width: 1,
+                          color: AppTheme.verifiedGold.withValues(alpha: 0.3),
+                          width: 1.5,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, -5),
+                          ),
+                        ],
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Row 1: 1, 2, 3
                           _buildKeypadRow(['1', '2', '3']),
                           const SizedBox(height: 16),
-                          // Row 2: 4, 5, 6
                           _buildKeypadRow(['4', '5', '6']),
                           const SizedBox(height: 16),
-                          // Row 3: 7, 8, 9
                           _buildKeypadRow(['7', '8', '9']),
                           const SizedBox(height: 16),
-                          // Row 4: Biometric/Empty, 0, Backspace
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
-                              // Biometric button or empty
                               _isBiometricAvailable &&
                                       !widget.isSettingUp &&
                                       !_isVerifyingOldPin &&
@@ -347,9 +344,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
                                       onTap: _authenticateWithBiometrics,
                                     )
                                   : const SizedBox(width: 72, height: 72),
-                              // 0
                               _buildKeypadButton('0'),
-                              // Backspace
                               _buildKeypadActionKey(
                                 icon: Icons.backspace_rounded,
                                 onTap: _onBackspaceTap,
@@ -379,23 +374,23 @@ class _AppLockScreenState extends State<AppLockScreen> {
       child: InkWell(
         onTap: () => _onNumberTap(digit),
         borderRadius: BorderRadius.circular(36),
-        splashColor: _goldPrimary.withValues(alpha: 0.3),
-        highlightColor: _goldPrimary.withValues(alpha: 0.15),
+        splashColor: AppTheme.verifiedGold.withValues(alpha: 0.3),
+        highlightColor: AppTheme.verifiedGold.withValues(alpha: 0.15),
         child: Container(
           width: 72,
           height: 72,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: 0.05),
+            color: AppTheme.slateColor.withValues(alpha: 0.25),
             border: Border.all(
-              color: _goldPrimary.withValues(alpha: 0.25),
-              width: 1.2,
+              color: AppTheme.verifiedGold.withValues(alpha: 0.4),
+              width: 1.5,
             ),
           ),
           child: Center(
             child: Text(
               digit,
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 26,
                 fontWeight: FontWeight.w600,
@@ -416,23 +411,23 @@ class _AppLockScreenState extends State<AppLockScreen> {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(36),
-        splashColor: _goldPrimary.withValues(alpha: 0.3),
-        highlightColor: _goldPrimary.withValues(alpha: 0.15),
+        splashColor: AppTheme.verifiedGold.withValues(alpha: 0.3),
+        highlightColor: AppTheme.verifiedGold.withValues(alpha: 0.15),
         child: Container(
           width: 72,
           height: 72,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: 0.03),
+            color: AppTheme.slateColor.withValues(alpha: 0.2),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.1),
-              width: 1,
+              color: AppTheme.verifiedGold.withValues(alpha: 0.3),
+              width: 1.2,
             ),
           ),
           child: Center(
             child: Icon(
               icon,
-              color: _goldPrimary,
+              color: AppTheme.verifiedGold,
               size: 26,
             ),
           ),
