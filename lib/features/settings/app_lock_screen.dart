@@ -1,23 +1,23 @@
 // lib/features/settings/app_lock_screen.dart
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/security_service.dart';
+import 'package:account_app/core/theme/app_theme.dart';
 
 class AppLockScreen extends StatefulWidget {
   final bool isSettingUp;
   final bool isChangingPin;
-  final bool isVerifyingOnly; // ⭐ نیا
+  final bool isVerifyingOnly;
   final VoidCallback? onUnlock;
 
   const AppLockScreen({
     super.key,
     this.isSettingUp = false,
     this.isChangingPin = false,
-    this.isVerifyingOnly = false, // ⭐ نیا
+    this.isVerifyingOnly = false,
     this.onUnlock,
   });
 
@@ -26,9 +26,7 @@ class AppLockScreen extends StatefulWidget {
 }
 
 class _AppLockScreenState extends State<AppLockScreen> {
-  final TextEditingController _pinController = TextEditingController();
-  final FocusNode _focusNode = FocusNode();
-
+  String _enteredPin = '';
   String? _newPinCache;
   bool _isVerifyingOldPin = false;
   bool _isLoading = true;
@@ -37,32 +35,29 @@ class _AppLockScreenState extends State<AppLockScreen> {
   bool _isAuthenticatingBiometrics = false;
   String? _errorTextOverride;
 
-  final Color _greyColor = const Color(0xFF607D8B);
+  // Gold & Slate Palette
+  final Color _slateDark = const Color(0xFF0F172A);
+  final Color _slateCard = const Color(0xFF1E293B);
+  final Color _goldPrimary = const Color(0xFFD4AF37);
+  final Color _goldLight = const Color(0xFFF3E5AB);
 
   @override
   void initState() {
     super.initState();
     _isVerifyingOldPin = widget.isChangingPin;
     _loadInitialState();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkBiometricsAndFocus();
-    });
   }
 
   Future<void> _loadInitialState() async {
     if (mounted) {
       setState(() => _isLoading = false);
     }
+    if (!widget.isSettingUp && !_isVerifyingOldPin && !widget.isVerifyingOnly) {
+      _checkBiometrics();
+    }
   }
 
-  Future<void> _checkBiometricsAndFocus() async {
-    // ⭐ verifyOnly کے لیے صرف keyboard — biometrics نہیں
-    if (widget.isSettingUp || _isVerifyingOldPin || widget.isVerifyingOnly) {
-      _showKeyboard();
-      return;
-    }
-
+  Future<void> _checkBiometrics() async {
     final securityService =
         Provider.of<SecurityService>(context, listen: false);
     final isAvailable = await securityService.isBiometricsAvailable();
@@ -75,16 +70,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
 
       if (_isBiometricAvailable) {
         await _authenticateWithBiometrics();
-      } else {
-        _showKeyboard();
       }
-    }
-  }
-
-  void _showKeyboard() {
-    if (mounted && !_isLoading) {
-      _focusNode.requestFocus();
-      SystemChannels.textInput.invokeMethod('TextInput.show');
     }
   }
 
@@ -95,8 +81,6 @@ class _AppLockScreenState extends State<AppLockScreen> {
         Provider.of<SecurityService>(context, listen: false);
     final isUrdu = Provider.of<LanguageService>(context, listen: false).isUrdu;
     try {
-      FocusScope.of(context).unfocus();
-
       final isAuthenticated = await securityService.authenticateWithBiometrics(
         localizedReason: isUrdu
             ? 'ایپ کھولنے کے لیے اپنی شناخت کی تصدیق کریں'
@@ -105,19 +89,34 @@ class _AppLockScreenState extends State<AppLockScreen> {
 
       if (isAuthenticated && mounted) {
         widget.onUnlock?.call();
-      } else {
-        _showKeyboard();
       }
     } finally {
       if (mounted) setState(() => _isAuthenticatingBiometrics = false);
     }
   }
 
-  @override
-  void dispose() {
-    _pinController.dispose();
-    _focusNode.dispose();
-    super.dispose();
+  void _onNumberTap(String digit) {
+    if (_enteredPin.length < 4) {
+      setState(() {
+        _enteredPin += digit;
+        _isError = false;
+        _errorTextOverride = null;
+      });
+
+      if (_enteredPin.length == 4) {
+        _validatePin(_enteredPin);
+      }
+    }
+  }
+
+  void _onBackspaceTap() {
+    if (_enteredPin.isNotEmpty) {
+      setState(() {
+        _enteredPin = _enteredPin.substring(0, _enteredPin.length - 1);
+        _isError = false;
+        _errorTextOverride = null;
+      });
+    }
   }
 
   @override
@@ -127,304 +126,317 @@ class _AppLockScreenState extends State<AppLockScreen> {
     final fontFamily = isUrdu ? 'NooriNastaleeq' : null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B1628),
-      resizeToAvoidBottomInset: true,
-      body: Stack(
-        children: [
-          Positioned(
-            top: -110,
-            right: -85,
-            child: Container(
-              width: 280,
-              height: 280,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF1D6ED6).withValues(alpha: 0.16),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              _slateDark,
+              _slateCard,
+              const Color(0xFF0B132B),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: _isLoading
+              ? Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(_goldPrimary),
+                  ),
+                )
+              : Column(
+                  children: [
+                    // Top Bar / Close Button if setting up or verifying only
+                    if ((widget.isSettingUp ||
+                            widget.isChangingPin ||
+                            widget.isVerifyingOnly) &&
+                        _newPinCache == null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            IconButton(
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(Icons.close_rounded,
+                                  color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      const SizedBox(height: 24),
+
+                    // Header Icon & Title
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 76,
+                            height: 76,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [
+                                  _goldPrimary.withValues(alpha: 0.2),
+                                  _goldPrimary.withValues(alpha: 0.05),
+                                ],
+                              ),
+                              border: Border.all(
+                                color: _goldPrimary.withValues(alpha: 0.5),
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _goldPrimary.withValues(alpha: 0.15),
+                                  blurRadius: 20,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.lock_rounded,
+                              color: _goldPrimary,
+                              size: 36,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          UrduAwareText(
+                            isUrdu ? 'کاروباری ساتھی' : 'Karobari Sathi',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: fontFamily,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          UrduAwareText(
+                            _getStatusText(isUrdu),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: _goldLight,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          UrduAwareText(
+                            isUrdu
+                                ? 'اپنا 4 ہندسوں کا پن کوڈ درج کریں'
+                                : 'Enter your 4-digit security PIN',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.6),
+                              fontSize: 13,
+                              fontFamily: fontFamily,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+
+                          // PIN Dots Indicator
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(4, (index) {
+                              final isFilled = index < _enteredPin.length;
+                              return AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 10),
+                                width: 16,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isFilled
+                                      ? (_isError
+                                          ? Colors.redAccent
+                                          : _goldPrimary)
+                                      : Colors.white.withValues(alpha: 0.15),
+                                  border: Border.all(
+                                    color: isFilled
+                                        ? (_isError
+                                            ? Colors.redAccent
+                                            : _goldLight)
+                                        : Colors.white.withValues(alpha: 0.3),
+                                    width: 1.5,
+                                  ),
+                                  boxShadow: isFilled
+                                      ? [
+                                          BoxShadow(
+                                            color: (_isError
+                                                    ? Colors.redAccent
+                                                    : _goldPrimary)
+                                                .withValues(alpha: 0.5),
+                                            blurRadius: 8,
+                                            spreadRadius: 1,
+                                          )
+                                        ]
+                                      : [],
+                                ),
+                              );
+                            }),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Error text or spacing
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
+                            child: _isError
+                                ? UrduAwareText(
+                                    _getErrorText(isUrdu),
+                                    key: const ValueKey('pin-error'),
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: const Color(0xFFFF6B6B),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: fontFamily,
+                                    ),
+                                  )
+                                : const SizedBox(
+                                    key: ValueKey('pin-hint'),
+                                    height: 18,
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Custom On-Screen Keypad
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(32, 16, 32, 24),
+                      decoration: BoxDecoration(
+                        color: _slateCard.withValues(alpha: 0.6),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(32),
+                        ),
+                        border: Border.all(
+                          color: _goldPrimary.withValues(alpha: 0.15),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Row 1: 1, 2, 3
+                          _buildKeypadRow(['1', '2', '3']),
+                          const SizedBox(height: 16),
+                          // Row 2: 4, 5, 6
+                          _buildKeypadRow(['4', '5', '6']),
+                          const SizedBox(height: 16),
+                          // Row 3: 7, 8, 9
+                          _buildKeypadRow(['7', '8', '9']),
+                          const SizedBox(height: 16),
+                          // Row 4: Biometric/Empty, 0, Backspace
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              // Biometric button or empty
+                              _isBiometricAvailable &&
+                                      !widget.isSettingUp &&
+                                      !_isVerifyingOldPin &&
+                                      !widget.isVerifyingOnly
+                                  ? _buildKeypadActionKey(
+                                      icon: Icons.fingerprint_rounded,
+                                      onTap: _authenticateWithBiometrics,
+                                    )
+                                  : const SizedBox(width: 72, height: 72),
+                              // 0
+                              _buildKeypadButton('0'),
+                              // Backspace
+                              _buildKeypadActionKey(
+                                icon: Icons.backspace_rounded,
+                                onTap: _onBackspaceTap,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKeypadRow(List<String> digits) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: digits.map((digit) => _buildKeypadButton(digit)).toList(),
+    );
+  }
+
+  Widget _buildKeypadButton(String digit) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _onNumberTap(digit),
+        borderRadius: BorderRadius.circular(36),
+        splashColor: _goldPrimary.withValues(alpha: 0.3),
+        highlightColor: _goldPrimary.withValues(alpha: 0.15),
+        child: Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.05),
+            border: Border.all(
+              color: _goldPrimary.withValues(alpha: 0.25),
+              width: 1.2,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              digit,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 26,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
-          SafeArea(
-            child: _isLoading
-                ? Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(_greyColor),
-                    ),
-                  )
-                : Stack(
-                    children: [
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        child: SizedBox(
-                          width: 1,
-                          height: 1,
-                          child: TextField(
-                            controller: _pinController,
-                            focusNode: _focusNode,
-                            keyboardType: TextInputType.number,
-                            maxLength: 4,
-                            showCursor: false,
-                            enableSuggestions: false,
-                            autocorrect: false,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              counterText: '',
-                            ),
-                            style: const TextStyle(color: Colors.transparent),
-                            onChanged: (value) {
-                              setState(() {
-                                _isError = false;
-                                _errorTextOverride = null;
-                              });
-                              if (value.length == 4) _validatePin(value);
-                            },
-                          ),
-                        ),
-                      ),
-                      GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: _showKeyboard,
-                        child: Center(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 22,
-                              vertical: 28,
-                            ),
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 440),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    width: 72,
-                                    height: 72,
-                                    decoration: BoxDecoration(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.08),
-                                      borderRadius: BorderRadius.circular(24),
-                                      border: Border.all(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.12),
-                                      ),
-                                    ),
-                                    child: const Icon(
-                                      Icons.lock_rounded,
-                                      color: Color(0xFF78B7FF),
-                                      size: 34,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 18),
-                                  UrduAwareText(
-                                    isUrdu
-                                        ? 'کاروباری ساتھی'
-                                        : 'Karobari Sathi',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w700,
-                                      fontFamily: fontFamily,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 28),
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.fromLTRB(
-                                      24,
-                                      30,
-                                      24,
-                                      24,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF14243A)
-                                          .withValues(alpha: 0.94),
-                                      borderRadius: BorderRadius.circular(30),
-                                      border: Border.all(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.08),
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black
-                                              .withValues(alpha: 0.22),
-                                          blurRadius: 32,
-                                          offset: const Offset(0, 18),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        UrduAwareText(
-                                          _getStatusText(isUrdu),
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 19,
-                                            height: 1.6,
-                                            fontWeight: FontWeight.w700,
-                                            fontFamily: fontFamily,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 10),
-                                        UrduAwareText(
-                                          isUrdu
-                                              ? 'اپنا 4 ہندسوں کا پن درج کریں'
-                                              : 'Enter your 4-digit PIN',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: Colors.white
-                                                .withValues(alpha: 0.58),
-                                            fontSize: 13,
-                                            fontFamily: fontFamily,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 26),
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: List.generate(4, (index) {
-                                            final isFilled = index <
-                                                _pinController.text.length;
-                                            return AnimatedContainer(
-                                              duration: const Duration(
-                                                milliseconds: 180,
-                                              ),
-                                              margin:
-                                                  const EdgeInsets.symmetric(
-                                                horizontal: 9,
-                                              ),
-                                              width: 54,
-                                              height: 58,
-                                              decoration: BoxDecoration(
-                                                color: isFilled
-                                                    ? const Color(0xFF1D6ED6)
-                                                        .withValues(alpha: 0.2)
-                                                    : Colors.white.withValues(
-                                                        alpha: 0.04,
-                                                      ),
-                                                borderRadius:
-                                                    BorderRadius.circular(17),
-                                                border: Border.all(
-                                                  color: _isError
-                                                      ? Colors.redAccent
-                                                      : isFilled
-                                                          ? const Color(
-                                                              0xFF78B7FF)
-                                                          : Colors.white
-                                                              .withValues(
-                                                              alpha: 0.13,
-                                                            ),
-                                                  width: 1.4,
-                                                ),
-                                              ),
-                                              child: Center(
-                                                child: AnimatedContainer(
-                                                  duration: const Duration(
-                                                    milliseconds: 180,
-                                                  ),
-                                                  width: isFilled ? 12 : 8,
-                                                  height: isFilled ? 12 : 8,
-                                                  decoration: BoxDecoration(
-                                                    shape: BoxShape.circle,
-                                                    color: isFilled
-                                                        ? (_isError
-                                                            ? Colors.redAccent
-                                                            : const Color(
-                                                                0xFF78B7FF,
-                                                              ))
-                                                        : Colors.white
-                                                            .withValues(
-                                                            alpha: 0.24,
-                                                          ),
-                                                  ),
-                                                ),
-                                              ),
-                                            );
-                                          }),
-                                        ),
-                                        const SizedBox(height: 18),
-                                        AnimatedSwitcher(
-                                          duration:
-                                              const Duration(milliseconds: 180),
-                                          child: _isError
-                                              ? UrduAwareText(
-                                                  _getErrorText(isUrdu),
-                                                  key: const ValueKey(
-                                                      'pin-error'),
-                                                  textAlign: TextAlign.center,
-                                                  style: TextStyle(
-                                                    color:
-                                                        const Color(0xFFFF7B7B),
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w600,
-                                                    fontFamily: fontFamily,
-                                                  ),
-                                                )
-                                              : const SizedBox(
-                                                  key: ValueKey('pin-hint'),
-                                                  height: 18,
-                                                ),
-                                        ),
-                                        if (_isBiometricAvailable &&
-                                            !widget.isSettingUp &&
-                                            !_isVerifyingOldPin &&
-                                            !widget.isVerifyingOnly) ...[
-                                          const SizedBox(height: 16),
-                                          TextButton.icon(
-                                            onPressed: _isAuthenticatingBiometrics
-                                                ? null
-                                                : _authenticateWithBiometrics,
-                                            icon: const Icon(
-                                              Icons.fingerprint_rounded,
-                                              size: 22,
-                                            ),
-                                            label: UrduAwareText(
-                                              isUrdu
-                                                  ? 'فنگر پرنٹ سے تصدیق'
-                                                  : 'Use fingerprint',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                fontFamily: fontFamily,
-                                              ),
-                                            ),
-                                            style: TextButton.styleFrom(
-                                              foregroundColor:
-                                                  const Color(0xFF9ACBFF),
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                  if ((widget.isSettingUp ||
-                                          widget.isChangingPin ||
-                                          widget.isVerifyingOnly) &&
-                                      _newPinCache == null) ...[
-                                    const SizedBox(height: 18),
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context),
-                                      child: UrduAwareText(
-                                        isUrdu ? 'واپس جائیں' : 'Cancel',
-                                        style: TextStyle(
-                                          color: Colors.white70,
-                                          fontWeight: FontWeight.w600,
-                                          fontFamily: fontFamily,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKeypadActionKey({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(36),
+        splashColor: _goldPrimary.withValues(alpha: 0.3),
+        highlightColor: _goldPrimary.withValues(alpha: 0.15),
+        child: Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.03),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.1),
+              width: 1,
+            ),
           ),
-        ],
+          child: Center(
+            child: Icon(
+              icon,
+              color: _goldPrimary,
+              size: 26,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -442,7 +454,6 @@ class _AppLockScreenState extends State<AppLockScreen> {
         return isUrdu ? 'تصدیق کے لیے دوبارہ درج کریں' : 'Re-enter to confirm';
       }
     }
-    // ⭐ verifyOnly کے لیے واضح متن
     if (widget.isVerifyingOnly) {
       return isUrdu ? 'تصدیق کے لیے پن کوڈ درج کریں' : 'Enter PIN to verify';
     }
@@ -477,13 +488,12 @@ class _AppLockScreenState extends State<AppLockScreen> {
               ? 'بہت زیادہ کوششیں ہو گئیں۔ $remainingSeconds سیکنڈ بعد دوبارہ کوشش کریں۔'
               : 'Too many attempts. Try again in $remainingSeconds seconds.')
           : fallbackMessage;
-      _pinController.clear();
+      _enteredPin = '';
     });
-    _showKeyboard();
   }
 
   Future<void> _validatePin(String enteredPin) async {
-    await Future.delayed(const Duration(milliseconds: 200));
+    await Future.delayed(const Duration(milliseconds: 150));
     if (!mounted) return;
 
     final securityService =
@@ -497,11 +507,10 @@ class _AppLockScreenState extends State<AppLockScreen> {
         if (isValid) {
           setState(() {
             _isVerifyingOldPin = false;
-            _pinController.clear();
+            _enteredPin = '';
             _isError = false;
             _errorTextOverride = null;
           });
-          _showKeyboard();
         } else {
           await _showPinFailure(
             securityService: securityService,
@@ -517,9 +526,8 @@ class _AppLockScreenState extends State<AppLockScreen> {
         if (_newPinCache == null) {
           setState(() {
             _newPinCache = cleanPin;
-            _pinController.clear();
+            _enteredPin = '';
           });
-          _showKeyboard();
         } else {
           if (cleanPin == _newPinCache) {
             await securityService.setNewPin(cleanPin);
@@ -530,10 +538,9 @@ class _AppLockScreenState extends State<AppLockScreen> {
             setState(() {
               _isError = true;
               _errorTextOverride = null;
-              _pinController.clear();
+              _enteredPin = '';
               _newPinCache = null;
             });
-            _showKeyboard();
           }
         }
       } else {
@@ -562,9 +569,8 @@ class _AppLockScreenState extends State<AppLockScreen> {
         _errorTextOverride = isUrdu
             ? 'پن کی تصدیق نہیں ہو سکی۔ دوبارہ کوشش کریں۔'
             : 'Could not verify PIN. Please try again.';
-        _pinController.clear();
+        _enteredPin = '';
       });
-      _showKeyboard();
     }
   }
 }
