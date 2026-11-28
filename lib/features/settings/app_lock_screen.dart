@@ -2,7 +2,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:account_app/core/widgets/urdu_aware_text.dart';
+import 'package:account_app/core/widgets/app_toast.dart';
 import 'package:account_app/core/services/language_service.dart';
 import 'package:account_app/core/services/security_service.dart';
 import 'package:account_app/core/theme/app_theme.dart';
@@ -111,6 +114,102 @@ class _AppLockScreenState extends State<AppLockScreen> {
         _errorTextOverride = null;
       });
     }
+  }
+
+  void _showForgotPinDialog(BuildContext context, bool isUrdu, String? fontFamily) {
+    final emailController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: UrduAwareText(
+          isUrdu ? 'پن بھول گئے؟ (ای میل سے بحالی)' : 'Forgot PIN? (Recover via Email)',
+          style: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            UrduAwareText(
+              isUrdu
+                  ? 'اپنے اکاؤنٹ کی تصدیق کے لیے وہ ای میل درج کریں جو آپ نے اپنے کاروباری ساتھی پروفائل میں درج کی تھی۔'
+                  : 'Enter the email address linked to your Karobari Saathi profile to verify your account.',
+              style: TextStyle(fontFamily: fontFamily, fontSize: 13, color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: isUrdu ? 'ای میل ایڈریس' : 'Email Address',
+                hintText: 'example@email.com',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: UrduAwareText(isUrdu ? 'منسوخ' : 'Cancel', style: TextStyle(fontFamily: fontFamily)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.verifiedGold,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              final enteredEmail = emailController.text.trim().toLowerCase();
+              if (enteredEmail.isEmpty) return;
+
+              final user = FirebaseAuth.instance.currentUser;
+              if (user == null) {
+                Navigator.pop(dialogContext);
+                AppToast.error(context, isUrdu ? 'صارف لاگ ان نہیں ہے' : 'User not logged in');
+                return;
+              }
+
+              String? profileEmail = user.email?.trim().toLowerCase();
+              try {
+                final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+                final docEmail = userDoc.data()?['email']?.toString().trim().toLowerCase();
+                if (docEmail != null && docEmail.isNotEmpty) {
+                  profileEmail = docEmail;
+                }
+              } catch (_) {}
+
+              if (profileEmail != null && profileEmail == enteredEmail) {
+                final securityService = Provider.of<SecurityService>(context, listen: false);
+                await securityService.deleteSensitiveData('app_pin_hash');
+                await securityService.setAppLockEnabled(false);
+
+                if (!dialogContext.mounted) return;
+                Navigator.pop(dialogContext);
+
+                AppToast.success(
+                  context,
+                  isUrdu
+                      ? 'تصدیق کامیاب! پن ری سیٹ کر دیا گیا ہے، اب آپ سیٹنگز سے نیا پن لگا سکتے ہیں۔'
+                      : 'Verification successful! PIN has been reset. You can set a new PIN in settings.',
+                );
+
+                widget.onUnlock?.call();
+              } else {
+                if (!dialogContext.mounted) return;
+                AppToast.error(
+                  context,
+                  isUrdu
+                      ? 'درج کردہ ای میل آپ کے پروفائل ای میل سے میچ نہیں کرتی۔'
+                      : 'Entered email does not match your profile email.',
+                );
+              }
+            },
+            child: UrduAwareText(isUrdu ? 'تصدیق کریں' : 'Verify & Reset', style: TextStyle(fontFamily: fontFamily)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -234,7 +333,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
                           ),
                           const SizedBox(height: 28),
 
-                          // PIN Dots Indicator (Gold & Slate Styled)
+                          // PIN Dots Indicator
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: List.generate(4, (index) {
@@ -299,11 +398,29 @@ class _AppLockScreenState extends State<AppLockScreen> {
                                     height: 18,
                                   ),
                           ),
+
+                          // Forgot PIN button (Linked with Email)
+                          if (!widget.isSettingUp && !_isVerifyingOldPin) ...[
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: () => _showForgotPinDialog(context, isUrdu, fontFamily),
+                              child: UrduAwareText(
+                                isUrdu ? 'پن بھول گئے؟ (ای میل کے ذریعے بحال کریں)' : 'Forgot PIN? (Recover via Email)',
+                                style: TextStyle(
+                                  color: AppTheme.verifiedGold.withValues(alpha: 0.9),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: fontFamily,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
 
-                    // Custom On-Screen Keypad (Slate background with Gold accents)
+                    // Custom On-Screen Keypad
                     Container(
                       padding: const EdgeInsets.fromLTRB(32, 20, 32, 28),
                       decoration: BoxDecoration(
